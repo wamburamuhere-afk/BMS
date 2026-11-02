@@ -1,7 +1,7 @@
 <?php
 /**
  * API: search the items a restaurant counts — bought Menu items and ingredients (restaurant focus pass).
- * GET: warehouse_id (required), q (optional) → Select2 { results: [{ id, text, unit, cost_price, stock }] }
+ * GET: warehouse_id (required), q (optional) → Select2 { results: [{ id, text, unit, cost_price, stock, selling_price|null }] }
  * Ordinary retail stock (it has a selling price and is not on the Menu or in a recipe) is never listed.
  * Gate: Restaurant POS + Smart POS on, a Restaurant/Hybrid shop in the user's scope. Read-only.
  */
@@ -24,7 +24,7 @@ if (!restaurantShopActive($pdo, $warehouse_id)) { echo json_encode(['results' =>
 
 $q = trim((string)($_GET['q'] ?? ''));
 $sql = "SELECT p.product_id, p.product_name, COALESCE(NULLIF(p.unit,''), NULLIF(p.unit_of_measure,''), 'pcs') AS unit,
-               COALESCE(p.cost_price, 0) AS cost_price,
+               COALESCE(p.cost_price, 0) AS cost_price, COALESCE(p.selling_price, 0) AS selling_price, p.is_menu_item,
                (SELECT COALESCE(SUM(ps.stock_quantity), 0) FROM product_stocks ps WHERE ps.product_id = p.product_id AND ps.warehouse_id = ?) AS stock
           FROM products p
          WHERE " . restaurantStockItemSql('p') . "
@@ -37,4 +37,5 @@ $st->execute($params);
 echo json_encode(['results' => array_map(fn($r) => [
     'id' => (int)$r['product_id'], 'text' => $r['product_name'] . ' (' . $r['unit'] . ')', 'unit' => $r['unit'],
     'cost_price' => (float)$r['cost_price'], 'stock' => (float)$r['stock'],
+    'selling_price' => (int)$r['is_menu_item'] === 1 ? (float)$r['selling_price'] : null,   // only an item sold on the Menu has one
 ], $st->fetchAll(PDO::FETCH_ASSOC))]);

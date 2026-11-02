@@ -46,7 +46,15 @@ if ($rdScope === 'combined') {
     $rdHours = rdOrdersByHour($pdo, $rdIds, 30);
     $rdTypeRows = restaurantSalesByOrderType($pdo, $rdMonthFrom, $rdToday, $rdIds);
     $rdData = restaurantDashboardData($pdo);
-    $rdAttention = rdAttention($pdo, $rdIds, $rdMoney ? count($rdDishes['needs_cost']) : 0, count($rdData['low_drinks']));
+    $rdCheck = rdProfitCheck($pdo, $rdJe, $rdMonthFrom, $rdToday);
+    $rdWarn = $rdMoney ? rdProfitWarnings($rdStory['cur'], $rdDishes['items'], $rdCheck['groceries']) : [];
+    $rdOwed = null;
+    if ($rdMoney && canView('pos')) {                      // the same figure as "Who Owes Me" and the retail Credit card
+        require_once ROOT_DIR . '/core/pos_credit_aging.php';
+        $rdOwed = posCreditTotalOutstanding($pdo, scopeFilterSqlNullable('warehouse', 's'));
+    }
+    // The cost warning now sits with the profit figure it concerns, so it is not repeated in "Needs your attention".
+    $rdAttention = rdAttention($pdo, $rdIds, 0, count($rdData['low_drinks']));
 }
 $rdTrendNote = t('The last 7 days compared with the 7 days before'); // complete days only — today is never compared with a full day
 $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('Popular, small profit'), 'review' => t('Review')];
@@ -140,14 +148,14 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
             <div class="rdp-card h-100">
                 <div class="rdp-card-h">
                     <h6><i class="bi bi-cash-coin me-1"></i><?= t('Where your money went') ?></h6>
-                    <?php if ($unc > 0): ?>
+                    <?php if ($unc > 0 || $rdWarn): ?>
                     <span class="rdp-pill" title="<?= htmlspecialchars(sprintf(t('%d item(s) sold have no recipe or purchase cost, so their cost is not counted and profit may look too high.'), $unc)) ?>"><?= t('Estimated') ?></span>
                     <?php else: ?>
                     <span class="rdp-pill rdp-pill-ok" title="<?= htmlspecialchars(t('Every item sold this month has a cost.')) ?>"><?= t('Complete') ?></span>
                     <?php endif; ?>
                 </div>
                 <div class="p-3">
-                    <div class="rdp-sub"><?= t('Profit this month') ?></div>
+                    <div class="rdp-sub"><?= t('Net Profit this month') ?></div>
                     <div class="rdp-num rdp-num-lg <?= $cur['profit'] < 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($cur['profit']) ?> <small><?= htmlspecialchars($rdCur) ?></small></div>
                     <div class="rdp-sub mb-2">
                         <?php if ($hasSales): ?><strong><?= rtrim(rtrim(number_format($rdStory['margin'], 1), '0'), '.') ?>%</strong> <?= t('margin') ?><?php endif; ?>
@@ -160,10 +168,18 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                         <?php if (!$lossy): ?><span class="rdp-bar-profit" style="width:<?= max(0, min(100, $p100['profit'])) ?>%"></span><?php endif; ?>
                     </div>
                     <ul class="rdp-legend">
-                        <li><i class="rdp-dot rdp-bar-food"></i><?= t('Food cost') ?><b><?= $rdFmt($cur['cost']) ?></b></li>
-                        <li><i class="rdp-dot rdp-bar-exp"></i><?= t('Other expenses') ?><b><?= $rdFmt($cur['expenses']) ?></b></li>
-                        <li><i class="rdp-dot rdp-bar-profit"></i><?= t('Profit') ?><b class="<?= $lossy ? 'text-danger' : '' ?>"><?= $rdFmt($cur['profit']) ?></b></li>
+                        <li><i class="rdp-dot rdp-bar-food"></i><?= t('Cost of Goods') ?><b><?= $rdFmt($cur['cost']) ?></b></li>
+                        <li><i class="rdp-dot" style="background:#adb5bd"></i><?= t('Gross Profit') ?><b><?= $rdFmt($cur['sales'] - $cur['cost']) ?></b></li>
+                        <li><i class="rdp-dot rdp-bar-exp"></i><?= t('Expenses') ?><b><?= $rdFmt($cur['expenses']) ?></b></li>
+                        <li><i class="rdp-dot rdp-bar-profit"></i><?= t('Net Profit') ?><b class="<?= $lossy ? 'text-danger' : '' ?>"><?= $rdFmt($cur['profit']) ?></b></li>
                     </ul>
+                    <?php foreach ($rdWarn as $w):
+                        if ($w['type'] === 'no_cost')             { $wt = sprintf(t('%d item(s) sold have no cost.'), $w['n']); $wl = getUrl('restaurant/menu'); }
+                        elseif ($w['type'] === 'no_food_bought')  { $wt = t('You sold dishes with no recipe, but no food purchase is recorded this month.'); $wl = getUrl('restaurant/purchases'); }
+                        else                                      { $wt = t('No expenses are recorded this month — gas, wages, rent?'); $wl = getUrl('expenses'); } ?>
+                    <a href="<?= $wl ?>" class="d-block small text-danger fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i><?= $wt ?></a>
+                    <?php endforeach; ?>
+                    <?php if ($rdWarn): ?><div class="small text-danger mb-2"><?= t('Until these are done, the real profit is lower than this figure.') ?></div><?php endif; ?>
                     <div class="rdp-story">
                         <?php if ($lossy): ?>
                             <i class="bi bi-exclamation-circle me-1"></i><?= t('You are spending more than you sell this month.') ?>
@@ -266,6 +282,26 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
             </div>
         </div>
     </div>
+
+    <!-- ───────── Bought → used → left ───────── -->
+    <?php if ($rdMoney && $rdScope === 'company'): ?>
+    <div class="rdp-card mb-3">
+        <div class="rdp-card-h"><h6><i class="bi bi-arrow-left-right me-1"></i><?= t('Money check this month') ?></h6></div>
+        <div class="p-3">
+            <div class="row g-2">
+                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Added to stock') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['added']) ?></div></div></div>
+                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Used for food sold') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['used']) ?></div></div></div>
+                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('In stock now') ?></div><div class="rdp-num <?= $rdCheck['in_stock'] < 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($rdCheck['in_stock']) ?></div></div></div>
+                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Groceries (not counted)') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['groceries']) ?></div></div></div>
+                <?php if ($rdOwed !== null): ?>
+                <div class="col-12 col-md"><a href="<?= getUrl('pos/credit-customers') ?>" class="text-decoration-none"><div class="rdp-stat"><div class="rdp-label"><?= t('Owed to me') ?></div><div class="rdp-num <?= $rdOwed > 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($rdOwed) ?></div></div></a></div>
+                <?php endif; ?>
+            </div>
+            <div class="rdp-sub mt-2"><?= t('What you buy for stock is not a cost yet. It becomes a cost as the food is sold; the rest stays in stock.') ?></div>
+            <?php if ($rdCheck['in_stock'] < 0): ?><a href="<?= getUrl('restaurant/purchases') ?>" class="d-block small text-danger fw-semibold mt-1"><i class="bi bi-exclamation-triangle me-1"></i><?= t('Stock is below zero: more was sold than was recorded as bought. Record your purchases.') ?></a><?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- ───────── 4. Needs attention ───────── -->
     <?php if ($rdAttention): ?>

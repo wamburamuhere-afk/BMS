@@ -1,7 +1,8 @@
 <?php
 /**
  * API: recent restaurant purchases (restaurant focus pass) — what was bought through Purchases.
- * GET: warehouse_id (required) → { success, data: [{ date, item, quantity, unit, unit_cost, total, reference, by }] } (latest 100)
+ * GET: warehouse_id (required) → { success, data: [{ date, item, quantity, unit, kind: stock|grocery, unit_cost, total, reference, by }] } (latest 100;
+ * a grocery row has no quantity / unit_cost — it is the amount only)
  * Read-only. Gate: Restaurant POS + Smart POS on, a Restaurant/Hybrid shop in the user's scope.
  */
 header('Content-Type: application/json');
@@ -25,14 +26,35 @@ $st = $pdo->prepare("
     SELECT sm.movement_date AS d, p.product_name AS item, sm.quantity AS qty,
            COALESCE(NULLIF(p.unit,''), NULLIF(p.unit_of_measure,''), 'pcs') AS unit,
            sm.unit_cost, ROUND(sm.quantity * sm.unit_cost, 2) AS total, sm.reference_number AS ref,
-           TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS by_name
+           TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS by_name, sm.movement_id AS sort_id
       FROM stock_movements sm
       JOIN products p ON p.product_id = sm.product_id
  LEFT JOIN users u ON u.user_id = sm.created_by
      WHERE sm.warehouse_id = ? AND sm.notes LIKE 'Restaurant purchase:%'
   ORDER BY sm.movement_id DESC LIMIT 100");
 $st->execute([$warehouse_id]);
-echo json_encode(['success' => true, 'data' => array_map(fn($r) => [
-    'date' => $r['d'], 'item' => $r['item'], 'quantity' => (float)$r['qty'], 'unit' => $r['unit'],
-    'unit_cost' => (float)$r['unit_cost'], 'total' => (float)$r['total'], 'reference' => $r['ref'], 'by' => $r['by_name'],
-], $st->fetchAll(PDO::FETCH_ASSOC))]);
+$rows = array_map(fn($r) => [
+    'date' => $r['d'], 'item' => $r['item'], 'quantity' => (float)$r['qty'], 'unit' => $r['unit'], 'kind' => 'stock',
+    'unit_cost' => (float)$r['unit_cost'], 'total' => (float)$r['total'], 'reference' => $r['ref'], 'by' => $r['by_name'], '_s' => (int)$r['sort_id'],
+], $st->fetchAll(PDO::FETCH_ASSOC));
+
+// Groceries (not counted) are listed too, so everything bought is in one place. They are expenses saved by "Something else".
+$ge = $pdo->prepare("
+    SELECT e.expense_date AS d, e.description, e.amount, e.reference_number AS ref, e.expense_id,
+           TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS by_name
+      FROM expenses e
+ LEFT JOIN users u ON u.user_id = e.created_by
+     WHERE e.warehouse_id = ? AND e.description LIKE 'Ingredients:%' AND e.status IN ('paid', 'approved', 'pending', 'reviewed')
+  ORDER BY e.expense_id DESC LIMIT 100");
+$ge->execute([$warehouse_id]);
+foreach ($ge->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $rows[] = [
+        'date' => $r['d'], 'item' => trim(preg_replace('/^Ingredients:\s*/i', '', (string)$r['description'])), 'quantity' => null, 'unit' => '', 'kind' => 'grocery',
+        'unit_cost' => null, 'total' => (float)$r['amount'], 'reference' => $r['ref'], 'by' => $r['by_name'], '_s' => 1000000000 + (int)$r['expense_id'],
+    ];
+}
+usort($rows, fn($a, $b) => [$b['date'], $b['_s']] <=> [$a['date'], $a['_s']]);
+$rows = array_slice($rows, 0, 100);
+foreach ($rows as &$row) unset($row['_s']);
+unset($row);
+echo json_encode(['success' => true, 'data' => $rows]);

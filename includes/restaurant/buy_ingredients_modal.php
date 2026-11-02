@@ -11,6 +11,7 @@
  * Open it with rbiOpen(). Expects $pdo.
  */
 if (!restaurantModuleOn($pdo) || !canCreate('expenses')) return;
+require_once ROOT_DIR . '/core/sales_posting.php';   // posReceiptAccountId() — the same cash account the sales go to
 $rbiShops   = restaurantWarehousesForSelect($pdo);
 $rbiAccount = restaurantIngredientsAccountId($pdo);
 if (!$rbiShops || !$rbiAccount) return;
@@ -27,6 +28,7 @@ if (!$rbiShops || !$rbiAccount) return;
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="expense_account_id" value="<?= (int)$rbiAccount ?>">
                     <input type="hidden" name="status" value="paid">
+                    <input type="hidden" name="bank_account_id" value="<?= (int)(posReceiptAccountId($pdo, 'cash') ?: 0) ?>">
                     <div id="rbi-message" class="mb-2"></div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold"><?= t('What did you buy?') ?> <span class="text-danger">*</span></label>

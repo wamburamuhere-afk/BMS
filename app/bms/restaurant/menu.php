@@ -93,7 +93,9 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                     <th><?= t('Group') ?></th>
                     <th><?= t('Type') ?></th>
                     <th><?= t('Prepared at') ?></th>
-                    <th class="text-end"><?= t('Price') ?></th>
+                    <th class="text-end"><?= t('Selling price') ?></th>
+                    <th class="text-end"><?= t('Cost') ?></th>
+                    <th class="text-end"><?= t('Profit') ?></th>
                     <th class="text-end"><?= t('Stock') ?></th>
                     <th class="text-center"><?= t('Available today') ?></th>
                     <th class="text-end"><?= t('Actions') ?></th>
@@ -179,6 +181,11 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                                 <input type="number" step="any" min="0" class="form-control" name="selling_price" id="f-price" inputmode="decimal">
                             </div>
                         </div>
+                        <div class="mt-3 dish-only">
+                            <label class="form-label"><?= t('What does one plate cost you?') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
+                            <input type="number" step="any" min="0" class="form-control" name="plate_cost" id="f-plate" inputmode="decimal">
+                            <div class="form-text"><?= t('A rough figure, to show the profit on each plate. For an exact cost add a recipe.') ?></div>
+                        </div>
                         <div class="mt-3 bought-only new-only">
                             <label class="form-label"><?= t('Opening stock') ?></label>
                             <input type="number" step="any" min="0" class="form-control" name="opening_stock" id="f-stock" inputmode="decimal" placeholder="0">
@@ -232,7 +239,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                     <div class="d-flex justify-content-between"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
                     <div class="d-flex justify-content-between"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
                 </div>
-                <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With recipes, bring ingredients in with Receive Stock (not Buy Ingredients), so they are not counted twice.') ?></div>
+                <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.') ?></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
@@ -291,6 +298,7 @@ const RM = {
     buyStock: <?= json_encode(t('Buy stock & ingredients')) ?>,
     buyUrl: <?= json_encode(getUrl('restaurant/purchases')) ?>,
     cost: <?= json_encode(t('cost')) ?>,
+    noCostYet: <?= json_encode(t('No cost yet — add it')) ?>,
     profit: <?= json_encode(t('profit')) ?>,
     perPlate: <?= json_encode(t('per plate')) ?>,
     inStock: <?= json_encode(t('in stock')) ?>,
@@ -314,7 +322,7 @@ $(function () {
     menuTable = $('#menuTable').DataTable({
         responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtipB',
         buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
-        columnDefs: [{ targets: [6, 7], orderable: false }],
+        columnDefs: [{ targets: [8, 9], orderable: false }],
         language: { emptyTable: RM.empty, zeroRecords: RM.noMatch }
     });
     $('#rmSearch').on('input', render);
@@ -393,11 +401,29 @@ function actionMenu(it) {
         </ul></div>`;
 }
 function typeLabel(it) { return it.is_service ? RM.dish : RM.stockItem; }
-// restaurant_plan.md Phase 7 — "Recipe · cost 1,200 · profit 3,800" under a dish that has one.
-function recipeLine(it) {
-    if (!it.has_recipe) return '';
-    const profit = it.selling_price - it.recipe_cost;
-    return `<div class="small text-muted"><i class="bi bi-list-check text-primary"></i> ${RM.recipe} · ${RM.cost} ${fmt(it.recipe_cost)} · ${RM.profit} <span class="${profit < 0 ? 'text-danger' : 'text-primary'} fw-semibold">${fmt(profit)}</span></div>`;
+// What one item costs: a recipe (exact), a bought item's cost, or the owner's plate estimate. null = nothing known yet.
+function itemCost(it) {
+    if (it.has_recipe) return { v: it.recipe_cost, est: false };
+    if (!it.is_service && it.cost_price > 0) return { v: it.cost_price, est: false };
+    if (it.is_service && it.plate_cost > 0) return { v: it.plate_cost, est: true };
+    return null;
+}
+function costCell(it) {
+    const c = itemCost(it);
+    if (!c) return `<span data-order="-1"><a href="#" class="text-danger fw-semibold small" onclick="${it.is_service ? `openRecipe(${it.product_id})` : `editItem(${it.product_id})`};return false;">${RM.noCostYet}</a></span>`;
+    return `<span data-order="${c.v}">${c.est ? '~' : ''}${fmt(c.v)}</span>`;
+}
+function profitCell(it) {
+    const c = itemCost(it);
+    if (!c) return '<span data-order="-999999999" class="text-muted">—</span>';
+    const p = it.selling_price - c.v, pc = it.selling_price > 0 ? Math.round(p / it.selling_price * 100) : 0;
+    return `<span data-order="${p}" class="${p < 0 ? 'text-danger' : 'text-primary'} fw-semibold">${c.est ? '~' : ''}${fmt(p)} <small class="fw-normal">(${pc}%)</small></span>`;
+}
+// Phone card: the same figures in one line.
+function costLine(it) {
+    const c = itemCost(it);
+    if (!c) return `<div class="small">${costCell(it)}</div>`;
+    return `<div class="small text-muted">${RM.cost} ${c.est ? '~' : ''}${fmt(c.v)} · ${RM.profit} ${profitCell(it)}</div>`;
 }
 function prepLabel(it) { return it.station_name || RM.noPrep; }
 function stockLabel(it) { return it.is_service ? `<span class="text-muted">${RM.madeToOrder}</span>` : fmt(it.stock); }
@@ -410,11 +436,13 @@ function render() {
 
     menuTable.clear();
     rows.forEach(it => menuTable.row.add([
-        `<span class="fw-semibold">${safeOutput(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}${recipeLine(it)}`,
+        `<span class="fw-semibold">${safeOutput(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}`,
         safeOutput(it.category_name || RM.noGroup),
         `<span class="badge rm-badge">${typeLabel(it)}</span>`,
         safeOutput(prepLabel(it)),
         `<span data-order="${it.selling_price}">${fmt(it.selling_price)}</span>`,
+        costCell(it),
+        profitCell(it),
         stockLabel(it),
         `<div class="text-center">${availSwitch(it)}</div>`,
         actionMenu(it)
@@ -434,7 +462,7 @@ function render() {
                         <div class="min-w-0">
                             <div class="rm-name">${safeOutput(it.product_name)}</div>
                             <div class="small text-muted">${safeOutput(it.category_name || RM.noGroup)} · ${safeOutput(prepLabel(it))}</div>
-                            ${recipeLine(it)}
+                            ${costLine(it)}
                         </div>
                         <div class="rm-price">${fmt(it.selling_price)}</div>
                     </div>
@@ -547,6 +575,7 @@ function setType(type) {
         const show = type === 'bought' && (!$(this).hasClass('new-only') || isNew);
         $(this).toggleClass('d-none', !show);
     });
+    $('.dish-only').toggleClass('d-none', type !== 'dish');
     $('#priceCol').toggleClass('col-6', type === 'bought').toggleClass('col-12', type !== 'bought');
     if (isNew) $(`#prep-${type === 'dish' ? 'kitchen' : 'none'}`).prop('checked', true);
 }
@@ -578,6 +607,8 @@ function editItem(id) {
     $('#f-name').val(it.product_name);
     $('#f-price').val(it.selling_price);
     $('#f-cost').val(it.cost_price);
+    $('#f-plate').val(it.plate_cost > 0 ? it.plate_cost : '');
+    $('.dish-only').toggleClass('d-none', !it.is_service || !!it.has_recipe);   // a recipe gives the exact cost
     $('#f-cat').val(it.category_id ? String(it.category_id) : '').trigger('change');
     $('#prepGroup .rm-extra').remove();
     $('input[name="prep_area"]').prop('checked', false);

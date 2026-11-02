@@ -75,6 +75,12 @@ try {
     // instead of asking; the normal form still requires an explicit choice.
     if (!$bank_account_id && $simplePos) {
         $bank_account_id = defaultCashAccountId($pdo);
+        // Restaurant focus (2026-11-02): a restaurant-only company pays from the same cash account its sales and purchases use.
+        require_once __DIR__ . '/../../core/restaurant_scope.php';
+        if (restaurantOnlyCompany($pdo)) {
+            require_once __DIR__ . '/../../core/sales_posting.php';
+            $bank_account_id = posReceiptAccountId($pdo, 'cash') ?: $bank_account_id;
+        }
     }
     if (!$bank_account_id) {
         http_response_code(400);

@@ -77,6 +77,9 @@ if (!function_exists('restaurantBuyStock')) {
         $warehouseId = (int)($in['warehouse_id'] ?? 0);
         $qty         = round((float)($in['quantity'] ?? 0), 3);
         $unitCost    = round((float)($in['unit_cost'] ?? 0), 2);
+        // "Total paid" — for what is not bought per unit (a goat, a crate, a sack): the price for one is worked out from it.
+        $totalPaid   = round((float)($in['total_paid'] ?? 0), 2);
+        $sellIn      = (isset($in['selling_price']) && $in['selling_price'] !== '' && $in['selling_price'] !== null) ? round((float)$in['selling_price'], 2) : null;
         $date        = !empty($in['date']) ? (string)$in['date'] : date('Y-m-d');
         $supplierId  = (int)($in['supplier_id'] ?? 0);
         $expiry      = !empty($in['expiry_date']) ? (string)$in['expiry_date'] : null;
@@ -91,13 +94,25 @@ if (!function_exists('restaurantBuyStock')) {
         if ($expiry !== null && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiry) || strtotime($expiry) === false)) throw new Exception(t('Enter a valid date.'));
         if ($expiry !== null && $expiry < $date) throw new Exception(t('The expiry date cannot be before the purchase date.'));
 
-        $st = $pdo->prepare("SELECT p.product_id, p.product_name, p.selling_price, COALESCE(p.cost_price, 0) AS cost_price
+        $st = $pdo->prepare("SELECT p.product_id, p.product_name, p.selling_price, p.is_menu_item, COALESCE(p.cost_price, 0) AS cost_price
                                FROM products p WHERE p.product_id = ? AND " . restaurantStockItemSql('p'));
         $st->execute([$productId]);
         $prod = $st->fetch(PDO::FETCH_ASSOC);
         if (!$prod) throw new Exception(t('Pick a drink or an ingredient — an item you count.'));
 
-        $total = round($qty * $unitCost, 2);
+        if ($totalPaid < 0) throw new Exception(t('Prices cannot be negative.'));
+        if ($totalPaid > 0) {                       // the total is what was paid; the price for one follows from it
+            $total    = $totalPaid;
+            $unitCost = round($totalPaid / $qty, 4);
+        } else {
+            $total = round($qty * $unitCost, 2);
+        }
+        // A price you sell at may be changed here (like the retail Receive Stock) — only for an item sold on the Menu.
+        $newSelling = null;
+        if ($sellIn !== null && (int)$prod['is_menu_item'] === 1) {
+            if ($sellIn <= 0) throw new Exception(t('Selling price must be greater than zero.'));
+            if (abs($sellIn - (float)$prod['selling_price']) > 0.004) $newSelling = $sellIn;
+        }
         if ($total > 0) {
             if ($paidFrom <= 0 && posSimpleModeEnabled()) $paidFrom = (int)(posReceiptAccountId($pdo, 'cash') ?? 0);
             if ($paidFrom <= 0) throw new Exception(t('Select where this was paid from.'));
@@ -130,7 +145,7 @@ if (!function_exists('restaurantBuyStock')) {
                 'supplier_id'      => $supplierId > 0 ? $supplierId : null,
                 'write_batch'      => true,
                 'expiry_date'      => $expiry,
-                'selling_price'    => (float)$prod['selling_price'],
+                'selling_price'    => $newSelling ?? (float)$prod['selling_price'],
                 'receipt_id'       => null,
                 'movement_type'    => 'adjustment_in',
                 'reference_type'   => 'stock_adjustment',
@@ -143,6 +158,9 @@ if (!function_exists('restaurantBuyStock')) {
             // The cost follows what is actually paid (weighted average); purchase_price keeps the last price paid.
             $pdo->prepare("UPDATE products SET cost_price = ?, purchase_price = ?, updated_by = ? WHERE product_id = ?")
                 ->execute([$newCost, $unitCost, $userId, $productId]);
+            if ($newSelling !== null) {
+                $pdo->prepare("UPDATE products SET selling_price = ? WHERE product_id = ?")->execute([$newSelling, $productId]);
+            }
             if ($total > 0) {
                 $txn = postOutflow($pdo, 'stock_restock', $paidFrom, $inventoryAcc, $total, $date, $ref,
                     "Restaurant purchase: {$prod['product_name']} x{$qty} @ " . number_format($unitCost, 2));
@@ -156,7 +174,7 @@ if (!function_exists('restaurantBuyStock')) {
         }
 
         return ['product_id' => $productId, 'product_name' => $prod['product_name'], 'quantity' => $qty, 'unit_cost' => $unitCost, 'total' => $total,
-                'old_cost' => round($oldCost, 2), 'new_cost' => $newCost, 'on_hand_before' => $onHand, 'on_hand_after' => $onHand + $qty,
+                'old_cost' => round($oldCost, 2), 'new_cost' => $newCost, 'selling_price' => $newSelling ?? (float)$prod['selling_price'], 'on_hand_before' => $onHand, 'on_hand_after' => $onHand + $qty,
                 'reference' => $ref, 'transaction_id' => $txn ?: null, 'batch_id' => $intake['batch_id'] ?? null, 'movement_id' => $intake['movement_id'] ?? null];
     }
 }
