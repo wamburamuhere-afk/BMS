@@ -287,6 +287,8 @@ $wf = [
             line-height: 1.6;
             color: #1a252f;
         }
+        /* Service description: compact so long text takes fewer lines (service layout only) */
+        tbody tr td.svc-desc { font-size: 11px; line-height: 1.35; }
         .text-right  { text-align: right;  }
         .text-center { text-align: center; }
         .fw-bold     { font-weight: 700;   }
@@ -526,14 +528,14 @@ $wf = [
             <tr>
                 <th class="text-center" style="width:38px;">S/NO</th>
                 <?php if ($svcLayout): ?>
-                <th class="text-center" style="width:30%;">Service Name</th>
+                <th class="text-center" style="width:20%;">Service Name</th>
                 <th class="text-center">Description</th>
                 <?php else: ?>
                 <th class="text-center" style="width:100px;">Product Code</th>
                 <th class="text-center">Item / Description</th>
                 <?php endif; ?>
-                <th class="text-right" style="width:80px;">Qty</th>
-                <th class="text-right" style="width:105px;">Unit Price</th>
+                <th class="text-right" style="width:<?= $svcLayout ? 70 : 80 ?>px;">Qty</th>
+                <th class="text-right" style="width:<?= $svcLayout ? 100 : 105 ?>px;">Unit Price</th>
                 <th class="text-right" style="width:115px;">Total (<?= $currency ?>)</th>
             </tr>
         </thead>
@@ -550,7 +552,7 @@ $wf = [
                 <?php if ($svcLayout):
                     $svcDesc = trim((string)($item['description'] ?? '')) !== '' ? (string)$item['description'] : (string)($item['svc_description'] ?? ''); ?>
                 <td style="overflow-wrap:anywhere;word-break:break-word;"><?= caseFormat($item['product_name'] ?? $item['item_name'] ?? '', 'Unknown Service') ?></td>
-                <td style="overflow-wrap:anywhere;word-break:break-word;white-space:pre-line;"><?= htmlspecialchars(trim($svcDesc), ENT_QUOTES, 'UTF-8') ?></td>
+                <td class="svc-desc" style="overflow-wrap:anywhere;word-break:break-word;white-space:pre-line;"><?= htmlspecialchars(trim($svcDesc), ENT_QUOTES, 'UTF-8') ?></td>
                 <?php else: ?>
                 <td class="text-center"><?= !empty($item['sku']) ? htmlspecialchars($item['sku']) : '—' ?></td>
                 <td>

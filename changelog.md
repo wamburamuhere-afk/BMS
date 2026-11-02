@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-11-02 — fix(print): wider Description column on service documents (default templates)
+
+**Changed:** `app/bms/invoice/invoice_print.php`, `app/bms/sales/print_sales_order.php`, `app/bms/sales/quotations/print_quotation.php`.
+**New:** `tests/test_print_service_description_width_cli.php`.
+
+- **Why:** on a service document the Description column was only about 175px wide (Service Name took 30% and Qty / Unit Price / Total are fixed), so a long description wrapped to dozens of lines. The shared auto-fit shrinks a page only to 75%, so the totals spilled onto a 2nd page.
+- **Service layout only:** Service Name 30% → 20%, Qty 80 → 70px, Unit Price 105 → 100px. Description grows to about 265px, and its text is 11px / 1.35 line height (was 13px / 1.6).
+- **Unchanged:** product layout and its widths, the shared auto-fit (75% floor), and every other print design (onyx, summit, wave, meadow, noir, terra, confirmation, ledger, studio).
+- **Checked:** the new test passes 75 checks, including real renders of all three pages. An invoice with five long service lines printed to PDF takes 2 pages with the old widths and 1 page with the new ones. `test_service_print_columns_cli`, `test_invoices_print_layout_cli` and `test_sales_orders_print_layout_cli` still pass.
+
 ## 2026-11-01 — fix(legal): Privacy Policy shows the serving company's own name and contact
 
 **Changed:** `privacy.php`, `tests/test_privacy_page_cli.php`.
