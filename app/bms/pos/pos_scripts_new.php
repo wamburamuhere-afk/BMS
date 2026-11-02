@@ -38,6 +38,11 @@ let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetch
 let currentOrderType = '';
 // restaurant_plan.md Phase 4 — split bill in progress: { original: [...], remainder: [...] }.
 let rsSplit = null;
+// Restaurant simplicity pass — the waiter's till shows the Menu by default (not every retail product).
+// Only a restaurant/hybrid shop ever uses these; a retail shop never turns Menu mode on.
+let posMenuOnly = true;
+let posMenuCategoryIds = null;    // category ids that hold Menu items, from the last full Menu load
+function posMenuModeOn() { return posRestaurantActive() && posMenuOnly; }
 
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
 // True for admins / users granted every shop: they may load products with no shop chosen.
@@ -657,10 +662,19 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             search: searchTerm,
             warehouse_id: warehouseId,
             project_id: projectId,
-            price_group_id: posSelectedPriceGroupId || ''
+            price_group_id: posSelectedPriceGroupId || '',
+            menu_only: posMenuModeOn() ? 1 : ''   // restaurant shops only; '' (ignored) everywhere else
         },
         dataType: 'json',
         success: function(response) {
+            // Menu view with nothing on the Menu yet: show the products instead of an empty till.
+            if (posMenuModeOn() && !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined)
+                && !(response.success && response.data && response.data.length > 0)) {
+                posMenuOnly = false;
+                $('#posViewAll').prop('checked', true);
+                loadProducts();
+                return;
+            }
             console.log('=== API RESPONSE ===');
             console.log('Success:', response.success);
             console.log('Data:', response.data);
@@ -673,7 +687,15 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 // Keep a full-catalog copy for the barcode scanner so it can find
                 // any product even when the grid is filtered to one category.
                 if (categoryId === 'all' || categoryId === '' || categoryId === undefined) {
-                    allProducts = response.data;
+                    if (posMenuModeOn()) {
+                        // Menu view: build the Menu's own category chips; leave the scanner's catalog alone.
+                        if (!searchTerm) {
+                            posMenuCategoryIds = [...new Set(response.data.map(p => parseInt(p.category_id, 10)))];
+                            posRenderMenuChips('all');
+                        }
+                    } else {
+                        allProducts = response.data;
+                    }
                 }
                 const grid = $('#productGrid');
                 grid.empty();
@@ -879,6 +901,38 @@ function loadProductsByCategory(categoryId) {
     loadProducts(categoryId, '');
 }
 
+// Restaurant simplicity pass — the Menu view's own group chips: only groups that hold Menu items
+// (not the shop's 30 retail categories). Never used on a retail shop.
+function posRenderMenuChips(activeId) {
+    const strip = $('#menuCategoryButtons');
+    if (!strip.length) return;
+    const ids = posMenuCategoryIds || [];
+    const allLabel = $('#categoryButtons button:first').text().trim();
+    let html = `<button type="button" class="btn btn-sm ${activeId === 'all' ? 'btn-primary active' : 'btn-outline-secondary'}" onclick="loadMenuCategory('all')">${safeOutput(allLabel)}</button>`;
+    ids.forEach(function (id) {
+        const cat = categories.find(c => parseInt(c.category_id, 10) === id);
+        if (!cat) return;
+        html += `<button type="button" class="btn btn-sm ${activeId === id ? 'btn-primary active' : 'btn-outline-secondary'}" onclick="loadMenuCategory(${id})">${caseFormatJs(cat.category_name)}</button>`;
+    });
+    strip.html(html);
+}
+function loadMenuCategory(categoryId) {
+    $('#productSearch').val('');
+    if (categoryId !== 'all') posRenderMenuChips(categoryId);
+    loadProducts(categoryId, '');
+}
+// Menu | All products switch (restaurant/hybrid shops only — the row stays hidden on a retail shop).
+$(document).on('change', 'input[name="posView"]', function () {
+    posMenuOnly = (this.value === 'menu');
+    posShowAllProducts = false;
+    $('#productSearch').val('');
+    if (!posMenuOnly) {
+        $('#categoryButtons button').removeClass('active btn-primary').addClass('btn-outline-secondary');
+        $('#categoryButtons button:first').removeClass('btn-outline-secondary').addClass('active btn-primary');
+    }
+    loadProducts('all', '');
+});
+
 function searchProducts() {
     const searchTerm = $('#productSearch').val().trim();
     console.log('Manual search:', searchTerm);
@@ -886,7 +940,8 @@ function searchProducts() {
     // Reset category to "All" when searching
     $('#categoryButtons button').removeClass('active btn-primary').addClass('btn-outline-secondary');
     $('#categoryButtons button:first').removeClass('btn-outline-secondary').addClass('active btn-primary');
-    
+    if (posMenuModeOn()) posRenderMenuChips('all');
+
     loadProducts('all', searchTerm);
 }
 
@@ -905,7 +960,11 @@ function posTapProduct(productId) {
     const restaurantShop = POS_RESTAURANT_ENABLED
         && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail';
     const unitCount = (product.unit_count === null || product.unit_count === undefined) ? -1 : parseInt(product.unit_count, 10);
-    const needsPopup = product.track_serials == 1 || restaurantShop || unitCount !== 0;
+    // Restaurant shop: the popup is only for items that have add-on groups (or whose count is unknown) —
+    // every other dish/drink is one tap. A retail shop never reaches the add-on check.
+    const modCount = (product.modifier_group_count === null || product.modifier_group_count === undefined) ? -1 : parseInt(product.modifier_group_count, 10);
+    const restaurantNeedsPopup = restaurantShop && modCount !== 0;
+    const needsPopup = product.track_serials == 1 || restaurantNeedsPopup || unitCount !== 0;
     if (needsPopup) {
         showProductQuickView(productId);
         return;
@@ -1982,6 +2041,10 @@ function posRestaurantActive() {
 function applyPosModeUi() {
     const mode = posShopMode();
     const show = posRestaurantActive();
+    // Menu | All products switch, and the Menu's own group chips in place of the retail categories.
+    $('#posMenuSwitchRow').toggleClass('d-none', !show);
+    $('#menuCategoryButtons').toggleClass('d-none', !(show && posMenuOnly));
+    $('#categoryButtons').toggleClass('d-none', show && posMenuOnly);
     // The order bar (Dine in / Take away / Delivery + table) replaces the small table icon.
     const hasBar = $('#restaurantOrderBar').length > 0;
     $('#restaurantTableBtn').toggleClass('d-none', !show || hasBar);
@@ -2230,11 +2293,16 @@ function renderTablePickerFloor(floor, tables, warehouseId) {
     const colors = { available: '#198754', occupied: '#dc3545', reserved: '#fd7e14', cleaning: '#6c757d' };
     let cards = '';
     tables.forEach(t => {
+        // Same rule as the Tables board: busy only while the table holds an open order
+        // (a table someone merely opened, or one left "occupied" by mistake, is free).
+        if (t.has_open_order !== undefined) {
+            t.status = (t.has_open_order == 1) ? 'occupied' : (t.status === 'occupied' ? 'available' : t.status);
+        }
         const color = colors[t.status] || '#6c757d';
         cards += `
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-2" style="cursor:pointer;border-top:4px solid ${color} !important;"
-                 onclick="selectTable(${t.table_id}, ${warehouseId}, ${JSON.stringify(t.table_number)})">
+                 onclick="selectTable(${t.table_id}, ${warehouseId}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')})">
                 <div class="fw-bold">${safeOutput(t.table_number)}</div>
                 <div class="small text-muted">${t.seats} <?= t('seats') ?></div>
                 <span class="badge mt-1" style="background:${color};color:#fff;">${safeOutput(t.status)}</span>
@@ -2262,9 +2330,10 @@ function selectTable(tableId, warehouseId, tableNumber) {
                 console.error('Error restoring table order', e);
                 cart = [];
             }
-        } else {
-            cart = [];
         }
+        // A table with no open order is a NEW order: keep whatever the waiter already added
+        // (before, choosing the table silently emptied the cart). A table WITH an open order
+        // still loads that order, exactly as before.
 
         updateCartDisplay();
         saveCartToStorage();
@@ -2277,10 +2346,8 @@ function selectTable(tableId, warehouseId, tableNumber) {
         $('#rsTableBtn').removeClass('btn-outline-primary').addClass('btn-primary text-white');
         $('#rsSaveTableBtn').removeClass('d-none');
         $('#rsSplitRow').removeClass('d-none');
-
-        $.post('<?= buildUrl('api/restaurant/update_table_status.php') ?>', {
-            table_id: tableId, status: 'occupied', _csrf: <?= json_encode(csrf_token()) ?>
-        });
+        // A table becomes occupied when its order is saved (hold_sale.php) — not merely by being
+        // opened, which left tables stuck "occupied" with no order and disagreeing with the board.
     }).fail(function () {
         Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError });
     });
@@ -3299,12 +3366,7 @@ function updateCashBalanceUI() {
                    (p.sku     && p.sku.toLowerCase()     === needle);
         });
 
-        if (found) {
-            scanSuccess();
-            flashHeader('#198754', 400);
-            scanAddToCart(found);
-            console.info('[Scanner] Found:', found.product_name, '— code:', code);
-        } else {
+        const scanNotFound = function () {
             scanError();
             flashHeader('#dc3545', 600);
             scanToast(
@@ -3313,6 +3375,25 @@ function updateCashBalanceUI() {
                 true
             );
             console.warn('[Scanner] Not found:', code);
+        };
+
+        if (found) {
+            scanSuccess();
+            flashHeader('#198754', 400);
+            scanAddToCart(found);
+            console.info('[Scanner] Found:', found.product_name, '— code:', code);
+        } else if (posMenuModeOn()) {
+            // Restaurant shop in Menu view: the code may belong to a shop product that is not on the
+            // Menu — look past the Menu view before saying "not found". (Never runs on a retail shop.)
+            $.getJSON('<?= buildUrl('/api/pos/simple_products.php') ?>', { search: code, warehouse_id: $('#posWarehouseId').val() }, function (r) {
+                const hit = (r && r.success && r.data || []).find(function (p) {
+                    return (p.barcode && p.barcode.toLowerCase() === needle) || (p.sku && p.sku.toLowerCase() === needle);
+                });
+                if (hit) { scanSuccess(); flashHeader('#198754', 400); scanAddToCart(hit); }
+                else scanNotFound();
+            }).fail(scanNotFound);
+        } else {
+            scanNotFound();
         }
     }
 

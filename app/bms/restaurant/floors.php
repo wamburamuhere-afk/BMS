@@ -72,6 +72,9 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#tableModal" onclick="openTableModal()">
                         <i class="bi bi-plus-circle me-1"></i> <?= t('Add Table') ?>
                     </button>
+                    <button class="btn btn-outline-primary btn-sm" id="addSeveralTablesBtn" onclick="addSeveralTables()">
+                        <i class="bi bi-collection me-1"></i> <?= t('Add several tables') ?>
+                    </button>
                 </div>
                 <?php endif; ?>
             </div>
@@ -180,6 +183,24 @@ $(document).ready(function () {
 });
 
 function currentWarehouseId() { return parseInt($('#whSelect').val() || 0, 10); }
+
+// Set up a whole restaurant in one step: "I have 10 tables" → T1…T10 (numbers you already have are skipped).
+// Uses the same endpoint as the Getting-started box, which disappears after first use.
+function addSeveralTables() {
+    Swal.fire({
+        title: <?= json_encode(t('How many tables do you have?')) ?>,
+        text: <?= json_encode(t('Tables T1, T2, T3… are added. Numbers you already have are skipped. You can rename them or change their seats later.')) ?>,
+        input: 'number', inputValue: 10, inputAttributes: { min: 1, max: 100, step: 1 },
+        showCancelButton: true, confirmButtonText: <?= json_encode(t('Add tables')) ?>, cancelButtonText: <?= json_encode(t('Cancel')) ?>,
+        inputValidator: v => (parseInt(v, 10) >= 1 && parseInt(v, 10) <= 100) ? null : <?= json_encode(t('Enter a number of tables between 1 and 100.')) ?>
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        $.post('<?= buildUrl('api/restaurant/quick_setup.php') ?>', { action: 'tables', count: parseInt(r.value, 10), warehouse_id: currentWarehouseId(), _csrf: CSRF_FIELD }, function (res) {
+            if (res.success) { Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: res.message, timer: 2200, showConfirmButton: false }); loadFloors(); }
+            else Swal.fire({ icon: 'error', title: STRINGS.error, text: res.message });
+        }, 'json').fail(function () { Swal.fire({ icon: 'error', title: STRINGS.error, text: STRINGS.serverError }); });
+    });
+}
 
 function loadFloors() {
     const wid = currentWarehouseId();

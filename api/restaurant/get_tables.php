@@ -26,7 +26,9 @@ if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id)) {
 }
 $floor_id = (int)($_GET['floor_id'] ?? 0);
 
-$sql = "SELECT t.table_id, t.warehouse_id, t.floor_id, t.table_number, t.seats, t.status, f.name AS floor_name
+// has_open_order — the same truth the Tables board uses: a table is busy only while it holds an open order.
+$sql = "SELECT t.table_id, t.warehouse_id, t.floor_id, t.table_number, t.seats, t.status, f.name AS floor_name,
+               EXISTS(SELECT 1 FROM pos_held_sales h WHERE h.table_id = t.table_id AND h.status = 'held') AS has_open_order
         FROM restaurant_tables t
         JOIN restaurant_floors f ON f.floor_id = t.floor_id
         WHERE t.warehouse_id = ?";
