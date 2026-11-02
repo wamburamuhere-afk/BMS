@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-02 — fix(pos): a paid order no longer comes back into the till's cart (retail and restaurant)
+
+**Changed:** `app/bms/pos/pos_scripts_new.php` (one line in `submitPayment()`). **New:** `tests/test_pos_paid_cart_not_restored_cli.php`.
+
+- **Cause:** the till keeps the cart in the browser (`localStorage` `pos_cart`) and reloads it when the page opens. The saved copy was cleared only when the "Sale Completed" popup closed. A refresh, closed tab or power cut while the popup showed brought the paid order back, and paying it again recorded the sale twice. Normal web sales send no `client_uuid`, so the server cannot refuse the repeat.
+- **Proof (browser, retail shop, throwaway database):** old code, one "ZZ Proof Soap" sold, refreshed with the popup open, paid again: two sales (2616, 2617), stock down by 2. New code, same steps: one sale (2618), cart empty after the refresh.
+- **Fix:** clear the saved copy as soon as the server confirms the sale. The in-memory cart stays until the popup closes (the WhatsApp receipt is built from it). A failed payment keeps the cart. An unpaid order still survives a refresh. "Next Customer" is unchanged.
+
 ## 2026-11-02 — feat(restaurant): true profit you can see — one Purchases form like Receive Stock, buying and selling price together, cost and profit on the Menu, a money check on the dashboard
 
 **Plan:** `restaurant_plan.md` → "Profit truth pass (2026-11-02)". Branch `feat/restaurant-profit-truth`.
