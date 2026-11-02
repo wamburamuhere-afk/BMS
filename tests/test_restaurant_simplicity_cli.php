@@ -257,9 +257,10 @@ try {
     $afterRecipe = restaurantDashboardData($pdo);
     ok($afterRecipe['uncosted_dishes'] === $base['uncosted_dishes'], 'once the dish has a recipe it is no longer counted');
     $pdo->prepare("DELETE FROM product_assembly_components WHERE parent_product_id = ?")->execute([$DISH]);
-    $dv = file_get_contents("$root/includes/restaurant/dashboard.php");
-    ok(preg_match('/if \(!empty\(\$rd\[\'uncosted_dishes\'\]\)\):.*id="rdUncostedHint"/s', $dv) === 1, 'the hint shows only when there are uncosted dishes');
-    ok(strpos($dv, "t('Food profit this month')") !== false && strpos($dv, "\$rdFmt(\$rd['month_food_profit'])") !== false, 'the profit figure itself is unchanged (still the ledger number)');
+    // The old Food-profit card was replaced by the profit story panel (includes/restaurant/dash_panel.php); its "Estimated"
+    // badge and "no cost yet" nudge carry the same warning, and the profit figure still comes from the ledger.
+    $dv = file_get_contents("$root/includes/restaurant/dash_panel.php");
+    ok(strpos($dv, "t('Estimated')") !== false && strpos($dv, "\$rdDishes['needs_cost']") !== false, 'the panel still warns when dishes sold have no recipe or purchase cost');
     $pdo->prepare("UPDATE cash_register_shifts SET status = 'closed' WHERE shift_code = 'TEST-SIMPLE2'")->execute();
 
     // [later phases append here]
@@ -369,10 +370,9 @@ ok($kbad === 0, 'every inline script of the kitchen page parses (' . count($km[1
 ok(strpos(file_get_contents("$root/app/bms/restaurant/kitchen_dashboard.php"), '${parseFloat(it.quantity)}${STRINGS.qty}') !== false, 'a ticket line reads "1x Chai", not "1.000x Chai"');
 
 // ───────────────────────────────────────────────────────────────────────────
-section('E2. Restaurant dashboard renders; no hint when nothing is uncosted');
+section('E2. Restaurant dashboard renders');
 $dash = $renderPage('includes/restaurant/dashboard.php', ['pos' => true, 'restaurant_pos' => true], 'restaurant');
-ok(strpos($dash, 'Food profit this month') !== false, 'the restaurant dashboard renders its Food profit card');
-ok(strpos($dash, 'id="rdUncostedHint"') === false, 'no warning when no dish without a recipe was sold');
+ok(strpos($dash, 'Where your money went') !== false, 'the restaurant dashboard renders its profit story');
 ok(!preg_match('/PHP (Warning|Notice|Fatal|Parse)|___EXC___/', $dash), 'the dashboard renders with no PHP warnings or errors');
 
 // ───────────────────────────────────────────────────────────────────────────

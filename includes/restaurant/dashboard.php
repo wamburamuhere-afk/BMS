@@ -1,6 +1,7 @@
 <?php
 /**
- * includes/restaurant/dashboard.php — the restaurant dashboard (restaurant_plan.md Phase 6).
+ * includes/restaurant/dashboard.php — the restaurant dashboard (restaurant_plan.md Phase 6; the numbers, charts and
+ * profit story now live in includes/restaurant/dash_panel.php — restaurant dashboard pass, 2026-11-02).
  * Shown by app/dashboard.php INSTEAD of the shop dashboard only for a restaurant-only
  * company (restaurantOnlyCompany()). Expects $pdo and the header already rendered.
  */
@@ -39,38 +40,9 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
         <?php endif; ?>
     </div>
 
-    <!-- Today -->
-    <div class="row g-2 g-md-3 mb-3">
-        <div class="col-6 col-lg-3"><div class="card rd-stat h-100 p-2 p-md-3">
-            <div class="small text-muted"><?= t('Sales today') ?></div>
-            <div class="rd-num text-primary"><?= $rdFmt($rd['sales_today']) ?></div>
-            <div class="small text-muted"><?= htmlspecialchars($rdCur) ?></div>
-        </div></div>
-        <div class="col-6 col-lg-3"><div class="card rd-stat h-100 p-2 p-md-3">
-            <div class="small text-muted"><?= t('Orders today') ?></div>
-            <div class="rd-num text-primary"><?= (int)$rd['orders_today'] ?></div>
-            <div class="small text-muted"><?= t('paid orders') ?></div>
-        </div></div>
-        <div class="col-6 col-lg-3"><div class="card rd-stat h-100 p-2 p-md-3">
-            <div class="small text-muted"><?= t('Tables with order') ?></div>
-            <div class="rd-num text-danger"><?= (int)$rd['open_tables'] ?></div>
-            <div class="small text-muted"><?= sprintf(t('%s not paid yet'), $rdFmt($rd['open_amount'])) ?></div>
-        </div></div>
-        <div class="col-6 col-lg-3"><div class="card rd-stat h-100 p-2 p-md-3">
-            <div class="small text-muted"><?= t('Food profit this month') ?></div>
-            <div class="rd-num <?= $rd['month_food_profit'] < 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($rd['month_food_profit']) ?></div>
-            <div class="small text-muted"><?= sprintf(t('Sales %1$s − ingredients %2$s'), $rdFmt($rd['month_sales']), $rdFmt($rd['month_ingredients'])) ?></div>
-            <?php if (!empty($rd['uncosted_dishes'])): ?>
-            <a href="<?= getUrl('restaurant/menu') ?>" class="small text-decoration-none d-block mt-1 text-warning-emphasis" id="rdUncostedHint">
-                <i class="bi bi-exclamation-triangle me-1"></i><?= sprintf(t('%d dish(es) sold have no recipe, so their cost is not counted and profit may look too high. Add recipes in Menu.'), (int)$rd['uncosted_dishes']) ?>
-            </a>
-            <?php endif; ?>
-        </div></div>
-    </div>
-    <div class="alert alert-light border small d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <span><i class="bi bi-receipt text-primary me-1"></i><?= sprintf(t('Other expenses this month: %1$s %2$s'), $rdFmt($rd['month_expenses']), htmlspecialchars($rdCur)) ?></span>
-        <strong><?= sprintf(t('Profit after expenses: %s'), $rdFmt($rd['month_food_profit'] - $rd['month_expenses'])) ?></strong>
-    </div>
+    <!-- The restaurant dashboard panel: today vs yesterday, performance chart, where the money went,
+         what earns money, busy hours, order types, needs attention (includes/restaurant/dash_panel.php). -->
+    <?php $rdScope = 'company'; include ROOT_DIR . '/includes/restaurant/dash_panel.php'; ?>
 
     <div class="row g-3">
         <div class="col-lg-7">
@@ -96,18 +68,6 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
             </div>
         </div>
         <div class="col-lg-5 d-flex flex-column gap-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-trophy text-primary me-1"></i><?= t('Best sellers today') ?></h6></div>
-                <div class="list-group list-group-flush">
-                    <?php if (!$rd['top_dishes']): ?><div class="list-group-item text-muted small"><?= t('Nothing sold yet today.') ?></div><?php endif; ?>
-                    <?php foreach ($rd['top_dishes'] as $i => $d): ?>
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <span class="text-truncate"><span class="badge rounded-pill me-2" style="background:#cfe2ff;color:#084298;"><?= $i + 1 ?></span><?= safe_output($d['product_name']) ?></span>
-                        <span class="fw-semibold text-nowrap"><?= rtrim(rtrim(number_format((float)$d['qty'], 2), '0'), '.') ?> ×</span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-cup-straw text-primary me-1"></i><?= t('Drinks and ingredients running low') ?></h6></div>
                 <div class="list-group list-group-flush">

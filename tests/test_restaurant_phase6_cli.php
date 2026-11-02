@@ -83,7 +83,7 @@ try {
     $setModes(array_fill_keys(array_keys($active), 'restaurant'));
     $o = worker(['page' => 'app/dashboard.php', 'session' => $sess, 'features' => $ON]);
     ok($clean($o) && strpos($o, 'class="rd-actions') !== false && strpos($o, 'Quick Links') === false, 'restaurant-only company → restaurant dashboard (no shop Quick Links)');
-    ok(strpos($o, 'Food profit this month') !== false && strpos($o, 'Recent orders') !== false, 'restaurant dashboard shows today + month cards and recent orders');
+    ok(strpos($o, 'Where your money went') !== false && strpos($o, 'Recent orders') !== false, 'restaurant dashboard shows the profit story (restaurant dashboard pass) and recent orders');
 
     $setModes(array_fill_keys(array_keys($active), 'retail'));
     $pdo->prepare("UPDATE warehouses SET pos_mode = 'restaurant' WHERE warehouse_id = ?")->execute([$W]);
