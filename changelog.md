@@ -1,5 +1,23 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): true profit you can see — one Purchases form like Receive Stock, buying and selling price together, cost and profit on the Menu, a money check on the dashboard
+
+**Plan:** `restaurant_plan.md` → "Profit truth pass (2026-11-02)". Branch `feat/restaurant-profit-truth`.
+**Changed:** `app/bms/restaurant/purchases.php`, `core/restaurant_purchases.php`, `api/restaurant/buy_stock.php`, `api/restaurant/search_stock_items.php`, `api/restaurant/get_purchases.php`, `app/bms/restaurant/menu.php`, `api/restaurant/get_menu_items.php`, `api/restaurant/save_menu_item.php`, `core/restaurant_scope.php`, `core/restaurant_insights.php`, `core/restaurant_dashboard.php`, `app/bms/restaurant/sales_report.php`, `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/buy_ingredients_modal.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Shared files, gated to a restaurant-only Smart POS company:** `api/account/add_expense.php` (default cash account), `api/account/get_inventory_report.php` and `app/constant/reports/inventory_report.php` (counted items only). Retail, mixed, Hybrid and full BMS behave as before; `api/pos/quick_restock.php` is untouched.
+
+- **No account list in Smart POS.** My Purchases page wrongly showed "Paid from: 1-1130 — Cash Drawer". Removed; paid from the default cash account, like every other Smart POS screen.
+- **One form.** Pick what you bought; "Something else (not counted)" covers tomatoes and greens (saved through the Expenses engine). Everything bought is in one list.
+- **Price for one OR total paid.** A goat: 14 kg, 350,000 total, gives 25,000 per kg. The ledger gets the exact total.
+- **Buying and selling price together.** An item you sell shows its selling price (editable, as in Receive Stock) and the live profit on each.
+- **Menu list:** Selling price, Cost, Profit (with %). No cost shows a red "No cost yet — add it". A dish may state a rough plate cost.
+- **A plate cost is an estimate and never reaches the books:** it is stored in `purchase_price`, because the Income Statement drill-down reads `cost_price`, and posting it would count food twice with groceries.
+- **Sales report:** cost and profit per item, labelled an estimate.
+- **Dashboard:** same words as the retail Profit Report (Cost of Goods, Gross Profit, Net Profit); red reasons when the profit is not yet real (no cost, dishes sold but no food bought, no expenses); a money check from the ledger (added to stock, used, in stock now, groceries, owed to me).
+- **Stock report is back** for a restaurant (Phase 1 hid it by mistake), limited to what it counts.
+- **Bug found by using the system:** food "paid from cash" left the Cheque Account, because `defaultCashAccountId()` picks a different account from `posReceiptAccountId()`. Fixed for restaurant screens. The retail default is unchanged.
+- **Not built:** paying a supplier later (retail has none either; awaiting a decision). Multi-line purchases dropped at the owner's request.
+
 ## 2026-11-02 — feat(restaurant): Smart POS focus pass — a restaurant-only company sees a restaurant (menu, orders, purchases, settings), no retail leftovers
 
 **Plan:** `restaurant_plan.md` → "Focus pass (2026-11-02)". Branch `feat/restaurant-focus`.

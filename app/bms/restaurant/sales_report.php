@@ -32,6 +32,10 @@ if ($shopId > 0) $ids = in_array($shopId, $ids, true) && userCan('warehouse', $s
 
 $byType = $ids ? restaurantSalesByOrderType($pdo, $from, $to, $ids) : [];
 $items  = $ids ? restaurantItemsSold($pdo, $from, $to, $ids) : [];
+// Per-item money is the same estimate the dashboard's "profit per plate" uses; the totals above stay ledger-only.
+require_once __DIR__ . '/../../../core/restaurant_insights.php';
+$earn = [];
+if ($ids) foreach (rdDishEarnings($pdo, $ids, $from, $to)['items'] as $e) $earn[$e['product_id']] = $e;
 $total  = array_sum(array_column($byType, 'sales'));
 $orders = array_sum(array_column($byType, 'orders'));
 $typeLabels = ['dine_in' => t('Dine in'), 'take_away' => t('Take away'), 'delivery' => t('Delivery'), 'walk_in' => t('Counter sale'), 'customer' => t('Customer sale'), 'online' => t('Online')];
@@ -103,7 +107,7 @@ $cur = getSetting('currency', 'TZS');
         <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><?= t('Dishes and drinks sold') ?></h6></div>
         <div class="card-body">
             <table id="rrItemsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark"><tr><th><?= t('Item') ?></th><th><?= t('Group') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Quantity') ?></th></tr></thead>
+                <thead class="table-dark"><tr><th><?= t('Item') ?></th><th><?= t('Group') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Selling price') ?></th><th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Profit on each') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
                 <tbody>
                 <?php foreach ($items as $it): ?>
                     <tr>
@@ -111,10 +115,16 @@ $cur = getSetting('currency', 'TZS');
                         <td><?= safe_output($it['group_name'] ?: t('Other')) ?></td>
                         <td><?= (int)$it['is_service'] ? t('Dish') : t('Stock item') ?></td>
                         <td class="text-end"><?= rtrim(rtrim(number_format((float)$it['qty'], 2), '0'), '.') ?></td>
+                        <?php $e = $earn[(int)($it['product_id'] ?? 0)] ?? null; $known = $e && $e['profit_per_plate'] !== null; ?>
+                        <td class="text-end"><?= $e ? number_format($e['price']) : '—' ?></td>
+                        <td class="text-end"><?= $known ? number_format($e['cost']) : '<span class="text-danger small fw-semibold">' . t('No cost yet') . '</span>' ?></td>
+                        <td class="text-end"><?= $known ? number_format($e['profit_per_plate']) : '—' ?></td>
+                        <td class="text-end fw-semibold"><?= $known ? number_format($e['est_profit']) : '—' ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <div class="small text-muted mt-2"><?= t('Profit per item is an estimate from today\'s recipes and costs, to guide your menu. Your true profit is in the Profit Report.') ?></div>
         </div>
     </div>
     <?php endif; ?>

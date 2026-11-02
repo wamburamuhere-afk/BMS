@@ -92,6 +92,9 @@ try {
         $where[]  = "w.project_id = ?";
         $params[] = $project_id;
     }
+    // Restaurant focus (2026-11-02): a restaurant-only Smart POS company sees what it counts — drinks and ingredients. Everyone else: unchanged.
+    require_once __DIR__ . '/../../core/restaurant_purchases.php';
+    if (posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo)) $where[] = restaurantStockItemSql('p');
     $scope_sql = ($warehouse_id === null) ? scopeFilterSqlNullable('warehouse', 'w') : '';
     $where_sql = implode(' AND ', $where) . $scope_sql;
 

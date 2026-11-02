@@ -137,7 +137,7 @@ if (!function_exists('restaurantItemsSold')) {
         if (!$ids) return [];
         $in = implode(',', $ids);
         $st = $pdo->prepare("
-            SELECT p.product_name, COALESCE(c.category_name, '') AS group_name, p.is_service, SUM(psi.quantity) AS qty
+            SELECT p.product_id, p.product_name, COALESCE(c.category_name, '') AS group_name, p.is_service, SUM(psi.quantity) AS qty
               FROM pos_sale_items psi
               JOIN pos_sales ps ON ps.sale_id = psi.sale_id
               JOIN products p   ON p.product_id = psi.product_id

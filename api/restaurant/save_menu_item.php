@@ -37,6 +37,7 @@ $item_type    = (string)($_POST['item_type'] ?? 'dish');
 $name         = trim((string)($_POST['product_name'] ?? ''));
 $price        = (float)($_POST['selling_price'] ?? 0);
 $cost         = max(0, (float)($_POST['cost_price'] ?? 0));
+$plate_cost   = max(0, (float)($_POST['plate_cost'] ?? 0));   // a dish's rough cost of one plate — an estimate for profit per plate, never posted
 $opening      = max(0, (float)($_POST['opening_stock'] ?? 0));
 $prep_area    = trim((string)($_POST['prep_area'] ?? ''));
 $is_available = ((string)($_POST['is_available'] ?? '1') === '1') ? 1 : 0;
@@ -89,6 +90,7 @@ try {
         $sets = "product_name = ?, category_id = ?, selling_price = ?, kitchen_station_id = ?, is_available = ?, updated_by = ?";
         $params = [$name, $resolveCategory(), $price, $stationId, $is_available, $user_id];
         if (!(int)$row['is_service']) { $sets .= ", cost_price = ?, purchase_price = ?"; $params[] = $cost; $params[] = $cost; }
+        else { $sets .= ", purchase_price = ?"; $params[] = $plate_cost; }
         $params[] = $product_id;
         $pdo->prepare("UPDATE products SET $sets WHERE product_id = ?")->execute($params);
         $pdo->commit();
@@ -120,6 +122,7 @@ try {
         'name'         => $name,
         'price'        => $price,
         'cost'         => $cost,
+        'plate_cost'   => $plate_cost,
         'opening'      => $opening,
         'prep_area'    => $prep_area,
         'category_id'  => $resolveCategory(),

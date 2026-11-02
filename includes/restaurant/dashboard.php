@@ -32,8 +32,8 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
         <a href="<?= getUrl('restaurant/tables-board') ?>" class="rd-act"><i class="bi bi-grid-3x3-gap"></i><span><?= t('Tables') ?></span></a>
         <?php endif; ?>
         <a href="<?= getUrl('restaurant/menu') ?>" class="rd-act"><i class="bi bi-journal-richtext"></i><span><?= t('Menu') ?></span></a>
-        <?php if (canCreate('expenses')): ?>
-        <button type="button" class="rd-act" onclick="rbiOpen()"><i class="bi bi-basket"></i><span><?= t('Buy Ingredients') ?></span></button>
+        <?php if ((canView('pos') && canView('pos_restock')) || canCreate('expenses')): ?>
+        <a href="<?= getUrl('restaurant/purchases') ?>" class="rd-act"><i class="bi bi-basket"></i><span><?= t('Purchases') ?></span></a>
         <?php endif; ?>
         <?php if (canView('expenses')): ?>
         <a href="<?= getUrl('expenses') ?>" class="rd-act"><i class="bi bi-receipt"></i><span><?= t('Expenses') ?></span></a>
@@ -87,8 +87,6 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
     </div>
 </div>
 
-<?php require ROOT_DIR . '/includes/restaurant/buy_ingredients_modal.php'; ?>
-<script>window.rbiSaved = function () { setTimeout(function () { location.reload(); }, 1600); };</script>
 
 <style>
 .rd-actions { display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:1fr; gap:8px; }
