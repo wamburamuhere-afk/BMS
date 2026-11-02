@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-11-02 — fix(restaurant): fixes found by testing on the live demo — Swahili groceries listed, only restaurant groups, no retail products to add, restaurant words on the till
+
+**Changed:** `api/restaurant/get_purchases.php`, `app/bms/product/categories.php`, `app/bms/restaurant/menu.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+All four changes apply only to a restaurant-only Smart POS company (every active shop is a Restaurant). Retail, mixed, Hybrid and full BMS are unchanged (tested).
+
+- **Groceries entered in Swahili were missing from the Purchases list.** They are saved as "Viungo: …", and the list looked only for "Ingredients:". It now finds groceries by their cost-of-food account and removes the prefix in either language. The money was always counted; only the list missed them.
+- **Menu groups showed 25 old retail groups** (Baby Products, Engine Part, Hair Care…). A restaurant-only company now sees only groups used by a menu item, or new empty ones. Old groups stay in the database, untouched.
+- **Menu → "Already in my products"** offered old retail products. It is hidden for a restaurant-only company; a mixed company keeps it.
+- **Till words:** "Take order" (not "Sell"), "No items on this order yet / Tap a dish or drink to add it." (not "Search or browse products"). Swahili: "Weka Oda".
+
 ## 2026-11-02 — fix(pos): a paid order no longer comes back into the till's cart (retail and restaurant)
 
 **Changed:** `app/bms/pos/pos_scripts_new.php` (one line in `submitPayment()`). **New:** `tests/test_pos_paid_cart_not_restored_cli.php`.
