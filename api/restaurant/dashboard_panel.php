@@ -38,7 +38,7 @@ if (!$ids) { echo json_encode(['success' => false, 'message' => t('This shop is 
 
 try {
     if ($part === 'trend') {
-        $period = in_array($_GET['period'] ?? '', ['daily', 'weekly', 'monthly'], true) ? $_GET['period'] : 'daily';
+        $period = in_array($_GET['period'] ?? '', ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true) ? $_GET['period'] : 'daily';
         $trend = rdTrend($pdo, $period, rdJeScope($ids, $scope === 'combined' ? 'company' : $scope), $scope === 'combined' ? $ids : null);
         echo json_encode(['success' => true, 'trend' => $trend]);
         exit;

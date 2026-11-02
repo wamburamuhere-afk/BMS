@@ -699,11 +699,11 @@ ok(clean($sr6) && strpos(body($sr6), 'Estimated profit') !== false && strpos(bod
 $dp = runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1');
 $bd = body($dp);
 $dpSrc = file_get_contents("$root/includes/restaurant/dash_panel.php");
-ok(clean($dp) && strpos($bd, 'Money check this month') !== false && strpos($bd, 'In stock now') !== false && strpos($bd, 'Net Profit') !== false, 'dashboard: the money check, and Net Profit');
+ok(clean($dp) && strpos($bd, 'Money check this month') === false && strpos($bd, 'In stock now') === false && strpos($bd, 'Net Profit') !== false, 'dashboard: Net Profit, and the money check is gone (owner\'s choice)');
 ok(strpos($dpSrc, "t('Cost of Goods')") !== false && strpos($dpSrc, "t('Gross Profit')") !== false && strpos($dpSrc, "t('Food cost')") === false, 'dashboard: same words as the retail Profit Report (shown once there are sales)');
 ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, 'restaurant/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
 $dsw = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw'));
-ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') !== false && strpos($dsw, 'Money check this month') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: the money check is in Swahili, no English left');
+ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: Net Profit in Swahili, no money check');
 $dr = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
 ok(strpos($dr, 'Money check this month') === false, 'a retail company\'s dashboard does not get any of this');
 // Stock report limited for a restaurant, untouched otherwise (static + the gate)
@@ -725,7 +725,6 @@ $ae = file_get_contents("$root/api/account/add_expense.php");
 $iA = strpos($ae, '$bank_account_id = defaultCashAccountId($pdo);'); $iB = strpos($ae, 'if (restaurantOnlyCompany($pdo))');
 ok($iA !== false && $iB > $iA && strpos($ae, "\$bank_account_id = posReceiptAccountId(\$pdo, 'cash') ?: \$bank_account_id;") !== false, 'Add Expense: only a restaurant-only company changes account; everyone else keeps the default');
 ok((int)posReceiptAccountId($pdo, 'cash') > 0, 'the cash account resolves');
-ok(strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "Stock is below zero") !== false, 'dashboard explains a stock value below zero instead of only showing the number');
 ok(strpos($pgP, 'text-truncate') === false && strpos($pgP, 'name="cost_price" min=') === false, 'Purchases: the title is not cut, and the New ingredient window asks no price');
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -789,8 +788,8 @@ foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaur
     ok(strpos($nav9, '/' . $href . '"') !== false && strpos($nav9, "<b>$lbl</b>") !== false, "action: $lbl → /$href");
 ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
 // Today and Money cards; the supplier-credit card is deliberately NOT there
-foreach (['Sales today', 'Orders today', 'Open tables', 'Owed to me', 'Expenses this month', 'Profit this month'] as $lbl)
-    ok(strpos($dc, '<span class="rdp-label">' . $lbl . '</span>') !== false, "card: $lbl");
+foreach (['sales' => 'Sales', 'orders' => 'Orders', 'profit' => 'Profit', 'exp' => 'Expenses', 'tables' => 'Open tables', 'owed' => 'Owed to me'] as $cc => $lbl)
+    ok((bool)preg_match('#class="rd2-sc rd2-c-' . $cc . '"><span class="rd2-l"><i class="bi [^"]+"></i>' . preg_quote($lbl, '#') . '#', $dc), "card with its own colour: $lbl");
 ok(stripos($dc, 'We owe suppliers') === false && stripos($dc, 'owe suppliers') === false, 'no "We owe suppliers" card (supplier credit is not built)');
 // side panel
 foreach (['att', 'low', 'ord'] as $pt) ok(strpos($dc, 'data-pt="' . $pt . '"') !== false, "side panel tab: $pt");
@@ -810,7 +809,7 @@ try {
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode','none') ON DUPLICATE KEY UPDATE setting_value='none'");
     $dn = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1')));
     preg_match('#<nav class="rd2-acts".*?</nav>#s', $dn, $navn);
-    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($dn, '<span class="rdp-label">Kitchen waiting</span>') === false, 'kitchen "by mouth": no Kitchen action and no Kitchen waiting card');
+    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false, 'kitchen "by mouth": no Kitchen action');
 } finally {
     if ($ko === false) $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
     else $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$ko]);
@@ -826,7 +825,7 @@ foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'
     $h = body(runWorker(['page' => 'app/dashboard.php'], $ON, $modes9, $simple9));
     ok(strpos($h, 'rd2-acts') === false && strpos($h, 'rdp-l2') === false && strpos($h, 'id="rdBell"') === false, "$nm: no Layout 2 and no notification bell");
 }
-$strip = body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'));
+$strip = (string)(json_decode(trim(body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'))), true)['html'] ?? '');
 ok(strpos($strip, 'class="rd2 ') === false && strpos($strip, 'class="rd2-acts"') === false && strpos($strip, 'rdp-stat') !== false, 'the mixed-company strip keeps its own layout (no Layout 2)');
 // the bell
 ok(strpos($dc, 'id="rdBell"') !== false, 'restaurant-only: the notification bell is in the top bar');
@@ -835,11 +834,64 @@ $hdr9 = file_get_contents("$root/header.php");
 ok(strpos($hdr9, '$__bell_on = posSimpleModeEnabled() && canView(\'restaurant_pos\') && restaurantOnlyCompany($pdo);') !== false && strpos($hdr9, 'notifications WHERE user_id = ? AND is_read = 0') !== false, 'the bell is for a restaurant-only Smart POS company only and counts the user\'s unread notifications');
 // Swahili: everything new is translated, none left in English
 $dsw9 = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw')));
-foreach (['Leo' => 'Today', 'Fedha' => 'Money', 'Matumizi mwezi huu' => 'Expenses this month', 'Fungua kaunta ya mauzo' => 'Open the till', 'Yanayohitaji hatua' => 'Needs attention', 'Zinakaribia kuisha' => 'Running low', 'Ninazodai' => 'Owed to me', 'Ripoti ya mauzo' => 'Sales report'] as $swt => $en)
+foreach (['Inaonyesha' => 'Showing', 'Sasa hivi' => 'Right now', 'Kila Robo Mwaka' => 'Quarterly', 'Fungua kaunta ya mauzo' => 'Open the till', 'Yanayohitaji hatua' => 'Needs attention', 'Zinakaribia kuisha' => 'Running low', 'Ninazodai' => 'Owed to me', 'Ripoti ya mauzo' => 'Sales report'] as $swt => $en)
     ok(strpos($dsw9, $swt) !== false && strpos($dsw9, '>' . $en . '<') === false && strpos($dsw9, '<b>' . $en . '</b>') === false, "Swahili: '$en' is '$swt', none left in English");
 // every inline script parses
 preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $dc, $m9); $bad9 = 0;
 foreach ($m9[1] as $js) { if (trim($js) === '') continue; $tmp = tempnam(sys_get_temp_dir(), 'djs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) $bad9++; $oo = []; }
 ok($bad9 === 0, 'dashboard: every inline script parses (' . count($m9[1]) . ' scripts)');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P10. Dashboard arrangement A: period choices, removed blocks, bell beside Help, no red');
+// the "Showing" dates, on fixed days
+$rg = fn($p, $d) => rdPeriodRange($p, $d);
+$r = $rg('today', '2026-11-04'); ok($r['from'] === '2026-11-04' && $r['to'] === '2026-11-04' && $r['prev_from'] === '2026-11-03' && $r['prev_to'] === '2026-11-03', 'Today: compared with yesterday');
+$r = $rg('week', '2026-11-04'); ok($r['from'] === '2026-11-02' && $r['prev_from'] === '2026-10-26' && $r['prev_to'] === '2026-10-28', 'This week: Monday to today, against the same days last week');
+$r = $rg('month', '2026-11-04'); ok($r['from'] === '2026-11-01' && $r['prev_from'] === '2026-10-01' && $r['prev_to'] === '2026-10-04', 'This month: against the same days last month');
+$r = $rg('month', '2026-03-31'); ok($r['prev_from'] === '2026-02-01' && $r['prev_to'] === '2026-02-28', 'This month on the 31st: last month stops at its own end, not in this month');
+$r = $rg('quarter', '2026-11-04'); ok($r['from'] === '2026-10-01' && $r['prev_from'] === '2026-07-01' && $r['prev_to'] === '2026-08-04', 'This quarter: from 1 Oct, against the same days of the last quarter');
+$r = $rg('year', '2026-11-04'); ok($r['from'] === '2026-01-01' && $r['prev_from'] === '2025-01-01' && $r['prev_to'] === '2025-11-04', 'This year: against last year up to the same day');
+ok($rg('nonsense', '2026-11-04')['key'] === 'today', 'an unknown choice in the address falls back to Today');
+// the five chart periods
+$q = rdPeriod('quarterly', '2026-11-04'); ok(count($q['keys']) === 8 && $q['keys'][7] === '2026-Q4' && $q['keys'][0] === '2025-Q1' && $q['start'] === '2025-01-01' && $q['labels'][7] === 'Q4 2026', 'chart Quarterly: 8 quarters, 2025-Q1 to 2026-Q4');
+$q = rdPeriod('quarterly', '2026-02-10'); ok($q['keys'][7] === '2026-Q1' && $q['keys'][6] === '2025-Q4' && $q['keys'][0] === '2024-Q2' && $q['start'] === '2024-04-01', 'chart Quarterly crosses a year correctly');
+$y = rdPeriod('yearly', '2026-11-04'); ok($y['keys'] === ['2022', '2023', '2024', '2025', '2026'] && $y['start'] === '2022-01-01', 'chart Yearly: 5 years');
+ok(count(rdPeriod('daily', '2026-11-04')['keys']) === 30 && count(rdPeriod('weekly', '2026-11-04')['keys']) === 12 && count(rdPeriod('monthly', '2026-11-04')['keys']) === 12, 'chart Daily, Weekly and Monthly unchanged');
+// figures agree: chart year = story year = the Income Statement function
+$js9 = rdJeScope([$W2], 'company');
+$st9 = rdPeriodStory($pdo, $js9, [$W2], rdPeriodRange('year'));
+$pl9 = glProfitLoss($pdo, date('Y-01-01'), date('Y-m-d'), null, $js9);
+ok(near3($st9['cur']['sales'], ($pl9['total_revenue'] ?? 0) + ($pl9['total_other_income'] ?? 0)) && near3($st9['cur']['cost'], (float)($pl9['total_cogs'] ?? 0)), 'This year: the cards match the Income Statement figures');
+$tr9 = rdTrend($pdo, 'yearly', $js9);
+ok(near3(end($tr9['sales']), $st9['cur']['sales'], 0.02) && near3(end($tr9['profit']), $st9['cur']['profit'], 0.02), 'This year: the Yearly chart\'s last bar equals the cards');
+$qr = rdPeriodRange('quarter'); $sq = rdPeriodStory($pdo, $js9, [$W2], $qr); $tq = rdTrend($pdo, 'quarterly', $js9);
+ok(near3(end($tq['sales']), $sq['cur']['sales'], 0.02), 'This quarter: the Quarterly chart\'s last bar equals the cards');
+// the page
+$pg10 = preg_replace('#<!--.*?-->#s', '', $dc);
+preg_match('#<select class="form-select form-select-sm w-auto rdp-period-sel".*?</select>#s', $pg10, $ps);
+ok(preg_match_all('#<option value="(daily|weekly|monthly|quarterly|yearly)"#', $ps[0] ?? '') === 5, 'Performance period is a dropdown with all 5 retail periods');
+ok(strpos($pg10, 'class="btn-group btn-group-sm rdp-period"') === false, 'the Daily / Weekly / Monthly buttons are gone');
+preg_match('#<select id="rdPeriodSel".*?</select>#s', $pg10, $ps2);
+ok(preg_match_all('#<option value="(today|week|month|quarter|year)"#', $ps2[0] ?? '') === 5, 'the "Showing" dropdown has 5 choices');
+ok(strpos($pg10, 'Money check this month') === false && strpos($pg10, 'Busy hours') === false && strpos($pg10, '-hours"') === false, 'Money check and Busy hours are gone');
+ok(strpos($pg10, 'class="rd2-sl"') === false && strpos($pg10, 'Kitchen waiting') === false, 'the "Today" heading and the Kitchen waiting card are gone (Kitchen stays as an action)');
+preg_match('#\.rdp-l2 \.text-danger \{[^}]*\}#', $pg10, $td);
+ok(strpos($td[0] ?? '', '#b45309') !== false && strpos(preg_replace('#<(style|script)[ >].*?</\1>#s', '', substr($pg10, strpos($pg10, 'class="rd2 '))), '#dc3545') === false, 'no red in the new layout: warnings are amber');
+$wk = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php', 'get' => ['rd_period' => 'year']], $ON, $onlyRest, '1')));
+ok(preg_match('#<option value="year" selected#', $wk) === 1 && strpos($wk, 'Net Profit · This year') !== false, 'choosing This year: the choice stays selected and the money story says so');
+// the bell: lower bar, left of Help, on computer and phone
+$tp10 = strpos($pg10, 'class="top-header"'); $top = substr($pg10, $tp10, strpos($pg10, 'navbar-dark bottom-header', $tp10) - $tp10);
+ok(strpos($top, 'rdBell') === false, 'the bell left the top blue bar');
+$bd10 = strpos($pg10, 'id="rdBell"'); $hd10 = strpos($pg10, 'bms-help-btn d-inline-flex align-items-center', $bd10);
+ok($bd10 !== false && $hd10 !== false && strpos($pg10, 'navbar-dark bottom-header') < $bd10, 'computer: the bell is in the lower bar, before Help');
+$bm10 = strpos($pg10, 'id="rdBellM"');
+ok($bm10 !== false && strpos(substr($pg10, $bm10, 900), 'bms-help-btn-round') !== false, 'phone: the bell comes just before Help');
+// nothing leaks to others
+foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'full BMS' => [$onlyRest, '0']] as $nm => [$m10, $s10]) {
+    $h = body(runWorker(['page' => 'app/dashboard.php', 'get' => ['rd_period' => 'year']], $ON, $m10, $s10));
+    ok(strpos($h, 'id="rdBell') === false && strpos($h, 'id="rdPeriodSel"') === false, "$nm: no bell and no Showing dropdown");
+}
+$strip10 = (string)(json_decode(trim(body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'))), true)['html'] ?? '');
+ok(strpos($strip10, 'rdp-period"') !== false && strpos($strip10, 'Busy hours') !== false, 'the mixed-company strip keeps its buttons and Busy hours');
 
 // [later phases append here]
