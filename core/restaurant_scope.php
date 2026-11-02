@@ -113,6 +113,20 @@ if (!function_exists('restaurantShopActive')) {
     }
 }
 
+if (!function_exists('restaurantShopIsRestaurantOnly')) {
+    /**
+     * Restaurant focus pass (2026-11-02) — is THIS shop a plain Restaurant shop (not Hybrid, not Retail) of a
+     * Smart POS company with the module on? Only such a shop gets the Menu-only till. Hybrid keeps today's till.
+     */
+    function restaurantShopIsRestaurantOnly(PDO $pdo, int $warehouseId): bool
+    {
+        if ($warehouseId <= 0 || !restaurantModuleOn($pdo)) return false;
+        $st = $pdo->prepare("SELECT pos_mode FROM warehouses WHERE warehouse_id = ?");
+        $st->execute([$warehouseId]);
+        return $st->fetchColumn() === 'restaurant';
+    }
+}
+
 if (!function_exists('restaurantOnlyCompany')) {
     /**
      * restaurant_plan.md "Dashboard, Settings, Reports" — true only when the

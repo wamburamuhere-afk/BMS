@@ -21,6 +21,9 @@ $pos_advanced_entitled = canView('pos_advanced');
 // restaurant module is on (Restaurant POS + Smart POS). Retail: never shown, never saved.
 require_once __DIR__ . '/../../../core/restaurant_scope.php';
 $restaurant_on = restaurantModuleOn($pdo);
+// Restaurant focus (2026-11-02): a company whose every shop is a Restaurant gets the Restaurant options first and
+// no retail-only ones (Record Old Sale, Loyalty). Any other company sees the page exactly as before.
+$rf_set = $restaurant_on && restaurantOnlyCompany($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
@@ -35,12 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         save_setting('pos_receipt_width', in_array($_POST['pos_receipt_width'] ?? '', ['58', '80'], true) ? $_POST['pos_receipt_width'] : '80');
         save_setting('pos_auto_print_receipt', isset($_POST['pos_auto_print_receipt']) ? '1' : '0');
         // Record Old Sale — how many days back a sale may be dated (core/pos_old_sales.php).
-        $old_days = (int)($_POST['pos_old_sale_max_days'] ?? 30);
+        $old_days = (int)($_POST['pos_old_sale_max_days'] ?? get_setting('pos_old_sale_max_days', '30'));
         save_setting('pos_old_sale_max_days', ($old_days >= 1 && $old_days <= 365) ? $old_days : 30);
         // Phase 11/13 — loyalty program settings only take effect for a
         // tenant actually entitled to 'pos_advanced'; silently ignored
         // otherwise so a raw POST can't turn it on without the entitlement.
-        if ($pos_advanced_entitled) {
+        if ($pos_advanced_entitled && !$rf_set) {
             save_setting('pos_loyalty_enabled', isset($_POST['pos_loyalty_enabled']) ? '1' : '0');
             save_setting('pos_loyalty_spend_per_point', max(1, (float)($_POST['pos_loyalty_spend_per_point'] ?? 1000)));
             save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
@@ -74,6 +77,34 @@ require_once __DIR__ . '/../../../core/warehouse_scope.php';
 $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
 ?>
 
+<?php ob_start(); ?>
+                        <?php if ($restaurant_on):
+                            $rk_mode = restaurantKitchenMode();
+                            $rk_types = restaurantOrderTypes(); ?>
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><i class="bi bi-cup-hot text-primary me-1"></i><?= t('Restaurant') ?></h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><?= t('How do orders reach the kitchen?') ?></label>
+                            <?php foreach ([
+                                'none'    => [t('By mouth'), t('No kitchen step on the till. The waiter tells the cook; the order stays on its table.')],
+                                'screen'  => [t('Kitchen screen'), t('A phone or tablet in the kitchen shows each order (Restaurant → Kitchen).')],
+                                'printer' => [t('Printer'), t('"Send to Kitchen" prints a kitchen slip on your receipt printer.')],
+                            ] as $val => [$lbl, $hint]): ?>
+                            <div class="form-check border rounded p-2 ps-5 mb-2">
+                                <input class="form-check-input" type="radio" name="restaurant_kitchen_mode" id="rk_<?= $val ?>" value="<?= $val ?>" <?= $rk_mode === $val ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="rk_<?= $val ?>"><?= $lbl ?></label>
+                                <div class="form-text mt-0"><?= $hint ?></div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><?= t('Order types on the Sell screen') ?></label>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" checked disabled id="rt_dine"><label class="form-check-label" for="rt_dine"><?= t('Dine in') ?> <span class="text-muted small">(<?= t('always on') ?>)</span></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="restaurant_order_take_away" id="rt_take" value="1" <?= in_array('take_away', $rk_types, true) ? 'checked' : '' ?>><label class="form-check-label" for="rt_take"><?= t('Take away') ?></label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="restaurant_order_delivery" id="rt_del" value="1" <?= in_array('delivery', $rk_types, true) ? 'checked' : '' ?>><label class="form-check-label" for="rt_del"><?= t('Delivery') ?></label></div>
+                        </div>
+                        <?php endif; ?>
+<?php $rest_block = ob_get_clean(); ?>
+
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -100,9 +131,10 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-body p-4">
-                    <h6 class="fw-bold mb-4 text-dark text-uppercase small"><?= t('Display') ?></h6>
+                    <?php if (!$rf_set): ?><h6 class="fw-bold mb-4 text-dark text-uppercase small"><?= t('Display') ?></h6><?php endif; ?>
                     <form method="POST">
                         <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                        <?php if ($rf_set): echo $rest_block; ?><h6 class="fw-bold mb-4 mt-4 text-dark text-uppercase small"><?= t('Display') ?></h6><?php endif; ?>
                         <div class="mb-3">
                             <label for="pos_products_display_limit" class="form-label"><?= t('Products shown on open (desktop)') ?></label>
                             <select class="form-select" id="pos_products_display_limit" name="pos_products_display_limit">
@@ -148,40 +180,18 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                             <div class="form-text"><?= t('Sends the receipt straight to your browser\'s print dialog / default printer — no "Print Receipt" click needed. Requires a printer already set as your OS/browser default.') ?></div>
                         </div>
 
+                        <?php if (!$rf_set): ?>
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Record Old Sale') ?></h6>
                         <div class="mb-3">
                             <label for="pos_old_sale_max_days" class="form-label"><?= t('How many days back an old sale may be dated') ?></label>
                             <input type="number" class="form-control" id="pos_old_sale_max_days" name="pos_old_sale_max_days" min="1" max="365" step="1" value="<?= (int)$pos_old_sale_max_days ?: 30 ?>" style="max-width: 160px;">
                             <div class="form-text"><?= t('People with the "POS Record Old Sale" permission can record a sale made up to this many days ago (1 to 365). Admins have it; give it to other roles in Roles & Permissions.') ?></div>
                         </div>
-
-                        <?php if ($restaurant_on):
-                            $rk_mode = restaurantKitchenMode();
-                            $rk_types = restaurantOrderTypes(); ?>
-                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><i class="bi bi-cup-hot text-primary me-1"></i><?= t('Restaurant') ?></h6>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold"><?= t('How do orders reach the kitchen?') ?></label>
-                            <?php foreach ([
-                                'none'    => [t('By mouth'), t('No kitchen step on the till. The waiter tells the cook; the order stays on its table.')],
-                                'screen'  => [t('Kitchen screen'), t('A phone or tablet in the kitchen shows each order (Restaurant → Kitchen).')],
-                                'printer' => [t('Printer'), t('"Send to Kitchen" prints a kitchen slip on your receipt printer.')],
-                            ] as $val => [$lbl, $hint]): ?>
-                            <div class="form-check border rounded p-2 ps-5 mb-2">
-                                <input class="form-check-input" type="radio" name="restaurant_kitchen_mode" id="rk_<?= $val ?>" value="<?= $val ?>" <?= $rk_mode === $val ? 'checked' : '' ?>>
-                                <label class="form-check-label fw-semibold" for="rk_<?= $val ?>"><?= $lbl ?></label>
-                                <div class="form-text mt-0"><?= $hint ?></div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold"><?= t('Order types on the Sell screen') ?></label>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" checked disabled id="rt_dine"><label class="form-check-label" for="rt_dine"><?= t('Dine in') ?> <span class="text-muted small">(<?= t('always on') ?>)</span></label></div>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="restaurant_order_take_away" id="rt_take" value="1" <?= in_array('take_away', $rk_types, true) ? 'checked' : '' ?>><label class="form-check-label" for="rt_take"><?= t('Take away') ?></label></div>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="restaurant_order_delivery" id="rt_del" value="1" <?= in_array('delivery', $rk_types, true) ? 'checked' : '' ?>><label class="form-check-label" for="rt_del"><?= t('Delivery') ?></label></div>
-                        </div>
                         <?php endif; ?>
 
-                        <?php if ($pos_advanced_entitled): ?>
+                        <?php if (!$rf_set) echo $rest_block; ?>
+
+                        <?php if ($rf_set): /* Loyalty is a retail-till feature — not shown for a restaurant */ elseif ($pos_advanced_entitled): ?>
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Loyalty Program') ?></h6>
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="pos_loyalty_enabled" name="pos_loyalty_enabled" value="1" <?= $pos_loyalty_enabled == '1' ? 'checked' : '' ?>>

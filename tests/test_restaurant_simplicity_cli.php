@@ -180,10 +180,12 @@ try {
 
     // ───────────────────────────────────────────────────────────────────────
     section('B. Till product list — Menu view and one-tap add');
+    // A HYBRID shop lists dishes and retail products; a plain Restaurant shop lists the Menu only (restaurant focus pass).
+    $pdo->prepare("UPDATE warehouses SET pos_mode = 'hybrid' WHERE warehouse_id = ?")->execute([$W]);
     $plain = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W]);
     $menu  = call('api/pos/simple_products.php', 'GET', ['warehouse_id' => $W, 'menu_only' => 1]);
     $ids = fn($r) => array_map(fn($p) => (int)$p['product_id'], $r['data'] ?? []);
-    ok(!empty($plain['success']) && in_array($DISH, $ids($plain), true) && in_array($DRINK, $ids($plain), true), 'restaurant shop, no filter: dishes AND retail products are listed (hybrid view unchanged)');
+    ok(!empty($plain['success']) && in_array($DISH, $ids($plain), true) && in_array($DRINK, $ids($plain), true), 'hybrid shop, no filter: dishes AND retail products are listed (unchanged)');
     ok(!empty($menu['success']) && in_array($DISH, $ids($menu), true), 'menu_only=1: the Menu dish is listed');
     ok(!in_array($DRINK, $ids($menu), true), 'menu_only=1: a retail product that is not on the Menu is NOT listed');
     $nonMenuInMenu = 0;
@@ -220,7 +222,7 @@ try {
     $tap = substr($js, (int)strpos($js, 'function posTapProduct('), 2200);
     ok(strpos($tap, 'modifier_group_count') !== false && strpos($tap, 'restaurantNeedsPopup') !== false, 'one-tap: posTapProduct opens the popup only for add-on dishes on a restaurant shop');
     ok(strpos($tap, 'const needsPopup = product.track_serials == 1 || restaurantNeedsPopup || unitCount !== 0;') !== false, 'serial / unit rules for the popup are unchanged');
-    ok(strpos($js, 'function posMenuModeOn() { return posRestaurantActive() && posMenuOnly; }') !== false, 'Menu mode is gated on posRestaurantActive() (never on a retail shop)');
+    ok(strpos($js, 'function posMenuModeOn() { return posRestaurantActive() && (posMenuOnly || posRestaurantOnlyShop()); }') !== false, 'Menu mode is gated on posRestaurantActive() (never on a retail shop)');
     ok(strpos($js, "menu_only: posMenuModeOn() ? 1 : ''") !== false, 'the till only asks for menu_only in Menu mode');
     $scan = substr($js, (int)strpos($js, 'function handleBarcodeScanned('), 2600);
     ok(strpos($scan, 'else if (posMenuModeOn())') !== false && strpos($scan, 'scanNotFound()') !== false, 'scanner: in Menu mode a miss is looked up on the server before "not found"');

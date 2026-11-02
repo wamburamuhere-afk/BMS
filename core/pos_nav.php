@@ -109,6 +109,19 @@ if (!function_exists('posSimpleModeEnabled')) {
     }
 }
 
+if (!function_exists('posModeSelectable')) {
+    /**
+     * Restaurant focus pass (2026-11-02) — may this company choose a shop's POS Mode
+     * (Retail / Restaurant / Hybrid) at all? Only in Smart POS: POS + Restaurant POS on AND Simple Mode on.
+     * Full BMS never shows the choice, never accepts it from the web form or the mobile API,
+     * and keeps whatever mode a shop already has.
+     */
+    function posModeSelectable(): bool
+    {
+        return tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos') && posSimpleModeEnabled();
+    }
+}
+
 if (!function_exists('advancedProductEnabled')) {
     /**
      * Superadmin-only override (products_simple_pos_plan.md §3): shows the
