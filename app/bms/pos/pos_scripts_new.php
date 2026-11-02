@@ -2230,6 +2230,11 @@ function renderTablePickerFloor(floor, tables, warehouseId) {
     const colors = { available: '#198754', occupied: '#dc3545', reserved: '#fd7e14', cleaning: '#6c757d' };
     let cards = '';
     tables.forEach(t => {
+        // Same rule as the Tables board: busy only while the table holds an open order
+        // (a table someone merely opened, or one left "occupied" by mistake, is free).
+        if (t.has_open_order !== undefined) {
+            t.status = (t.has_open_order == 1) ? 'occupied' : (t.status === 'occupied' ? 'available' : t.status);
+        }
         const color = colors[t.status] || '#6c757d';
         cards += `
         <div class="col-6 col-md-3">
@@ -2277,10 +2282,8 @@ function selectTable(tableId, warehouseId, tableNumber) {
         $('#rsTableBtn').removeClass('btn-outline-primary').addClass('btn-primary text-white');
         $('#rsSaveTableBtn').removeClass('d-none');
         $('#rsSplitRow').removeClass('d-none');
-
-        $.post('<?= buildUrl('api/restaurant/update_table_status.php') ?>', {
-            table_id: tableId, status: 'occupied', _csrf: <?= json_encode(csrf_token()) ?>
-        });
+        // A table becomes occupied when its order is saved (hold_sale.php) — not merely by being
+        // opened, which left tables stuck "occupied" with no order and disagreeing with the board.
     }).fail(function () {
         Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError });
     });

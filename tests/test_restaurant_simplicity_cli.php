@@ -156,6 +156,28 @@ try {
     ], true);
     ok(empty($sale['success']), 'PAYING with no shift is still refused (money needs a shift): "' . ($sale['message'] ?? '') . '"');
 
+    // ───────────────────────────────────────────────────────────────────────
+    section('C. Table picker tells the same truth as the Tables board');
+    $T3row = null;
+    $pdo->prepare("INSERT INTO restaurant_tables (warehouse_id, floor_id, table_number, seats, status) VALUES (?, ?, ?, 4, 'occupied')")->execute([$W, $floor, "SPC$sfx"]);
+    $T3 = (int)val("SELECT table_id FROM restaurant_tables WHERE table_number = ?", ["SPC$sfx"]);
+    $gt = call('api/restaurant/get_tables.php', 'GET', ['warehouse_id' => $W]);
+    $by = []; foreach ($gt['data'] ?? [] as $r) $by[(int)$r['table_id']] = $r;
+    ok(!empty($gt['success']) && isset($by[$T3]) && array_key_exists('has_open_order', $by[$T3]), 'get_tables returns has_open_order for each table (additive field)');
+    ok((int)($by[$T3]['has_open_order'] ?? 1) === 0 && ($by[$T3]['status'] ?? '') === 'occupied', 'a table stuck "occupied" with no order reports has_open_order = 0 (the picker will show it free)');
+    ok((int)($by[$T1]['has_open_order'] ?? 0) === 1, 'a table with a saved order reports has_open_order = 1');
+    $bd = call('api/restaurant/get_tables_board.php', 'GET', ['warehouse_id' => $W]);
+    $bb = []; foreach ($bd['data'] ?? [] as $r) $bb[(int)$r['table_id']] = $r;
+    ok(($bb[$T3]['status'] ?? '') === 'available' && ($bb[$T1]['status'] ?? '') === 'occupied', 'the Tables board agrees: stuck table free, ordered table busy');
+    foreach (['table_id', 'warehouse_id', 'floor_id', 'table_number', 'seats', 'status', 'floor_name'] as $k) {
+        if (!array_key_exists($k, $by[$T1] ?? [])) { ok(false, "get_tables keeps its existing field $k"); }
+    }
+    ok(isset($by[$T1]['table_number'], $by[$T1]['floor_name']), 'get_tables keeps every existing field (floors page unaffected)');
+    $js = file_get_contents("$root/app/bms/pos/pos_scripts_new.php");
+    $selFn = substr($js, (int)strpos($js, 'function selectTable('), 2600);
+    ok(strpos($selFn, 'update_table_status') === false, 'opening a table no longer marks it occupied by itself');
+    ok(strpos($js, 'has_open_order') !== false, 'the picker applies the open-order rule');
+
     // [later phases append here]
 } finally {
     $pdo->endOuter();
