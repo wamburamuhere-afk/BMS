@@ -9,9 +9,9 @@
  * Expects: $pdo, and $rdScope = 'company' (restaurant-only company) | 'restaurant' | 'combined' (mixed).
  * Money: the one ledger (core/restaurant_insights.php). Counts: operational tables.
  *
- * Layout 2 ("Side actions", chosen by the owner from the layouts artifact, 2026-11-02) is for the restaurant-only
- * company ('company'): quick actions down the left, Today and Money cards across the top, performance beside a side
- * panel (needs attention / activities / running low / orders), then where the money went, what earns, busy hours.
+ * Layout 2 ("Side actions", arrangement A chosen by the owner, 2026-11-02) is for the restaurant-only company ('company'):
+ * quick actions down the left, six coloured cards for the chosen period, performance beside a side panel (needs attention /
+ * activities / running low / orders), then where the money went, what earns, how customers order. No black or red.
  * The mixed-company strip ('restaurant' / 'combined') keeps the layout it always had.
  */
 require_once ROOT_DIR . '/core/restaurant_insights.php';
@@ -53,7 +53,16 @@ if ($rdScope === 'combined') {
     $rdTypeRows = restaurantSalesByOrderType($pdo, $rdMonthFrom, $rdToday, $rdIds);
     $rdData = restaurantDashboardData($pdo);
     $rdCheck = rdProfitCheck($pdo, $rdJe, $rdMonthFrom, $rdToday);
+    // The warnings look at the whole month in every view: no expenses TODAY is normal, none this MONTH is not.
     $rdWarn = $rdMoney ? rdProfitWarnings($rdStory['cur'], $rdDishes['items'], $rdCheck['groceries']) : [];
+    $rdUncMonth = count($rdDishes['needs_cost']);
+    if ($rdL2) {                                          // the "Showing" choice drives the cards, the money story, what earns and how customers order
+        $rdRange = rdPeriodRange((string)($_GET['rd_period'] ?? 'today'), $rdToday);
+        $rdPLabel = ['today' => t('Today'), 'week' => t('This week'), 'month' => t('This month'), 'quarter' => t('This quarter'), 'year' => t('This year')][$rdRange['key']];
+        $rdStory = rdPeriodStory($pdo, $rdJe, $rdIds, $rdRange);
+        $rdDishes = rdDishEarnings($pdo, $rdIds, $rdRange['from'], $rdRange['to']);
+        $rdTypeRows = restaurantSalesByOrderType($pdo, $rdRange['from'], $rdRange['to'], $rdIds);
+    }
     $rdOwed = null;
     if ($rdMoney && canView('pos')) {                      // the same figure as "Who Owes Me" and the retail Credit card
         require_once ROOT_DIR . '/core/pos_credit_aging.php';
@@ -112,7 +121,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     <div class="small text-muted"><i class="bi bi-info-circle me-1"></i><?= t('Costs that belong to the whole company (payroll, rent) are counted under "Shops & other".') ?></div>
 
 <?php else:
-    $cur = $rdStory['cur']; $hasSales = $cur['sales'] > 0; $unc = count($rdDishes['needs_cost']);
+    $cur = $rdStory['cur']; $hasSales = $cur['sales'] > 0; $unc = $rdUncMonth;
 
     // ───── the blocks, each built once and placed by the layout below ─────
     ob_start(); ?>
@@ -147,11 +156,21 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
             <div class="rdp-card h-100">
                 <div class="rdp-card-h">
                     <h6><i class="bi bi-graph-up-arrow me-1"></i><?= t('Performance') ?></h6>
+                    <?php if ($rdL2): ?>
+                    <select class="form-select form-select-sm w-auto rdp-period-sel" aria-label="<?= htmlspecialchars(t('Performance')) ?>">
+                        <option value="daily" selected><?= t('Daily') ?></option>
+                        <option value="weekly"><?= t('Weekly') ?></option>
+                        <option value="monthly"><?= t('Monthly') ?></option>
+                        <option value="quarterly"><?= t('Quarterly') ?></option>
+                        <option value="yearly"><?= t('Yearly') ?></option>
+                    </select>
+                    <?php else: ?>
                     <div class="btn-group btn-group-sm rdp-period" role="group">
                         <button type="button" class="btn btn-outline-primary active" data-p="daily"><?= t('Daily') ?></button>
                         <button type="button" class="btn btn-outline-primary" data-p="weekly"><?= t('Weekly') ?></button>
                         <button type="button" class="btn btn-outline-primary" data-p="monthly"><?= t('Monthly') ?></button>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="rdp-chart"><canvas id="<?= $rdUid ?>-trend"></canvas></div>
             </div>
@@ -168,11 +187,11 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <?php endif; ?>
                 </div>
                 <div class="p-3">
-                    <div class="rdp-sub"><?= t('Net Profit this month') ?></div>
+                    <div class="rdp-sub"><?= $rdL2 ? t('Net Profit') . ' · ' . htmlspecialchars($rdPLabel) : t('Net Profit this month') ?></div>
                     <div class="rdp-num rdp-num-lg <?= $cur['profit'] < 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($cur['profit']) ?> <small><?= htmlspecialchars($rdCur) ?></small></div>
                     <div class="rdp-sub mb-2">
                         <?php if ($hasSales): ?><strong><?= rtrim(rtrim(number_format($rdStory['margin'], 1), '0'), '.') ?>%</strong> <?= t('margin') ?><?php endif; ?>
-                        <?= $rdDelta($rdStory['profit_vs_prev'], sprintf(t('compared with %1$s – %2$s last month'), date('d M', strtotime($rdStory['prev_from'])), date('d M', strtotime($rdStory['prev_to'])))) ?>
+                        <?= $rdDelta($rdStory['profit_vs_prev'], $rdL2 ? sprintf(t('compared with %1$s – %2$s'), date('d M', strtotime($rdStory['prev_from'])), date('d M', strtotime($rdStory['prev_to']))) : sprintf(t('compared with %1$s – %2$s last month'), date('d M', strtotime($rdStory['prev_from'])), date('d M', strtotime($rdStory['prev_to'])))) ?>
                     </div>
                     <?php if ($hasSales): $p100 = $rdStory['per100']; $lossy = $cur['profit'] < 0; ?>
                     <div class="rdp-bar" role="img" aria-label="<?= htmlspecialchars(t('Where your money went')) ?>">
@@ -201,7 +220,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                         <?php endif; ?>
                     </div>
                     <?php else: ?>
-                    <div class="rdp-empty"><i class="bi bi-hourglass-split"></i><div><?= t('Your profit story appears after your first orders this month.') ?></div></div>
+                    <div class="rdp-empty"><i class="bi bi-hourglass-split"></i><div><?= $rdL2 ? t('Nothing sold in this period yet.') : t('Your profit story appears after your first orders this month.') ?></div></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -220,7 +239,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 </div>
                 <div class="rdp-tab <?= $rdMoney ? '' : 'd-none' ?>" data-t="earners">
                     <?php if (!$rdDishes['best_earners']): ?>
-                        <div class="rdp-empty"><i class="bi bi-journal-richtext"></i><div><?= $rdDishes['items'] ? t('Add a recipe to your dishes (and a purchase cost to your drinks) to see which items earn you the most.') : t('Nothing sold this month yet.') ?></div></div>
+                        <div class="rdp-empty"><i class="bi bi-journal-richtext"></i><div><?= $rdDishes['items'] ? t('Add a recipe to your dishes (and a purchase cost to your drinks) to see which items earn you the most.') : ($rdL2 ? t('Nothing sold in this period yet.') : t('Nothing sold this month yet.')) ?></div></div>
                     <?php else: ?>
                     <div class="table-responsive"><table class="table table-sm align-middle mb-0 rdp-table">
                         <thead><tr><th><?= t('Item') ?></th><th class="text-end"><?= t('Plates') ?></th><th class="text-end"><?= t('Profit per plate') ?></th><th class="text-end"><?= t('Margin') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
@@ -242,7 +261,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 </div>
                 <div class="rdp-tab <?= $rdMoney ? 'd-none' : '' ?>" data-t="sellers">
                     <?php if (!$rdDishes['best_sellers']): ?>
-                        <div class="rdp-empty"><i class="bi bi-journal-richtext"></i><div><?= t('Nothing sold this month yet.') ?></div></div>
+                        <div class="rdp-empty"><i class="bi bi-journal-richtext"></i><div><?= $rdL2 ? t('Nothing sold in this period yet.') : t('Nothing sold this month yet.') ?></div></div>
                     <?php else: ?>
                     <div class="list-group list-group-flush">
                         <?php foreach ($rdDishes['best_sellers'] as $i => $d): ?>
@@ -277,7 +296,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
 
     ob_start(); ?>
             <div class="rdp-card">
-                <div class="rdp-card-h"><h6><i class="bi bi-pie-chart me-1"></i><?= t('How customers order') ?></h6><span class="rdp-sub"><?= t('this month') ?></span></div>
+                <div class="rdp-card-h"><h6><i class="bi bi-pie-chart me-1"></i><?= t('How customers order') ?></h6><span class="rdp-sub"><?= $rdL2 ? htmlspecialchars($rdPLabel) : t('this month') ?></span></div>
                 <?php if ($rdTypeRows): ?>
                 <div class="d-flex align-items-center gap-3 p-3 flex-wrap">
                     <div class="rdp-donut"><canvas id="<?= $rdUid ?>-types"></canvas></div>
@@ -294,27 +313,6 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?php endif; ?>
             </div>
     <?php $b_types = ob_get_clean();
-
-    ob_start();
-    if ($rdMoney && $rdScope === 'company'): ?>
-    <div class="rdp-card">
-        <div class="rdp-card-h"><h6><i class="bi bi-arrow-left-right me-1"></i><?= t('Money check this month') ?></h6></div>
-        <div class="p-3">
-            <div class="row g-2">
-                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Added to stock') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['added']) ?></div></div></div>
-                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Used for food sold') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['used']) ?></div></div></div>
-                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('In stock now') ?></div><div class="rdp-num <?= $rdCheck['in_stock'] < 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($rdCheck['in_stock']) ?></div></div></div>
-                <div class="col-6 col-md"><div class="rdp-stat"><div class="rdp-label"><?= t('Groceries (not counted)') ?></div><div class="rdp-num text-primary"><?= $rdFmt($rdCheck['groceries']) ?></div></div></div>
-                <?php if ($rdOwed !== null): ?>
-                <div class="col-12 col-md"><a href="<?= getUrl('pos/credit-customers') ?>" class="text-decoration-none"><div class="rdp-stat"><div class="rdp-label"><?= t('Owed to me') ?></div><div class="rdp-num <?= $rdOwed > 0 ? 'text-danger' : 'text-primary' ?>"><?= $rdFmt($rdOwed) ?></div></div></a></div>
-                <?php endif; ?>
-            </div>
-            <div class="rdp-sub mt-2"><?= t('What you buy for stock is not a cost yet. It becomes a cost as the food is sold; the rest stays in stock.') ?></div>
-            <?php if ($rdCheck['in_stock'] < 0): ?><a href="<?= getUrl('restaurant/purchases') ?>" class="d-block small text-danger fw-semibold mt-1"><i class="bi bi-exclamation-triangle me-1"></i><?= t('Stock is below zero: more was sold than was recorded as bought. Record your purchases.') ?></a><?php endif; ?>
-        </div>
-    </div>
-    <?php endif;
-    $b_check = ob_get_clean();
 
     // "Needs attention" rows (bills open too long, kitchen orders waiting, running low)
     $rdAttRows = [];
@@ -357,8 +355,6 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         <div class="col-lg-5 d-flex flex-column gap-3"><?= $b_busy ?><?= $b_types ?></div>
     </div>
 
-    <?= $b_check ?>
-
     <!-- ───────── 4. Needs attention ───────── -->
     <?= $b_attn ?>
 
@@ -378,10 +374,10 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         $acts[] = [t('Reservations'), sprintf(t('%d today'), $rdX['reservations_today']), 'bi-calendar-check', '#7c3aed', getUrl('restaurant/reservations')];
         $acts[] = [t('Sales report'), t('Today and past'), 'bi-bar-chart', '#475f8a', getUrl('restaurant/sales-report')];
 
-        $card = function (string $label, string $value, string $sub, string $href = '', string $valClass = '') {
+        $card = function (string $colour, string $icon, string $label, string $value, string $sub, string $href = '', bool $now = false) {
             $tag = $href !== '' ? 'a href="' . htmlspecialchars($href) . '"' : 'div';
             $end = $href !== '' ? 'a' : 'div';
-            return '<' . $tag . ' class="rd2-sc"><span class="rdp-label">' . $label . '</span><span class="rd2-kv ' . $valClass . '">' . $value . '</span><span class="rd2-ks">' . $sub . '</span></' . $end . '>';
+            return '<' . $tag . ' class="rd2-sc rd2-c-' . $colour . '"><span class="rd2-l"><i class="bi ' . $icon . '"></i>' . $label . ($now ? '<span class="rd2-now">' . t('Right now') . '</span>' : '') . '</span><span class="rd2-kv">' . $value . '</span><span class="rd2-ks">' . $sub . '</span></' . $end . '>';
         };
         $flat = !$rdMoney;                       // without profit access there is no chart to put the side panel next to
         $pTabs = [['att', t('Needs attention')]];
@@ -389,7 +385,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         $pTabs[] = ['low', t('Running low')];
         $pTabs[] = ['ord', t('Orders')];
         ?>
-    <div class="rd2 <?= $flat ? 'rd2-flat' : (($b_check === '') ? 'rd2-nocheck' : '') ?>">
+    <div class="rd2 <?= $flat ? 'rd2-flat' : '' ?>">
         <nav class="rd2-acts" aria-label="<?= htmlspecialchars(t('Quick actions')) ?>">
             <?php foreach ($acts as $i => [$an, $as, $ai, $ac, $ah]): ?>
             <a href="<?= $ah ?>" class="rd2-act"><span class="rd2-sq" style="background:<?= $ac ?>"><i class="bi <?= $ai ?>"></i></span><span class="rd2-at"><b><?= $an ?></b><small><?= $as ?></small></span></a>
@@ -397,21 +393,20 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         </nav>
 
         <section class="rd2-hero">
-            <div class="rd2-sl"><?= t('Today') ?></div>
+            <?php
+            $rdCurTag = ' <small>' . htmlspecialchars($rdCur) . '</small>';
+            $prevLbl = ['today' => t('Yesterday %s'), 'week' => t('Last week so far %s'), 'month' => t('Last month so far %s'), 'quarter' => t('Last quarter so far %s'), 'year' => t('Last year so far %s')][$rdRange['key']];
+            ?>
             <div class="rd2-sum">
-                <?= $card(t('Sales today'), $rdFmt($rdHero['sales']['today']) . ' <small>' . htmlspecialchars($rdCur) . '</small>', sprintf(t('Yesterday %s'), $rdFmt($rdHero['sales']['yesterday'])) . ($rdHero['sales']['trend7'] !== null ? ' · ' . $rdDelta($rdHero['sales']['trend7'], $rdTrendNote) : ''), getUrl('restaurant/sales-report')) ?>
-                <?= $card(t('Orders today'), (string)(int)$rdHero['orders']['today'], sprintf(t('Average bill %s'), $rdFmt($rdHero['avg_bill']['today'])), getUrl('restaurant/sales-report')) ?>
-                <?= $card(t('Open tables'), $rdX['tables_total'] > 0 ? sprintf(t('%1$d of %2$d'), $nWith, $rdX['tables_total']) : (string)$nWith, sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])), getUrl('restaurant/tables-board'), $nWith > 0 ? 'text-danger' : '') ?>
-                <?php if ($rdKitchenOn): ?><?= $card(t('Kitchen waiting'), (string)$rdX['kitchen_waiting'], t('orders over 20 minutes'), getUrl('restaurant/kitchen-dashboard'), $rdX['kitchen_waiting'] > 0 ? 'text-danger' : '') ?><?php endif; ?>
+                <?= $card('sales', 'bi-cart-check', t('Sales'), $rdFmt($cur['sales']) . $rdCurTag, sprintf($prevLbl, $rdFmt($rdStory['prev']['sales'])), getUrl('restaurant/sales-report')) ?>
+                <?= $card('orders', 'bi-receipt', t('Orders'), (string)$rdStory['orders'], sprintf(t('Average bill %s'), $rdFmt($rdStory['avg_bill'])), getUrl('restaurant/sales-report')) ?>
+                <?php if ($rdMoney): ?>
+                <?= $card('profit', 'bi-graph-up-arrow', t('Profit'), $rdFmt($cur['profit']) . $rdCurTag, ($hasSales ? rtrim(rtrim(number_format($rdStory['margin'], 1), '0'), '.') . '% ' . t('margin') . ' · ' : '') . (($unc > 0 || $rdWarn) ? t('Estimated') : t('Complete'))) ?>
+                <?= $card('exp', 'bi-basket', t('Expenses'), $rdFmt($cur['expenses']) . $rdCurTag, sprintf(t('%d to approve'), $rdX['expenses_pending']), canView('expenses') ? getUrl('expenses') : '') ?>
+                <?php endif; ?>
+                <?= $card('tables', 'bi-grid-3x3-gap', t('Open tables'), $rdX['tables_total'] > 0 ? sprintf(t('%1$d of %2$d'), $nWith, $rdX['tables_total']) : (string)$nWith, sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])), getUrl('restaurant/tables-board'), true) ?>
+                <?php if ($rdOwed !== null): ?><?= $card('owed', 'bi-cash-coin', t('Owed to me'), $rdFmt($rdOwed) . $rdCurTag, t('customers who bought on credit'), getUrl('pos/credit-customers'), true) ?><?php endif; ?>
             </div>
-            <?php if ($rdMoney): ?>
-            <div class="rd2-sl"><?= t('Money') ?></div>
-            <div class="rd2-sum">
-                <?php if ($rdOwed !== null): ?><?= $card(t('Owed to me'), $rdFmt($rdOwed) . ' <small>' . htmlspecialchars($rdCur) . '</small>', t('customers who bought on credit'), getUrl('pos/credit-customers'), $rdOwed > 0 ? 'text-danger' : '') ?><?php endif; ?>
-                <?= $card(t('Expenses this month'), $rdFmt($cur['expenses']) . ' <small>' . htmlspecialchars($rdCur) . '</small>', sprintf(t('%d to approve'), $rdX['expenses_pending']), canView('expenses') ? getUrl('expenses') : '') ?>
-                <?= $card(t('Profit this month'), $rdFmt($cur['profit']) . ' <small>' . htmlspecialchars($rdCur) . '</small>', ($hasSales ? rtrim(rtrim(number_format($rdStory['margin'], 1), '0'), '.') . '% ' . t('margin') . ' · ' : '') . (($unc > 0 || $rdWarn) ? t('Estimated') : t('Complete')), '', $cur['profit'] < 0 ? 'text-danger' : '') ?>
-            </div>
-            <?php endif; ?>
         </section>
 
         <?php if ($rdMoney): ?><section class="rd2-perf"><?= $b_perf ?></section><?php endif; ?>
@@ -438,7 +433,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <div class="rd2-pt d-none" data-pt="low">
                         <?php if (!$rdData['low_drinks']): ?><div class="rdp-empty"><i class="bi bi-check2-circle"></i><div><?= t('Everything has enough stock.') ?></div></div><?php endif; ?>
                         <?php foreach ($rdData['low_drinks'] as $d): ?>
-                        <div class="rd2-row justify-content-between"><span><?= safe_output($d['product_name']) ?></span><span class="badge" style="background:#dc3545;color:#fff;"><?= rtrim(rtrim(number_format((float)$d['stock'], 2), '0'), '.') ?></span></div>
+                        <div class="rd2-row justify-content-between"><span><?= safe_output($d['product_name']) ?></span><span class="badge rd2-low"><?= rtrim(rtrim(number_format((float)$d['stock'], 2), '0'), '.') ?></span></div>
                         <?php endforeach; ?>
                         <?php if ($rdData['low_drinks'] && canView('pos') && canView('pos_restock')): ?>
                         <a href="<?= getUrl('restaurant/purchases') ?>" class="rd2-row text-primary small"><i class="bi bi-box-arrow-in-down"></i><span><?= t('Buy stock & ingredients') ?></span></a>
@@ -457,8 +452,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
 
         <?php if ($rdMoney): ?><section class="rd2-money"><?= $b_money ?></section><?php endif; ?>
         <section class="rd2-earn"><?= $b_earn ?></section>
-        <section class="rd2-busy d-flex flex-column gap-3"><?= $b_busy ?><?= $b_types ?></section>
-        <?php if ($b_check !== ''): ?><section class="rd2-check"><?= $b_check ?></section><?php endif; ?>
+        <section class="rd2-types"><?= $b_types ?></section>
     </div>
     <?php endif; ?>
 <?php endif; ?>
@@ -504,27 +498,34 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
 .rdp .rdp-nudge .bi-lightbulb { font-size:1.2rem; color:#0d6efd; }
 @media (max-width:575.98px) { .rdp .rdp-chart { height:240px; } .rdp .rdp-num { font-size:1.3rem; } .rdp .rdp-num-lg { font-size:1.7rem; } }
 
-/* ── Layout 2 — "Side actions" (restaurant-only company). Colours as in the owner's chosen design: sales blue, costs orange. ── */
-.rdp-l2 .rdp-bar-food { background:#d97706; } .rdp-l2 .rdp-bar-exp { background:#7c93b5; } .rdp-l2 .rdp-bar-profit { background:#0d6efd; }
+/* ── Layout 2 — "Side actions" (restaurant-only company). Each card its own colour; sales blue, costs orange, profit green; no black or red. ── */
+.rdp-l2 .rdp-bar-food { background:#d97706; } .rdp-l2 .rdp-bar-exp { background:#7c93b5; } .rdp-l2 .rdp-bar-profit { background:#15803d; }
+.rdp-l2 .text-danger { color:#b45309 !important; } .rdp-l2 .rdp-num.text-primary { color:#15803d !important; }
+.rdp-l2 .rdp-down { background:#fef3e2; color:#b45309; }
+.rdp-l2 .rd2-low { background:#fef3e2; color:#b45309; }
 .rd2 { display:grid; gap:12px; grid-template-columns:200px repeat(3, minmax(0, 1fr));
-       grid-template-areas:"acts hero hero hero" "acts perf perf panel" "acts money earn busy" "acts check check check"; }
-.rd2.rd2-nocheck { grid-template-areas:"acts hero hero hero" "acts perf perf panel" "acts money earn busy"; }
+       grid-template-areas:"acts hero hero hero" "acts perf perf panel" "acts money earn types"; }
 .rd2 > * { min-width:0; }
 .rd2-acts { grid-area:acts; display:flex; flex-direction:column; gap:8px; align-content:start; align-self:start; background:#0d6efd; padding:10px; border-radius:14px; }
-.rd2-hero { grid-area:hero; background:#fff; border:1px solid #dbe6fb; border-radius:14px; padding:12px 14px; box-shadow:0 1px 3px rgba(13,110,253,.06); }
+.rd2-hero { grid-area:hero; }
 .rd2-perf { grid-area:perf; } .rd2-panel { grid-area:panel; } .rd2-money { grid-area:money; } .rd2-earn { grid-area:earn; }
-.rd2-busy { grid-area:busy; } .rd2-check { grid-area:check; }
+.rd2-types { grid-area:types; }
 .rd2-act { display:flex; align-items:center; gap:9px; background:#fff; border-radius:10px; padding:8px; text-decoration:none; color:#12305a; min-height:54px; }
 .rd2-act:hover { background:#e7f0ff; color:#0a58ca; }
 .rd2-sq { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; flex:none; font-size:1.05rem; }
 .rd2-at b { display:block; font-size:.85rem; line-height:1.15; } .rd2-at small { display:block; font-size:.72rem; color:#4f6381; line-height:1.15; }
-.rd2-sl { font-size:.72rem; font-weight:700; color:#4f6381; text-transform:uppercase; letter-spacing:.04em; margin:2px 0 6px; }
-.rd2-sum { display:grid; gap:8px; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); margin-bottom:10px; }
-.rd2-sc { display:flex; flex-direction:column; background:#eef4ff; border:1px solid transparent; border-radius:10px; padding:10px 12px; text-decoration:none; color:inherit; min-width:0; }
-a.rd2-sc:hover { border-color:#0d6efd; background:#fff; color:inherit; }
-.rd2-kv { font-size:1.35rem; font-weight:700; color:#0b5ed7; line-height:1.2; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
-.rd2-kv.text-danger { color:#dc3545 !important; } .rd2-kv small { font-size:.7rem; font-weight:600; color:#6c757d; }
-.rd2-ks { font-size:.72rem; color:#4f6381; }
+.rd2-sum { display:grid; gap:8px; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.rd2-sc { display:flex; flex-direction:column; gap:1px; border-radius:12px; padding:11px 13px; text-decoration:none; color:#fff; min-width:0; }
+a.rd2-sc:hover { color:#fff; filter:brightness(1.08); }
+.rd2-c-sales { background:#0b5ed7; } .rd2-c-orders { background:#0f766e; } .rd2-c-profit { background:#15803d; }
+.rd2-c-exp { background:#c2610c; } .rd2-c-tables { background:#7e22ce; } .rd2-c-owed { background:#3f3fb8; }
+.rd2-l { display:flex; align-items:center; gap:6px; font-size:.8rem; font-weight:600; }
+.rd2-now { margin-left:auto; font-size:.62rem; font-weight:700; border-radius:8px; padding:0 6px; background:rgba(255,255,255,.25); white-space:nowrap; }
+.rd2-kv { font-size:1.45rem; font-weight:700; line-height:1.15; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.rd2-kv small { font-size:.7rem; font-weight:600; }
+.rd2-ks { font-size:.72rem; }
+.rdp-ptabs { display:flex; flex-wrap:wrap; gap:3px; }
+.rdp-ptabs .btn { flex:none; margin:0 !important; font-size:.72rem !important; padding:3px 7px !important; border-radius:7px !important; line-height:1.3; min-height:0; }
 .rd2-pbody { overflow:auto; max-height:290px; }
 .rd2-row { display:flex; align-items:flex-start; gap:9px; padding:8px 12px; border-bottom:1px solid #eef3fd; color:#12305a; text-decoration:none; font-size:.82rem; }
 a.rd2-row:hover { background:#f4f8ff; color:#0a58ca; }
@@ -532,7 +533,8 @@ a.rd2-row:hover { background:#f4f8ff; color:#0a58ca; }
 .rd2-cnt { display:inline-block; min-width:16px; padding:0 4px; border-radius:8px; background:#b45309; color:#fff; font-size:.68rem; line-height:16px; text-align:center; }
 .rd2-ptabs .btn.active .rd2-cnt { background:#fff; color:#b45309; }
 @media (max-width:1199.98px) {
-    .rd2, .rd2.rd2-nocheck { grid-template-columns:minmax(0, 1fr); grid-template-areas:none; }
+    .rd2 { grid-template-columns:minmax(0, 1fr); grid-template-areas:none; }
+    .rd2-sum { grid-template-columns:repeat(2, minmax(0, 1fr)); }
     .rd2 > * { grid-area:auto !important; }
     .rd2-acts { flex-direction:row; flex-wrap:wrap; }
     .rd2-act { flex:1 1 calc(25% - 8px); flex-direction:column; text-align:center; padding:6px 2px; min-width:72px; }
@@ -555,7 +557,7 @@ a.rd2-row:hover { background:#f4f8ff; color:#0a58ca; }
                 restaurant: <?= json_encode(t('Restaurant')) ?>, other: <?= json_encode(t('Shops & other')) ?>, orders: <?= json_encode(t('Orders')) ?> };
     const URL_API = <?= json_encode(buildUrl('api/restaurant/dashboard_panel.php')) ?>;
     // Layout 2 uses the chosen design's colours: sales blue, costs orange, profit a dark line.
-    const BLUE = '#0d6efd', NAVY = '#052c65', SKY = '#9ec5fe', RED = '#dc3545', AMBER = '#d97706', INK = '#12305a', SLATE = '#7c93b5', PALE = '#a9c8f8';
+    const BLUE = '#0d6efd', NAVY = '#052c65', SKY = '#9ec5fe', RED = '#dc3545', AMBER = '#d97706', GREEN = '#15803d', SLATE = '#7c93b5', PALE = '#a9c8f8';
     const fmt = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
     let trendChart = null;
 
@@ -578,7 +580,7 @@ a.rd2-row:hover { background:#f4f8ff; color:#0a58ca; }
         ] : [
             { type: 'bar', label: L.sales, data: d.sales, backgroundColor: L2 ? BLUE : SKY, borderRadius: 4, order: 3 },
             { type: 'bar', label: L.costs, data: d.cost.map((c, i) => c + d.expenses[i]), backgroundColor: L2 ? AMBER : NAVY, borderRadius: 4, order: 2 },
-            { type: 'line', label: L.profit, data: d.profit, borderColor: L2 ? INK : BLUE, backgroundColor: L2 ? INK : BLUE, tension: .3, pointRadius: 2, borderWidth: 3, order: 1 }
+            { type: 'line', label: L.profit, data: d.profit, borderColor: L2 ? GREEN : BLUE, backgroundColor: L2 ? GREEN : BLUE, tension: .3, pointRadius: 2, borderWidth: 3, order: 1 }
         ];
         trendChart = new Chart(cv.getContext('2d'), {
             data: { labels: d.labels, datasets: datasets },
@@ -610,6 +612,12 @@ a.rd2-row:hover { background:#f4f8ff; color:#0a58ca; }
         b.addEventListener('click', function () {
             root.querySelectorAll('.rdp-period button').forEach(x => x.classList.remove('active')); b.classList.add('active');
             fetch(URL_API + '?part=trend&scope=' + encodeURIComponent(SCOPE) + '&period=' + encodeURIComponent(b.dataset.p), { credentials: 'same-origin' })
+                .then(r => r.json()).then(function (j) { if (j && j.success) drawTrend(j.trend); });
+        });
+    });
+    root.querySelectorAll('.rdp-period-sel').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            fetch(URL_API + '?part=trend&scope=' + encodeURIComponent(SCOPE) + '&period=' + encodeURIComponent(sel.value), { credentials: 'same-origin' })
                 .then(r => r.json()).then(function (j) { if (j && j.success) drawTrend(j.trend); });
         });
     });
