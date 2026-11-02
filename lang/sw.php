@@ -6212,4 +6212,7 @@ return [
     'Ask an admin to turn it on in Selling Settings.' => 'Mwombe msimamizi aiwashe kwenye Mipangilio ya Kuuza.',
     'Kitchen screen is on.' => 'Skrini ya jikoni imewashwa.',
     '%d dish(es) sold have no recipe, so their cost is not counted and profit may look too high. Add recipes in Menu.' => 'Chakula/vyakula %d vilivyouzwa havina mapishi, kwa hiyo gharama yake haihesabiwi na faida inaweza kuonekana kubwa kuliko ilivyo. Ongeza mapishi kwenye Menyu.',
+    'Add several tables' => 'Ongeza meza nyingi',
+    'How many tables do you have?' => 'Una meza ngapi?',
+    'Tables T1, T2, T3… are added. Numbers you already have are skipped. You can rename them or change their seats later.' => 'Meza T1, T2, T3… zinaongezwa. Namba ulizo nazo tayari zinarukwa. Unaweza kubadilisha majina au viti baadaye.',
 ];

@@ -374,3 +374,23 @@ $dash = $renderPage('includes/restaurant/dashboard.php', ['pos' => true, 'restau
 ok(strpos($dash, 'Food profit this month') !== false, 'the restaurant dashboard renders its Food profit card');
 ok(strpos($dash, 'id="rdUncostedHint"') === false, 'no warning when no dish without a recipe was sold');
 ok(!preg_match('/PHP (Warning|Notice|Fatal|Parse)|___EXC___/', $dash), 'the dashboard renders with no PHP warnings or errors');
+
+// ───────────────────────────────────────────────────────────────────────────
+section('F. Floors & Tables — add several tables at once');
+$fl = $renderPage('app/bms/restaurant/floors.php', ['pos' => true, 'restaurant_pos' => true], 'restaurant');
+ok(strpos($fl, 'id="addSeveralTablesBtn"') !== false && strpos($fl, 'function addSeveralTables()') !== false, 'the page offers "Add several tables"');
+$fsrc = file_get_contents("$root/app/bms/restaurant/floors.php");
+ok(preg_match('/if \(\$can_edit\): \?>.*id="addSeveralTablesBtn".*<\?php endif; \?>/s', $fsrc) === 1, 'the button is shown only to people who can edit (same rule as Add Table)');
+ok(strpos($fsrc, "api/restaurant/quick_setup.php") !== false && strpos($fsrc, "action: 'tables'") !== false, 'it reuses the existing bulk endpoint (no new write path)');
+ok(!preg_match('/PHP (Warning|Notice|Fatal|Parse)|___EXC___/', $fl), 'the page renders with no PHP warnings');
+$fh = preg_replace('#<!--.*?-->#s', '', explode('___OUT___', $fl, 2)[1] ?? '');
+preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $fh, $fm);
+$fbad = 0;
+foreach ($fm[1] as $i => $jsPart) {
+    if (trim($jsPart) === '' || strpos($jsPart, 'application/ld+json') !== false) continue;
+    $ff = tempnam(sys_get_temp_dir(), 'fjs') . '.js'; file_put_contents($ff, $jsPart);
+    exec('node --check ' . escapeshellarg($ff) . ' 2>&1', $oo, $rc); @unlink($ff);
+    if ($rc !== 0) { $fbad++; echo "     script #$i: " . implode(' ', array_slice($oo, 0, 3)) . "\n"; }
+    $oo = [];
+}
+ok($fbad === 0, 'every inline script of the floors page parses (' . count($fm[1]) . ' scripts)');
