@@ -947,6 +947,21 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
 
                 <!-- Date + location (right side) -->
                 <div class="ms-auto d-flex align-items-center gap-2 gap-md-3 text-white date-location-box">
+                    <?php
+                    // Restaurant dashboard (2026-11-02): a notification bell with the unread count, for a restaurant-only Smart POS company
+                    // only. It opens the existing Notification Center; what appears in it is decided later. Everyone else: no change.
+                    require_once __DIR__ . '/core/restaurant_scope.php';
+                    $__bell_on = posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo);
+                    if ($__bell_on):
+                        $__bell_n = 0;
+                        try { $__bq = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $__bq->execute([(int)($_SESSION['user_id'] ?? 0)]); $__bell_n = (int)$__bq->fetchColumn(); } catch (Throwable $e) { /* the icon still shows */ }
+                        $__bell_tag = canView('notification_center') ? 'a href="' . htmlspecialchars(getUrl('notification_center')) . '"' : 'span';
+                        $__bell_end = canView('notification_center') ? 'a' : 'span'; ?>
+                    <<?= $__bell_tag ?> class="rd-bell text-white position-relative" id="rdBell" title="<?= htmlspecialchars(t('Notifications')) ?>" aria-label="<?= htmlspecialchars(t('Notifications')) ?>">
+                        <i class="bi bi-bell fs-5"></i><?php if ($__bell_n > 0): ?><span class="rd-bell-n"><?= $__bell_n > 99 ? '99+' : $__bell_n ?></span><?php endif; ?>
+                    </<?= $__bell_end ?>>
+                    <style>.rd-bell{text-decoration:none;line-height:1;padding:2px 4px}.rd-bell .rd-bell-n{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#fff;color:#0b5ed7;font-size:.65rem;font-weight:700;line-height:17px;text-align:center}</style>
+                    <?php endif; ?>
                     <div class="small fw-bold date-text" style="font-size:0.85rem;">
                         <i class="bi bi-calendar3 me-1 opacity-75"></i>
                         <span class="d-none d-md-inline"><?= date('l, d M Y') ?></span>

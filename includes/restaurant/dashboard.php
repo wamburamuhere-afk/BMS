@@ -25,66 +25,13 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
     require ROOT_DIR . '/includes/restaurant/getting_started.php';
     ?>
 
-    <!-- Quick actions -->
-    <div class="rd-actions mb-3">
-        <?php if (canCreate('pos')): ?>
-        <a href="<?= getUrl('pos') ?>" class="rd-act rd-act-main"><i class="bi bi-cart-check"></i><span><?= t('Take order') ?></span></a>
-        <a href="<?= getUrl('restaurant/tables-board') ?>" class="rd-act"><i class="bi bi-grid-3x3-gap"></i><span><?= t('Tables') ?></span></a>
-        <?php endif; ?>
-        <a href="<?= getUrl('restaurant/menu') ?>" class="rd-act"><i class="bi bi-journal-richtext"></i><span><?= t('Menu') ?></span></a>
-        <?php if ((canView('pos') && canView('pos_restock')) || canCreate('expenses')): ?>
-        <a href="<?= getUrl('restaurant/purchases') ?>" class="rd-act"><i class="bi bi-basket"></i><span><?= t('Purchases') ?></span></a>
-        <?php endif; ?>
-        <?php if (canView('expenses')): ?>
-        <a href="<?= getUrl('expenses') ?>" class="rd-act"><i class="bi bi-receipt"></i><span><?= t('Expenses') ?></span></a>
-        <?php endif; ?>
-    </div>
-
     <!-- The restaurant dashboard panel: today vs yesterday, performance chart, where the money went,
-         what earns money, busy hours, order types, needs attention (includes/restaurant/dash_panel.php). -->
+         what earns money, busy hours, order types, needs attention, running low, recent orders — Layout 2, "Side actions"
+         (includes/restaurant/dash_panel.php). -->
     <?php $rdScope = 'company'; include ROOT_DIR . '/includes/restaurant/dash_panel.php'; ?>
 
-    <div class="row g-3">
-        <div class="col-lg-7">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-1"></i><?= t('Recent orders') ?></h6>
-                    <?php if (canView('pos')): ?><a href="<?= getUrl('pos_dashboard') ?>" class="small"><?= t('See all') ?></a><?php endif; ?>
-                </div>
-                <div class="list-group list-group-flush">
-                    <?php if (!$rd['recent']): ?>
-                    <div class="list-group-item text-muted text-center py-4"><?= t('No orders yet today. Tap "Take order" to start.') ?></div>
-                    <?php endif; ?>
-                    <?php foreach ($rd['recent'] as $o): ?>
-                    <div class="list-group-item d-flex justify-content-between align-items-center gap-2">
-                        <div class="min-w-0">
-                            <div class="fw-semibold text-truncate"><?= safe_output($o['table_number'] !== null ? t('Table') . ' ' . $o['table_number'] : ($rdTypes[$o['sale_type']] ?? t('Order'))) ?></div>
-                            <div class="small text-muted text-truncate"><?= safe_output($o['receipt_number']) ?> · <?= date('H:i', strtotime($o['sale_date'])) ?></div>
-                        </div>
-                        <div class="fw-bold text-nowrap"><?= $rdFmt($o['grand_total']) ?></div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-5 d-flex flex-column gap-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-cup-straw text-primary me-1"></i><?= t('Drinks and ingredients running low') ?></h6></div>
-                <div class="list-group list-group-flush">
-                    <?php if (!$rd['low_drinks']): ?><div class="list-group-item text-muted small"><?= t('Everything has enough stock.') ?></div><?php endif; ?>
-                    <?php foreach ($rd['low_drinks'] as $d): ?>
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <span class="text-truncate"><?= safe_output($d['product_name']) ?></span>
-                        <span class="badge" style="background:#dc3545;color:#fff;"><?= rtrim(rtrim(number_format((float)$d['stock'], 2), '0'), '.') ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                    <?php if ($rd['low_drinks'] && canView('pos') && canView('pos_restock')): ?>
-                    <a href="<?= getUrl('restaurant/purchases') ?>" class="list-group-item list-group-item-action text-primary small"><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Layout 2: the quick actions, the summary cards, and the Needs attention / Activities / Running low / Orders panel are all
+         part of the panel above (they used to be separate rows here). -->
 </div>
 
 
