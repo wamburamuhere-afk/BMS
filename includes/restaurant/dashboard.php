@@ -18,6 +18,15 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
             <h4 class="mb-0 text-truncate"><i class="bi bi-cup-hot text-primary me-2"></i><?= t('Dashboard') ?></h4>
             <div class="small text-muted"><?= $rdName !== '' ? sprintf(t('Welcome back, %s!'), safe_output($rdName)) . ' · ' : '' ?><?= date('d M Y') ?></div>
         </div>
+        <form method="get" class="d-flex align-items-center gap-2 mb-0">
+            <label for="rdPeriodSel" class="small text-muted mb-0"><?= t('Showing') ?></label>
+            <select id="rdPeriodSel" name="rd_period" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                <?php $rdPSel = (string)($_GET['rd_period'] ?? 'today');
+                foreach (['today' => t('Today'), 'week' => t('This week'), 'month' => t('This month'), 'quarter' => t('This quarter'), 'year' => t('This year')] as $k => $l): ?>
+                <option value="<?= $k ?>" <?= $rdPSel === $k ? 'selected' : '' ?>><?= $l ?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
     </div>
 
     <?php

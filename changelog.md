@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): dashboard arrangement A — period dropdowns, coloured cards, bell beside Help; Money check and Busy hours removed
+
+**Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `api/restaurant/dashboard_panel.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Not changed:** the retail dashboard and the mixed-company strip (it keeps its buttons and Busy hours). Restaurant-only Smart POS company only.
+
+- **Performance period** is a dropdown with all 5 retail periods: Daily, Weekly, Monthly, Quarterly, Yearly.
+- **"Today" heading replaced** by a "Showing" dropdown (Today, This week, This month, This quarter, This year). It drives the cards, Where your money went, What earns you money and How customers order. Each period is compared with the same stretch of the period before.
+- **Six cards, each its own colour:** Sales blue, Orders teal, Profit green, Expenses orange, Open tables purple, Owed to me indigo. Open tables and Owed to me are marked "Right now". The Kitchen waiting card is dropped; the Kitchen action still shows the count.
+- **Removed:** Money check this month, Busy hours.
+- **Bell** moved to the lower bar, left of Help, on computer and phone.
+- **No black or red** in the new layout: warnings are amber, profit is green.
+- The profit warnings still look at the whole month in every view, because no expenses today is normal and none this month is not.
+
 ## 2026-11-02 — feat(restaurant): dashboard Layout 2 "Side actions" with the chosen design's colours, and a notification bell
 
 **Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_dashboard_cli.php`, `tests/test_restaurant_phase6_cli.php`.
