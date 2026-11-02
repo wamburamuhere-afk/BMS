@@ -42,7 +42,9 @@ let rsSplit = null;
 // Only a restaurant/hybrid shop ever uses these; a retail shop never turns Menu mode on.
 let posMenuOnly = true;
 let posMenuCategoryIds = null;    // category ids that hold Menu items, from the last full Menu load
-function posMenuModeOn() { return posRestaurantActive() && posMenuOnly; }
+function posMenuModeOn() { return posRestaurantActive() && (posMenuOnly || posRestaurantOnlyShop()); }
+// A plain Restaurant shop (not Hybrid, not Retail): Menu only, and none of the retail-only controls.
+function posRestaurantOnlyShop() { return !!POS_REST_ONLY[parseInt($('#posWarehouseId').val() || 0, 10)]; }
 
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
 // True for admins / users granted every shop: they may load products with no shop chosen.
@@ -63,6 +65,10 @@ const PT = {
     stockLabel: <?= json_encode(t('Stock:')) ?>,
     quantityLabel: <?= json_encode(t('Quantity')) ?>,
     addToCart: <?= json_encode(t('Add to Cart')) ?>,
+    allShort: <?= json_encode(t('All')) ?>,
+    searchMenu: <?= json_encode(t('Search the menu...')) ?>,
+    menuEmpty: <?= json_encode(t('Your menu is empty. Add dishes and drinks in Menu.')) ?>,
+    openMenu: <?= json_encode(t('Open Menu')) ?>,
     cancel: <?= json_encode(t('Cancel')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     serverError: <?= json_encode(t('Server error.')) ?>,
@@ -668,7 +674,14 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
         dataType: 'json',
         success: function(response) {
             // Menu view with nothing on the Menu yet: show the products instead of an empty till.
-            if (posMenuModeOn() && !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined)
+            if (posRestaurantOnlyShop() && !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined)
+                && response.success && !(response.data && response.data.length > 0)) {
+                // A Restaurant shop with nothing on its Menu yet: say so (never fall back to retail products).
+                $('#loadingProducts').hide();
+                $('#productGrid').html('<div class="col-12 text-center py-5"><i class="bi bi-journal-richtext" style="font-size:3rem;color:#0d6efd"></i><h5 class="mt-3">' + PT.menuEmpty + '</h5><a class="btn btn-primary mt-2" href="<?= getUrl('restaurant/menu') ?>">' + PT.openMenu + '</a></div>');
+                return;
+            }
+            if (posMenuModeOn() && !posRestaurantOnlyShop() && !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined)
                 && !(response.success && response.data && response.data.length > 0)) {
                 posMenuOnly = false;
                 $('#posViewAll').prop('checked', true);
@@ -907,7 +920,7 @@ function posRenderMenuChips(activeId) {
     const strip = $('#menuCategoryButtons');
     if (!strip.length) return;
     const ids = posMenuCategoryIds || [];
-    const allLabel = $('#categoryButtons button:first').text().trim();
+    const allLabel = PT.allShort;
     let html = `<button type="button" class="btn btn-sm ${activeId === 'all' ? 'btn-primary active' : 'btn-outline-secondary'}" onclick="loadMenuCategory('all')">${safeOutput(allLabel)}</button>`;
     ids.forEach(function (id) {
         const cat = categories.find(c => parseInt(c.category_id, 10) === id);
@@ -2043,8 +2056,18 @@ function applyPosModeUi() {
     const show = posRestaurantActive();
     // Menu | All products switch, and the Menu's own group chips in place of the retail categories.
     $('#posMenuSwitchRow').toggleClass('d-none', !show);
-    $('#menuCategoryButtons').toggleClass('d-none', !(show && posMenuOnly));
-    $('#categoryButtons').toggleClass('d-none', show && posMenuOnly);
+    $('#menuCategoryButtons').toggleClass('d-none', !posMenuModeOn());
+    $('#categoryButtons').toggleClass('d-none', posMenuModeOn());
+    // Restaurant-only shop: no Menu | All products choice, and none of the retail-only controls.
+    const restOnly = posRestaurantOnlyShop();
+    $('#posMenuSwitchGroup').toggleClass('pos-rest-hide', restOnly);
+    $('.pos-restock-btn, #addProductDropdown, #scannerReadyBadge, button[onclick="holdSale()"], button[onclick="showHeldSales()"], #loyaltyPointsSection').toggleClass('pos-rest-hide', restOnly);
+    $('#posPriceGroupId').closest('.mb-2').toggleClass('pos-rest-hide', restOnly);
+    const $srch = $('#productSearch');
+    if ($srch.length) {
+        if ($srch.data('origPlaceholder') === undefined) $srch.data('origPlaceholder', $srch.attr('placeholder'));
+        $srch.attr('placeholder', restOnly ? PT.searchMenu : $srch.data('origPlaceholder'));
+    }
     // The order bar (Dine in / Take away / Delivery + table) replaces the small table icon.
     const hasBar = $('#restaurantOrderBar').length > 0;
     $('#restaurantTableBtn').toggleClass('d-none', !show || hasBar);
@@ -3350,6 +3373,7 @@ function updateCashBalanceUI() {
     // ── Core barcode lookup ──────────────────────────────────────────────────
     function handleBarcodeScanned(code) {
         if (!code || code.length < 3) return;
+        if (posRestaurantOnlyShop()) return;   // a Restaurant shop sells from its Menu — no barcode scanning
 
         // Search allProducts first (full catalog, unaffected by category filter).
         // Fall back to products[] if allProducts hasn't been populated yet.

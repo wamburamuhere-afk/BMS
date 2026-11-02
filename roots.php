@@ -1179,6 +1179,7 @@ $routes = [
     'restaurant/menu'               => RESTAURANT_DIR . '/menu.php',   // restaurant_plan.md Phase 1
     'restaurant/tables-board'       => RESTAURANT_DIR . '/tables_board.php', // restaurant_plan.md Phase 2
     'restaurant/sales-report'       => RESTAURANT_DIR . '/sales_report.php', // restaurant_plan.md Phase 6
+    'restaurant/purchases'          => RESTAURANT_DIR . '/purchases.php',  // restaurant focus pass: buy stock & ingredients
 
 
     // ========================================================================

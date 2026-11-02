@@ -313,3 +313,14 @@ profit honest and makes adding recipes the obvious next step. Menu-engineering c
 the retail Performance card's gate (reports access).
 
 **Not built:** per-waiter performance (no waiter on the sale in the data model yet), money-by-hour (the ledger is dated by day only — hours show order counts).
+
+## Focus pass (2026-11-02) — built on branch `feat/restaurant-focus`
+
+Goal: a company whose every shop is a Restaurant sees a restaurant, not a retail shop with a restaurant bolted on. Retail, mixed, Hybrid and full BMS are unchanged (tests compare renders against develop).
+
+- **Phase 0** — POS Mode choice only in Smart POS (`posModeSelectable()`).
+- **Phase 1** — restaurant-only menu (Orders / Menu / Purchases / Customers), Comms removed from Smart POS, reports + settings entries, phone menu.
+- **Phase 2** — till for a Restaurant shop: Menu items only, retail controls hidden.
+- **Phase 3** — Purchases page: stock items (weighted-average cost, ledger-posted) and groceries; Menu "Buy stock" row action; low-stock links.
+- **Phase 4** — Selling Settings: Restaurant first, Record Old Sale / Loyalty hidden (saving keeps hidden values).
+- Not built: pay-supplier-later (Procurement/GRN, not used by Smart POS).

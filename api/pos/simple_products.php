@@ -163,7 +163,9 @@ try {
             $sqlSuffix .= " AND p.is_available = 1";
             // Restaurant simplicity pass — the waiter's "Menu" view: only Menu dishes/drinks,
             // not every retail product of a hybrid shop. Ignored on a retail shop.
-            if (!empty($_GET['menu_only']) && restaurantMenuSchemaReady($pdo)) {
+            // A plain Restaurant shop (not Hybrid) ALWAYS gets the Menu only — raw ingredients and leftover retail
+            // stock are never offered to a waiter, whatever the page asks for.
+            if ((!empty($_GET['menu_only']) || restaurantShopIsRestaurantOnly($pdo, $warehouse_id)) && restaurantMenuSchemaReady($pdo)) {
                 $sqlSuffix .= " AND p.is_menu_item = 1";
             }
         }

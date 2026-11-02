@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): Smart POS focus pass — a restaurant-only company sees a restaurant (menu, orders, purchases, settings), no retail leftovers
+
+**Plan:** `restaurant_plan.md` → "Focus pass (2026-11-02)". Branch `feat/restaurant-focus`.
+**New:** `core/restaurant_purchases.php`, `api/restaurant/buy_stock.php`, `api/restaurant/search_stock_items.php`, `api/restaurant/get_purchases.php`, `app/bms/restaurant/purchases.php`, `tests/test_restaurant_focus_cli.php`.
+**Changed:** `header.php`, `core/pos_nav.php`, `core/restaurant_scope.php`, `roots.php`, `app/bms/stock/warehouses.php`, `ajax_get_warehouse.php`, `api/mobile/warehouses/create.php`, `api/mobile/warehouses/update.php`, `api/pos/simple_products.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/menu.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/dash_panel.php`, `app/constant/settings/pos_config_settings.php`, `lang/sw.php`, `tests/test_restaurant_mode_gating_cli.php`, `tests/test_restaurant_simplicity_cli.php`, `tests/test_shop_pages_i18n_and_modules_cli.php`.
+**Not changed (proved by tests + side-by-side renders against develop):** full BMS menus, GRN / LPO / DN / procurement, retail Receive Stock (`api/pos/quick_restock.php`), and every retail, mixed or Hybrid Smart POS screen — apart from the removed Comms menu (see below).
+
+- **POS Mode only in Smart POS.** The shop form's POS Mode choice (add/edit, web and mobile API) now needs Smart POS on as well as Restaurant POS. Full BMS never sees it and cannot save it.
+- **Menu for a restaurant-only company** (every active shop is a Restaurant): Dashboard, Orders (take order, tables, kitchen, reservations, who owes me), Menu (menu items, groups, add-ons), Purchases, Customers; Restaurant Sales first under Reports, no Inventory report, Shops under Settings; same on the phone menu.
+- **Comms menu removed from Smart POS** (the floating Ask BMS icon replaces it; Campaigns/Leads were dead links). Full BMS untouched.
+- **The till for a Restaurant shop:** Menu items only (no All switch, no retail-only buttons: restock, add product, scanner, hold, loyalty, price group), "Your menu is empty" message instead of falling back to retail stock.
+- **Purchases page ("Buy stock & ingredients"):** drinks and ingredients (no selling price needed), cost follows what you pay (weighted average) so cost of sales and profit per plate stay true; posts to the one ledger (Dr Inventory / Cr cash or bank), batch with optional expiry, optional supplier; groceries (not counted) reuse the existing Buy Ingredients window. "Pay supplier later" deliberately not built (Procurement's job).
+- **Selling Settings:** for a restaurant-only company the Restaurant options come first and Record Old Sale / Loyalty are hidden; saving never resets a hidden setting.
+- All new text through `t()` with Swahili. Tests: `test_restaurant_focus_cli.php` 212 assertions; related suites re-run, remaining failures identical to develop.
+
 ## 2026-11-02 — feat(restaurant): a real dashboard — today vs yesterday, performance chart, "where your money went", profit per plate, busy hours, and an All | Restaurant | Shop switch for mixed companies
 
 **Plan:** `restaurant_plan.md` → "Dashboard pass (2026-11-02)".

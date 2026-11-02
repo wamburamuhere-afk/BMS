@@ -89,9 +89,9 @@ foreach (['WAREHOUSE INVENTORY REPORT', '>Active Locations<', '>Total Stock Item
 
 section('4. Switched-off modules leave no trace');
 ok(strpos($edit, '$show_projects = projectsModuleActive();') !== false && strpos($edit, '<?php if ($show_projects): ?>') !== false, 'edit form: Project field gated on projectsModuleActive()');
-ok(strpos($edit, "\$show_pos_mode = tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos');") !== false && strpos($edit, '<?php if ($show_pos_mode): ?>') !== false, 'edit form: POS Mode gated on Restaurant POS');
+ok(strpos($edit, "\$show_pos_mode = posModeSelectable();") !== false && strpos($edit, '<?php if ($show_pos_mode): ?>') !== false, 'edit form: POS Mode gated on Restaurant POS');
 $list = file_get_contents("$root/app/bms/stock/warehouses.php");
-ok(strpos($list, "<?php if (tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos')): ?>") !== false, 'add form: POS Mode gated on Restaurant POS');
+ok(strpos($list, "<?php if (posModeSelectable()): ?>") !== false, 'add form: POS Mode gated on Restaurant POS');
 ok(preg_match('/if \\(!projectsModuleActive\\(\\)\\) \\{\\s*\\$project_id = 0;/', $view) === 1, 'details page: ?project_id= ignored when Projects is off');
 
 section('5. Edit keeps hidden fields');

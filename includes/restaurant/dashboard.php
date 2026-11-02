@@ -79,7 +79,7 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
                     </div>
                     <?php endforeach; ?>
                     <?php if ($rd['low_drinks'] && canView('pos') && canView('pos_restock')): ?>
-                    <a href="<?= getUrl('receive_stock') ?>" class="list-group-item list-group-item-action text-primary small"><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Receive Stock') ?></a>
+                    <a href="<?= getUrl('restaurant/purchases') ?>" class="list-group-item list-group-item-action text-primary small"><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></a>
                     <?php endif; ?>
                 </div>
             </div>
