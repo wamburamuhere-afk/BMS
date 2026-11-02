@@ -6211,4 +6211,5 @@ return [
     'Turn on kitchen screen' => 'Washa skrini ya jikoni',
     'Ask an admin to turn it on in Selling Settings.' => 'Mwombe msimamizi aiwashe kwenye Mipangilio ya Kuuza.',
     'Kitchen screen is on.' => 'Skrini ya jikoni imewashwa.',
+    '%d dish(es) sold have no recipe, so their cost is not counted and profit may look too high. Add recipes in Menu.' => 'Chakula/vyakula %d vilivyouzwa havina mapishi, kwa hiyo gharama yake haihesabiwi na faida inaweza kuonekana kubwa kuliko ilivyo. Ongeza mapishi kwenye Menyu.',
 ];

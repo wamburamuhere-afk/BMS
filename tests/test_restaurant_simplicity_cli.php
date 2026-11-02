@@ -235,6 +235,33 @@ try {
         'choosing a table with no open order keeps the items already in the cart');
     ok(strpos($selBody, 'cart = JSON.parse(existing.items_data)') !== false, 'choosing a table WITH an open order still loads that order');
 
+    // ───────────────────────────────────────────────────────────────────────
+    section('E. Dashboard — profit hint for dishes sold without a recipe');
+    require_once "$root/core/restaurant_dashboard.php";
+    $base = restaurantDashboardData($pdo);
+    ok(array_key_exists('uncosted_dishes', $base) && is_int($base['uncosted_dishes']), 'dashboard data has an uncosted_dishes count (additive key)');
+    foreach (['sales_today', 'month_sales', 'month_ingredients', 'month_expenses', 'month_food_profit', 'orders_today', 'open_tables', 'open_amount', 'recent', 'top_dishes', 'low_drinks'] as $k) {
+        if (!array_key_exists($k, $base)) ok(false, "dashboard data still has $k");
+    }
+    ok(true, 'every existing dashboard figure is still returned');
+    $pdo->prepare("INSERT INTO cash_register_shifts (shift_code, user_id, register_id, warehouse_id, start_time, starting_cash, status) VALUES ('TEST-SIMPLE2', ?, 1, ?, NOW() - INTERVAL 1 HOUR, 0, 'active')")->execute([$admin, $W]);
+    $sale = call('api/pos/process_sale.php', 'POST', [
+        'customer_id' => null, 'warehouse_id' => $W, 'project_id' => null, 'items' => [$items[0]],
+        'subtotal' => 6000, 'discount_percentage' => 0, 'discount_amount' => 0, 'tax' => 0, 'total' => 6000,
+        'payment_method' => 'cash', 'amount_tendered' => 6000, 'change_given' => 0, 'amount_paid' => 6000, 'sale_type' => 'take_away',
+    ], true);
+    ok(!empty($sale['success']), 'a dish with no recipe is sold' . (!empty($sale['success']) ? '' : ' — ' . ($sale['message'] ?? '')));
+    $afterSale = restaurantDashboardData($pdo);
+    ok($afterSale['uncosted_dishes'] === $base['uncosted_dishes'] + 1, 'the dish sold with no recipe is counted (' . $base['uncosted_dishes'] . ' → ' . $afterSale['uncosted_dishes'] . ')');
+    $pdo->prepare("INSERT INTO product_assembly_components (parent_product_id, component_product_id, component_name, unit, qty_per_unit, total_qty) VALUES (?, ?, 'x', 'pcs', 1, 1)")->execute([$DISH, $DRINK]);
+    $afterRecipe = restaurantDashboardData($pdo);
+    ok($afterRecipe['uncosted_dishes'] === $base['uncosted_dishes'], 'once the dish has a recipe it is no longer counted');
+    $pdo->prepare("DELETE FROM product_assembly_components WHERE parent_product_id = ?")->execute([$DISH]);
+    $dv = file_get_contents("$root/includes/restaurant/dashboard.php");
+    ok(preg_match('/if \(!empty\(\$rd\[\'uncosted_dishes\'\]\)\):.*id="rdUncostedHint"/s', $dv) === 1, 'the hint shows only when there are uncosted dishes');
+    ok(strpos($dv, "t('Food profit this month')") !== false && strpos($dv, "\$rdFmt(\$rd['month_food_profit'])") !== false, 'the profit figure itself is unchanged (still the ledger number)');
+    $pdo->prepare("UPDATE cash_register_shifts SET status = 'closed' WHERE shift_code = 'TEST-SIMPLE2'")->execute();
+
     // [later phases append here]
 } finally {
     $pdo->endOuter();
@@ -340,3 +367,10 @@ foreach ($km[1] as $i => $jsPart) {
 }
 ok($kbad === 0, 'every inline script of the kitchen page parses (' . count($km[1]) . ' scripts)');
 ok(strpos(file_get_contents("$root/app/bms/restaurant/kitchen_dashboard.php"), '${parseFloat(it.quantity)}${STRINGS.qty}') !== false, 'a ticket line reads "1x Chai", not "1.000x Chai"');
+
+// ───────────────────────────────────────────────────────────────────────────
+section('E2. Restaurant dashboard renders; no hint when nothing is uncosted');
+$dash = $renderPage('includes/restaurant/dashboard.php', ['pos' => true, 'restaurant_pos' => true], 'restaurant');
+ok(strpos($dash, 'Food profit this month') !== false, 'the restaurant dashboard renders its Food profit card');
+ok(strpos($dash, 'id="rdUncostedHint"') === false, 'no warning when no dish without a recipe was sold');
+ok(!preg_match('/PHP (Warning|Notice|Fatal|Parse)|___EXC___/', $dash), 'the dashboard renders with no PHP warnings or errors');

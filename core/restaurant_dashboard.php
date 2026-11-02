@@ -34,6 +34,7 @@ if (!function_exists('restaurantDashboardData')) {
             'recent'            => [],
             'top_dishes'        => [],
             'low_drinks'        => [],
+            'uncosted_dishes'   => 0,   // dishes sold this month that have no recipe (so their cost is not in the profit)
         ];
         $out['month_food_profit'] = round($out['month_sales'] - $out['month_ingredients'], 2);
 
@@ -61,6 +62,16 @@ if (!function_exists('restaurantDashboardData')) {
                 WHERE ps.sale_status = 'completed' AND ps.is_return_sale = 0 AND DATE(ps.sale_date) = CURDATE()
                   AND ps.warehouse_id IN ($in) AND p.is_menu_item = 1
                 GROUP BY p.product_id, p.product_name ORDER BY qty DESC LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+
+            // A dish with no recipe is always sellable, but its ingredients cost nothing in the books —
+            // so "food profit" looks higher than it is. Count them so the dashboard can say so (operational
+            // count only; every money figure above still comes from the ledger).
+            $out['uncosted_dishes'] = (int)$pdo->query("SELECT COUNT(DISTINCT p.product_id)
+                FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id JOIN products p ON p.product_id = psi.product_id
+                WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
+                  AND DATE(ps.sale_date) BETWEEN " . $pdo->quote($monthStart) . " AND " . $pdo->quote($today) . "
+                  AND ps.warehouse_id IN ($in) AND p.is_menu_item = 1 AND p.is_service = 1
+                  AND NOT EXISTS (SELECT 1 FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id)")->fetchColumn();
 
             $out['low_drinks'] = $pdo->query("SELECT p.product_name, COALESCE(SUM(ps.stock_quantity),0) AS stock
                 FROM products p LEFT JOIN product_stocks ps ON ps.product_id = p.product_id AND ps.warehouse_id IN ($in)
