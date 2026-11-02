@@ -1814,6 +1814,11 @@ function submitPayment(paymentData) {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
+                // The sale is saved on the server, so forget the browser's saved copy of this cart NOW, not when the
+                // "Sale Completed" popup closes. Otherwise a refresh / closed tab / lost power while the popup is showing
+                // brings the PAID order back into the cart on the next open, ready to be charged again (2026-11-02).
+                // The in-memory cart stays until the popup closes: the WhatsApp receipt below is built from it.
+                clearCartStorage();
                 // Phase 10 (pos_upgrade_plan.md §7) — "Automatically print the
                 // receipt" POS setting: skip waiting for the button click.
                 if (POS_AUTO_PRINT_RECEIPT) { printReceipt(response.sale_id); }
