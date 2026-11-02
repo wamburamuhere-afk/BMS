@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): buy on credit or partly paid, and pay suppliers later
+
+**Branch:** `feat/restaurant-pay-later`.
+**New:** `core/restaurant_supplier_credit.php`, `api/restaurant/supplier_credit.php`, `tests/test_restaurant_pay_later_cli.php` (52 checks).
+**Changed:** `core/restaurant_purchases.php`, `api/restaurant/buy_stock.php`, `api/restaurant/get_purchases.php`, `app/bms/restaurant/purchases.php`, `lang/sw.php`.
+**Not changed:** retail Receive Stock (`api/pos/quick_restock.php`), the Smart BMS supplier bills and payments (`api/received_invoices.php`), and every retail or full-BMS screen.
+
+- **Payment on Purchases:** Paid (the default, unchanged), Partly paid (enter what you paid now) or Credit, with an optional "Pay by" date. A purchase that is not fully paid needs a supplier.
+- **One payable, shared with the Smart BMS:** the purchase becomes an approved supplier bill for the whole amount, posted exactly like a Bill (Dr Inventory, or Cost of food for groceries / Cr Accounts Payable). The part paid now is a payment on that bill (Dr Payable / Cr Cash), linked to it in the ledger. Example: 30,000 with 10,000 paid gives Inventory +30,000, Cash −10,000, Payable +20,000.
+- **New supplier with only a name and a phone number,** like adding a credit customer at the retail till. The same name and phone gives the same supplier.
+- **Suppliers you owe** on the Purchases page: supplier and phone, what, date, pay-by (with an Overdue mark), total, paid, owed, and a Pay button for part or all of it, with the payments made so far.
+- **Recent purchases** marks Credit / Partly paid with what is still owed, and lists groceries bought on credit.
+- **For the dashboard:** `restaurantOwedToSuppliers()` reads what is owed from the ledger (the bills' payable and their payments).
+- **Known, not changed:** `apSupplierInvoicesPosition()` in `core/receivables_payables.php` ignores part-payments; nothing uses it now.
+
 ## 2026-11-02 — feat(restaurant): true profit you can see — one Purchases form like Receive Stock, buying and selling price together, cost and profit on the Menu, a money check on the dashboard
 
 **Plan:** `restaurant_plan.md` → "Profit truth pass (2026-11-02)". Branch `feat/restaurant-profit-truth`.
