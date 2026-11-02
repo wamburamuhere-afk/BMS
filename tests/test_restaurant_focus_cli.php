@@ -138,4 +138,81 @@ ok(preg_match('/posModeSelectable\(\)\)\s*\{\s*\$sets\[\] = \'pos_mode = \?\'/',
 $s = file_get_contents("$root/api/mobile/warehouses/create.php");
 ok(preg_match('/if \(!posModeSelectable\(\)\) \{\s*\$pos_mode = \'retail\';/', $s) === 1, 'mobile create: a new shop is Retail unless the choice is offered');
 
+// ═══════════════════════════════════════════════════════════════════════════
+section('P1. Menus — restaurant-only company vs everything else');
+// The desktop bar only (between the main <ul> and the user-account <ul>), the phone side menu, and the phone reports sheet.
+$navOf = function (string $o): string {
+    $h = body($o);
+    $a = strpos($h, '<ul class="navbar-nav me-auto">'); $b = strpos($h, 'User Account (right side');
+    return ($a !== false && $b !== false && $b > $a) ? preg_replace('#<!--.*?-->#s', '', substr($h, $a, $b - $a)) : '';
+};
+// the phone side menu's group headings, e.g. ['Orders', 'Menu', 'Purchases', 'Customers']
+$sideOf = function (string $o): array {
+    preg_match_all('#<div class="bn-group">([^<]*)</div>#', preg_replace('#<!--.*?-->#s', '', body($o)), $m);
+    return array_map('html_entity_decode', $m[1]);
+};
+$page = ['page' => 'app/dashboard.php'];
+$rest = runWorker($page, $ON, $onlyRest, '1');
+$nav = $navOf($rest);
+ok(clean($rest) && $nav !== '', 'restaurant-only company: the dashboard renders with a desktop menu, no PHP warnings');
+foreach (['rfOrdersDropdown', 'rfMenuDropdown', 'rfBuyDropdown'] as $id) ok(strpos($nav, "id=\"$id\"") !== false, "restaurant-only: the $id menu is there");
+foreach (['Take order', 'Tables', 'Kitchen', 'Reservations', 'Who Owes Me', 'Menu items', 'Menu groups', 'Add-on options', 'Receive Stock', 'Suppliers', 'Customers', 'Restaurant Sales'] as $lbl) {
+    ok(strpos($nav, '> ' . $lbl . '</a>') !== false || strpos($nav, '>' . $lbl . '</a>') !== false || strpos($nav, $lbl . '</a>') !== false, "restaurant-only menu has: $lbl");
+}
+foreach (['aria-labelledby="coreDropdown"', 'My Business', 'Shop Products', 'simpleShopDropdown', 'id="restaurantDropdown"', 'communicationDropdown', 'Comms', 'Campaigns', 'Service', 'Inventory Report'] as $gone) {
+    ok(strpos($nav, $gone) === false, "restaurant-only menu does NOT have: $gone");
+}
+ok(preg_match('#>\s*(?:<i[^>]*></i>)?\s*Sell\s*</a>#', $nav) === 0, 'restaurant-only menu has no stand-alone "Sell" link (Orders → Take order replaces it)');
+$posRep = strpos($nav, 'Restaurant Sales'); $posSales = strpos($nav, 'Sales Report');
+ok($posRep !== false && ($posSales === false || $posRep < $posSales), 'Reports: Restaurant Sales comes first');
+ok(preg_match('#getUrl|href="[^"]*warehouses"#', $nav) === 1 || strpos($nav, 'warehouses') !== false, 'Settings holds the Shops page');
+$side = $sideOf($rest);
+foreach (['Orders', 'Menu', 'Purchases'] as $g) ok(in_array($g, $side, true), "phone side menu has the group: $g");
+ok(!in_array('Sales', $side, true) && !in_array('My Business', $side, true), 'phone side menu has no retail Sales / My Business groups');
+$sheet = body($rest); $sa = strpos($sheet, 'id="bmsReportsSheet"');
+ok($sa !== false && strpos(substr($sheet, $sa, 3500), 'Inventory Report') === false, 'phone Reports sheet has no Inventory Report');
+
+// Everything that is NOT restaurant-only keeps its menu.
+$legacyMustHave = ['aria-labelledby="coreDropdown"', '/products"', '/suppliers"', '/customers"'];   // the links (their labels follow the company's Shop / Warehouse wording)
+$cases = [
+  'retail Smart POS (every shop Retail)'    => [$retailAll, '1', true],
+  'mixed company (one Restaurant shop)'     => [$mixed, '1', true],
+  'every shop Hybrid'                       => [$hybridAll, '1', true],
+];
+foreach ($cases as $name => [$modes, $simple]) {
+    $o = runWorker($page, $ON, $modes, $simple); $n = $navOf($o);
+    ok(clean($o) && $n !== '', "$name: renders");
+    $miss = array_filter($legacyMustHave, fn($x) => strpos($n, $x) === false);
+    ok(!$miss, "$name: My Business keeps its Customers, Suppliers and Products links (" . ($miss ? 'missing ' . implode(', ', $miss) : 'all present') . ')');
+    ok(strpos($n, 'rfOrdersDropdown') === false && strpos($n, 'rfMenuDropdown') === false && strpos($n, 'rfBuyDropdown') === false, "$name: none of the restaurant-only menus");
+    ok(strpos($n, 'simpleShopDropdown') !== false || strpos($n, '>Shop<') !== false || strpos($n, 'Shop</a>') !== false || strpos($n, 'Receive Stock') !== false, "$name: the Shop menu (Shops / Receive Stock) is still there");
+    ok(strpos($n, 'communicationDropdown') === false && strpos($n, 'Campaigns') === false, "$name: Comms is gone from Smart POS");
+    $sd = $sideOf($o);
+    ok(!in_array('Purchases', $sd, true) && !in_array('Orders', $sd, true), "$name: the phone side menu has no restaurant-only groups");
+}
+$o = runWorker($page, $ON, $mixed, '1'); $n = $navOf($o);
+ok(strpos($n, 'restaurantDropdown') !== false, 'mixed company: the usual Restaurant dropdown is still there');
+$o = runWorker($page, $ON, $retailAll, '0'); $n = $navOf($o);
+ok(clean($o) && $n !== '' && strpos($n, 'rfOrdersDropdown') === false, 'full BMS (Simple Mode off): no restaurant-only menus');
+ok(strpos($n, 'communicationDropdown') !== false, 'full BMS: the Comms menu is still there (only Smart POS loses it)');
+$o = runWorker($page, $OFF, $onlyRest, '1'); $n = $navOf($o);
+ok(clean($o) && strpos($n, 'rfOrdersDropdown') === false, 'Restaurant POS off: no restaurant-only menus even if every shop is Restaurant');
+
+// ── Language: Swahili mode shows Swahili labels only — no English leftovers from this pass ──────────────────────
+$sw = require "$root/lang/sw.php";
+$swRest = runWorker($page, $ON, $onlyRest, '1', 'sw'); $swNav = $navOf($swRest);
+ok($swNav !== '', 'restaurant-only company in Swahili renders');
+$labels = ['Orders', 'Take order', 'Tables', 'Kitchen', 'Reservations', 'Who Owes Me', 'Menu', 'Menu items', 'Menu groups', 'Add-on options', 'Purchases', 'Receive Stock', 'Suppliers', 'Customers'];
+foreach ($labels as $k) {
+    $tr = $sw[$k] ?? null;
+    $hasSw = $tr !== null && strpos($swNav, $tr) !== false;
+    $leak = ($tr !== null && $tr !== $k) && preg_match('#</i>\s*' . preg_quote($k, '#') . '\s*</a>#', $swNav) === 1;
+    ok($hasSw && !$leak, "Swahili: '$k' shows as '" . ($tr ?? '(no translation!)') . "'" . ($leak ? ' — but the English label is also shown' : ''));
+}
+$enRest = runWorker($page, $ON, $onlyRest, '1', 'en'); $enNav = $navOf($enRest);
+ok(strpos($enNav, 'Take order') !== false && strpos($enNav, ($sw['Take order'] ?? '§§')) === false, 'English: the same menu shows English only (no Swahili mixed in)');
+$leaks = [];
+foreach (['Menu items', 'Menu groups', 'Add-on options', 'Purchases', 'Orders', 'Take order'] as $k) { if (!isset($sw[$k]) || $sw[$k] === $k) $leaks[] = $k; }
+ok(!$leaks, 'every new menu label has its own Swahili text' . ($leaks ? ' — missing: ' . implode(', ', $leaks) : ''));
+
 // [later phases append here]

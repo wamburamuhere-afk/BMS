@@ -6266,4 +6266,8 @@ return [
     'Restaurant and shops together' => 'Mgahawa na maduka kwa pamoja',
     'Restaurant only' => 'Mgahawa pekee',
     'Your shop dashboard is below' => 'Dashibodi ya duka lako iko chini',
+    // Restaurant focus pass (2026-11-02)
+    'Menu items' => 'Vitu vya Menyu',
+    'Menu groups' => 'Makundi ya Menyu',
+    'Add-on options' => 'Nyongeza',
 ];
