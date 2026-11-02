@@ -40,8 +40,9 @@ try {
     // their assigned projects. Mirrors app/bms/stock/warehouses.php. Skipped
     // entirely (and the field below hidden) when the Projects module is off.
     $show_projects = projectsModuleActive();
-    // POS Mode only matters to Restaurant POS; a retail-only tenant never sees it.
-    $show_pos_mode = tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos');
+    // POS Mode only matters to Smart POS with Restaurant POS; a retail-only or full-BMS tenant never sees it.
+    require_once __DIR__ . '/core/pos_nav.php';
+    $show_pos_mode = posModeSelectable();
     $all_projects = [];
     if (!$show_projects) {
         // nothing to load

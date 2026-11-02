@@ -1,6 +1,8 @@
 <?php
 // File: app/bms/stock/warehouses.php
 require_once __DIR__ . '/../../../roots.php';
+// posModeSelectable() — the save handlers below run before the header (which would load it) does.
+require_once __DIR__ . '/../../../core/pos_nav.php';
 
 // Enforce permission BEFORE any output
 autoEnforcePermission('warehouses');
@@ -59,9 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // enum, never trusted verbatim from POST.
         $pos_mode = in_array($_POST['pos_mode'] ?? '', ['retail', 'restaurant', 'hybrid'], true)
             ? $_POST['pos_mode'] : 'retail';
-        // Restaurant POS off for this tenant → a new shop is always retail,
+        // Restaurant POS off, or not Smart POS → a new shop is always retail,
         // whatever was posted (the form doesn't even show the field then).
-        if (!(tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos'))) {
+        if (!posModeSelectable()) {
             $pos_mode = 'retail';
         }
 
@@ -250,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         // Restaurant POS off for this tenant → a posted pos_mode is ignored
         // and the stored value kept, so only an entitled tenant can change it.
-        if (array_key_exists('pos_mode', $_POST) && !(tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos'))) {
+        if (array_key_exists('pos_mode', $_POST) && !posModeSelectable()) {
             $keep_mode_stmt = $pdo->prepare("SELECT pos_mode FROM warehouses WHERE warehouse_id = ?");
             $keep_mode_stmt->execute([$warehouse_id]);
             $stored_mode = $keep_mode_stmt->fetchColumn();
@@ -1358,7 +1360,7 @@ function get_primary_badge($is_primary) {
                             </div>
                         </div>
 
-                        <?php if (tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos')): ?>
+                        <?php if (posModeSelectable()): ?>
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="pos_mode" class="form-label"><?= t('POS Mode') ?></label>

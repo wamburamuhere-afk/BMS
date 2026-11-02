@@ -151,9 +151,9 @@ try {
 
     section('E. Mobile warehouses API carries the same gate');
     $c = file_get_contents("$root/api/mobile/warehouses/create.php");
-    ok(preg_match("/if \(!\(tenantFeatureEnabled\('pos'\) && tenantFeatureEnabled\('restaurant_pos'\)\)\) \{\s*\\\$pos_mode = 'retail';/", $c) === 1, 'create.php forces retail when Restaurant POS is off');
+    ok(preg_match('/if \(!posModeSelectable\(\)\) \{\s*\$pos_mode = \'retail\';/', $c) === 1, 'create.php forces retail unless the POS Mode choice is offered (Restaurant POS on AND Smart POS)');
     $u = file_get_contents("$root/api/mobile/warehouses/update.php");
-    ok(strpos($u, "&& tenantFeatureEnabled('pos') && tenantFeatureEnabled('restaurant_pos')) {") !== false, 'update.php only writes pos_mode when Restaurant POS is on');
+    ok(strpos($u, '&& posModeSelectable()) {') !== false, 'update.php only writes pos_mode when the POS Mode choice is offered (Restaurant POS on AND Smart POS)');
 } finally {
     $setMode($origMode);
     ok($getMode() === $origMode, "fixture restored: warehouse $whId pos_mode back to '$origMode'");
