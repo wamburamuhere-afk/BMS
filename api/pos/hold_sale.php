@@ -71,7 +71,20 @@ try {
     $shift = $stmt->fetch(PDO::FETCH_ASSOC);
     $shift_id = $shift['shift_id'] ?? null;
     if (!$shift_id) {
-        throw new Exception("Please start a cash register shift before holding a sale.");
+        // Restaurant simplicity pass — saving a TABLE's order moves no money, so a waiter
+        // needs no cash shift for it (paying still does). Only a table order on an active
+        // restaurant shop, and only once shift_id is nullable; every other hold — all
+        // retail holds included — keeps the rule below exactly as before.
+        $tableOrderNoShift = false;
+        if ($table_id) {
+            require_once __DIR__ . '/../../core/restaurant_scope.php';
+            $shiftCol = $pdo->query("SHOW COLUMNS FROM pos_held_sales LIKE 'shift_id'")->fetch(PDO::FETCH_ASSOC);
+            $tableOrderNoShift = $shiftCol && strtoupper((string)$shiftCol['Null']) === 'YES'
+                && restaurantShopActive($pdo, $warehouse_id);
+        }
+        if (!$tableOrderNoShift) {
+            throw new Exception("Please start a cash register shift before holding a sale.");
+        }
     }
 
     // Generate hold reference
