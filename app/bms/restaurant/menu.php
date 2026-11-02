@@ -288,6 +288,8 @@ const RM = {
     serverError: <?= json_encode(t('Server error. Please try again.')) ?>,
     stockLeft: <?= json_encode(t('stock')) ?>,
     recipe: <?= json_encode(t('Recipe')) ?>,
+    buyStock: <?= json_encode(t('Buy stock & ingredients')) ?>,
+    buyUrl: <?= json_encode(getUrl('restaurant/purchases')) ?>,
     cost: <?= json_encode(t('cost')) ?>,
     profit: <?= json_encode(t('profit')) ?>,
     perPlate: <?= json_encode(t('per plate')) ?>,
@@ -385,7 +387,7 @@ function actionMenu(it) {
         <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i></button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
             <li><button class="dropdown-item py-2 rounded" onclick="editItem(${it.product_id})"><i class="bi bi-pencil text-primary me-2"></i>${RM.edit}</button></li>
-            ${it.is_service ? `<li><button class="dropdown-item py-2 rounded" onclick="openRecipe(${it.product_id})"><i class="bi bi-list-check text-primary me-2"></i>${RM.recipe}</button></li>` : ''}
+            ${it.is_service ? `<li><button class="dropdown-item py-2 rounded" onclick="openRecipe(${it.product_id})"><i class="bi bi-list-check text-primary me-2"></i>${RM.recipe}</button></li>` : `<li><a class="dropdown-item py-2 rounded" href="${RM.buyUrl}?item=${it.product_id}"><i class="bi bi-box-arrow-in-down text-primary me-2"></i>${RM.buyStock}</a></li>`}
             <li><hr class="dropdown-divider"></li>
             <li><button class="dropdown-item py-2 rounded text-danger" onclick="removeItem(${it.product_id})"><i class="bi bi-x-circle text-danger me-2"></i>${RM.remove}</button></li>
         </ul></div>`;

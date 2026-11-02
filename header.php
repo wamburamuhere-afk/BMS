@@ -1040,7 +1040,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="rfBuyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-basket"></i> <?= t('Purchases') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfBuyDropdown">
-                                <?php if (canView('pos') && canView('pos_restock')): ?><li><a class="dropdown-item" href="<?= getUrl('receive_stock') ?>"><i class="bi bi-box-arrow-in-down"></i> <?= t('Receive Stock') ?></a></li><?php endif; ?>
+                                <?php if (canView('pos') && canView('pos_restock')): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/purchases') ?>"><i class="bi bi-box-arrow-in-down"></i> <?= t('Buy stock & ingredients') ?></a></li><?php endif; ?>
                                 <?php if (canView('suppliers')): ?><li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> <?= t('Suppliers') ?></a></li><?php endif; ?>
                             </ul>
                         </li>
@@ -1945,7 +1945,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 if (canView('categories')) $__rf_m[] = [getUrl('categories'), 'bi-tags', t('Menu groups')];
                 $__rf_m[] = [getUrl('restaurant/modifier-group'), 'bi-list-check', t('Add-on options')];
                 $__rf_b = [];
-                if (canView('pos') && canView('pos_restock')) $__rf_b[] = [getUrl('receive_stock'), 'bi-box-arrow-in-down', t('Receive Stock')];
+                if (canView('pos') && canView('pos_restock')) $__rf_b[] = [getUrl('restaurant/purchases'), 'bi-box-arrow-in-down', t('Buy stock & ingredients')];
                 if (canView('suppliers')) $__rf_b[] = [getUrl('suppliers'), 'bi-truck', t('Suppliers')];
                 $__rf_c = [];
                 if (canView('customers')) $__rf_c[] = [getUrl('customers'), 'bi-people', t('Customers')];
