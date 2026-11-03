@@ -89,7 +89,7 @@ function msPeriod(array $t, ?string $endsAt, ?int $daysLeft, array $payments): a
     $kind = $daysLeft !== null && $daysLeft < 0 ? 'grace' : ($status === 'trial' ? 'trial' : 'paid');
     $start = null;
     if ($status === 'trial') {
-        $start = !empty($t['created_at']) ? substr((string)$t['created_at'], 0, 10) : null;
+        $start = tenantTrialStartsAt($t);
     } else {
         $end = substr($endsAt, 0, 10);
         foreach ($payments as $p) if (substr((string)$p['ends_at'], 0, 10) === $end) { $start = substr((string)$p['starts_at'], 0, 10); break; }
@@ -130,7 +130,8 @@ $docUrl = function (?string $token): ?string {
 if ($action === 'status') {
     try {
         $st = getControlPdo()->prepare("SELECT company_name, subdomain, status, plan, trial_ends_at, subscription_ends_at,
-                                               grace_until, billing_cycle, payment_status, created_at FROM tenants WHERE id = ?");
+                                               grace_until, billing_cycle, payment_status, created_at"
+            . (controlColumnExists('tenants', 'trial_starts_at') ? ', trial_starts_at' : '') . " FROM tenants WHERE id = ?");
         $st->execute([$tenantId]);
         $t = $st->fetch(PDO::FETCH_ASSOC);
         if (!$t) $out(['success' => false, 'message' => 'Company not found.'], 404);

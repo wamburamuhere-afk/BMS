@@ -16,6 +16,17 @@
 - **All / Free / Busy** filter appears only when a shop has more than 12 tables.
 - **Tests:** `test_restaurant_phase2_cli` 39 (new: opened today, today's booking only, since yesterday, no red, no noise), `test_restaurant_phase4_cli` 22, `test_restaurant_simplicity_cli` 70, `test_restaurant_focus_cli` 394 — all pass. The local DB had `pos_simple_mode = 0` (set by another session); it was set to 1 only while the suites and the browser check ran, then put back to 0.
 
+## 2026-10-25 — feat(trial): new companies start on a real free trial; superadmin "Set free trial" with start and end dates
+
+**Files:** `core/tenant_registration.php`, `core/tenant_lifecycle_policy.php`, `scripts/setup_control_db.php`, `actions/superadmin_tenant_access.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenant_new.php`, `api/my_subscription.php`, `tests/test_tenant_free_trial_cli.php` (new), `tests/test_tenant_registration_cli.php`, `tests/test_register_redesign_cli.php`
+
+- **Bug fixed:** a company that signed up on the public Register page, or was approved for Smart BMS, or continued as Smart POS, was saved as "active" with a trial date nothing read. Its trial never ran out and its Subscription page showed "No end date" (∞). These companies now start as **Trial**: they sign in at once, the page shows **Free trial · X days left**, and the normal reminders and expiry apply.
+- **Superadmin › New company** now defaults to **Free trial (14 days)**, counted from when you click Create. "Active (paid) — no trial" is still available.
+- **Superadmin › company page › Set free trial** (or **Change free trial dates** while on trial): choose the **start date**; the end date fills in as start + the default trial length, and you can change the length or pick another end date. The company becomes Trial; any paid-until date, grace window or expiry suspension is cleared, so service resumes. Refused for a company with recorded payments (use Extend access), one suspended by hand, one waiting for approval, and a closed one; the start can't be in the future or over a year ago, and the end must be after the start, within 365 days, and not already past. Every change goes to the activity log.
+- The Subscription page's "Trial started" uses the date set here, otherwise the account creation date.
+- New control-DB column `tenants.trial_starts_at` (added by `scripts/setup_control_db.php`).
+- Not changed automatically: companies that signed up before this fix are still "active" with no end date. Give each one a trial with **Set free trial**, or a paid period with **Extend access**.
+
 ## 2026-11-02 — feat(restaurant): restaurant icons (Lucide) on the restaurant screens only
 
 **New:** `assets/css/restaurant-icons.css` (23 Lucide icons, ISC licence, drawn as CSS masks so they take the text colour and size like Bootstrap icons).

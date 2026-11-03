@@ -425,6 +425,113 @@ if (!function_exists('applySubscriptionPayment')) {
     }
 }
 
+if (!function_exists('tenantTrialStartsAt')) {
+    /**
+     * When the free trial began: the date an operator set (trial_starts_at),
+     * else when the account was created. Y-m-d, or null when unknown.
+     */
+    function tenantTrialStartsAt(array $tenant): ?string
+    {
+        foreach (['trial_starts_at', 'created_at'] as $k) {
+            if (!empty($tenant[$k])) return substr((string)$tenant[$k], 0, 10);
+        }
+        return null;
+    }
+}
+
+if (!function_exists('setTenantTrial')) {
+    /**
+     * Put a company on a free trial from $start to $end (Y-m-d), or to
+     * $start + the default trial length when $end is blank. For a company
+     * that was created Active by mistake, or one that needs a fresh trial
+     * after a problem on their side.
+     *
+     * Rules:
+     *   - refused for closed tenants, for a company an operator suspended by
+     *     hand (activate it first), and for one with recorded payments — a
+     *     paying customer gets more days with Extend access, never a trial
+     *   - start: a real date within the last year and not in the future
+     *   - end: after the start, at most 365 days after it, and not already past
+     *   - the company becomes status 'trial'; the paid-until date, grace window
+     *     and an expiry suspension are cleared, so service resumes
+     *
+     * @return array{ok:bool, error:?string, starts_at:?string, ends_at:?string, resumed:bool}
+     */
+    function setTenantTrial(int $tenantId, string $start, string $end = ''): array
+    {
+        $fail = fn(string $m): array => ['ok' => false, 'error' => $m, 'starts_at' => null, 'ends_at' => null, 'resumed' => false];
+        $day = function (string $v): ?int {
+            $v = trim($v);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return null;
+            [$y, $m, $d] = array_map('intval', explode('-', $v));
+            return checkdate($m, $d, $y) ? (int)strtotime($v) : null;
+        };
+
+        $startTs = $day($start);
+        if ($startTs === null) return $fail('Choose a valid trial start date.');
+        $today = (int)strtotime(date('Y-m-d'));
+        if ($startTs > $today) return $fail('The trial start date cannot be in the future.');
+        if ($startTs < strtotime('-365 days', $today)) return $fail('The trial start date cannot be more than a year ago.');
+
+        if (trim($end) === '') {
+            $endTs = (int)strtotime('+' . tenantDefaultTrialDays() . ' days', $startTs);
+        } else {
+            $endTs = $day($end);
+            if ($endTs === null) return $fail('Choose a valid trial end date.');
+        }
+        if ($endTs <= $startTs) return $fail('The trial must end after it starts.');
+        if ($endTs > strtotime('+365 days', $startTs)) return $fail('A trial can be at most 365 days long.');
+        if ($endTs < $today) return $fail('That trial would already have ended on ' . date('d M Y', $endTs) . '. Choose a later end date.');
+
+        try {
+            if (!controlColumnExists('tenants', 'trial_starts_at')) {
+                return $fail('The platform database needs updating first (run scripts/setup_control_db.php).');
+            }
+            $ctrl = getControlPdo();
+            $st = $ctrl->prepare("SELECT id, subdomain, status, suspension_reason FROM tenants WHERE id = ? LIMIT 1");
+            $st->execute([$tenantId]);
+            $t = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$t) return $fail('Tenant not found.');
+
+            $status = (string)$t['status'];
+            $reason = (string)($t['suspension_reason'] ?? '');
+            if (in_array($status, ['deleted', 'archived'], true)) return $fail('This tenant is closed. Reactivate it first.');
+            if ($status === 'suspended' && !in_array($reason, ['trial_expired', 'subscription_expired'], true)) {
+                return $fail($reason === 'awaiting_approval'
+                    ? 'This company is waiting for approval. Approve it instead — its trial starts that day.'
+                    : 'This company was suspended by hand. Activate it first, then set the trial.');
+            }
+            $paid = $ctrl->prepare("SELECT COUNT(*) FROM tenant_payments WHERE tenant_id = ?");
+            $paid->execute([$tenantId]);
+            if ((int)$paid->fetchColumn() > 0) {
+                return $fail('This company has recorded payments, so it is a paying customer. Use Extend access to give it more days instead.');
+            }
+
+            $startVal = date('Y-m-d 00:00:00', $startTs);
+            $endVal   = date('Y-m-d 23:59:59', $endTs);
+            $operator = function_exists('currentSuperadmin') ? (int)(currentSuperadmin()['id'] ?? 0) : 0;
+            $resumed  = $status === 'suspended';
+
+            $ctrl->prepare("
+                UPDATE tenants
+                   SET status = 'trial', trial_starts_at = ?, trial_ends_at = ?, subscription_ends_at = NULL,
+                       grace_until = NULL, suspended_at = NULL, suspension_reason = NULL, trial_extended_by = ?
+                 WHERE id = ?
+            ")->execute([$startVal, $endVal, $operator > 0 ? $operator : null, $tenantId]);
+
+            if (function_exists('logTenantAdminAction')) {
+                logTenantAdminAction($tenantId, (string)$t['subdomain'], 'set_trial',
+                    'Free trial ' . date('Y-m-d', $startTs) . ' → ' . date('Y-m-d', $endTs)
+                    . ' (' . (int)round(($endTs - $startTs) / 86400) . ' days; was ' . $status . ')' . ($resumed ? ' (service resumed)' : ''));
+            }
+            return ['ok' => true, 'error' => null, 'starts_at' => $startVal, 'ends_at' => $endVal, 'resumed' => $resumed];
+        } catch (Throwable $e) {
+            error_log('setTenantTrial(' . $tenantId . '): ' . $e->getMessage());
+            return $fail('Could not set the free trial. Please try again.');
+        }
+    }
+}
+
 if (!function_exists('setTenantGraceDays')) {
     /**
      * Give one tenant their own grace period, or clear it back to the platform
