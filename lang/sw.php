@@ -6546,6 +6546,14 @@ return [
     'Safety' => 'Usalama',
     'e.g. window seat, birthday' => 'mf. kiti cha dirishani, siku ya kuzaliwa',
 
+    // Online menu: cart icon, My orders, ordering-off notices
+    'My orders' => 'Oda zangu',
+    'No orders yet from this phone.' => 'Bado hakuna oda kutoka kwenye simu hii.',
+    'Online ordering is not available right now. Please order with a waiter or at the counter.' => 'Kuagiza mtandaoni hakupatikani kwa sasa. Tafadhali agiza kwa mhudumu au kaunta.',
+    'Table QR codes show the menu only. Turn on "Order from the table" so customers can order from their table.' => 'QR za meza zinaonyesha menyu tu. Washa "Agiza ukiwa mezani" ili wateja waagize wakiwa mezani.',
+    'This link shows the menu only. Turn on "Order for pickup" so customers can order from it.' => 'Kiungo hiki kinaonyesha menyu tu. Washa "Agiza uje kuchukua" ili wateja waagize kupitia kiungo hiki.',
+    'Waiting' => 'Inasubiri',
+
     // Restaurant online menu & ordering (restaurant_online_menu_plan.md)
     '%d tables' => 'Meza %d',
     '%s is not available right now.' => '%s haipatikani kwa sasa.',

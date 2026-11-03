@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-03 — feat(restaurant): online menu — bag icon, "My orders", clear "ordering is off" notices
+
+**Branch:** `feat/online-menu-cart` (off `develop`). Owner asked after testing the live link: a cart icon always visible, and a way back to the order page after leaving it.
+**Changed:** `public_menu.php`, `includes/restaurant/online_menu_share.php`, `lang/sw.php` (6 phrases), `tests/test_restaurant_online_menu_cli.php` + `_staff.inc.php` (113 checks).
+
+- **Bag icon** in the customer page's top bar with the item count (bumps when something is added); tap it anywhere on the page to open the basket. The bottom "View order" bar stays.
+- **My orders** (receipt icon): every order sent from this phone — and any status page opened — is remembered in this browser only (last 24 h, max 10, this site's status links only). The panel lists code, time and the live status (Waiting / Accepted / Ready / Done / Rejected) and reopens the status page. After sending, the browser Back button now returns to the menu (was replaced).
+- **Ordering off:** the customer page says "Online ordering is not available right now. Please order with a waiter or at the counter." instead of silently hiding the buttons; the Share panel warns next to the link when "Order for pickup" is off, and under Table QR codes when "Order from the table" is off.
+- Live finding (bjprestaurant demo): the shared shop link takes **pickup** orders, so it only accepts orders when "Order for pickup" is on — with it on, order W-0004 went through and was accepted.
+- Checked in headless Chrome at 390 px: add → bag shows 2 → open basket from the icon → send → status page shows My orders (1) → back to menu → My orders lists W-0055 and reopens it; ordering-off note and Share warning shown.
+
 ## 2026-11-03 — feat(pos): sell goods by measure in parts (0.5 kg), Products stock without ".000"
 
 **Branch:** `feat/pos-decimal-qty` (off `develop`).
