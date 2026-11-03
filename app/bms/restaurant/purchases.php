@@ -1,6 +1,6 @@
 <?php
 /**
- * app/bms/restaurant/purchases.php — Purchases (restaurant focus pass, 2026-11-02).
+ * app/bms/restaurant/purchases.php — Purchases (restaurant focus pass, 2026-11-02; simpler, smarter screen 2026-11-02).
  *
  * ONE form, the way the retail Receive Stock works — pick what you bought, say how many and what it cost:
  *   • an item you COUNT (a drink, rice, oil, meat): stock goes up and its cost follows what you pay (weighted average), so the
@@ -8,6 +8,12 @@
  *     also shows its selling price and the profit it leaves.
  *   • "Something else" (tomatoes, a bundle of greens) — not counted: just the amount, straight to the cost of food sold.
  * No account is ever asked — it is paid from the default cash account, like every other Smart POS screen.
+ *
+ * Screen (2026-11-02): Counted item | Something else switch on top; a live Summary with the one Save button beside the form
+ * (below it on a phone — no extra bar over the phone's bottom menu); quiet checks that only speak up when something looks wrong — a price far from the
+ * average cost, the same purchase saved twice, a part of a count unit (2.5 crates), a "Something else" that is really a counted
+ * item (it would count twice). A new ingredient is added straight from the search. Recent purchases: S/No., full width, a total
+ * row, All / Today / This week, and "Buy again".
  *
  * Only for Smart POS + Restaurant POS, on Restaurant/Hybrid shops. Logic: core/restaurant_purchases.php.
  */
@@ -40,6 +46,7 @@ if ($module_on && $warehouses && !empty($_GET['item'])) {
 $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carton'];
 // "Something else" (not counted) is saved as an ordinary expense on the cost-of-food account — needs permission and that account.
 $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAccountId($pdo) : null;
+$cur = getSetting('currency', 'TZS');
 ?>
 
 <div class="container-fluid mt-3 mt-md-4 rp-page">
@@ -61,65 +68,92 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
     <div class="row g-3 mb-3">
         <div class="col-lg-8">
             <div class="rp-card h-100">
-                <div class="rp-card-h"><h6><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></h6></div>
+                <div class="rp-card-h d-flex justify-content-between align-items-center">
+                    <h6><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></h6>
+                    <a class="rp-help" data-bs-toggle="collapse" href="#rpHelp" role="button" aria-expanded="false" title="<?= htmlspecialchars(t('How it works')) ?>"><i class="bi bi-question-lg"></i></a>
+                </div>
                 <form id="rpForm" class="p-3" autocomplete="off">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="warehouse_id" id="rpWarehouse" value="<?= (int)$warehouses[0]['warehouse_id'] ?>">
-                    <div id="rpMessage" class="mb-2"></div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold"><?= t('What did you buy?') ?> <span class="text-danger">*</span></label>
-                        <select id="rpItem" name="product_id" class="form-select" style="width:100%">
-                            <?php if ($preItem): ?><option value="<?= (int)$preItem['product_id'] ?>" selected><?= safe_output($preItem['product_name']) ?> (<?= htmlspecialchars($preItem['unit']) ?>)</option><?php endif; ?>
-                        </select>
-                        <div class="d-flex justify-content-between small mt-1">
-                            <span class="text-muted" id="rpItemInfo"></span>
-                            <?php if ($can_edit): ?><a href="#" id="rpNewIngredient"><i class="bi bi-plus-circle me-1"></i><?= t('New ingredient') ?></a><?php endif; ?>
+                    <div class="collapse" id="rpHelp">
+                        <div class="rp-explain mb-3">
+                            <i class="bi bi-lightbulb"></i>
+                            <div>
+                                <strong><?= t('How it works') ?></strong>
+                                <span><?= t('Drinks, rice, oil and meat are counted: stock goes up, and the cost of every plate follows the price you pay.') ?></span>
+                                <span class="mt-2"><?= t('Not on the list — tomatoes, a bundle of greens? Choose "Something else". It is not counted; the amount is the cost of food sold.') ?></span>
+                            </div>
                         </div>
                     </div>
+                    <div id="rpMessage" class="mb-2"></div>
+
+                    <?php if ($other_account): ?>
+                    <!-- What kind of buy: counted (stock) or something else (not counted) -->
+                    <div class="btn-group w-100 rp-seg rp-kind mb-3" role="group" aria-label="<?= htmlspecialchars(t('What did you buy?')) ?>">
+                        <input type="radio" class="btn-check" name="rpKind" id="rpKindStock" value="stock" checked>
+                        <label class="btn btn-outline-primary" for="rpKindStock"><i class="bi bi-box-seam me-1"></i><?= t('Counted item') ?><small><?= t('stock goes up') ?></small></label>
+                        <input type="radio" class="btn-check" name="rpKind" id="rpKindOther" value="other">
+                        <label class="btn btn-outline-primary" for="rpKindOther"><i class="bi bi-basket me-1"></i><?= t('Something else') ?><small><?= t('not counted') ?></small></label>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- A counted item -->
                     <div id="rpStockFields">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="rpItem"><?= t('What did you buy?') ?> <span class="text-danger">*</span></label>
+                            <select id="rpItem" name="product_id" class="form-select" style="width:100%">
+                                <?php if ($preItem): ?><option value="<?= (int)$preItem['product_id'] ?>" selected><?= safe_output($preItem['product_name']) ?> (<?= htmlspecialchars($preItem['unit']) ?>)</option><?php endif; ?>
+                            </select>
+                        </div>
                         <div class="row g-2">
                             <div class="col-md-4">
-                                <label class="form-label fw-semibold"><?= t('Quantity') ?> <span class="text-danger">*</span> <small class="text-muted" id="rpUnit"></small></label>
-                                <input type="number" class="form-control" id="rpQty" min="0.001" step="0.001" inputmode="decimal">
+                                <label class="form-label fw-semibold" for="rpQty"><?= t('Quantity') ?> <span class="text-danger">*</span></label>
+                                <div class="input-group"><input type="number" class="form-control rp-num" id="rpQty" min="0.001" step="0.001" inputmode="decimal"><span class="input-group-text" id="rpUnit">—</span></div>
                             </div>
                             <div class="col-6 col-md-4">
-                                <label class="form-label fw-semibold"><?= t('Price for one') ?></label>
-                                <input type="number" class="form-control" id="rpPrice" min="0" step="0.01" inputmode="decimal">
+                                <label class="form-label fw-semibold" for="rpPrice"><?= t('Price for one') ?></label>
+                                <div class="input-group"><input type="number" class="form-control rp-num" id="rpPrice" min="0" step="0.01" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
+                                <div class="rp-hint" id="rpPriceHint"></div>
                             </div>
                             <div class="col-6 col-md-4">
-                                <label class="form-label fw-semibold"><?= t('Total paid') ?></label>
-                                <input type="number" class="form-control" id="rpTotal" min="0" step="0.01" inputmode="decimal">
+                                <label class="form-label fw-semibold" for="rpTotal"><span class="rp-or"><?= t('or') ?></span> <?= t('Total paid') ?></label>
+                                <div class="input-group"><input type="number" class="form-control rp-num" id="rpTotal" min="0" step="0.01" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
                             </div>
                         </div>
-                        <div class="form-text"><?= t('Fill the price for one, or the total you paid — the other is worked out. Buying a goat or a crate? Enter what you can use and the total.') ?></div>
-                        <div class="mt-3" id="rpSellRow" style="display:none;">
-                            <label class="form-label fw-semibold"><?= t('Selling price') ?></label>
-                            <input type="number" class="form-control" id="rpSell" min="0" step="0.01" inputmode="decimal" style="max-width:220px;">
+                        <!-- An item sold on the Menu: its selling price, changed only when you tap the pencil -->
+                        <div class="rp-sell mt-3" id="rpSellRow" style="display:none;">
+                            <i class="bi bi-tag text-primary"></i> <?= t('Selling price') ?> <strong id="rpSellTxt"></strong>
+                            <a href="#" id="rpSellEdit" class="ms-1" title="<?= htmlspecialchars(t('Change')) ?>"><i class="bi bi-pencil"></i></a>
+                            <div class="mt-2" id="rpSellBox" style="display:none;">
+                                <div class="input-group" style="max-width:240px;"><input type="number" class="form-control rp-num" id="rpSell" min="0" step="0.01" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
+                            </div>
                         </div>
-                        <div class="rp-preview mt-3" id="rpPreview" style="display:none;"></div>
+                        <div id="rpMoreWrap">
+                            <a class="small d-inline-block mt-3" data-bs-toggle="collapse" href="#rpMore" role="button"><i class="bi bi-sliders me-1"></i><?= t('More options') ?></a>
+                            <div class="collapse" id="rpMore">
+                                <div class="row g-2 mt-1">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="rpExpiry"><?= t('Expiry date') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
+                                        <input type="date" class="form-control" name="expiry_date" id="rpExpiry">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Something else (not counted) -->
                     <div id="rpOtherFields" style="display:none;">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold"><?= t('What is it?') ?> <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold" for="rpOtherName"><?= t('What is it?') ?> <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="rpOtherName" maxlength="200" placeholder="<?= htmlspecialchars(t('e.g. tomatoes, onions, a bundle of greens')) ?>">
+                            <div class="rp-match mt-2" id="rpOtherMatch" style="display:none;"></div>
                         </div>
                         <div class="mb-1">
-                            <label class="form-label fw-semibold"><?= t('Amount paid') ?> <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="rpOtherAmount" min="1" step="any" inputmode="decimal" style="max-width:220px;">
+                            <label class="form-label fw-semibold" for="rpOtherAmount"><?= t('Amount paid') ?> <span class="text-danger">*</span></label>
+                            <div class="input-group" style="max-width:260px;"><input type="number" class="form-control rp-num" id="rpOtherAmount" min="1" step="any" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
                         </div>
-                        <div class="form-text"><?= t('Not counted in stock — the amount is recorded as the cost of the food you sell.') ?></div>
                     </div>
 
-                    <div class="row g-2 mt-2">
-                        <div class="col-md-5">
-                            <label class="form-label fw-semibold"><?= t('Date') ?></label>
-                            <input type="date" class="form-control" name="date" id="rpDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>">
-                        </div>
-                    </div>
                     <!-- Payment: Paid (default) · Partly paid · Credit — what is not paid now is owed to the supplier -->
                     <div class="rp-pay mt-3">
                         <label class="form-label fw-semibold d-block"><?= t('Payment') ?></label>
@@ -151,34 +185,27 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
                         </div>
                         <div class="rp-owe-note mt-2 rp-owe-only" id="rpOweNote" style="display:none;"></div>
                     </div>
-                    <div id="rpMoreWrap">
-                        <a class="small d-inline-block mt-2" data-bs-toggle="collapse" href="#rpMore" role="button"><i class="bi bi-sliders me-1"></i><?= t('More options') ?></a>
-                        <div class="collapse" id="rpMore">
-                            <div class="row g-2 mt-1">
-                                <div class="col-md-6">
-                                    <label class="form-label"><?= t('Expiry date') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
-                                    <input type="date" class="form-control" name="expiry_date" id="rpExpiry">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="submit" class="btn btn-primary" id="rpSave"><i class="bi bi-check-circle me-1"></i><?= t('Save purchase') ?></button>
-                    </div>
                 </form>
             </div>
         </div>
+
+        <!-- Summary: what you are about to save, live — and the one Save button -->
         <div class="col-lg-4">
-            <div class="rp-explain h-100">
-                <i class="bi bi-lightbulb"></i>
-                <div>
-                    <strong><?= t('How it works') ?></strong>
-                    <span><?= t('Drinks, rice, oil and meat are counted: stock goes up, and the cost of every plate follows the price you pay.') ?></span>
-                    <span class="mt-2"><?= t('Not on the list — tomatoes, a bundle of greens? Choose "Something else". It is not counted; the amount is the cost of food sold.') ?></span>
+            <div class="rp-sum">
+                <div class="rp-sum-h"><i class="bi bi-receipt me-1"></i><?= t('Summary') ?></div>
+                <div class="rp-sum-b" id="rpSumBody"></div>
+                <div class="rp-sum-date">
+                    <label for="rpDate"><i class="bi bi-calendar3 me-1"></i><?= t('Date') ?></label>
+                    <input type="date" class="form-control form-control-sm" form="rpForm" name="date" id="rpDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>">
+                </div>
+                <div class="rp-sum-total"><span><?= t('Total') ?></span><strong id="rpSumTotal">0 <?= htmlspecialchars($cur) ?></strong></div>
+                <div class="p-3 pt-0">
+                    <button type="submit" form="rpForm" class="btn btn-primary btn-lg w-100 rp-save" id="rpSave"><i class="bi bi-check-circle me-1"></i><?= t('Save purchase') ?></button>
                 </div>
             </div>
         </div>
     </div>
+
     <!-- Suppliers you owe — pay part or all of a debt later -->
     <div class="rp-card mb-3" id="rpOwe">
         <div class="rp-card-h d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -226,23 +253,40 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
         </div></div>
     </div>
 
-    <div class="rp-card mb-3">
-        <div class="rp-card-h"><h6><i class="bi bi-clock-history me-1"></i><?= t('Recent purchases') ?></h6></div>
-        <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="rpTable">
-            <thead><tr><th><?= t('Date') ?></th><th><?= t('Item') ?></th><th><?= t('Quantity') ?></th><th><?= t('Price for one') ?></th><th><?= t('Total') ?></th><th><?= t('By') ?></th></tr></thead>
-            <tbody></tbody>
-        </table></div>
+    <!-- Recent purchases — full width, numbered, with a total -->
+    <div class="rp-card mb-3" id="rpRecent">
+        <div class="rp-card-h d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h6><i class="bi bi-clock-history me-1"></i><?= t('Recent purchases') ?> <span class="rp-count" id="rpCount">0</span></h6>
+            <div class="btn-group btn-group-sm rp-seg rp-range" role="group" aria-label="<?= htmlspecialchars(t('Recent purchases')) ?>">
+                <input type="radio" class="btn-check" name="rpRange" id="rpRangeAll" value="all" checked>
+                <label class="btn btn-outline-primary" for="rpRangeAll"><?= t('All') ?></label>
+                <input type="radio" class="btn-check" name="rpRange" id="rpRangeToday" value="today">
+                <label class="btn btn-outline-primary" for="rpRangeToday"><?= t('Today') ?></label>
+                <input type="radio" class="btn-check" name="rpRange" id="rpRangeWeek" value="week">
+                <label class="btn btn-outline-primary" for="rpRangeWeek"><?= t('This week') ?></label>
+            </div>
+        </div>
+        <div class="rp-table-wrap">
+            <table class="table table-sm table-hover align-middle mb-0 w-100 rp-table" id="rpTable" style="width:100%">
+                <thead><tr>
+                    <th><?= t('S/No.') ?></th><th><?= t('Item') ?></th><th><?= t('Date') ?></th><th class="text-end"><?= t('Quantity') ?></th>
+                    <th class="text-end"><?= t('Price for one') ?></th><th class="text-end"><?= t('Total') ?></th><th><?= t('By') ?></th><th class="text-end"><?= t('Actions') ?></th>
+                </tr></thead>
+                <tbody></tbody>
+                <tfoot><tr><th></th><th></th><th></th><th></th><th class="text-end"><?= t('Total') ?></th><th class="text-end" id="rpFootTotal">0</th><th></th><th></th></tr></tfoot>
+            </table>
+        </div>
     </div>
 
-    <!-- New ingredient -->
+    <!-- New ingredient (opened from the search: "+ Add … as a new ingredient") -->
     <div class="modal fade" id="rpIngModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content">
             <div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i><?= t('New ingredient') ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
             <form id="rpIngForm" autocomplete="off">
                 <div class="modal-body">
                     <div id="rpIngMsg" class="mb-2"></div>
-                    <div class="mb-3"><label class="form-label"><?= t('Name') ?> <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required maxlength="100"></div>
-                    <div><label class="form-label"><?= t('Unit') ?></label><select class="form-select" name="unit"><?php foreach ($units as $u): ?><option value="<?= $u ?>"><?= $u ?></option><?php endforeach; ?></select></div>
+                    <div class="mb-3"><label class="form-label" for="rpIngName"><?= t('Name') ?> <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" id="rpIngName" required maxlength="100"></div>
+                    <div><label class="form-label" for="rpIngUnit"><?= t('Unit') ?></label><select class="form-select" name="unit" id="rpIngUnit"><?php foreach ($units as $u): ?><option value="<?= $u ?>"><?= $u ?></option><?php endforeach; ?></select></div>
                     <input type="hidden" name="cost_price" value="0"><!-- the price comes from the purchase itself -->
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button></div>
@@ -256,7 +300,9 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
 .rp-page .rp-card { background:#fff; border:1px solid #dbe6fb; border-radius:14px; box-shadow:0 1px 3px rgba(13,110,253,.06); overflow:hidden; }
 .rp-page .rp-card-h { padding:10px 14px; border-bottom:1px solid #eef3fd; }
 .rp-page .rp-card-h h6 { margin:0; font-weight:700; color:#0b3d91; }
-.rp-page .rp-tag { font-size:.65rem; font-weight:700; border-radius:20px; padding:2px 8px; margin-left:6px; background:#cfe2ff; color:#084298; vertical-align:middle; }
+.rp-page .rp-help { width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:#e7f0ff; color:#0d6efd; text-decoration:none; }
+.rp-page .rp-help:hover { background:#cfe2ff; }
+.rp-page .rp-tag { font-size:.65rem; font-weight:700; border-radius:20px; padding:2px 8px; margin-left:6px; background:#cfe2ff; color:#084298; vertical-align:middle; white-space:nowrap; }
 .rp-page .rp-tag-grey { background:#e9ecef; color:#495057; }
 .rp-page .rp-explain { display:flex; gap:10px; align-items:flex-start; background:#f4f8ff; border:1px solid #cfe2ff; border-radius:12px; padding:10px 14px; font-size:.85rem; color:#1e3a8a; }
 .rp-page .rp-explain i { color:#0d6efd; font-size:1.2rem; }
@@ -264,8 +310,56 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
 .rp-page .rp-owe-note { background:#fff7e6; border:1px solid #f5d38f; border-radius:10px; padding:8px 12px; font-size:.85rem; color:#7a4b00; }
 .rp-page .rp-tag-owe { background:#fff1d6; color:#7a4b00; }
 .rp-page .rp-late { font-size:.65rem; font-weight:700; border-radius:20px; padding:2px 8px; margin-left:4px; background:#b45309; color:#fff; }
-.rp-page .rp-pay-seg .btn { font-weight:600; }
+.rp-page .rp-pay-seg .btn, .rp-page .rp-seg .btn { font-weight:600; }
 .rp-page .rp-preview { background:#e7f0ff; border:1px solid #b6ccfe; border-radius:10px; padding:9px 12px; font-size:.85rem; color:#0b3d91; }
+/* Counted item | Something else */
+.rp-page .rp-kind .btn { padding:8px 6px; line-height:1.2; }
+.rp-page .rp-kind .btn small { display:block; font-weight:400; font-size:11px; opacity:.8; }
+.rp-page .rp-num { font-size:15px; font-weight:600; }
+.rp-page .rp-or { font-weight:400; font-style:italic; color:#6c757d; }
+.rp-page .rp-hint { font-size:12px; color:#6c757d; margin-top:3px; min-height:1em; }
+.rp-page .rp-hint.rp-warn { color:#b45309; font-weight:600; }
+.rp-page .rp-sell { background:#f8fbff; border:1px dashed #b6ccfe; border-radius:10px; padding:8px 12px; font-size:13px; }
+.rp-page .rp-match { background:#fff7e6; border:1px solid #f5d38f; border-radius:10px; padding:8px 12px; font-size:13px; color:#7a4b00; }
+/* Search results: name + a quiet line of facts */
+.rp-opt-name { font-weight:600; }
+.rp-opt-meta { font-size:12px; color:#6c757d; }
+.rp-opt-new { color:#0d6efd; font-weight:600; }
+/* Summary */
+.rp-page .rp-sum { background:#fff; border:1px solid #b6ccfe; border-radius:14px; box-shadow:0 2px 8px rgba(13,110,253,.08); position:sticky; top:80px; overflow:hidden; }
+.rp-page .rp-sum-h { background:#0d6efd; color:#fff; font-weight:700; padding:10px 14px; }
+.rp-page .rp-sum-b { padding:12px 14px 4px; min-height:96px; font-size:13px; }
+.rp-page .rp-sum-empty { color:#6c757d; text-align:center; padding:14px 4px; }
+.rp-page .rp-sum-empty i { display:block; font-size:24px; color:#b6ccfe; margin-bottom:4px; }
+.rp-page .rp-sum-item { font-weight:700; color:#0b3d91; font-size:15px; margin-bottom:6px; }
+.rp-page .rp-sum-line { display:flex; justify-content:space-between; gap:8px; padding:3px 0; }
+.rp-page .rp-sum-line span:last-child { text-align:right; font-weight:600; }
+.rp-page .rp-sum-line.rp-muted { color:#6c757d; }
+.rp-page .rp-sum-line.rp-neg { color:#dc3545; }
+.rp-page .rp-sum-line.rp-owe { color:#7a4b00; }
+.rp-page .rp-sum-date { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 14px; border-top:1px dashed #dbe6fb; font-size:13px; color:#495057; }
+.rp-page .rp-sum-date input { max-width:160px; }
+.rp-page .rp-sum-total { display:flex; justify-content:space-between; align-items:baseline; padding:10px 14px 14px; border-top:1px solid #eef3fd; }
+.rp-page .rp-sum-total span { font-weight:600; color:#495057; font-size:14px; }
+.rp-page .rp-sum-total strong { font-size:22px; color:#0b3d91; }
+@media (max-width: 991.98px) { .rp-page .rp-sum { position:static; } }
+/* Recent purchases */
+.rp-page .rp-count { display:inline-block; min-width:22px; padding:1px 8px; margin-left:6px; border-radius:20px; background:#0d6efd; color:#fff; font-size:11px; text-align:center; vertical-align:middle; }
+.rp-page .rp-table-wrap { padding:6px 10px 10px; }
+.rp-page .rp-table thead th, .rp-page .dataTables_scrollHead thead th { background:#f4f8ff; color:#0b3d91; font-weight:700; font-size:12px; white-space:nowrap; border-bottom:1px solid #cfe2ff; }
+/* headers line up with their column (responsive.css centres every th with !important) */
+.rp-page .rp-table th, .rp-page .dataTables_scrollHead th, .rp-page .dataTables_scrollFoot th { text-align:left !important; }
+.rp-page .rp-table th.text-end, .rp-page .dataTables_scrollHead th.text-end, .rp-page .dataTables_scrollFoot th.text-end { text-align:right !important; }
+/* the legacy style.css makes every .btn 16px / 85px wide — keep the row gear and the range switch compact */
+.rp-page .rp-table .btn, .rp-page .rp-range .btn { min-width:0; padding:3px 9px; font-size:12px; line-height:1.4; }
+.rp-page .rp-table .dropdown-item { font-size:13px; }
+.rp-page .rp-table td { padding-top:7px; padding-bottom:7px; }
+.rp-page .rp-table td.rp-sno { color:#6c757d; width:48px; }
+.rp-page .rp-table .rp-by { padding-left:28px !important; color:#495057; }
+.rp-page .rp-table td.text-end { white-space:nowrap; }
+.rp-page .rp-table tfoot th, .rp-page .dataTables_scrollFoot tfoot th { background:#e7f0ff; color:#0b3d91; border-top:1px solid #b6ccfe; white-space:nowrap; }
+.rp-page .rp-empty { color:#6c757d; padding:18px 0; }
+.rp-page .rp-empty i { display:block; font-size:24px; color:#b6ccfe; }
 </style>
 
 <?php if ($warehouses && $can_buy): ?>
@@ -274,19 +368,19 @@ const RP = {
     api: <?= json_encode(buildUrl('api/restaurant/')) ?>,
     expenseApi: <?= json_encode(buildUrl('api/add_expense.php')) ?>,
     csrf: <?= json_encode(csrf_token()) ?>,
-    cur: <?= json_encode(getSetting('currency', 'TZS')) ?>,
+    cur: <?= json_encode($cur) ?>,
     otherAccount: <?= (int)($other_account ?: 0) ?>,
     cashAccount: <?= (int)(posReceiptAccountId($pdo, 'cash') ?: 0) ?>,
+    canEdit: <?= $can_edit ? 'true' : 'false' ?>,
+    today: <?= json_encode(date('Y-m-d')) ?>, weekStart: <?= json_encode(date('Y-m-d', strtotime('-6 days'))) ?>,
     s: {
         search: <?= json_encode(t('Search the item...')) ?>, saving: <?= json_encode(t('Saving...')) ?>, error: <?= json_encode(t('Error')) ?>,
         serverError: <?= json_encode(t('Server error. Please try again.')) ?>, total: <?= json_encode(t('Total')) ?>,
         onHand: <?= json_encode(t('On hand')) ?>, cost: <?= json_encode(t('Cost')) ?>, newCost: <?= json_encode(t('New cost')) ?>,
-        costFollows: <?= json_encode(t('The cost follows the prices you pay (average).')) ?>,
         pickItem: <?= json_encode(t('Pick what you bought, or choose "Something else".')) ?>, saved: <?= json_encode(t('Purchase saved.')) ?>,
         costNow: <?= json_encode(t('Cost is now')) ?>, none: <?= json_encode(t('No purchases yet.')) ?>,
-        other: <?= json_encode(t('Something else (not counted)')) ?>, notCounted: <?= json_encode(t('Not counted')) ?>,
-        sells: <?= json_encode(t('Sells for')) ?>, costs: <?= json_encode(t('costs')) ?>, perOne: <?= json_encode(t('profit on each')) ?>,
-        belowCost: <?= json_encode(t('Selling below cost')) ?>, costsPer: <?= json_encode(t('Costs')) ?>, per: <?= json_encode(t('per')) ?>,
+        notCounted: <?= json_encode(t('Not counted')) ?>, perOne: <?= json_encode(t('profit on each')) ?>,
+        belowCost: <?= json_encode(t('Selling below cost')) ?>, per: <?= json_encode(t('per')) ?>,
         enterQty: <?= json_encode(t('Enter the quantity.')) ?>, enterPrice: <?= json_encode(t('Enter the price for one, or the total you paid.')) ?>,
         enterName: <?= json_encode(t('Enter what you bought.')) ?>, enterAmount: <?= json_encode(t('Enter the amount paid.')) ?>,
         groceryDesc: <?= json_encode(t('Ingredients')) ?>,
@@ -297,21 +391,43 @@ const RP = {
         overdue: <?= json_encode(t('Overdue')) ?>, pay: <?= json_encode(t('Pay')) ?>, noDebts: <?= json_encode(t('You owe no supplier anything.')) ?>,
         totalOwed: <?= json_encode(t('Total owed')) ?>, owedNow: <?= json_encode(t('Owed now')) ?>, paidSoFar: <?= json_encode(t('Paid so far')) ?>,
         enterSupName: <?= json_encode(t("Please enter the supplier's name.")) ?>, supAdded: <?= json_encode(t('Supplier added')) ?>,
-        paidBefore: <?= json_encode(t('Payments made')) ?>, stillOwe: <?= json_encode(t('Still owed')) ?>
+        paidBefore: <?= json_encode(t('Payments made')) ?>, stillOwe: <?= json_encode(t('Still owed')) ?>,
+        // 2026-11-02 simpler, smarter screen
+        sumEmpty: <?= json_encode(t('Pick what you bought — the total shows here.')) ?>, foodCost: <?= json_encode(t('Goes to the cost of food sold')) ?>,
+        paidNowL: <?= json_encode(t('Paid now')) ?>, owe: <?= json_encode(t('You will owe')) ?>,
+        avgCost: <?= json_encode(t('Average cost: %s')) ?>, timesAvg: <?= json_encode(t('%1$s× the average cost (%2$s)')) ?>, belowAvg: <?= json_encode(t('%1$s%% below the average cost (%2$s)')) ?>,
+        onMenu: <?= json_encode(t('On the menu')) ?>, addNew: <?= json_encode(t('+ Add "%s" as a new ingredient')) ?>,
+        wholeOnly: <?= json_encode(t('%s is counted in whole numbers — enter 1, 2, 3…')) ?>,
+        priceCheck: <?= json_encode(t('Check the price')) ?>, priceCheckTxt: <?= json_encode(t('You entered %1$s for one %2$s — the average cost is %3$s. Is this correct?')) ?>,
+        dupTitle: <?= json_encode(t('Already saved?')) ?>, dupTxt: <?= json_encode(t('The same purchase (%s) is already saved for this date. Save it again?')) ?>,
+        countedTitle: <?= json_encode(t('This item is counted')) ?>,
+        countedTxt: <?= json_encode(t('%1$s is a counted item (%2$s). Buy it as a counted item, or it will count twice in your costs.')) ?>,
+        switchTo: <?= json_encode(t('Buy as counted item')) ?>, keepOther: <?= json_encode(t('Save as not counted anyway')) ?>,
+        yesSave: <?= json_encode(t('Yes, save')) ?>, fixIt: <?= json_encode(t('Let me fix it')) ?>, buyAgain: <?= json_encode(t('Buy again')) ?>,
+        gone: <?= json_encode(t('This item is no longer available to buy here.')) ?>
     }
 };
 RP.creditApi = RP.api + 'supplier_credit.php';
 const fmt = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
-let rpItem = null;        // { stock, cost, unit, sell } of the chosen item
+const rpFmtCur = n => fmt(n) + ' ' + RP.cur;
+let rpItem = null;        // { id, name, stock, cost, unit, sell } of the chosen item
 let rpMode = 'stock';     // 'stock' = a counted item, 'other' = something else (not counted)
 let rpLast = 'price';     // which of price / total the user typed last
+let rpRows = [];          // the recent purchases as loaded (also used by the "already saved?" check and "Buy again")
+let rpMatch = null;       // a counted item whose name matches what was typed in "Something else"
+// units you count in whole pieces — 2.5 crates is a typing mistake; kg / lt keep their decimals
+const RP_WHOLE = ['pcs', 'pc', 'piece', 'pieces', 'dozen', 'bunch', 'bag', 'crate', 'carton', 'bottle', 'loaf', 'loaves', 'egg', 'eggs', 'roll', 'box', 'tray', 'packet', 'pack', 'sack', 'tin', 'can'];
+const rpIsWhole = u => RP_WHOLE.indexOf(String(u || '').toLowerCase().trim()) !== -1;
+const rpNameOf = d => { const t = String(d.text || ''), sfx = ' (' + d.unit + ')'; return t.endsWith(sfx) ? t.slice(0, -sfx.length) : t; };
 
 function rpWh() { return parseInt($('#rpShop').length ? $('#rpShop').val() : $('#rpWarehouse').val(), 10); }
 
 function rpSetMode(m) {
     rpMode = m;
-    $('#rpStockFields').toggle(m === 'stock'); $('#rpOtherFields').toggle(m === 'other'); $('#rpMoreWrap').toggle(m === 'stock');
-    if (m === 'other') { rpItem = null; $('#rpItemInfo').text(''); }
+    $('#rpKindStock').prop('checked', m === 'stock'); $('#rpKindOther').prop('checked', m === 'other');
+    $('#rpStockFields').toggle(m === 'stock'); $('#rpOtherFields').toggle(m === 'other');
+    if (m === 'other') { rpItem = null; $('#rpItem').val(null).trigger('change'); } else { rpMatch = null; $('#rpOtherMatch').hide(); }
+    rpSummary(); rpPayUi();
 }
 
 // price for one <-> total paid: whichever was typed last wins, the other follows
@@ -322,41 +438,85 @@ function rpSync(from) {
         if (rpLast === 'total') { const t = parseFloat($('#rpTotal').val()); $('#rpPrice').val(isNaN(t) ? '' : Math.round(t / q * 100) / 100); }
         else { const p = parseFloat($('#rpPrice').val()); $('#rpTotal').val(isNaN(p) ? '' : Math.round(p * q * 100) / 100); }
     }
-    rpPreview();
+    rpSummary();
 }
 function rpUnitPrice() {
     const q = parseFloat($('#rpQty').val()) || 0;
     if (rpLast === 'total' && q > 0) { const t = parseFloat($('#rpTotal').val()); return isNaN(t) ? 0 : t / q; }
     return parseFloat($('#rpPrice').val()) || 0;
 }
-
-function rpPreview() {
-    const q = parseFloat($('#rpQty').val()) || 0, p = rpUnitPrice(), box = $('#rpPreview');
-    if (!rpItem || q <= 0) { box.hide(); return; }
-    const old = Math.max(0, rpItem.stock), tot = old + q;
-    const nc = tot > 0 ? ((old * rpItem.cost) + (q * p)) / tot : p;
-    let h = `<strong>${RP.s.total}: ${fmt(q * p)} ${RP.cur}</strong><br><span class="small">${RP.s.onHand}: ${fmt(rpItem.stock)} · ${RP.s.cost}: ${fmt(rpItem.cost)} → <strong>${RP.s.newCost}: ${fmt(nc)}</strong></span>`;
-    const sell = rpItem.sell !== null ? (parseFloat($('#rpSell').val()) || 0) : null;
-    if (sell !== null) {
-        const pr = sell - nc, pc = sell > 0 ? Math.round(pr / sell * 100) : 0;
-        h += `<br><span class="small ${pr < 0 ? 'text-danger fw-bold' : ''}">${RP.s.sells} ${fmt(sell)} · ${RP.s.costs} ${fmt(nc)} → <strong>${RP.s.perOne} ${fmt(pr)} (${pc}%)</strong>${pr < 0 ? ' — ' + RP.s.belowCost : ''}</span>`;
-    } else {
-        h += `<br><span class="small">${RP.s.costsPer} ${fmt(nc)} ${RP.s.per} ${safeOutput(rpItem.unit)} — ${RP.s.costFollows}</span>`;
-    }
-    box.html(h).show();
+/** How far the price is from the item's average cost: null when it is normal (or there is nothing to compare with). */
+function rpPriceOff(p) {
+    if (!rpItem || rpItem.cost <= 0 || p <= 0) return null;
+    const r = p / rpItem.cost;
+    if (r >= 1.5) return RP.s.timesAvg.replace('%1$s', (Math.round(r * 10) / 10)).replace('%2$s', fmt(rpItem.cost));
+    if (r <= 0.5) return RP.s.belowAvg.replace('%1$s', Math.round((1 - r) * 100)).replace('%%', '%').replace('%2$s', fmt(rpItem.cost));
+    return null;
 }
 
+const rpLine = (l, r, cls) => `<div class="rp-sum-line ${cls || ''}"><span>${l}</span><span>${r}</span></div>`;
+/** The live Summary (and the phone bar): what will be saved, before it is saved. */
+function rpSummary() {
+    let h = '', total = 0;
+    if (rpMode === 'other') {
+        const name = ($('#rpOtherName').val() || '').trim(), amt = parseFloat($('#rpOtherAmount').val()) || 0;
+        total = amt;
+        if (name || amt) h = `<div class="rp-sum-item">${safeOutput(name || '—')} <span class="rp-tag rp-tag-grey">${RP.s.notCounted}</span></div>` + rpLine(RP.s.foodCost, '', 'rp-muted');
+    } else if (rpItem) {
+        const q = parseFloat($('#rpQty').val()) || 0, p = rpUnitPrice(), u = safeOutput(rpItem.unit);
+        total = q * p;
+        const old = Math.max(0, rpItem.stock), tot = old + q, nc = q > 0 ? (tot > 0 ? ((old * rpItem.cost) + (q * p)) / tot : p) : rpItem.cost;
+        h = `<div class="rp-sum-item">${safeOutput(rpItem.name)}</div>`;
+        if (q > 0) h += rpLine(`${fmt(q)} ${u} × ${fmt(p)}`, fmt(total));
+        h += rpLine(RP.s.onHand, q > 0 ? `${fmt(rpItem.stock)} → ${fmt(rpItem.stock + q)} ${u}` : `${fmt(rpItem.stock)} ${u}`, 'rp-muted');
+        h += rpLine(`${RP.s.cost} ${RP.s.per} ${u}`, q > 0 ? `${fmt(rpItem.cost)} → ${fmt(nc)}` : fmt(rpItem.cost), 'rp-muted');
+        if (rpItem.sell !== null) {
+            const sell = parseFloat($('#rpSell').val()) || 0, pr = sell - nc, pc = sell > 0 ? Math.round(pr / sell * 100) : 0;
+            h += rpLine(pr < 0 ? RP.s.belowCost : RP.s.perOne, `${fmt(pr)} (${pc}%)`, pr < 0 ? 'rp-neg' : '');
+        }
+        // the price hint under "Price for one"
+        const off = q > 0 || $('#rpPrice').val() !== '' ? rpPriceOff(p) : null;
+        $('#rpPriceHint').toggleClass('rp-warn', !!off).text(off ? '⚠ ' + off : (rpItem.cost > 0 ? RP.s.avgCost.replace('%s', fmt(rpItem.cost)) : ''));
+    }
+    if (!rpItem || rpMode === 'other') $('#rpPriceHint').removeClass('rp-warn').text('');
+    total = Math.round(total * 100) / 100;
+    const pay = rpPayment();
+    if (h && pay !== 'paid' && total > 0) {
+        const paid = pay === 'partial' ? Math.min(total, parseFloat($('#rpNowAmt').val()) || 0) : 0;
+        h += rpLine(RP.s.paidNowL, fmt(paid)) + rpLine(RP.s.owe, fmt(total - paid), 'rp-owe');
+    }
+    $('#rpSumBody').html(h || `<div class="rp-sum-empty"><i class="bi bi-basket"></i>${RP.s.sumEmpty}</div>`);
+    $('#rpSumTotal').text(rpFmtCur(total));
+}
+
+function rpSellShow() { $('#rpSellTxt').text(rpItem && rpItem.sell !== null ? rpFmtCur(parseFloat($('#rpSell').val()) || 0) : ''); }
 function rpPick(d) {
-    rpItem = { stock: parseFloat(d.stock) || 0, cost: parseFloat(d.cost_price) || 0, unit: d.unit, sell: (d.selling_price === null || d.selling_price === undefined) ? null : parseFloat(d.selling_price) };
-    $('#rpUnit').text('(' + d.unit + ')'); $('#rpPrice').val(rpItem.cost > 0 ? rpItem.cost : ''); $('#rpTotal').val(''); rpLast = 'price';
-    $('#rpSellRow').toggle(rpItem.sell !== null); $('#rpSell').val(rpItem.sell !== null ? rpItem.sell : '');
-    $('#rpItemInfo').text(RP.s.onHand + ': ' + fmt(rpItem.stock) + ' · ' + RP.s.cost + ': ' + fmt(rpItem.cost));
-    rpSetMode('stock'); rpSync();
+    rpItem = { id: parseInt(d.id, 10) || 0, name: d.name || rpNameOf(d), stock: parseFloat(d.stock) || 0, cost: parseFloat(d.cost_price) || 0, unit: d.unit,
+               sell: (d.selling_price === null || d.selling_price === undefined) ? null : parseFloat(d.selling_price) };
+    const whole = rpIsWhole(d.unit);
+    $('#rpUnit').text(d.unit || '—'); $('#rpQty').attr({ step: whole ? 1 : 0.001, min: whole ? 1 : 0.001, inputmode: whole ? 'numeric' : 'decimal' });
+    $('#rpPrice').val(rpItem.cost > 0 ? rpItem.cost : ''); $('#rpTotal').val(''); rpLast = 'price';
+    $('#rpSellRow').toggle(rpItem.sell !== null); $('#rpSellBox').hide(); $('#rpSell').val(rpItem.sell !== null ? rpItem.sell : ''); rpSellShow();
+    if (rpMode !== 'stock') rpSetMode('stock');
+    rpSync();
+}
+/** Choose an item by id (the Menu's "Buy stock" link, "Buy again", "Buy as counted item"), with its live stock and cost. */
+function rpLoadItem(id, name, then) {
+    $.getJSON(RP.api + 'search_stock_items.php', { warehouse_id: rpWh(), q: name }, function (r) {
+        const m = (r.results || []).find(x => +x.id === +id);
+        if (!m) { Swal.fire({ icon: 'info', title: RP.s.gone, timer: 2600, showConfirmButton: false }); return; }
+        if (rpMode !== 'stock') rpSetMode('stock');
+        if (!$('#rpItem option[value="' + (+m.id) + '"]').length) $('#rpItem').append(new Option(m.text, m.id, false, false));
+        $('#rpItem').val(String(m.id)).trigger('change');
+        rpPick(m);
+        if (then) then(m);
+    });
 }
 function rpReset() {
     $('#rpQty, #rpPrice, #rpTotal, #rpSell, #rpOtherName, #rpOtherAmount, #rpNowAmt, #rpDue').val(''); $('#rpItem').val(null).trigger('change');
     $('#rpSupplier').val('').trigger('change'); $('#rpPayPaid').prop('checked', true);
-    rpItem = null; rpLast = 'price'; $('#rpUnit, #rpItemInfo').text(''); $('#rpSellRow').hide(); rpSetMode('stock'); rpPreview(); rpPayUi();
+    rpItem = null; rpLast = 'price'; rpMatch = null; $('#rpUnit').text('—'); $('#rpOtherMatch').hide(); $('#rpSellRow').hide(); $('#rpQty').attr({ step: 0.001, min: 0.001 });
+    rpSetMode('stock');
 }
 
 // ── Payment: Paid (default) · Partly paid · Credit ──
@@ -369,6 +529,7 @@ function rpPayUi() {
     const p = rpPayment(), owe = p !== 'paid';
     $('.rp-owe-only').toggle(owe); $('#rpNowAmtWrap').toggle(p === 'partial');
     $('#rpSupHint').toggle(!owe); $('#rpSupStar').toggleClass('d-none', !owe);
+    rpSummary();
     if (!owe) return;
     const total = Math.round(rpPurchaseTotal() * 100) / 100, paid = p === 'partial' ? (parseFloat($('#rpNowAmt').val()) || 0) : 0;
     const owed = Math.max(0, total - paid);
@@ -390,6 +551,39 @@ function rpPayData() {
     return d;
 }
 
+// ── "Something else": is it really a counted item? (it would count twice) ──
+let rpMatchTimer = null;
+function rpCheckMatch() {
+    const q = ($('#rpOtherName').val() || '').trim().toLowerCase();
+    rpMatch = null; $('#rpOtherMatch').hide();
+    if (q.length < 3) return;
+    $.getJSON(RP.api + 'search_stock_items.php', { warehouse_id: rpWh(), q: q }, function (r) {
+        if (($('#rpOtherName').val() || '').trim().toLowerCase() !== q) return;          // typed on since
+        const m = (r.results || []).find(x => { const n = rpNameOf(x).toLowerCase(); return n === q || n.startsWith(q) || q.startsWith(n); });
+        if (!m) return;
+        rpMatch = m;
+        $('#rpOtherMatch').html('<i class="bi bi-exclamation-triangle me-1"></i>' + RP.s.countedTxt.replace('%1$s', '<strong>' + safeOutput(rpNameOf(m)) + '</strong>').replace('%2$s', safeOutput(m.unit))
+            + ' <a href="#" id="rpUseMatch" class="fw-semibold ms-1">' + RP.s.switchTo + ' →</a>').show();
+    });
+}
+function rpUseMatch() {
+    const m = rpMatch; if (!m) return;
+    const amt = parseFloat($('#rpOtherAmount').val()) || 0;
+    $('#rpOtherName, #rpOtherAmount').val('');
+    rpLoadItem(m.id, rpNameOf(m), () => { if (amt > 0) { $('#rpTotal').val(amt); rpLast = 'total'; } setTimeout(() => $('#rpQty').trigger('focus'), 100); rpSync(); });
+}
+
+/** Ask once, in plain words; resolves true to go on. */
+function rpAsk(title, html, yes, no) {
+    return Swal.fire({ icon: 'question', title: title, html: html, showCancelButton: true, confirmButtonColor: '#0d6efd',
+                       confirmButtonText: yes || RP.s.yesSave, cancelButtonText: no || RP.s.fixIt, reverseButtons: true }).then(r => r.isConfirmed);
+}
+/** The same purchase already in the list for this date? (a double tap, a retry after a slow network) */
+function rpAlreadySaved(kind, name, qty, total, date) {
+    return rpRows.some(r => r.date === date && (r.kind === 'grocery') === (kind === 'grocery') && String(r.item).toLowerCase() === String(name).toLowerCase()
+        && Math.abs((+r.total || 0) - total) < 0.01 && (kind === 'grocery' || Math.abs((+r.quantity || 0) - qty) < 0.0005));
+}
+
 // ── Suppliers you owe ──
 let rpDebts = {};
 function loadDebts() {
@@ -409,48 +603,112 @@ function loadDebts() {
     });
 }
 
-let rpDT = null;   // the Recent purchases DataTable (standard init; reloaded with clear().rows.add().draw())
+// ── Recent purchases ──
+let rpDT = null;     // standard DataTable; reloaded with clear().rows.add().draw()
+let rpRange = 'all'; // All · Today · This week
+const rpNum = (v, type, html) => (type === 'sort' || type === 'type') ? (v === null || v === undefined ? -1 : +v) : html;
 function loadPurchases() {
     $.getJSON(RP.api + 'get_purchases.php', { warehouse_id: rpWh() }, function (res) {
-        const rows = (res.success ? res.data : []).map(r => {
-            const g = r.kind === 'grocery';
-            const payTag = r.payment === 'credit' ? ' <span class="rp-tag rp-tag-owe">' + RP.s.creditTag + ' · ' + RP.s.owedTag + ' ' + fmt(r.owed) + '</span>'
-                         : r.payment === 'partial' ? ' <span class="rp-tag rp-tag-owe">' + RP.s.partlyTag + ' · ' + RP.s.owedTag + ' ' + fmt(r.owed) + '</span>' : '';
-            return [
-                safeOutput(r.date),
-                '<span class="fw-semibold">' + safeOutput(r.item) + '</span>' + (g ? ' <span class="rp-tag rp-tag-grey">' + RP.s.notCounted + '</span>' : '') + payTag,
-                g ? '—' : fmt(r.quantity) + ' ' + safeOutput(r.unit),
-                g ? '—' : fmt(r.unit_cost), '<strong>' + fmt(r.total) + '</strong>', safeOutput(r.by || '')
-            ];
-        });
-        rpDT.clear().rows.add(rows).draw();
+        rpRows = (res.success ? res.data : []).map((r, i) => Object.assign(r, { _i: i }));
+        rpDT.clear().rows.add(rpRows).draw();
+    });
+}
+function rpBuyAgain(i) {
+    const r = rpRows[i]; if (!r) return;
+    document.getElementById('rpForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (r.kind === 'grocery') {
+        rpSetMode('other'); $('#rpOtherName').val(r.item); $('#rpOtherAmount').val(r.total); rpSummary(); rpPayUi(); rpCheckMatch();
+        setTimeout(() => $('#rpOtherAmount').trigger('focus').trigger('select'), 300);
+        return;
+    }
+    rpLoadItem(r.product_id, r.item, () => {
+        $('#rpQty').val(r.quantity); $('#rpPrice').val(r.unit_cost); rpLast = 'price'; rpSync(); rpPayUi();
+        setTimeout(() => $('#rpQty').trigger('focus').trigger('select'), 300);
     });
 }
 
 $(function () {
-    rpDT = $('#rpTable').DataTable({
-        responsive: false, scrollX: true, pageLength: 10, order: [[0, 'desc']], dom: 'rtip',
-        columnDefs: [{ targets: [2, 3, 4], className: 'text-end' }],
-        language: { emptyTable: RP.s.none, zeroRecords: RP.s.none }
+    $.fn.dataTable.ext.search.push(function (settings, data, idx, row) {
+        if (settings.nTable.id !== 'rpTable' || rpRange === 'all') return true;
+        return rpRange === 'today' ? row.date === RP.today : row.date >= RP.weekStart;
     });
+    rpDT = $('#rpTable').DataTable({
+        responsive: false, scrollX: true, autoWidth: false, pageLength: 10, order: [], dom: 'rtip',
+        columns: [
+            { data: null, orderable: false, searchable: false, className: 'rp-sno', render: () => '' },
+            { data: 'item', render: (d, t, r) => {      // Item before Date: it is also the title of each phone card
+                if (t !== 'display') return d;
+                const g = r.kind === 'grocery';
+                const payTag = r.payment === 'credit' ? ' <span class="rp-tag rp-tag-owe">' + RP.s.creditTag + ' · ' + RP.s.owedTag + ' ' + fmt(r.owed) + '</span>'
+                             : r.payment === 'partial' ? ' <span class="rp-tag rp-tag-owe">' + RP.s.partlyTag + ' · ' + RP.s.owedTag + ' ' + fmt(r.owed) + '</span>' : '';
+                return '<span class="fw-semibold">' + safeOutput(d) + '</span>' + (g ? ' <span class="rp-tag rp-tag-grey">' + RP.s.notCounted + '</span>' : '') + payTag;
+            } },
+            { data: 'date', render: (d, t) => t === 'display' ? safeOutput(d) : d },
+            { data: 'quantity', className: 'text-end', render: (d, t, r) => rpNum(d, t, r.kind === 'grocery' ? '—' : fmt(d) + ' ' + safeOutput(r.unit)) },
+            { data: 'unit_cost', className: 'text-end', render: (d, t, r) => rpNum(d, t, r.kind === 'grocery' ? '—' : fmt(d)) },
+            { data: 'total', className: 'text-end', render: (d, t) => rpNum(d, t, '<strong>' + fmt(d) + '</strong>') },
+            { data: 'by', className: 'rp-by', render: (d, t) => t === 'display' ? safeOutput(d || '') : (d || '') },
+            { data: null, orderable: false, searchable: false, className: 'text-end', render: (d, t, r) => t !== 'display' ? '' :
+                `<div class="dropdown d-flex justify-content-end">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear-fill me-1"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
+                        <li><button type="button" class="dropdown-item py-2 rounded rp-again" data-i="${+r._i}"><i class="bi bi-arrow-repeat text-primary me-2"></i> ${RP.s.buyAgain}</button></li>
+                    </ul>
+                </div>` }
+        ],
+        language: { emptyTable: '<div class="rp-empty"><i class="bi bi-basket"></i>' + RP.s.none + '</div>', zeroRecords: '<div class="rp-empty"><i class="bi bi-basket"></i>' + RP.s.none + '</div>' },
+        drawCallback: function () {
+            const api = this.api();
+            // S/No. counts down the list as shown (1, 2, 3 … across pages), whatever the sort
+            api.column(0, { search: 'applied', order: 'applied' }).nodes().each((c, i) => { c.textContent = i + 1; });
+            const shown = api.rows({ search: 'applied' }).data().toArray();
+            $('#rpCount').text(shown.length);
+            $('#rpFootTotal').html('<strong>' + rpFmtCur(shown.reduce((s, r) => s + (+r.total || 0), 0)) + '</strong>');
+        }
+    });
+    $(window).on('resize', () => rpDT.columns.adjust());
+    $('input[name="rpRange"]').on('change', function () { rpRange = this.value; rpDT.draw(); });
+    $('#rpTable').on('click', '.rp-again', function () { rpBuyAgain(+$(this).data('i')); });
+
     $('#rpSupplier, #rpShop').select2({ theme: 'bootstrap-5', width: '100%' });
     $('#rpItem').select2({
         theme: 'bootstrap-5', width: '100%', placeholder: RP.s.search, allowClear: true, minimumInputLength: 0,
         ajax: { url: RP.api + 'search_stock_items.php', dataType: 'json', delay: 250, data: p => ({ q: p.term || '', warehouse_id: rpWh() }),
-                processResults: d => { const r = d.results || []; if (RP.otherAccount) r.push({ id: '__other', text: RP.s.other }); return { results: r }; }, cache: false }
+                processResults: (d, params) => {
+                    const r = d.results || [], term = ((params && params.term) || '').trim();
+                    // nothing with this exact name? add it as a new ingredient, right from the search
+                    if (RP.canEdit && term.length >= 2 && !r.some(x => rpNameOf(x).toLowerCase() === term.toLowerCase())) r.push({ id: '__new', text: RP.s.addNew.replace('%s', term), term: term });
+                    return { results: r };
+                }, cache: false },
+        templateResult: function (d) {
+            if (d.loading || !d.id) return d.text;
+            if (d.id === '__new') return $('<span class="rp-opt-new"></span>').text(d.text);
+            const meta = [d.unit, RP.s.onHand + ' ' + fmt(d.stock), RP.s.cost + ' ' + fmt(d.cost_price)].join(' · ');
+            return $('<div></div>').append($('<div class="rp-opt-name"></div>').text(rpNameOf(d)).append(d.selling_price !== null && d.selling_price !== undefined ? ' <span class="rp-tag">' + RP.s.onMenu + '</span>' : ''))
+                                   .append($('<div class="rp-opt-meta"></div>').text(meta));
+        }
     }).on('select2:select', function (e) {
         const d = e.params.data;
-        if (d.id === '__other') { rpSetMode('other'); setTimeout(() => $('#rpOtherName').trigger('focus'), 100); } else { rpPick(d); }
-    }).on('select2:clear', function () { rpItem = null; rpSetMode('stock'); $('#rpUnit, #rpItemInfo').text(''); $('#rpSellRow').hide(); rpPreview(); });
+        if (d.id === '__new') {
+            $('#rpItem').val(null).trigger('change'); rpItem = null; rpSummary();
+            $('#rpIngMsg').empty(); $('#rpIngForm')[0].reset(); $('#rpIngName').val(d.term);
+            new bootstrap.Modal(document.getElementById('rpIngModal')).show(); setTimeout(() => $('#rpIngUnit').trigger('focus'), 300);
+            return;
+        }
+        rpPick(d);
+    }).on('select2:clear', function () { rpItem = null; $('#rpUnit').text('—'); $('#rpSellRow').hide(); rpSummary(); });
+    $('input[name="rpKind"]').on('change', function () { rpSetMode(this.value); if (this.value === 'other') setTimeout(() => $('#rpOtherName').trigger('focus'), 50); });
     $('#rpQty').on('input', () => rpSync());
     $('#rpPrice').on('input', () => rpSync('price'));
     $('#rpTotal').on('input', () => rpSync('total'));
-    $('#rpSell').on('input', rpPreview);
+    $('#rpSell').on('input', () => { rpSellShow(); rpSummary(); });
+    $('#rpSellEdit').on('click', function (e) { e.preventDefault(); $('#rpSellBox').toggle(); if ($('#rpSellBox').is(':visible')) $('#rpSell').trigger('focus').trigger('select'); });
+    $('#rpOtherName').on('input', () => { rpSummary(); clearTimeout(rpMatchTimer); rpMatchTimer = setTimeout(rpCheckMatch, 400); });
+    $('#rpOtherAmount').on('input', rpSummary);
+    $('#rpOtherMatch').on('click', '#rpUseMatch', function (e) { e.preventDefault(); rpUseMatch(); });
     $('#rpShop').on('change', function () { $('#rpWarehouse').val(this.value); rpReset(); loadPurchases(); loadDebts(); });
     <?php if ($preItem): ?>
-    $.getJSON(RP.api + 'search_stock_items.php', { warehouse_id: rpWh(), q: <?= json_encode($preItem['product_name']) ?> }, function (r) {
-        const m = (r.results || []).find(x => x.id === <?= (int)$preItem['product_id'] ?>); if (m) rpPick(m);
-    });
+    rpLoadItem(<?= (int)$preItem['product_id'] ?>, <?= json_encode($preItem['product_name']) ?>);
     <?php endif; ?>
 
     function done(msgHtml) {
@@ -501,55 +759,81 @@ $(function () {
             loadDebts(); loadPurchases();
         }, 'json').fail(() => $('#rpPayMsg').html('<div class="alert alert-danger py-2 mb-0">' + RP.s.serverError + '</div>')).always(() => btn.prop('disabled', false).html(orig));
     });
-    function fail(m) { $('#rpMessage').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(m) + '</div>'); }
+    function fail(m) {
+        $('#rpMessage').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(m) + '</div>');
+        const el = document.getElementById('rpMessage'), top = el.getBoundingClientRect().top;
+        if (top < 60 || top > window.innerHeight - 120) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // the Save buttons (Summary and the phone bar) — busy together
+    $('.rp-save').each(function () { $(this).data('orig', $(this).html()); });
+    const rpBusy = on => $('.rp-save').each(function () { $(this).prop('disabled', on).html(on ? '<span class="spinner-border spinner-border-sm me-1"></span>' + RP.s.saving : $(this).data('orig')); });
+    let rpSaving = false;
 
     $('#rpForm').on('submit', function (e) {
         e.preventDefault();
-        const btn = $('#rpSave'), orig = btn.html();
-        const finish = () => btn.prop('disabled', false).html(orig);
-        const pay = rpPayData();
+        if (rpSaving) return;
+        const finish = () => { rpSaving = false; rpBusy(false); };
+        const start = () => { rpSaving = true; rpBusy(true); };
+        const pay = rpPayData(), date = $('#rpDate').val();
         if (rpMode === 'other') {
             const name = ($('#rpOtherName').val() || '').trim(), amt = parseFloat($('#rpOtherAmount').val()) || 0;
             if (!name) return fail(RP.s.enterName);
             if (amt <= 0) return fail(RP.s.enterAmount);
             if (pay.error) return fail(pay.error);
-            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>' + RP.s.saving);
-            if (pay.payment !== 'paid') {      // partly paid / credit: a supplier bill (fully paid keeps the expense path below)
-                $.post(RP.creditApi, Object.assign({ _csrf: RP.csrf, action: 'buy_grocery', name: name, amount: amt, warehouse_id: rpWh(), date: $('#rpDate').val(),
-                                                     supplier_id: $('#rpSupplier').val() }, pay), function (res) {
-                    if (res.success) done(safeOutput(name) + '<br><small>' + RP.s.owedTag + ': ' + fmt(res.owed) + ' ' + RP.cur + '</small>'); else fail(res.message || RP.s.error);
+            $('#rpMessage').empty();
+            let chain = Promise.resolve(true);
+            if (rpMatch) chain = chain.then(ok => ok && rpAsk(RP.s.countedTitle, RP.s.countedTxt.replace('%1$s', '<strong>' + safeOutput(rpNameOf(rpMatch)) + '</strong>').replace('%2$s', safeOutput(rpMatch.unit)), RP.s.keepOther, RP.s.switchTo)
+                .then(keep => { if (!keep) rpUseMatch(); return keep; }));
+            chain = chain.then(ok => ok && (!rpAlreadySaved('grocery', name, 0, amt, date) || rpAsk(RP.s.dupTitle, RP.s.dupTxt.replace('%s', safeOutput(name) + ' · ' + rpFmtCur(amt)))));
+            chain.then(ok => {
+                if (!ok) return;
+                start();
+                if (pay.payment !== 'paid') {      // partly paid / credit: a supplier bill (fully paid keeps the expense path below)
+                    $.post(RP.creditApi, Object.assign({ _csrf: RP.csrf, action: 'buy_grocery', name: name, amount: amt, warehouse_id: rpWh(), date: date,
+                                                         supplier_id: $('#rpSupplier').val() }, pay), function (res) {
+                        if (res.success) done(safeOutput(name) + '<br><small>' + RP.s.owedTag + ': ' + fmt(res.owed) + ' ' + RP.cur + '</small>'); else fail(res.message || RP.s.error);
+                    }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
+                    return;
+                }
+                $.post(RP.expenseApi, { _csrf: RP.csrf, expense_account_id: RP.otherAccount, bank_account_id: RP.cashAccount, status: 'paid', amount: amt, expense_date: date,
+                                        warehouse_id: rpWh(), description: RP.s.groceryDesc + ': ' + name }, function (res) {
+                    if (res.success) done(safeOutput(name) + '<br><small>' + fmt(amt) + ' ' + RP.cur + '</small>'); else fail(res.message || RP.s.error);
                 }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
-                return;
-            }
-            $.post(RP.expenseApi, { _csrf: RP.csrf, expense_account_id: RP.otherAccount, bank_account_id: RP.cashAccount, status: 'paid', amount: amt, expense_date: $('#rpDate').val(),
-                                    warehouse_id: rpWh(), description: RP.s.groceryDesc + ': ' + name }, function (res) {
-                if (res.success) done(safeOutput(name) + '<br><small>' + fmt(amt) + ' ' + RP.cur + '</small>'); else fail(res.message || RP.s.error);
-            }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
+            });
             return;
         }
         if (!$('#rpItem').val() || !rpItem) return fail(RP.s.pickItem);
         const q = parseFloat($('#rpQty').val()) || 0;
         if (q <= 0) return fail(RP.s.enterQty);
+        if (rpIsWhole(rpItem.unit) && Math.abs(q - Math.round(q)) > 1e-9) return fail(RP.s.wholeOnly.replace('%s', rpItem.unit));
         if ($('#rpPrice').val() === '' && $('#rpTotal').val() === '') return fail(RP.s.enterPrice);
         if (pay.error) return fail(pay.error);
-        const data = Object.assign({ _csrf: RP.csrf, warehouse_id: rpWh(), product_id: $('#rpItem').val(), quantity: q, date: $('#rpDate').val(),
+        $('#rpMessage').empty();
+        const data = Object.assign({ _csrf: RP.csrf, warehouse_id: rpWh(), product_id: $('#rpItem').val(), quantity: q, date: date,
                        supplier_id: $('#rpSupplier').val() || '', expiry_date: $('#rpExpiry').val() || '' }, pay);
         if (rpLast === 'total') data.total_paid = parseFloat($('#rpTotal').val()) || 0; else data.unit_cost = parseFloat($('#rpPrice').val()) || 0;
         if (rpItem.sell !== null && $('#rpSell').val() !== '') data.selling_price = $('#rpSell').val();
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>' + RP.s.saving);
-        $.post(RP.api + 'buy_stock.php', data, function (res) {
-            if (res.success) done(`${safeOutput(res.product_name)}<br><small>${RP.s.costNow} ${fmt(res.new_cost)} ${RP.cur}</small>` + (res.owed > 0 ? `<br><small>${RP.s.owedTag}: ${fmt(res.owed)} ${RP.cur}</small>` : '')); else fail(res.message || RP.s.error);
-        }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
+        const p = rpUnitPrice(), total = Math.round(q * p * 100) / 100, item = rpItem;
+        let chain = Promise.resolve(true);
+        if (rpPriceOff(p)) chain = chain.then(ok => ok && rpAsk(RP.s.priceCheck, RP.s.priceCheckTxt.replace('%1$s', '<strong>' + rpFmtCur(p) + '</strong>').replace('%2$s', safeOutput(item.unit)).replace('%3$s', rpFmtCur(item.cost))));
+        chain = chain.then(ok => ok && (!rpAlreadySaved('stock', item.name, q, total, date) || rpAsk(RP.s.dupTitle, RP.s.dupTxt.replace('%s', safeOutput(item.name) + ' · ' + fmt(q) + ' ' + safeOutput(item.unit) + ' · ' + rpFmtCur(total)))));
+        chain.then(ok => {
+            if (!ok) return;
+            start();
+            $.post(RP.api + 'buy_stock.php', data, function (res) {
+                if (res.success) done(`${safeOutput(res.product_name)}<br><small>${RP.s.costNow} ${fmt(res.new_cost)} ${RP.cur}</small>` + (res.owed > 0 ? `<br><small>${RP.s.owedTag}: ${fmt(res.owed)} ${RP.cur}</small>` : '')); else fail(res.message || RP.s.error);
+            }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
+        });
     });
 
-    $('#rpNewIngredient').on('click', function (e) { e.preventDefault(); $('#rpIngMsg').empty(); $('#rpIngForm')[0].reset(); new bootstrap.Modal(document.getElementById('rpIngModal')).show(); });
     $('#rpIngForm').on('submit', function (e) {
         e.preventDefault();
         $.post(RP.api + 'recipe.php', $(this).serialize() + '&action=new_ingredient&warehouse_id=' + rpWh() + '&_csrf=' + encodeURIComponent(RP.csrf), function (res) {
             if (res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('rpIngModal')).hide();
                 $('#rpItem').append(new Option(res.text, res.id, true, true)).trigger('change');
-                rpPick({ stock: 0, cost_price: res.cost_price, unit: res.unit, selling_price: null });
+                rpPick({ id: res.id, text: res.text, stock: 0, cost_price: res.cost_price, unit: res.unit, selling_price: null });
+                setTimeout(() => $('#rpQty').trigger('focus'), 300);
             } else { $('#rpIngMsg').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message || RP.s.error) + '</div>'); }
         }, 'json').fail(() => $('#rpIngMsg').html('<div class="alert alert-danger py-2 mb-0">' + RP.s.serverError + '</div>'));
     });
