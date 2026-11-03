@@ -19,6 +19,15 @@ if (!canView('restaurant_pos') || !canCreate('pos')) {
 }
 $ready      = restaurantModuleOn($pdo) && roSchemaReady($pdo);
 $warehouses = $ready ? restaurantWarehousesForSelect($pdo) : [];
+// Opened from a notification (online_orders?order=N): start on that order's shop (only a shop in the user's list).
+$focusOrder = (int)($_GET['order'] ?? 0);
+$focusWh = 0;
+if ($focusOrder > 0 && $warehouses) {
+    $fs = $pdo->prepare("SELECT warehouse_id FROM restaurant_online_orders WHERE order_id = ?");
+    $fs->execute([$focusOrder]);
+    $fw = (int)$fs->fetchColumn();
+    if (in_array($fw, array_map(fn($w) => (int)$w['warehouse_id'], $warehouses), true)) $focusWh = $fw;
+}
 $canShare   = canEdit('restaurant_pos');
 ?>
 <style>
@@ -26,6 +35,7 @@ $canShare   = canEdit('restaurant_pos');
     .oo-tabs .badge { font-size: .72rem; }
     .oo-card { border: 1px solid #e5e7eb; border-radius: 14px; }
     .oo-card.oo-new { border-color: #b6ccfe; box-shadow: 0 0 0 3px #e7f0ff; }
+    .oo-card.oo-focus { border-color: #0d6efd; box-shadow: 0 0 0 4px rgba(13,110,253,.25); }
     .oo-code { font-size: 1.25rem; font-weight: 800; letter-spacing: .01em; }
     .oo-where { font-size: .8rem; font-weight: 600; border-radius: 999px; padding: 3px 10px; background: #e7f0ff; color: #084298; }
     .oo-line { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #eef0f3; }
@@ -63,7 +73,7 @@ $canShare   = canEdit('restaurant_pos');
     <div class="mb-3" style="max-width:320px;">
         <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
         <select id="whSelect" class="form-select form-select-sm select2-static">
-            <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
+            <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"<?= (int)$w['warehouse_id'] === $focusWh ? ' selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
         </select>
     </div>
     <?php else: ?>
@@ -110,6 +120,7 @@ $canShare   = canEdit('restaurant_pos');
         'cur'        => bmsCurrencySymbol(),
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
     let tab = 'new', rows = [], seen = null, timer = null, sound = true;
+    const focus = <?= (int)$focusOrder ?>; let focused = false;   // ?order=N from a notification
     try { sound = localStorage.getItem('bms_oo_sound') !== '0'; } catch (e) {}
     const esc = s => safeOutput(String(s ?? ''));
     const money = v => OO.cur + Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -140,7 +151,7 @@ $canShare   = canEdit('restaurant_pos');
         if (o.status === 'accepted') btns = `<button class="btn btn-sm btn-outline-primary" onclick="ooAct(${o.order_id},'complete',this)">${OO.done}</button>
                                             <button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'ready',this)"><i class="bi bi-bell me-1"></i>${OO.ready}</button>`;
         if (o.status === 'ready')    btns = `<button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'complete',this)"><i class="bi bi-check2-all me-1"></i>${OO.done}</button>`;
-        return `<div class="col-12 col-md-6 col-xl-4"><div class="card oo-card h-100${o.status === 'pending' ? ' oo-new' : ''}"><div class="card-body p-3">
+        return `<div class="col-12 col-md-6 col-xl-4"><div class="card oo-card h-100${o.status === 'pending' ? ' oo-new' : ''}${o.order_id === focus ? ' oo-focus' : ''}" data-oid="${o.order_id}"><div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <div><div class="oo-code">${esc(o.code)}</div><small class="text-muted">${age}${o.handled_by ? ' · ' + OO.by.replace('%s', esc(o.handled_by)) : ''}</small></div>
                 <div class="text-end"><span class="oo-where">${where}</span><div class="mt-1"><span class="oo-badge oo-${esc(o.status)}">${esc(OO.status[o.status] || o.status)}</span></div></div>
@@ -163,10 +174,21 @@ $canShare   = canEdit('restaurant_pos');
         $.getJSON(OO.api, { action: 'list', warehouse_id: whId() }).done(r => {
             if (!r.success) { $('#ooList').html(`<div class="col-12"><div class="alert alert-warning">${esc(r.message)}</div></div>`); return; }
             rows = r.data;
+            if (focus && !focused) {   // opened from a notification: the tab that holds this order, then scroll to it
+                const f = rows.find(o => o.order_id === focus);
+                if (f) tab = f.status === 'pending' ? 'new' : (f.status === 'accepted' || f.status === 'ready' ? 'progress' : 'done');
+                $('.oo-tabs .nav-link').removeClass('active').filter('[data-tab="' + tab + '"]').addClass('active');
+            }
             const pend = new Set(rows.filter(o => o.status === 'pending').map(o => o.order_id));
             if (seen && [...pend].some(id => !seen.has(id))) chime();
             seen = pend;
             render();
+            if (focus && !focused) {
+                focused = true;
+                const el = document.querySelector('[data-oid="' + focus + '"]');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['order']);
+            }
         });
     }
     function post(data) { return $.post(OO.api, Object.assign({ _csrf: OO.csrf }, data), null, 'json'); }

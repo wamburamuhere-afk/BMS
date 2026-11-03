@@ -25,6 +25,15 @@ if (!canView('restaurant_pos')) {
 }
 $module_on  = restaurantModuleOn($pdo);
 $warehouses = $module_on ? restaurantWarehousesForSelect($pdo) : [];
+// Opened from a notification: tables-board?table=N — that table's shop, the table highlighted.
+$focusTable = (int)($_GET['table'] ?? 0);
+$focusWh = 0;
+if ($focusTable > 0 && $warehouses) {
+    $ft = $pdo->prepare("SELECT warehouse_id FROM restaurant_tables WHERE table_id = ?");
+    $ft->execute([$focusTable]);
+    $fw = (int)$ft->fetchColumn();
+    if (in_array($fw, array_map(fn($w) => (int)$w['warehouse_id'], $warehouses), true)) $focusWh = $fw; else $focusTable = 0;
+}
 $can_sell   = canCreate('pos');
 $cur        = getSetting('currency', 'TZS');
 ?>
@@ -56,7 +65,7 @@ $cur        = getSetting('currency', 'TZS');
         <div class="tb-shop">
             <select id="whSelect" class="form-select form-select-sm select2-static">
                 <?php foreach ($warehouses as $w): ?>
-                <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
+                <option value="<?= (int)$w['warehouse_id'] ?>"<?= (int)$w['warehouse_id'] === $focusWh ? ' selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -97,6 +106,7 @@ $cur        = getSetting('currency', 'TZS');
 </div>
 
 <style>
+.tb-card.tb-focus{outline:3px solid #0d6efd;outline-offset:2px;}
 /* sizes in px: the root font here is 12px, and style.css makes every .btn 16px / 85px wide — this page uses its own buttons */
 .tb-page .tb-hbtn { display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 14px; border-radius:10px; font-size:14px; font-weight:600; text-decoration:none; white-space:nowrap; }
 .tb-page .tb-hbtn-main { background:#0d6efd; color:#fff; border:1px solid #0d6efd; }
@@ -233,6 +243,7 @@ $(function () {
     setInterval(function () { if (!document.hidden && !$('.modal.show').length) loadBoard(true); }, 20000);
 });
 
+const TB_FOCUS = <?= (int)$focusTable ?>; let tbFocused = false;   // ?table=N from a notification
 function tbWid() { return parseInt($('#whSelect').val() || 0, 10); }
 
 function loadBoard(quiet) {
@@ -242,6 +253,12 @@ function loadBoard(quiet) {
         TB_DATA = res.data;
         $('#tbUpdAt').text(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }));
         renderBoard();
+        if (TB_FOCUS && !tbFocused) {   // from a notification: show that table
+            tbFocused = true;
+            const el = document.querySelector('[data-table="' + TB_FOCUS + '"]');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['table']);
+        }
     }).fail(function () { if (!quiet) Swal.fire({ icon: 'error', title: TB.error, text: TB.serverError }); })
       .always(function () { $('#tbRefresh').removeClass('tb-spin'); });
 }
@@ -261,7 +278,7 @@ function tbResLine(t) {
 function tbCard(t) {
     const isBusy = !!t.hold_id, late = tbIsLate(t);
     const open = `onclick='openTable(${JSON.stringify({ table_id: t.table_id, table_number: t.table_number })})'`;
-    const attrs = `class="tb-card ${isBusy ? (late ? 'tb-busy tb-late' : 'tb-busy') : (t.status === 'available' ? 'tb-free' : 'tb-other')}" role="button" tabindex="0" ${open}`;
+    const attrs = `class="tb-card ${isBusy ? (late ? 'tb-busy tb-late' : 'tb-busy') : (t.status === 'available' ? 'tb-free' : 'tb-other')}${+t.table_id === TB_FOCUS ? ' tb-focus' : ''}" data-table="${+t.table_id}" role="button" tabindex="0" ${open}`;
     if (!isBusy) {
         const pill = t.status === 'available' ? TB.free : (t.status === 'reserved' ? TB.reserved : TB.cleaning);
         return `<div ${attrs}>

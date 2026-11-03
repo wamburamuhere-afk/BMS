@@ -6546,6 +6546,13 @@ return [
     'Safety' => 'Usalama',
     'e.g. window seat, birthday' => 'mf. kiti cha dirishani, siku ya kuzaliwa',
 
+    // Restaurant notifications: the bell list
+    '%d h ago' => 'saa %d zilizopita',
+    '%d new' => 'Mpya %d',
+    'Dishes with no cost' => 'Vyakula visivyo na gharama',
+    'No notifications yet.' => 'Bado hakuna taarifa.',
+    'See all notifications' => 'Tazama taarifa zote',
+
     // Online menu: cart icon, My orders, ordering-off notices
     'My orders' => 'Oda zangu',
     'No orders yet from this phone.' => 'Bado hakuna oda kutoka kwenye simu hii.',
