@@ -309,7 +309,7 @@ section('G. Pages');
 $clean = fn($o) => !preg_match('/PHP (Warning|Notice|Fatal|Parse)|___EXC___/', explode('___OUT___', $o)[0] ?? '');
 $o = runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest);
 ok($clean($o) && strpos($o, 'class="rd2-acts"') !== false && strpos($o, 'class="rdp rdp-l2"') !== false && strpos($o, 'Quick Links') === false, 'restaurant-only company: restaurant dashboard with the new panel, no shop Quick Links');
-ok(strpos($o, 'data-pt="ord"') !== false && strpos($o, 'data-pt="low"') !== false && strpos($o, 'data-pt="att"') !== false, 'restaurant-only: recent orders, running low and needs attention are in the side panel (Layout 2)');
+ok(strpos($o, 'class="rd2-orders') !== false && strpos($o, 'class="rd2-chart') !== false && strpos($o, 'data-pt="att"') !== false && strpos($o, 'class="rd2-dishes') !== false, 'restaurant-only (redesign 2026-11-03): latest orders, the Sales | Orders chart, needs attention and top dishes are on the page');
 ok(strpos($o, 'Best sellers today') === false, 'restaurant-only: the old "Best sellers today" card is replaced by Best earners / Best sellers');
 $o = runWorker(['page' => 'app/dashboard.php'], $ON, $mixed);
 ok($clean($o) && strpos($o, 'Quick Links') !== false && strpos($o, 'Restaurant today') !== false && strpos($o, 'id="rdMixedSwitch"') !== false && strpos($o, 'data-v="combined"') !== false && strpos($o, 'data-v="shop"') !== false,

@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-11-03 — ui(restaurant): restaurant dashboard redesign — Preline look + Medesk parts, blue only
+
+**Branch:** `feat/restaurant-dashboard-redesign` (off `develop`). Owner approved the mock-up (Design canvas "Restaurant Dashboard Redesign").
+**Changed:** `includes/restaurant/dash_panel.php` (Layout 2 only), `includes/restaurant/dashboard.php` (header), `core/restaurant_insights.php` (4 new read-only helpers), `lang/sw.php`, tests (`test_restaurant_focus_cli`, `_dashboard_cli`, `_phase6_cli`, `_simplicity_cli`).
+**Not changed:** the mixed-company strip (`rdScope` restaurant / combined) and every retail or full-BMS dashboard.
+
+- **Header:** "Good morning / afternoon / evening, {name}.", the Showing choice and a **+ Take order** button.
+- **Quick actions:** same 8 actions, one blue; amber only when one needs you (Kitchen waiting long, Menu items with no cost). On a phone a 4-across grid.
+- **4 tiles instead of 6:** Sales (split by how customers order), Orders (average bill), Profit (margin; amber "Estimated" when a cost is missing), Tables busy right now (the one solid blue tile). Expenses and Owed to me moved into Money.
+- **Sales | Orders chart** that follows "Showing" against the same stretch before: Today by hour vs yesterday, week/month by day, quarter by week, year by month. Plain HTML bars (Layout 2 no longer loads Chart.js); the chart's totals equal the tiles (tested for all 5 periods).
+- **Kitchen right now** (tickets waiting or cooking per kitchen area) with **Needs your attention** (amber warnings, blue notes; low stock names the items; expenses waiting for approval) and Activities for audit-log users.
+- **Top dishes** (price, sold, sales, profit bar or "Needs a cost"), **Money** for the period in the Profit Report's words (Cost of Goods, Net Profit) with **Customers owe us** and **We owe suppliers**, **Latest orders** (tables not paid yet, then the last paid), **Sales by staff** (served-by, else who rang it up; amounts from the ledger).
+- Removed from Layout 2: the separate Performance period dropdown (one control now), "How customers order" donut (now the Sales tile split), Busy hours (now the hourly chart), the six coloured cards, orange/green/purple.
+- New helpers: `rdCompareSeries()`, `rdKitchenLoad()`, `rdOpenOrders()`, `rdStaffSales()` — money from the one ledger, counts from operational tables.
+- **Tests:** restaurant focus 435 (new P13), dashboard 67, phase 6 18, simplicity 70, pay-later 53, phases 0–7 all pass. `test_restaurant_pos_cli` (1) and `test_restaurant_pos_mode_setup_cli` (10) fail identically on plain `develop`. Checked in Chrome at desktop and phone width with a reversible fixture (all shops Restaurant + Smart POS on, restored after).
+
 ## 2026-11-03 — fix(restaurant): bring the latest `develop` into pay-later; two fixes found by the full test run
 
 **Branch:** `feat/restaurant-pay-later` (PR #2695). Merged `develop` again (free-trial PR #2552 had landed); only `changelog.md` clashed, both entries kept.

@@ -787,17 +787,21 @@ preg_match('#<nav class="rd2-acts".*?</nav>#s', $dc, $nav9); $nav9 = $nav9[0] ??
 foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaurant/kitchen-dashboard' => 'Kitchen', 'restaurant/menu' => 'Menu', 'restaurant/purchases' => 'Purchases', 'expenses' => 'Expenses', 'restaurant/reservations' => 'Reservations', 'restaurant/sales-report' => 'Sales report'] as $href => $lbl)
     ok(strpos($nav9, '/' . $href . '"') !== false && strpos($nav9, "<b>$lbl</b>") !== false, "action: $lbl → /$href");
 ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
-// Today and Money cards; the supplier-credit card is deliberately NOT there
-foreach (['sales' => 'Sales', 'orders' => 'Orders', 'profit' => 'Profit', 'exp' => 'Expenses', 'tables' => 'Open tables', 'owed' => 'Owed to me'] as $cc => $lbl)
-    ok((bool)preg_match('#class="rd2-sc rd2-c-' . $cc . '"><span class="rd2-l"><i class="ri ri-[a-z-]+"></i>' . preg_quote($lbl, '#') . '#', $dc), "card with its own colour: $lbl");
-ok(stripos($dc, 'We owe suppliers') === false && stripos($dc, 'owe suppliers') === false, 'no "We owe suppliers" card (supplier credit is not built)');
-// side panel
-foreach (['att', 'low', 'ord'] as $pt) ok(strpos($dc, 'data-pt="' . $pt . '"') !== false, "side panel tab: $pt");
-ok(strpos($dc, 'data-pt="act"') !== false, 'side panel: Activities tab for a user who may see the audit log (admin)');
+// Redesign 2026-11-03: 4 white tiles (Tables busy is the one solid blue), no per-card colours
+foreach (['Sales', 'Orders', 'Profit', 'Tables busy'] as $lbl)
+    ok((bool)preg_match('#class="rd2-tile[^"]*">\s*<span class="rd2-tl">' . preg_quote($lbl, '#') . '#', $dc), "tile: $lbl");
+ok(strpos($dc, 'class="rd2-tile rd2-tile-main"') !== false && strpos($dc, 'rd2-sc ') === false && strpos($dc, 'rd2-c-') === false, 'one solid blue tile (Tables busy); the six coloured cards are gone');
+// money: customers owe us + we owe suppliers (pay-later is built), both linked
+ok(strpos($dc, 'Customers owe us') !== false && strpos($dc, 'We owe suppliers') !== false && strpos($dc, '/restaurant/purchases#rpOwe"') !== false, 'Money: "Customers owe us" and "We owe suppliers" (opens Suppliers you owe)');
+// sections of the new layout
+foreach (['rd2-chart', 'rd2-panel', 'rd2-dishes', 'rd2-money', 'rd2-orders', 'rd2-staff'] as $sec) ok(strpos($dc, 'class="' . $sec . ' rdp-card"') !== false, "section: $sec");
+ok(strpos($dc, 'data-pt="att"') !== false && strpos($dc, 'data-pt="act"') !== false, 'Needs your attention, with Activities for a user who may see the audit log (admin)');
+ok(strpos($dc, 'data-ct="sales"') !== false && strpos($dc, 'data-ct="orders"') !== false && substr_count($dc, 'class="rd2-b"') >= 2, 'the Sales | Orders chart, drawn in HTML');
 $dsrc9 = file_get_contents("$root/includes/restaurant/dash_panel.php");
 ok(strpos($dsrc9, "\$rdActs = canView('audit_logs') ?") !== false, 'Activities are read only with the audit_logs permission, like the retail dashboard');
-// colours of the chosen design: sales blue, costs orange
-ok(strpos($dc, '.rdp-l2 .rdp-bar-food { background:#d97706; }') !== false && strpos($dc, "backgroundColor: L2 ? AMBER : NAVY") !== false && strpos($dc, "AMBER = '#d97706'") !== false, 'colours: costs are orange in the bar, the legend and the chart');
+// colours of the redesign: BMS blue only, amber for "needs you" — no orange cost, green profit or purple card left in the layout CSS
+preg_match('#<style>(?:(?!</style>).)*\.rd2 \{(?:(?!</style>).)*</style>#s', $dc, $css9); $css9 = $css9[0] ?? '';
+ok($css9 !== '' && strpos($css9, '#d97706') === false && strpos($css9, '#15803d') === false && strpos($css9, '#7e22ce') === false && strpos($css9, '.rd2-t-amber .rd2-sq { background:#fff1d6; color:#b45309; }') !== false, 'colours: blue only; amber marks an action that needs you');
 // the old stand-alone rows are gone from the page body (they moved into the panel)
 ok(strpos($dc, 'class="rd-actions') === false && strpos($dc, '>Recent orders<') === false, 'the old action row and the separate "Recent orders" card are gone (now in Layout 2)');
 // phone: one column, actions wrap
@@ -809,7 +813,7 @@ try {
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode','none') ON DUPLICATE KEY UPDATE setting_value='none'");
     $dn = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1')));
     preg_match('#<nav class="rd2-acts".*?</nav>#s', $dn, $navn);
-    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false, 'kitchen "by mouth": no Kitchen action');
+    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false && strpos($dn, 'Kitchen right now') === false, 'kitchen "by mouth": no Kitchen action and no "Kitchen right now"');
 } finally {
     if ($ko === false) $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
     else $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$ko]);
@@ -834,7 +838,7 @@ $hdr9 = file_get_contents("$root/header.php");
 ok(strpos($hdr9, '$__bell_on = posSimpleModeEnabled() && canView(\'restaurant_pos\') && restaurantOnlyCompany($pdo);') !== false && strpos($hdr9, 'notifications WHERE user_id = ? AND is_read = 0') !== false, 'the bell is for a restaurant-only Smart POS company only and counts the user\'s unread notifications');
 // Swahili: everything new is translated, none left in English
 $dsw9 = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw')));
-foreach (['Inaonyesha' => 'Showing', 'Sasa hivi' => 'Right now', 'Kila Robo Mwaka' => 'Quarterly', 'Fungua kaunta ya mauzo' => 'Open the till', 'Yanayohitaji hatua' => 'Needs attention', 'Zinakaribia kuisha' => 'Running low', 'Ninazodai' => 'Owed to me', 'Ripoti ya mauzo' => 'Sales report'] as $swt => $en)
+foreach (['Inaonyesha' => 'Showing', 'Sasa hivi' => 'Right now', 'Meza zenye wateja' => 'Tables busy', 'Fungua kaunta ya mauzo' => 'Open the till', 'Yanayohitaji hatua' => 'Needs attention', 'Oda za karibuni' => 'Latest orders', 'Wateja wanatudai' => 'Customers owe us', 'Ripoti ya mauzo' => 'Sales report'] as $swt => $en)
     ok(strpos($dsw9, $swt) !== false && strpos($dsw9, '>' . $en . '<') === false && strpos($dsw9, '<b>' . $en . '</b>') === false, "Swahili: '$en' is '$swt', none left in English");
 // every inline script parses
 preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $dc, $m9); $bad9 = 0;
@@ -868,8 +872,8 @@ $qr = rdPeriodRange('quarter'); $sq = rdPeriodStory($pdo, $js9, [$W2], $qr); $tq
 ok(near3(end($tq['sales']), $sq['cur']['sales'], 0.02), 'This quarter: the Quarterly chart\'s last bar equals the cards');
 // the page
 $pg10 = preg_replace('#<!--.*?-->#s', '', $dc);
-preg_match('#<select class="form-select form-select-sm w-auto rdp-period-sel".*?</select>#s', $pg10, $ps);
-ok(preg_match_all('#<option value="(daily|weekly|monthly|quarterly|yearly)"#', $ps[0] ?? '') === 5, 'Performance period is a dropdown with all 5 retail periods');
+// redesign 2026-11-03: one control — the chart follows "Showing" (no second period dropdown)
+ok(strpos($pg10, 'rdp-period-sel"') === false && strpos($pg10, 'class="btn-group btn-group-sm rd2-ct"') !== false, 'the chart follows the "Showing" choice; no separate Performance period dropdown');
 ok(strpos($pg10, 'class="btn-group btn-group-sm rdp-period"') === false, 'the Daily / Weekly / Monthly buttons are gone');
 preg_match('#<select id="rdPeriodSel".*?</select>#s', $pg10, $ps2);
 ok(preg_match_all('#<option value="(today|week|month|quarter|year)"#', $ps2[0] ?? '') === 5, 'the "Showing" dropdown has 5 choices');
@@ -878,7 +882,7 @@ ok(strpos($pg10, 'class="rd2-sl"') === false && strpos($pg10, 'Kitchen waiting')
 preg_match('#\.rdp-l2 \.text-danger \{[^}]*\}#', $pg10, $td);
 ok(strpos($td[0] ?? '', '#b45309') !== false && strpos(preg_replace('#<(style|script)[ >].*?</\1>#s', '', substr($pg10, strpos($pg10, 'class="rd2 '))), '#dc3545') === false, 'no red in the new layout: warnings are amber');
 $wk = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php', 'get' => ['rd_period' => 'year']], $ON, $onlyRest, '1')));
-ok(preg_match('#<option value="year" selected#', $wk) === 1 && strpos($wk, 'Net Profit · This year') !== false, 'choosing This year: the choice stays selected and the money story says so');
+ok(preg_match('#<option value="year" selected#', $wk) === 1 && strpos($wk, 'Money · This year') !== false && strpos($wk, 'By month') !== false && strpos($wk, 'Last year') !== false, 'choosing This year: the choice stays selected; Money says so; the chart is by month against last year');
 // the bell: lower bar, left of Help, on computer and phone
 $tp10 = strpos($pg10, 'class="top-header"'); $top = substr($pg10, $tp10, strpos($pg10, 'navbar-dark bottom-header', $tp10) - $tp10);
 ok(strpos($top, 'rdBell') === false, 'the bell left the top blue bar');
@@ -938,5 +942,34 @@ ok(strpos($bU, '<th>S/No.</th><th>Item</th><th>Date</th>') !== false && strpos(f
 ok(strpos($pgU, "c.textContent = i + 1") !== false && strpos($pgU, "order: []") !== false, 'S/No. numbers the list as shown, across pages');
 ok(strpos($pgU, 'rp-again') !== false && strpos($pgU, 'bi-gear-fill') !== false, 'each row has the gear menu with "Buy again"');
 ok(strpos(file_get_contents("$root/api/restaurant/get_purchases.php"), "'product_id' => (int)\$r['product_id']") !== false, 'get_purchases gives each counted row its product_id (for "Buy again")');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P13. Dashboard redesign (2026-11-03): chart, kitchen, open orders, staff — figures agree');
+$js13 = rdJeScope([$W2], 'company');
+foreach (['today', 'week', 'month', 'quarter', 'year'] as $p13) {
+    $r13 = rdPeriodRange($p13);
+    $s13 = rdCompareSeries($pdo, $js13, [$W2], $r13);
+    $st13 = rdPeriodStory($pdo, $js13, [$W2], $r13);
+    $n13 = count($s13['labels']);
+    ok($n13 > 0 && count($s13['sales']) === $n13 && count($s13['sales_prev']) === $n13 && count($s13['orders']) === $n13 && count($s13['orders_prev']) === $n13, "$p13: every series has one value per slot ($n13 slots)");
+    ok(near3(array_sum($s13['sales']), $st13['cur']['sales'], 0.05), "$p13: the chart's sales add up to the Sales tile (" . round(array_sum($s13['sales'])) . ' = ' . round($st13['cur']['sales']) . ')');
+    ok(array_sum($s13['orders']) === (int)$st13['orders'], "$p13: the chart's orders add up to the Orders tile (" . array_sum($s13['orders']) . ' = ' . $st13['orders'] . ')');
+}
+$t13 = time();
+ok(count(rdCompareSeries($pdo, $js13, [$W2], rdPeriodRange('month'))['labels']) === (int)date('j', $t13), 'This month: one slot per day up to today');
+ok(count(rdCompareSeries($pdo, $js13, [$W2], rdPeriodRange('year'))['labels']) === (int)date('n', $t13), 'This year: one slot per month up to this month');
+ok(count(rdCompareSeries($pdo, $js13, [$W2], rdPeriodRange('week'))['labels']) === (int)date('N', $t13), 'This week: Monday to today');
+$k13 = rdKitchenLoad($pdo, [$W2]);
+ok(isset($k13['total'], $k13['areas']) && $k13['total'] === array_sum(array_column($k13['areas'], 'n')), 'Kitchen right now: the areas add up to the total');
+ok(is_array(rdOpenOrders($pdo, [$W2], 5)) && count(rdOpenOrders($pdo, [$W2], 5)) <= 5, 'Latest orders: open table orders, at most the limit');
+$ry13 = rdPeriodRange('year'); $sf13 = rdStaffSales($pdo, $js13, [$W2], $ry13['from'], $ry13['to'], 50);
+$pos13 = (float)$pdo->query("SELECT COALESCE(SUM(CASE WHEN jei.type='credit' THEN jei.amount ELSE -jei.amount END),0) FROM journal_entry_items jei
+    JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted' AND je.entity_type = 'pos_sale'
+    JOIN accounts a ON a.account_id = jei.account_id JOIN account_types at ON at.type_id = a.account_type_id AND at.category = 'revenue'
+    JOIN pos_sales ps ON ps.sale_id = je.entity_id WHERE je.entry_date BETWEEN " . $pdo->quote($ry13['from']) . " AND " . $pdo->quote($ry13['to']) . " AND ps.warehouse_id = " . (int)$W2 . $js13)->fetchColumn();
+ok(near3(array_sum(array_column($sf13, 'sales')), $pos13, 0.05), 'Sales by staff: all staff together = the POS sales revenue in the books (' . round($pos13) . ')');
+$src13 = file_get_contents("$root/includes/restaurant/dash_panel.php");
+ok(strpos($src13, "if (el('trend') || el('hours') || el('types')) withChart(") !== false, 'Layout 2 no longer loads Chart.js (its chart is plain HTML); the mixed strip still does');
+ok(strpos(file_get_contents("$root/includes/restaurant/dashboard.php"), "t('Good morning')") !== false && strpos(file_get_contents("$root/includes/restaurant/dashboard.php"), 'class="rd-take"') !== false, 'greeting by time of day and a "Take order" button in the page header');
 
 // [later phases append here]

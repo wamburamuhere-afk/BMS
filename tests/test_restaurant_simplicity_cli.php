@@ -374,7 +374,7 @@ ok(strpos(file_get_contents("$root/app/bms/restaurant/kitchen_dashboard.php"), '
 // ───────────────────────────────────────────────────────────────────────────
 section('E2. Restaurant dashboard renders');
 $dash = $renderPage('includes/restaurant/dashboard.php', ['pos' => true, 'restaurant_pos' => true], 'restaurant');
-ok(strpos($dash, 'Where your money went') !== false, 'the restaurant dashboard renders its profit story');
+ok(strpos($dash, 'class="rd2-money rdp-card"') !== false && strpos($dash, 'Net Profit') !== false, 'the restaurant dashboard renders its money story (Money · period, Net Profit — redesign 2026-11-03)');
 ok(!preg_match('/PHP (Warning|Notice|Fatal|Parse)|___EXC___/', $dash), 'the dashboard renders with no PHP warnings or errors');
 
 // ───────────────────────────────────────────────────────────────────────────
