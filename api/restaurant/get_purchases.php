@@ -24,10 +24,13 @@ if (!restaurantShopActive($pdo, $warehouse_id)) { echo json_encode(['success' =>
 
 // Pay later (2026-11-02): a purchase that left something owing has a supplier bill (same reference) — show how it was paid.
 // 'paid' = no bill (paid in full at the time); otherwise where the debt stands now: credit · partial · settled.
-function rgpPayment($amount, $paid): string {
-    if ($amount === null) return 'paid';
-    if ((float)$paid >= (float)$amount - 0.005) return 'settled';
-    return (float)$paid > 0 ? 'partial' : 'credit';
+// Guarded: the endpoint can be included more than once in one process (the CLI suites call it in-process).
+if (!function_exists('rgpPayment')) {
+    function rgpPayment($amount, $paid): string {
+        if ($amount === null) return 'paid';
+        if ((float)$paid >= (float)$amount - 0.005) return 'settled';
+        return (float)$paid > 0 ? 'partial' : 'credit';
+    }
 }
 
 $st = $pdo->prepare("

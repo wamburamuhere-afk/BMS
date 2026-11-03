@@ -1,5 +1,12 @@
 # BMS Changelog
 
+## 2026-11-03 — fix(restaurant): bring the latest `develop` into pay-later; two fixes found by the full test run
+
+**Branch:** `feat/restaurant-pay-later` (PR #2695). Merged `develop` again (free-trial PR #2552 had landed); only `changelog.md` clashed, both entries kept.
+- **`api/restaurant/get_purchases.php`:** `rgpPayment()` is now declared once (`function_exists` guard). Called twice in one process it was a fatal error, which silently cut `test_restaurant_focus_cli` short (it reported 227 checks instead of 409). Live requests were not affected (one process each).
+- **`lang/sw.php`:** removed two duplicate keys the pay-later work added ('Open the till', 'Running low'); they silently overrode develop's words. Develop's are kept: "Fungua kaunta ya mauzo", "Zinakaribia kuisha".
+- **Tests:** restaurant focus 409/409, pay-later 53/53 (twice), dashboard 67, simplicity 70, phases 0–7 all pass. `test_restaurant_pos_cli` (1) and `test_restaurant_pos_mode_setup_cli` (10) fail identically on plain `develop` — not caused here.
+
 ## 2026-11-03 — merge(restaurant): bring `develop` into `feat/restaurant-pay-later` (PR #2695 conflicts)
 
 **Branch:** `feat/restaurant-pay-later`.

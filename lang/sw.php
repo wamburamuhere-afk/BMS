@@ -6441,7 +6441,6 @@ return [
     'Just now' => 'Sasa hivi',
     '%d min ago' => 'dakika %d zilizopita',
     '%d hr ago' => 'saa %d zilizopita',
-    'Open the till' => 'Fungua mauzo',
     '%d with order' => '%d zina oda',
     '%d waiting long' => '%d zimesubiri muda mrefu',
     '%d cooking' => '%d zinapikwa',
@@ -6470,7 +6469,6 @@ return [
     'Expenses this month' => 'Matumizi mwezi huu',
     'from your books' => 'kutoka vitabu vyako',
     'Activities' => 'Shughuli',
-    'Running low' => 'Zinaisha',
     'No activity yet.' => 'Bado hakuna shughuli.',
     'left' => 'zimebaki',
     // Restaurant Purchases — simpler, smarter screen (2026-11-02)
