@@ -10,7 +10,7 @@ autoEnforcePermission('edit_customer');
 
 // Check if customer ID is provided
 if (!isset($_GET['id']) || empty($_GET['id'])) {
-    header('Location: customers.php');
+    bmsRedirect(getUrl('customers'));
     exit();
 }
 
@@ -24,7 +24,7 @@ $stmt->execute([$customer_id]);
 $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$customer) {
-    header('Location: customers.php');
+    bmsRedirect(getUrl('customers'));
     exit();
 }
 
@@ -940,10 +940,10 @@ $dynamicAttachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <button type="submit" class="btn btn-primary btn-lg shadow-sm">
                             <i class="bi bi-check-circle"></i> Update <?= $isCompany ? 'Company' : 'Customer' ?>
                         </button>
-                        <a href="customer_details.php?id=<?= $customer['customer_id'] ?>" class="btn btn-secondary btn-lg shadow-sm">
+                        <a href="<?= getUrl('customer_details') ?>?id=<?= $customer['customer_id'] ?>" class="btn btn-secondary btn-lg shadow-sm">
                             <i class="bi bi-eye"></i> View Details
                         </a>
-                        <a href="customers.php" class="btn btn-outline-secondary btn-lg shadow-sm">
+                        <a href="<?= getUrl('customers') ?>" class="btn btn-outline-secondary btn-lg shadow-sm">
                             <i class="bi bi-arrow-left"></i> Back to List
                         </a>
                     </div>

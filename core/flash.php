@@ -30,22 +30,27 @@ if (!function_exists('bmsFlash')) {
     }
 }
 
+if (!function_exists('bmsRedirect')) {
+    /** Send the browser to $to and stop — also when the page has already printed its header. */
+    function bmsRedirect(string $to): void
+    {
+        if (!headers_sent()) {
+            header('Location: ' . $to);
+            exit();
+        }
+        $u = json_encode($to, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES);
+        echo '<script>location.replace(' . $u . ');</script>'
+           . '<noscript><meta http-equiv="refresh" content="0;url=' . htmlspecialchars($to, ENT_QUOTES) . '"></noscript>';
+        exit();
+    }
+}
+
 if (!function_exists('bmsFlashRedirect')) {
     /** Queue a message, send the browser to a clean address, stop. */
     function bmsFlashRedirect(string $to, string $type, string $message): void
     {
         bmsFlash($type, $message);
-        if (!headers_sent()) {
-            header('Location: ' . $to);
-            exit();
-        }
-        // Some pages print the site header before they validate the id, so the
-        // Location header can no longer be sent (PHP drops it silently and the
-        // user is left on a half-built page). Redirect from the browser instead.
-        $u = json_encode($to, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES);
-        echo '<script>location.replace(' . $u . ');</script>'
-           . '<noscript><meta http-equiv="refresh" content="0;url=' . htmlspecialchars($to, ENT_QUOTES) . '"></noscript>';
-        exit();
+        bmsRedirect($to);   // falls back to a browser redirect when the header was already printed
     }
 }
 

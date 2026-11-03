@@ -31,7 +31,7 @@ $pass = 0; $fail = 0;
 function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
 
 echo "\n── 1. No redirect puts a message in the address ──\n";
-$out = shell_exec('cd ' . escapeshellarg($root) . ' && git grep -nE "Location:[^;]*[?&](error|msg|message)=" -- "*.php" ":!tests"');
+$out = shell_exec('cd ' . escapeshellarg($root) . ' && git grep -nE "Location:[^;]*[?&](error|msg|message)=" -- "*.php" ":!tests" ":!core/flash.php"');
 ok(trim((string)$out) === '', 'no header("Location: …?error=/msg=/message=…") left in the code' . (trim((string)$out) ? "\n      " . trim($out) : ''));
 $flashUses = (int)trim((string)shell_exec('cd ' . escapeshellarg($root) . ' && git grep -c "bmsFlashRedirect" -- "app/*.php" | wc -l'));
 ok($flashUses >= 15, "$flashUses page files use bmsFlashRedirect");
@@ -41,6 +41,9 @@ $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/'; $_SERVER['RE
 $_SERVER['DOCUMENT_ROOT'] = $root; $_SERVER['SCRIPT_NAME'] = '/index.php'; $_SERVER['SCRIPT_FILENAME'] = $root . '/index.php';
 chdir($root);
 require_once $root . '/core/flash.php';
+if (!function_exists('isDetailRoute')) {   // roots.php is not loaded here; same answer from the same list
+    function isDetailRoute(string $k): bool { return in_array($k, require dirname(__DIR__) . '/core/detail_routes.php', true); }
+}
 $_SESSION = [];
 ok(bmsFlashDrain() === [] && bmsFlashScript() === '', 'nothing queued → nothing returned, no script');
 bmsFlash('error', 'Invoice Not Found');
@@ -61,6 +64,11 @@ $code = ''; foreach (token_get_all(file_get_contents($root . '/core/flash.php'))
 ok(!str_contains($code, 'session_start'), 'helper code never calls session_start() (the session lock is released early)');
 
 echo "\n── 3. Real HTTP: message shows once, address stays clean ──\n";
+if (!is_file($root . '/includes/config.php')) {   // CI: no database / config
+    echo "  (no includes/config.php — real HTTP checks skipped)\n";
+    echo "\n" . ($fail === 0 ? "\033[32mALL $pass PASSED\033[0m" : "\033[31m$fail FAILED\033[0m, $pass passed") . "\n";
+    exit($fail === 0 ? 0 : 1);
+}
 require_once $root . '/includes/config.php';
 $admin = (int)$pdo->query("SELECT user_id FROM users WHERE role_id = 1 ORDER BY user_id LIMIT 1")->fetchColumn();
 $port = 18000 + random_int(0, 900);
@@ -89,11 +97,11 @@ $http = function (string $path) use ($port, &$cookie): array {
 if ($up) {
     // (page that needs an id, the list it falls back to, the message it must give)
     $cases = [
-        ['/invoice_view?id=999999999',   '/invoices',   'Invoice Not Found'],
-        ['/product_view?id=999999999',   '/products',   'Product not found'],
-        ['/sales_order_view?id=999999999', '/sales_orders', 'Order Not Found'],
-        ['/quotation_view?id=999999999', '/quotations', 'Quotation Not Found'],
-        ['/grn_view?id=999999999',       '/grn',        'GRN Not Found'],
+        ['/' . (isDetailRoute('invoice_view') ? 'invoice_view/999999999' : 'invoice_view?id=999999999'),   '/invoices',   'Invoice Not Found'],
+        ['/' . (isDetailRoute('product_view') ? 'product_view/999999999' : 'product_view?id=999999999'),   '/products',   'Product not found'],
+        ['/' . (isDetailRoute('sales_order_view') ? 'sales_order_view/999999999' : 'sales_order_view?id=999999999'), '/sales_orders', 'Order Not Found'],
+        ['/' . (isDetailRoute('quotation_view') ? 'quotation_view/999999999' : 'quotation_view?id=999999999'), '/quotations', 'Quotation Not Found'],
+        ['/' . (isDetailRoute('grn_view') ? 'grn_view/999999999' : 'grn_view?id=999999999'),       '/grn',        'GRN Not Found'],
     ];
     foreach ($cases as [$bad, $list, $msg]) {
         $cookie = '';

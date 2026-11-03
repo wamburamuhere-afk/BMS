@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../../roots.php';
 
 // Check permissions
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login");
+    bmsRedirect(getUrl('login'));
     exit();
 }
 
@@ -533,7 +533,7 @@ require_once 'header.php';
                 <!-- Actions -->
                 <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center border-top pt-4 d-print-none">
                     <div>
-                        <a href="leaves.php" class="btn btn-outline-secondary btn-premium">
+                        <a href="<?= getUrl('leaves') ?>" class="btn btn-outline-secondary btn-premium">
                             <i class="bi bi-arrow-left"></i> Back to List
                         </a>
                     </div>

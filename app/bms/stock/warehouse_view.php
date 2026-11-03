@@ -21,7 +21,7 @@ if (!projectsModuleActive()) {
 
 if ($warehouse_id <= 0) {
     $_SESSION['error'] = isShopLabel() ? "Invalid shop ID" : "Invalid warehouse ID";
-    header("Location: warehouses.php");
+    bmsRedirect(getUrl('warehouses'));
     exit();
 }
 // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not the
@@ -55,7 +55,7 @@ $warehouse = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$warehouse) {
     $_SESSION['error'] = isShopLabel() ? "Shop not found" : "Warehouse not found";
-    header("Location: warehouses.php");
+    bmsRedirect(getUrl('warehouses'));
     exit();
 }
 
@@ -150,7 +150,7 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <?php if($project_id > 0): ?>
                         <li class="breadcrumb-item"><a href="<?= getUrl('project_view') . '?id=' . $project_id . '#procurements' ?>"><?= htmlspecialchars(t('Project Details')) ?></a></li>
                     <?php else: ?>
-                        <li class="breadcrumb-item"><a href="warehouses.php"><?= wLabel('Warehouses', 'Shops') ?></a></li>
+                        <li class="breadcrumb-item"><a href="<?= getUrl('warehouses') ?>"><?= wLabel('Warehouses', 'Shops') ?></a></li>
                     <?php endif; ?>
                     <li class="breadcrumb-item active"><?= caseFormat($warehouse['warehouse_name']) ?></li>
                 </ol>
@@ -756,11 +756,11 @@ function exportTable() {
 }
 
 function manageLocations(id) {
-    location.href = 'locations?warehouse_id=' + id + '<?= $project_id > 0 ? "&project_id=$project_id" : "" ?>';
+    location.href = '<?= getUrl('locations') ?>?warehouse_id=' + id + '<?= $project_id > 0 ? "&project_id=$project_id" : "" ?>';
 }
 
 function transferStock(id) {
-    location.href = 'stock_transfers?warehouse_id=' + id + '<?= $project_id > 0 ? "&project_id=$project_id" : "" ?>';
+    location.href = '<?= getUrl('stock_transfers') ?>?warehouse_id=' + id + '<?= $project_id > 0 ? "&project_id=$project_id" : "" ?>';
 }
 </script>
 

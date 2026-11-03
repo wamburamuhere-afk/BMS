@@ -1116,7 +1116,7 @@ function loadSupplierInfo() {
     }
     
     $.ajax({
-        url: 'api/get_supplier.php',
+        url: '<?= buildUrl('api/get_supplier.php') ?>',
         type: 'GET',
         data: { id: supplierId },
         dataType: 'json',

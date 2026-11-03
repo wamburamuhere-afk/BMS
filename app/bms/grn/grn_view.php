@@ -12,7 +12,7 @@ includeHeader();
 
 // Check permissions
 if (!isAuthenticated()) {
-    header("Location: login.php");
+    bmsRedirect(getUrl('login'));
     exit();
 }
 

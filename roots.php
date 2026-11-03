@@ -1986,15 +1986,46 @@ function canonicalRouteKey(string $key): string {
 }
 
 /**
- * Where an old address must be redirected, or null to serve it as it is.
- * Only GET/HEAD move; the query string is kept. Split out of handleRoute()
- * so a CLI test can check the target (CLI cannot read a Location header).
+ * Record pages (core/detail_routes.php) whose id travels in the path:
+ * /invoice_view/231 instead of /invoice_view?id=231.
+ */
+function isDetailRoute(string $key): bool {
+    static $set = null;
+    if ($set === null) $set = array_flip(require ROOT_DIR . '/core/detail_routes.php');
+    return isset($set[$key]);
+}
+
+/**
+ * The path-style address for "page?id=N&rest", or null when the page is not a
+ * record page, has no usable numeric id, or the id is not a plain positive
+ * integer. Other query values stay in the query string.
+ */
+function detailRoutePathFor(string $key, string $queryString): ?string {
+    if (!isDetailRoute($key) || $queryString === '') return null;
+    parse_str($queryString, $q);
+    if (!isset($q['id']) || !is_string($q['id']) || !preg_match('/^[1-9][0-9]{0,18}$/', $q['id'])) return null;
+    $id = $q['id'];
+    unset($q['id']);
+    $rest = $q ? http_build_query($q) : '';
+    return getUrl($key) . '/' . $id . ($rest !== '' ? '?' . $rest : '');
+}
+
+/**
+ * Where a request must be redirected, or null to serve it as it is:
+ *   - an old address (core/route_aliases.php) goes to its short address;
+ *   - "record-page?id=N" goes to "record-page/N" (core/detail_routes.php).
+ * Both can apply at once and are done in a single hop. Only GET/HEAD move; the
+ * query string is kept. Split out of handleRoute() so a CLI test can check the
+ * target (CLI cannot read a Location header).
  */
 function routeAliasRedirectFor(string $cleanUri, string $method, string $queryString): ?string {
     $method = strtoupper($method);
     if ($method !== 'GET' && $method !== 'HEAD') return null;
-    if (canonicalRouteKey($cleanUri) === $cleanUri) return null;
-    return getUrl($cleanUri) . ($queryString !== '' ? '?' . $queryString : '');
+    $short = canonicalRouteKey($cleanUri);
+    $path  = detailRoutePathFor($short, $queryString);
+    if ($path !== null) return $path;
+    if ($short === $cleanUri) return null;
+    return getUrl($short) . ($queryString !== '' ? '?' . $queryString : '');
 }
 
 /**
@@ -2164,8 +2195,16 @@ function handleRoute() {
     // AJAX call breaks. The query string travels with the redirect.
     $aliasTarget = routeAliasRedirectFor($clean_uri, $_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['QUERY_STRING'] ?? '');
     if ($aliasTarget !== null) {
-        header('Location: ' . $aliasTarget, true, 301);
+        // 301 for a renamed address (permanent); 302 for ?id=N → /N (the id is data, not a rename).
+        header('Location: ' . $aliasTarget, true, canonicalRouteKey($clean_uri) !== $clean_uri ? 301 : 302);
         exit();
+    }
+
+    // Record pages: /invoice_view/231 is served as invoice_view with id=231, so
+    // the page reads $_GET['id'] exactly as it always did (GET, POST and all).
+    if (!isset($routes[$clean_uri]) && preg_match('#^([^/]+)/([1-9][0-9]{0,18})$#', $clean_uri, $__dm) && isDetailRoute($__dm[1])) {
+        $_GET['id'] = $_REQUEST['id'] = $__dm[2];
+        $clean_uri = $__dm[1];
     }
 
     // 1. Map lookup

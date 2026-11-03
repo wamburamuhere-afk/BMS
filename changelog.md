@@ -1,6 +1,6 @@
 # BMS Changelog
 
-## 2026-11-03 — feat(urls): one short address per page; messages no longer travel in the address bar
+## 2026-11-03 — feat(urls): short addresses, no messages or one-time values in the address, record numbers in the path
 
 **Branch:** `feat/clean-urls`.
 **New:** `core/route_aliases.php`, `core/flash.php`, `tests/test_clean_urls_cli.php`, `tests/test_flash_messages_cli.php`.
@@ -11,7 +11,10 @@
 - **Module gate:** a short address is never less guarded than the old one. Some old side-addresses (e.g. `accounts/journals`, `bms/locations`) skipped the router's module check that the menu address already had; sending them to the menu address closes that gap.
 - **Messages:** 39 redirects put text in the address (`invoices?error=Invoice Not Found`) and no page ever showed it. They now keep the text in the session (`bmsFlashRedirect()`), the address stays clean (`/invoices`), and the next page shows it once as a toast. A hand-typed `?error=` does nothing.
 - **Bug fixed on the way:** GRN view/edit print the site header before checking the id, so their redirect header was silently dropped and the user was left on a half-built page. The helper now redirects from the browser when output has already started.
-- **Tests:** clean URLs 32, flash messages 32; restaurant phase 1 / phase 6 pass. Failures in other suites (restaurant focus 6, tenant registration 5, header nav 2, mobile side menu 2, POS nav wiring) are identical on plain `develop`.
+- **Forms opened from the address:** `?edit=12`, `?add=1`, `?action=add` still open the form, then the page removes that value from the address bar (`bmsCleanQuery()` in `header.php`), so a refresh or a shared link does not reopen it. Filters, tabs and dates stay. Pages: expenses, customers, customer groups, received invoices (bills), purchase returns, services. Create pages whose `?edit=` is their edit mode keep it.
+- **Record numbers in the path:** 50 record pages (`core/detail_routes.php`) now live at `/invoice_view/231` instead of `/invoice_view?id=231`. All existing `?id=` links keep working and forward there (other query values kept); the router fills in `$_GET['id']`, so the pages themselves are unchanged. Links inside those pages that were relative (`expenses.php`, `api/update_expense.php`, `customer_details.php?id=`, …) are now absolute so they work under the new address. Not moved yet (no local record to verify against): sales order view/edit, quotation view, payslip, project view, field visit details. Print pages keep `?id=`.
+- **Bugs fixed on the way:** several pages printed the site header before redirecting (edit expense, edit customer, warehouse view, payroll details, GRN/sales-order login checks), so their redirects never worked; they now use `bmsRedirect()`, which falls back to a browser redirect. The page-visit log no longer records "View 231" for a record page.
+- **Tests:** clean URLs 32, flash messages 32, form-address cleanup 27, record paths 29; restaurant phase 1 / phase 6 pass. Failures in other suites (restaurant focus 6, tenant registration 5, header nav 2, mobile side menu 2, POS nav wiring) are identical on plain `develop`.
 
 ## 2026-11-02 — feat(restaurant): restaurant icons (Lucide) on the restaurant screens only
 

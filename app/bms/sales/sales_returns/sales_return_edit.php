@@ -321,7 +321,7 @@ $(document).ready(function() {
                                 timer: 3000,
                                 showConfirmButton: true
                             }).then(() => {
-                                window.location.href = 'sales_returns.php';
+                                window.location.href = '<?= getUrl('sales_returns') ?>';
                             });
                         } else {
                             Swal.fire('Error', res.message, 'error');

@@ -29,6 +29,25 @@ if (PHP_SAPI === 'cli-server') {
 $pass = 0; $fail = 0;
 function ok($c, $m) { global $pass, $fail; if ($c) { $pass++; echo "  \033[32m✅\033[0m $m\n"; } else { $fail++; echo "  \033[31m❌ $m\033[0m\n"; } }
 
+// CI has no database and no includes/config.php, and roots.php needs both. There
+// only the static checks run; the rest runs wherever the app is configured.
+if (!is_file($root . '/includes/config.php')) {
+    echo "
+── Static checks (no includes/config.php: router and HTTP checks skipped) ──
+";
+    $al = require $root . '/core/route_aliases.php';
+    $dl = require $root . '/core/detail_routes.php';
+    $badA = array_filter(array_keys($al) + [], fn($k) => preg_match('#^(api|ajax|actions)/#', $k));
+    ok(is_array($al) && count($al) > 100 && !$badA, 'route_aliases.php loads, ' . count($al) . ' old addresses, none under api/ajax/actions');
+    ok(!array_filter($al, fn($v) => str_contains($v, '/') || isset($al[$v])), 'every short address is flat and not itself an old address');
+    ok(is_array($dl) && count($dl) === count(array_unique($dl)) && !array_filter($dl, fn($k) => isset($al[$k]) || str_contains($k, 'print')), 'detail_routes.php: short keys only, no print pages, no duplicates');
+    $src = (string)file_get_contents($root . '/roots.php');
+    ok(str_contains($src, 'function routeAliasRedirectFor(') && str_contains($src, 'function detailRoutePathFor(') && str_contains($src, 'canonicalRouteKey($key)'), 'roots.php has the alias + record-path routing');
+    echo "
+" . ($fail === 0 ? "[32mALL $pass PASSED[0m" : "[31m$fail FAILED[0m, $pass passed") . "
+";
+    exit($fail === 0 ? 0 : 1);
+}
 $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/'; $_SERVER['REQUEST_METHOD'] = 'GET';
 $_SERVER['DOCUMENT_ROOT'] = $root; $_SERVER['SCRIPT_NAME'] = '/index.php'; $_SERVER['SCRIPT_FILENAME'] = $root . '/index.php';
 chdir($root);
@@ -76,7 +95,8 @@ ok(getUrl('api/pos/get_sales') === $base . '/api/pos/get_sales', 'api paths unto
 
 echo "\n── 3. Old address redirects (GET only, query kept) ──\n";
 ok(routeAliasRedirectFor('restaurant/purchases', 'GET', '') === $base . '/purchases', 'GET restaurant/purchases → /purchases');
-ok(routeAliasRedirectFor('customers/details', 'GET', 'id=12&tab=invoices') === $base . '/customer_details?id=12&tab=invoices', 'query string travels with the redirect');
+ok(routeAliasRedirectFor('customers/groups', 'GET', 'q=x&tab=rules') === $base . '/customer_groups?q=x&tab=rules', 'query string travels with the redirect');
+ok(routeAliasRedirectFor('customers/details', 'GET', 'id=12&tab=invoices') === $base . '/customer_details/12?tab=invoices', 'old address + record id: one hop to the path form (core/detail_routes.php)');
 ok(routeAliasRedirectFor('restaurant/menu', 'HEAD', '') === $base . '/menu', 'HEAD redirects too');
 ok(routeAliasRedirectFor('restaurant/menu', 'POST', '') === null, 'POST to an old address is served, never redirected');
 ok(routeAliasRedirectFor('menu', 'GET', '') === null, 'the short address itself is served');
@@ -113,7 +133,8 @@ $http = function (string $path, string $method = 'GET') use ($port): array {
 
 if ($up) {
     $targets = array_values(array_unique(array_values($aliases)));
-    $broken = []; $opened = 0; $sentOn = [];
+    $broken = []; $opened = 0; $sentOn = []; $hiddenBySimple = [];
+    $simpleOn = (string)$pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn() === '1';
     // Pages that need a record id answer this way when opened bare — same as under their old address.
     $needsId = ['zreport' => [200, 'Invalid shift ID'], 'field_visit_details' => [404, '<body']];
     foreach ($targets as $key) {
@@ -126,13 +147,16 @@ if ($up) {
         } elseif ($code === 200 && stripos($body, '<body') !== false && strlen($body) > 5000) {
             $opened++;
         } elseif (in_array($code, [301, 302, 303], true)) {
-            if (preg_match('#/(login|unauthorized)#', $loc)) $broken[] = "/$key → sent to $loc";
+            if (preg_match('#/unauthorized#', $loc) && $simpleOn) $hiddenBySimple[] = $key;   // Simple POS hides it from everyone, by design
+            elseif (preg_match('#/(login|unauthorized)#', $loc)) $broken[] = "/$key → sent to $loc";
             else $sentOn[] = "/$key → $loc";   // e.g. a details page with no id goes back to its list
         } else {
             $broken[] = "/$key → HTTP $code, " . strlen($body) . ' bytes';
         }
     }
     ok(!$broken, "$opened of " . count($targets) . ' short addresses open a full page; none fail' . ($broken ? "\n      " . implode("\n      ", $broken) : ''));
+    if ($hiddenBySimple) echo '      (Simple POS mode is on in this database: ' . count($hiddenBySimple) . ' pages it hides answer /unauthorized, the same as under their old addresses: ' . implode(', ', $hiddenBySimple) . ")
+";
     if ($sentOn) echo "      (sent on by the page itself, e.g. no id given: " . implode(', ', $sentOn) . ")\n";
 
     // Links printed on real pages use the short addresses.

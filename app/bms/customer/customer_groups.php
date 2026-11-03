@@ -425,6 +425,7 @@ $(document).ready(function() {
     // Opened from Group Details → Edit (?edit=ID).
     const editId = parseInt(new URLSearchParams(location.search).get('edit'), 10);
     if (editId > 0 && <?= json_encode($can_edit) ?>) editGroup(editId);
+    bmsCleanQuery(['edit']);   // the form is open; a refresh must not reopen it
 });
 
 function resetGroupForm() {

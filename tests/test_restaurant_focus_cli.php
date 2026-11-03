@@ -701,7 +701,7 @@ $bd = body($dp);
 $dpSrc = file_get_contents("$root/includes/restaurant/dash_panel.php");
 ok(clean($dp) && strpos($bd, 'Money check this month') === false && strpos($bd, 'In stock now') === false && strpos($bd, 'Net Profit') !== false, 'dashboard: Net Profit, and the money check is gone (owner\'s choice)');
 ok(strpos($dpSrc, "t('Cost of Goods')") !== false && strpos($dpSrc, "t('Gross Profit')") !== false && strpos($dpSrc, "t('Food cost')") === false, 'dashboard: same words as the retail Profit Report (shown once there are sales)');
-ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, 'restaurant/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
+ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, '/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
 $dsw = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw'));
 ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: Net Profit in Swahili, no money check');
 $dr = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
