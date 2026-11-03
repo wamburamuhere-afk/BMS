@@ -6,60 +6,83 @@
  * Needs the page's whId() (current shop).
  */
 ?>
-<div class="modal fade" id="shareMenuModal" tabindex="-1" aria-labelledby="shareMenuTitle">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+<?php require_once __DIR__ . '/form_kit.php'; rfKitAssets(); ?>
+<div class="modal fade rf-modal" id="shareMenuModal" tabindex="-1" aria-labelledby="shareMenuTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="shareMenuTitle"><i class="bi bi-qr-code me-2"></i><?= t('Share your menu') ?></h5>
+                <h5 class="modal-title" id="shareMenuTitle"><i class="bi bi-qr-code"></i><?= t('Share your menu') ?></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <div class="modal-body">
                 <div id="smLoading" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span><?= t('Loading...') ?></div>
                 <div id="smBody" class="d-none">
-                    <div class="form-check form-switch fs-6 mb-1">
-                        <input class="form-check-input" type="checkbox" role="switch" id="smEnabled">
-                        <label class="form-check-label fw-semibold" for="smEnabled"><?= t('Show my menu online') ?></label>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-globe2"></i><?= t('Online menu') ?></div>
+                        <div class="rf-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="smEnabled">
+                            <label class="form-check-label fw-semibold" for="smEnabled"><?= t('Show my menu online') ?></label>
+                        </div>
+                        <div class="rf-help"><?= t('Customers open a link or scan a QR code and see the dishes and drinks available today. No login needed.') ?></div>
                     </div>
-                    <p class="small text-muted mb-3"><?= t('Customers open a link or scan a QR code and see the dishes and drinks available today. No login needed.') ?></p>
 
                     <div id="smOn" class="d-none">
-                        <div class="border rounded-3 p-3 mb-3">
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input sm-opt" type="checkbox" role="switch" id="smTable">
-                                <label class="form-check-label" for="smTable"><strong><?= t('Order from the table') ?></strong><br><small class="text-muted"><?= t('A customer scans the QR on their table and sends an order. Staff accept it first.') ?></small></label>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input sm-opt" type="checkbox" role="switch" id="smPickup">
-                                <label class="form-check-label" for="smPickup"><strong><?= t('Order for pickup') ?></strong><br><small class="text-muted"><?= t('Anyone with the menu link can order and collect. They give a name and phone number.') ?></small></label>
+                        <div class="rf-sec">
+                            <div class="rf-sec-title"><i class="bi bi-bag-check"></i><?= t('Ordering') ?></div>
+                            <div class="rf-grid">
+                                <div class="rf-field">
+                                    <label class="rf-choice" for="smTable">
+                                        <span class="form-check form-switch m-0 p-0"><input class="form-check-input sm-opt m-0" type="checkbox" role="switch" id="smTable"></span>
+                                        <span><span class="rf-ct"><?= t('Order from the table') ?></span><span class="rf-cd"><?= t('A customer scans the QR on their table and sends an order. Staff accept it first.') ?></span></span>
+                                    </label>
+                                </div>
+                                <div class="rf-field">
+                                    <label class="rf-choice" for="smPickup">
+                                        <span class="form-check form-switch m-0 p-0"><input class="form-check-input sm-opt m-0" type="checkbox" role="switch" id="smPickup"></span>
+                                        <span><span class="rf-ct"><?= t('Order for pickup') ?></span><span class="rf-cd"><?= t('Anyone with the menu link can order and collect. They give a name and phone number.') ?></span></span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
-                        <label class="form-label fw-semibold mb-1"><?= t('Menu link') ?></label>
-                        <div class="input-group input-group-sm mb-2">
-                            <input type="text" class="form-control font-monospace" id="smLink" readonly>
-                            <button class="btn btn-outline-secondary" type="button" id="smCopy" title="<?= htmlspecialchars(t('Copy')) ?>"><i class="bi bi-clipboard"></i></button>
+                        <div class="rf-sec">
+                            <div class="rf-sec-title"><i class="bi bi-link-45deg"></i><?= t('Menu link') ?></div>
+                            <div class="rf-grid">
+                                <div class="rf-field rf-full">
+                                    <label class="form-label visually-hidden" for="smLink"><?= t('Menu link') ?></label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control font-monospace" id="smLink" readonly>
+                                        <button class="btn btn-outline-secondary" type="button" id="smCopy" title="<?= htmlspecialchars(t('Copy')) ?>" aria-label="<?= htmlspecialchars(t('Copy')) ?>"><i class="bi bi-clipboard"></i></button>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 mt-2">
+                                        <a class="btn btn-sm btn-outline-primary" id="smWhatsapp" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp me-1"></i>WhatsApp</a>
+                                        <a class="btn btn-sm btn-outline-primary" id="smOpen" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i><?= t('Open') ?></a>
+                                        <button class="btn btn-sm btn-outline-primary" type="button" id="smDownload"><i class="bi bi-download me-1"></i><?= t('Download QR') ?></button>
+                                    </div>
+                                </div>
+                                <div class="rf-field rf-full text-center"><div id="smQr" class="d-inline-block p-2 bg-white border rounded-3"></div></div>
+                            </div>
                         </div>
-                        <div class="d-flex flex-wrap gap-2 mb-3">
-                            <a class="btn btn-sm btn-outline-primary" id="smWhatsapp" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp me-1"></i>WhatsApp</a>
-                            <a class="btn btn-sm btn-outline-primary" id="smOpen" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i><?= t('Open') ?></a>
-                            <button class="btn btn-sm btn-outline-primary" type="button" id="smDownload"><i class="bi bi-download me-1"></i><?= t('Download QR') ?></button>
-                        </div>
-                        <div class="text-center mb-3"><div id="smQr" class="d-inline-block p-2 bg-white border rounded-3"></div></div>
 
-                        <div class="d-flex justify-content-between align-items-center border-top pt-3">
-                            <div>
-                                <div class="fw-semibold"><?= t('Table QR codes') ?></div>
+                        <div class="rf-sec">
+                            <div class="rf-sec-title"><i class="bi bi-printer"></i><?= t('Table QR codes') ?></div>
+                            <div class="d-flex justify-content-between align-items-center gap-2">
                                 <small class="text-muted" id="smTablesCount"></small>
+                                <a class="btn btn-sm btn-primary" id="smPrint" target="_blank" rel="noopener"><i class="bi bi-printer me-1"></i><?= t('Print') ?></a>
                             </div>
-                            <a class="btn btn-sm btn-primary" id="smPrint" target="_blank" rel="noopener"><i class="bi bi-printer me-1"></i><?= t('Print') ?></a>
                         </div>
-                        <div class="border-top mt-3 pt-3">
-                            <button type="button" class="btn btn-link btn-sm text-danger p-0" id="smRotate"><i class="bi bi-arrow-repeat me-1"></i><?= t('Make new links') ?></button>
-                            <div class="small text-muted"><?= t('Use this if a link was shared by mistake. Old links and printed QR codes stop working.') ?></div>
+
+                        <div class="rf-sec">
+                            <div class="rf-sec-title"><i class="bi bi-shield-lock"></i><?= t('Safety') ?></div>
+                            <button type="button" class="btn btn-link btn-sm text-danger p-0" id="smRotate" style="min-width:0;"><i class="bi bi-arrow-repeat me-1"></i><?= t('Make new links') ?></button>
+                            <div class="rf-help"><?= t('Use this if a link was shared by mistake. Old links and printed QR codes stop working.') ?></div>
                         </div>
                     </div>
                     <div id="smMsg" class="mt-2"></div>
                 </div>
+            </div>
+            <div class="modal-footer rf-foot">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Close') ?></button>
             </div>
         </div>
     </div>

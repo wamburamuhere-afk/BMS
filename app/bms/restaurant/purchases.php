@@ -47,6 +47,8 @@ $units = ['kg', 'g', 'lt', 'ml', 'pcs', 'dozen', 'bunch', 'bag', 'crate', 'carto
 // "Something else" (not counted) is saved as an ordinary expense on the cost-of-food account — needs permission and that account.
 $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAccountId($pdo) : null;
 $cur = getSetting('currency', 'TZS');
+require_once __DIR__ . '/../../../includes/restaurant/form_kit.php';
+$rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company currency in front (TSh by default)
 ?>
 
 <div class="container-fluid mt-3 mt-md-4 rp-page">
@@ -65,6 +67,7 @@ $cur = getSetting('currency', 'TZS');
     <div class="alert alert-warning"><i class="bi bi-lock me-1"></i><?= t('You do not have permission to buy stock.') ?></div>
     <?php else: ?>
 
+    <?php rfKitAssets(); ?>
     <div class="row g-3 mb-3">
         <div class="col-lg-8">
             <div class="rp-card h-100">
@@ -87,37 +90,61 @@ $cur = getSetting('currency', 'TZS');
                     </div>
                     <div id="rpMessage" class="mb-2"></div>
 
-                    <?php if ($other_account): ?>
-                    <!-- What kind of buy: counted (stock) or something else (not counted) -->
-                    <div class="btn-group w-100 rp-seg rp-kind mb-3" role="group" aria-label="<?= htmlspecialchars(t('What did you buy?')) ?>">
-                        <input type="radio" class="btn-check" name="rpKind" id="rpKindStock" value="stock" checked>
-                        <label class="btn btn-outline-primary" for="rpKindStock"><i class="bi bi-box-seam me-1"></i><?= t('Counted item') ?><small><?= t('stock goes up') ?></small></label>
-                        <input type="radio" class="btn-check" name="rpKind" id="rpKindOther" value="other">
-                        <label class="btn btn-outline-primary" for="rpKindOther"><i class="bi bi-basket me-1"></i><?= t('Something else') ?><small><?= t('not counted') ?></small></label>
-                    </div>
-                    <?php endif; ?>
-
-                    <!-- A counted item -->
-                    <div id="rpStockFields">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold" for="rpItem"><?= t('What did you buy?') ?> <span class="text-danger">*</span></label>
-                            <select id="rpItem" name="product_id" class="form-select" style="width:100%">
-                                <?php if ($preItem): ?><option value="<?= (int)$preItem['product_id'] ?>" selected><?= safe_output($preItem['product_name']) ?> (<?= htmlspecialchars($preItem['unit']) ?>)</option><?php endif; ?>
-                            </select>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-basket"></i><?= t('What did you buy?') ?></div>
+                        <?php if ($other_account): ?>
+                        <!-- What kind of buy: counted (stock) or something else (not counted) -->
+                        <div class="btn-group w-100 rp-seg rp-kind mb-3" role="group" aria-label="<?= htmlspecialchars(t('What did you buy?')) ?>">
+                            <input type="radio" class="btn-check" name="rpKind" id="rpKindStock" value="stock" checked>
+                            <label class="btn btn-outline-primary" for="rpKindStock"><i class="bi bi-box-seam me-1"></i><?= t('Counted item') ?><small><?= t('stock goes up') ?></small></label>
+                            <input type="radio" class="btn-check" name="rpKind" id="rpKindOther" value="other">
+                            <label class="btn btn-outline-primary" for="rpKindOther"><i class="bi bi-basket me-1"></i><?= t('Something else') ?><small><?= t('not counted') ?></small></label>
                         </div>
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold" for="rpQty"><?= t('Quantity') ?> <span class="text-danger">*</span></label>
+                        <?php endif; ?>
+
+                        <!-- A counted item -->
+                        <div id="rpStockFields">
+                            <div class="rf-grid">
+                                <div class="rf-field rf-full">
+                                    <label class="form-label" for="rpItem"><?= t('Item') ?><span class="rf-req">*</span></label>
+                                    <select id="rpItem" name="product_id" class="form-select" style="width:100%">
+                                        <?php if ($preItem): ?><option value="<?= (int)$preItem['product_id'] ?>" selected><?= safe_output($preItem['product_name']) ?> (<?= htmlspecialchars($preItem['unit']) ?>)</option><?php endif; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Something else (not counted) -->
+                        <div id="rpOtherFields" style="display:none;">
+                            <div class="rf-grid">
+                                <div class="rf-field rf-full">
+                                    <label class="form-label" for="rpOtherName"><?= t('What is it?') ?><span class="rf-req">*</span></label>
+                                    <input type="text" class="form-control" id="rpOtherName" maxlength="200" placeholder="<?= htmlspecialchars(t('e.g. tomatoes, onions, a bundle of greens')) ?>">
+                                    <div class="rp-match mt-2" id="rpOtherMatch" style="display:none;"></div>
+                                </div>
+                                <div class="rf-field">
+                                    <label class="form-label" for="rpOtherAmount"><?= t('Amount paid') ?><span class="rf-req">*</span></label>
+                                    <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control rp-num" id="rpOtherAmount" min="1" step="any" inputmode="decimal"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec" id="rpQtySec">
+                        <div class="rf-sec-title"><i class="bi bi-calculator"></i><?= t('Quantity & price') ?></div>
+                        <div class="rp-grid3">
+                            <div class="rf-field">
+                                <label class="form-label" for="rpQty"><?= t('Quantity') ?><span class="rf-req">*</span></label>
                                 <div class="input-group"><input type="number" class="form-control rp-num" id="rpQty" min="0.001" step="0.001" inputmode="decimal"><span class="input-group-text" id="rpUnit">—</span></div>
                             </div>
-                            <div class="col-6 col-md-4">
-                                <label class="form-label fw-semibold" for="rpPrice"><?= t('Price for one') ?></label>
-                                <div class="input-group"><input type="number" class="form-control rp-num" id="rpPrice" min="0" step="0.01" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
+                            <div class="rf-field">
+                                <label class="form-label" for="rpPrice"><?= t('Price for one') ?></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control rp-num" id="rpPrice" min="0" step="0.01" inputmode="decimal"></div>
                                 <div class="rp-hint" id="rpPriceHint"></div>
                             </div>
-                            <div class="col-6 col-md-4">
-                                <label class="form-label fw-semibold" for="rpTotal"><span class="rp-or"><?= t('or') ?></span> <?= t('Total paid') ?></label>
-                                <div class="input-group"><input type="number" class="form-control rp-num" id="rpTotal" min="0" step="0.01" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
+                            <div class="rf-field">
+                                <label class="form-label" for="rpTotal"><span class="rp-or"><?= t('or') ?></span> <?= t('Total paid') ?></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control rp-num" id="rpTotal" min="0" step="0.01" inputmode="decimal"></div>
                             </div>
                         </div>
                         <!-- An item sold on the Menu: its selling price, changed only when you tap the pencil -->
@@ -125,15 +152,15 @@ $cur = getSetting('currency', 'TZS');
                             <i class="bi bi-tag text-primary"></i> <?= t('Selling price') ?> <strong id="rpSellTxt"></strong>
                             <a href="#" id="rpSellEdit" class="ms-1" title="<?= htmlspecialchars(t('Change')) ?>"><i class="bi bi-pencil"></i></a>
                             <div class="mt-2" id="rpSellBox" style="display:none;">
-                                <div class="input-group" style="max-width:240px;"><input type="number" class="form-control rp-num" id="rpSell" min="0" step="0.01" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
+                                <div class="input-group rf-money" style="max-width:260px;"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control rp-num" id="rpSell" min="0" step="0.01" inputmode="decimal"></div>
                             </div>
                         </div>
                         <div id="rpMoreWrap">
                             <a class="small d-inline-block mt-3" data-bs-toggle="collapse" href="#rpMore" role="button"><i class="bi bi-sliders me-1"></i><?= t('More options') ?></a>
                             <div class="collapse" id="rpMore">
-                                <div class="row g-2 mt-1">
-                                    <div class="col-md-6">
-                                        <label class="form-label" for="rpExpiry"><?= t('Expiry date') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
+                                <div class="rf-grid mt-2">
+                                    <div class="rf-field">
+                                        <label class="form-label" for="rpExpiry"><?= t('Expiry date') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></label>
                                         <input type="date" class="form-control" name="expiry_date" id="rpExpiry">
                                     </div>
                                 </div>
@@ -141,23 +168,10 @@ $cur = getSetting('currency', 'TZS');
                         </div>
                     </div>
 
-                    <!-- Something else (not counted) -->
-                    <div id="rpOtherFields" style="display:none;">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold" for="rpOtherName"><?= t('What is it?') ?> <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="rpOtherName" maxlength="200" placeholder="<?= htmlspecialchars(t('e.g. tomatoes, onions, a bundle of greens')) ?>">
-                            <div class="rp-match mt-2" id="rpOtherMatch" style="display:none;"></div>
-                        </div>
-                        <div class="mb-1">
-                            <label class="form-label fw-semibold" for="rpOtherAmount"><?= t('Amount paid') ?> <span class="text-danger">*</span></label>
-                            <div class="input-group" style="max-width:260px;"><input type="number" class="form-control rp-num" id="rpOtherAmount" min="1" step="any" inputmode="decimal"><span class="input-group-text"><?= htmlspecialchars($cur) ?></span></div>
-                        </div>
-                    </div>
-
                     <!-- Payment: Paid (default) · Partly paid · Credit — what is not paid now is owed to the supplier -->
-                    <div class="rp-pay mt-3">
-                        <label class="form-label fw-semibold d-block"><?= t('Payment') ?></label>
-                        <div class="btn-group w-100 rp-pay-seg" role="group" aria-label="<?= htmlspecialchars(t('Payment')) ?>">
+                    <div class="rf-sec rp-pay">
+                        <div class="rf-sec-title"><i class="bi bi-wallet2"></i><?= t('Payment') ?></div>
+                        <div class="btn-group w-100 rp-pay-seg mb-3" role="group" aria-label="<?= htmlspecialchars(t('Payment')) ?>">
                             <input type="radio" class="btn-check" name="rpPayment" id="rpPayPaid" value="paid" checked>
                             <label class="btn btn-outline-primary" for="rpPayPaid"><i class="bi bi-check-circle me-1"></i><?= t('Paid') ?></label>
                             <input type="radio" class="btn-check" name="rpPayment" id="rpPayPartial" value="partial">
@@ -165,21 +179,21 @@ $cur = getSetting('currency', 'TZS');
                             <input type="radio" class="btn-check" name="rpPayment" id="rpPayCredit" value="credit">
                             <label class="btn btn-outline-primary" for="rpPayCredit"><i class="bi bi-hourglass-split me-1"></i><?= t('Credit') ?></label>
                         </div>
-                        <div class="row g-2 mt-1">
-                            <div class="col-md-6">
-                                <label class="form-label"><?= t('Supplier') ?> <small class="text-muted" id="rpSupHint">(<?= t('optional') ?>)</small><span class="text-danger d-none" id="rpSupStar"> *</span></label>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="rpSupplier"><?= t('Supplier') ?> <span class="rf-opt" id="rpSupHint">(<?= t('optional') ?>)</span><span class="rf-req d-none" id="rpSupStar">*</span></label>
                                 <select name="supplier_id" id="rpSupplier" class="form-select" style="width:100%">
                                     <option value=""><?= t('-- Select --') ?></option>
                                     <?php foreach ($suppliers as $sp): ?><option value="<?= (int)$sp['supplier_id'] ?>"><?= caseFormat($sp['supplier_name']) ?></option><?php endforeach; ?>
                                 </select>
                                 <a href="#" class="small d-inline-block mt-1" id="rpNewSupplier"><i class="bi bi-person-plus me-1"></i><?= t('New supplier') ?></a>
                             </div>
-                            <div class="col-6 col-md-3 rp-owe-only" style="display:none;" id="rpNowAmtWrap">
-                                <label class="form-label"><?= t('Paid now') ?> <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="rpNowAmt" min="0" step="0.01" inputmode="decimal">
+                            <div class="rf-field rp-owe-only" style="display:none;" id="rpNowAmtWrap">
+                                <label class="form-label" for="rpNowAmt"><?= t('Paid now') ?><span class="rf-req">*</span></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control" id="rpNowAmt" min="0" step="0.01" inputmode="decimal"></div>
                             </div>
-                            <div class="col-6 col-md-3 rp-owe-only" style="display:none;">
-                                <label class="form-label"><?= t('Pay by') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
+                            <div class="rf-field rp-owe-only" style="display:none;">
+                                <label class="form-label" for="rpDue"><?= t('Pay by') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></label>
                                 <input type="date" class="form-control" id="rpDue">
                             </div>
                         </div>
@@ -198,7 +212,7 @@ $cur = getSetting('currency', 'TZS');
                     <label for="rpDate"><i class="bi bi-calendar3 me-1"></i><?= t('Date') ?></label>
                     <input type="date" class="form-control form-control-sm" form="rpForm" name="date" id="rpDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>">
                 </div>
-                <div class="rp-sum-total"><span><?= t('Total') ?></span><strong id="rpSumTotal">0 <?= htmlspecialchars($cur) ?></strong></div>
+                <div class="rp-sum-total"><span><?= t('Total') ?></span><strong id="rpSumTotal">0 <?= $rfCur ?></strong></div>
                 <div class="p-3 pt-0">
                     <button type="submit" form="rpForm" class="btn btn-primary btn-lg w-100 rp-save" id="rpSave"><i class="bi bi-check-circle me-1"></i><?= t('Save purchase') ?></button>
                 </div>
@@ -233,22 +247,34 @@ $cur = getSetting('currency', 'TZS');
         </div></div>
     </div>
 
-    <!-- Pay a supplier -->
-    <div class="modal fade" id="rpPayModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-            <div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i><?= t('Pay supplier') ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <!-- Pay a supplier (restaurant form layout) -->
+    <div class="modal fade rf-modal" id="rpPayModal" tabindex="-1" aria-labelledby="rpPayTitle">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down"><div class="modal-content">
+            <div class="modal-header bg-primary text-white"><h5 class="modal-title" id="rpPayTitle"><i class="bi bi-cash-coin"></i><?= t('Pay supplier') ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button></div>
             <form id="rpPayForm" autocomplete="off">
                 <div class="modal-body">
                     <div id="rpPayMsg" class="mb-2"></div>
-                    <div class="rp-preview mb-3" id="rpPayInfo"></div>
-                    <div class="row g-2">
-                        <div class="col-6"><label class="form-label" for="rpPayAmount"><?= t('Amount') ?> <span class="text-danger">*</span></label><input type="number" class="form-control" id="rpPayAmount" min="0.01" step="0.01" inputmode="decimal"></div>
-                        <div class="col-6"><label class="form-label" for="rpPayDate"><?= t('Date') ?></label><input type="date" class="form-control" id="rpPayDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>"></div>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-receipt"></i><?= t('Bill') ?></div>
+                        <div class="rp-preview" id="rpPayInfo"></div>
                     </div>
-                    <div class="form-text"><?= t('The money comes from cash. Pay part now and the rest later, or all of it.') ?></div>
-                    <div class="small mt-2" id="rpPayHistory"></div>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-cash-coin"></i><?= t('Payment') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field">
+                                <label class="form-label" for="rpPayAmount"><?= t('Amount') ?><span class="rf-req">*</span></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control" id="rpPayAmount" min="0.01" step="0.01" inputmode="decimal"></div>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="rpPayDate"><?= t('Date') ?></label>
+                                <input type="date" class="form-control" id="rpPayDate" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>">
+                            </div>
+                        </div>
+                        <div class="rf-help"><?= t('The money comes from cash. Pay part now and the rest later, or all of it.') ?></div>
+                        <div class="small mt-2" id="rpPayHistory"></div>
+                    </div>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button><button type="submit" class="btn btn-primary" id="rpPaySave"><i class="bi bi-check-circle me-1"></i><?= t('Pay') ?></button></div>
+                <div class="modal-footer rf-foot"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button><button type="submit" class="btn btn-primary" id="rpPaySave"><i class="bi bi-check-circle me-1"></i><?= t('Pay') ?></button></div>
             </form>
         </div></div>
     </div>
@@ -297,6 +323,9 @@ $cur = getSetting('currency', 'TZS');
 </div>
 
 <style>
+.rp-page .rp-grid3 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; }
+.rp-page .rp-grid3 > .rf-field:first-child { grid-column:1 / -1; }
+@media (min-width:768px) { .rp-page .rp-grid3 { grid-template-columns:repeat(3,minmax(0,1fr)); } .rp-page .rp-grid3 > .rf-field:first-child { grid-column:auto; } }
 .rp-page .rp-card { background:#fff; border:1px solid #dbe6fb; border-radius:14px; box-shadow:0 1px 3px rgba(13,110,253,.06); overflow:hidden; }
 .rp-page .rp-card-h { padding:10px 14px; border-bottom:1px solid #eef3fd; }
 .rp-page .rp-card-h h6 { margin:0; font-weight:700; color:#0b3d91; }
@@ -368,7 +397,7 @@ const RP = {
     api: <?= json_encode(buildUrl('api/restaurant/')) ?>,
     expenseApi: <?= json_encode(buildUrl('api/add_expense.php')) ?>,
     csrf: <?= json_encode(csrf_token()) ?>,
-    cur: <?= json_encode($cur) ?>,
+    cur: <?= json_encode(rfMoneyPrefix()) ?>,   // same currency as the money fields (company currency, TSh by default)
     otherAccount: <?= (int)($other_account ?: 0) ?>,
     cashAccount: <?= (int)(posReceiptAccountId($pdo, 'cash') ?: 0) ?>,
     canEdit: <?= $can_edit ? 'true' : 'false' ?>,
@@ -425,7 +454,7 @@ function rpWh() { return parseInt($('#rpShop').length ? $('#rpShop').val() : $('
 function rpSetMode(m) {
     rpMode = m;
     $('#rpKindStock').prop('checked', m === 'stock'); $('#rpKindOther').prop('checked', m === 'other');
-    $('#rpStockFields').toggle(m === 'stock'); $('#rpOtherFields').toggle(m === 'other');
+    $('#rpStockFields, #rpQtySec').toggle(m === 'stock'); $('#rpOtherFields').toggle(m === 'other');
     if (m === 'other') { rpItem = null; $('#rpItem').val(null).trigger('change'); } else { rpMatch = null; $('#rpOtherMatch').hide(); }
     rpSummary(); rpPayUi();
 }
