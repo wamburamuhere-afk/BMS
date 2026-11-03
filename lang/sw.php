@@ -6654,4 +6654,9 @@ return [
     'e.g. less salt' => 'mf. chumvi kidogo',
     'Mon' => 'Jtt', 'Tue' => 'Jnn', 'Wed' => 'Jtn', 'Thu' => 'Alh', 'Fri' => 'Iju', 'Sat' => 'Jmo', 'Sun' => 'Jpi',
     'Jan' => 'Jan', 'Feb' => 'Feb', 'Mar' => 'Mac', 'Apr' => 'Apr', 'Jun' => 'Jun', 'Jul' => 'Jul', 'Aug' => 'Ago', 'Sep' => 'Sep', 'Oct' => 'Okt', 'Nov' => 'Nov', 'Dec' => 'Des',
+    // POS: goods sold by measure in parts (2026-11-03)
+    "Enter a quantity for '%s'." => "Weka idadi ya '%s'.",
+    "The quantity for '%s' must be more than 0." => "Idadi ya '%s' lazima iwe zaidi ya 0.",
+    "'%s' is sold in whole numbers. Enter a quantity without decimals." => "'%s' huuzwa kwa idadi kamili. Weka idadi bila desimali.",
+    '%s is sold in whole numbers. Enter a quantity without decimals.' => '%s huuzwa kwa idadi kamili. Weka idadi bila desimali.',
 ];
