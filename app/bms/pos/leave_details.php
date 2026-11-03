@@ -15,7 +15,7 @@ autoEnforcePermission('leaves');
 $leave_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($leave_id <= 0) {
-    header("Location: leaves.php?error=Invalid Leave ID");
+    bmsFlashRedirect(getUrl('leaves'), 'error', t('Invalid Leave ID'));
     exit();
 }
 
@@ -55,14 +55,14 @@ $stmt->execute([$leave_id]);
 $leave = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$leave) {
-    header("Location: leaves.php?error=Leave Application Not Found");
+    bmsFlashRedirect(getUrl('leaves'), 'error', t('Leave Application Not Found'));
     exit();
 }
 
 // Phase D — project-scope gate
 $leave_project_id = $leave['employee_project_id'] ?? null;
 if (!empty($leave_project_id) && function_exists('userCan') && !userCan('project', (int)$leave_project_id)) {
-    header("Location: leaves.php?error=Access+denied:+this+leave+is+not+in+your+project+scope");
+    bmsFlashRedirect(getUrl('leaves'), 'error', t('Access denied: this leave is not in your project scope'));
     exit();
 }
 

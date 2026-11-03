@@ -27,7 +27,7 @@ $can_delete = canDelete('suppliers');
 // Get ID
 $supplier_id = $_GET['id'] ?? '';
 if (empty($supplier_id)) {
-    header("Location: sub_contractors?error=ID required");
+    bmsFlashRedirect(getUrl('sub_contractors'), 'error', t('ID required'));
     exit();
 }
 

@@ -268,6 +268,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
 <!-- SweetAlert2 (REQUIRED for Swal.fire) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<?= function_exists('bmsFlashScript') ? bmsFlashScript() : '' ?>
 
 <script>
     // Global App Configuration

@@ -12,7 +12,7 @@ global $pdo;
 
 $quotation_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($quotation_id <= 0) {
-    header("Location: " . getUrl('quotations') . "?error=Invalid Quotation ID");
+    bmsFlashRedirect(getUrl('quotations'), 'error', t('Invalid Quotation ID'));
     exit();
 }
 assertScopeForRecordHtml('quotations', 'sales_order_id', $quotation_id);
@@ -46,7 +46,7 @@ $stmt->execute([$quotation_id]);
 $quote = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$quote) {
-    header("Location: " . getUrl('quotations') . "?error=Quotation Not Found");
+    bmsFlashRedirect(getUrl('quotations'), 'error', t('Quotation Not Found'));
     exit();
 }
 

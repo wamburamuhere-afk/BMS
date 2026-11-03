@@ -784,7 +784,7 @@ $dc = preg_replace('#<!--.*?-->#s', '', $d9);
 ok(strpos($dc, 'class="rdp rdp-l2"') !== false && strpos($dc, 'class="rd2 ') !== false, 'restaurant-only: the Layout 2 grid is on the page');
 // the 8 quick actions (Take order, Tables, Kitchen, Menu, Purchases, Expenses, Reservations, Sales report), each with its live line
 preg_match('#<nav class="rd2-acts".*?</nav>#s', $dc, $nav9); $nav9 = $nav9[0] ?? '';
-foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaurant/kitchen-dashboard' => 'Kitchen', 'restaurant/menu' => 'Menu', 'restaurant/purchases' => 'Purchases', 'expenses' => 'Expenses', 'restaurant/reservations' => 'Reservations', 'restaurant/sales-report' => 'Sales report'] as $href => $lbl)
+foreach (['pos' => 'Take order', 'tables-board' => 'Tables', 'kitchen-dashboard' => 'Kitchen', 'menu' => 'Menu', 'purchases' => 'Purchases', 'expenses' => 'Expenses', 'reservations' => 'Reservations', 'restaurant-sales' => 'Sales report'] as $href => $lbl)
     ok(strpos($nav9, '/' . $href . '"') !== false && strpos($nav9, "<b>$lbl</b>") !== false, "action: $lbl → /$href");
 ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
 // Today and Money cards; the supplier-credit card is deliberately NOT there
@@ -809,7 +809,7 @@ try {
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode','none') ON DUPLICATE KEY UPDATE setting_value='none'");
     $dn = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1')));
     preg_match('#<nav class="rd2-acts".*?</nav>#s', $dn, $navn);
-    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false, 'kitchen "by mouth": no Kitchen action');
+    ok(strpos($navn[0] ?? '', '/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false, 'kitchen "by mouth": no Kitchen action');
 } finally {
     if ($ko === false) $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
     else $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$ko]);

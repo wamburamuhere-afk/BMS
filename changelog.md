@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-11-03 — feat(urls): one short address per page; messages no longer travel in the address bar
+
+**Branch:** `feat/clean-urls`.
+**New:** `core/route_aliases.php`, `core/flash.php`, `tests/test_clean_urls_cli.php`, `tests/test_flash_messages_cli.php`.
+**Changed:** `roots.php`, `header.php`, 17 page files that redirected with `?error=`, and three restaurant tests that looked for the old `restaurant/…` text.
+
+- **Short addresses (134 old → 103 short):** `restaurant/purchases` is now `/purchases`, `restaurant/menu` `/menu`, `customers/details` `/customer_details`, `pos/dashboard` `/pos_dashboard`, and so on, across Restaurant, POS, Accounts, Reports, Customers, Suppliers, Products, Stock, CRM, Documents, Communication, Integrations and Settings. `getUrl()` prints the short form everywhere, so every menu, button and redirect shows it.
+- **Nothing breaks:** every old address still answers, with a 301 to the short one (query string kept). POST/AJAX to an old address is still served. Checked over real HTTP: all 103 short pages open as admin, all 134 old addresses redirect.
+- **Module gate:** a short address is never less guarded than the old one. Some old side-addresses (e.g. `accounts/journals`, `bms/locations`) skipped the router's module check that the menu address already had; sending them to the menu address closes that gap.
+- **Messages:** 39 redirects put text in the address (`invoices?error=Invoice Not Found`) and no page ever showed it. They now keep the text in the session (`bmsFlashRedirect()`), the address stays clean (`/invoices`), and the next page shows it once as a toast. A hand-typed `?error=` does nothing.
+- **Bug fixed on the way:** GRN view/edit print the site header before checking the id, so their redirect header was silently dropped and the user was left on a half-built page. The helper now redirects from the browser when output has already started.
+- **Tests:** clean URLs 32, flash messages 32; restaurant phase 1 / phase 6 pass. Failures in other suites (restaurant focus 6, tenant registration 5, header nav 2, mobile side menu 2, POS nav wiring) are identical on plain `develop`.
+
 ## 2026-11-02 — feat(restaurant): restaurant icons (Lucide) on the restaurant screens only
 
 **New:** `assets/css/restaurant-icons.css` (23 Lucide icons, ISC licence, drawn as CSS masks so they take the text colour and size like Bootstrap icons).

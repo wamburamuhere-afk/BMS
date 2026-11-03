@@ -28,7 +28,7 @@ $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
 
 if ($invoice_id <= 0) {
-    header("Location: " . getUrl('invoices') . "?error=Invalid Invoice ID");
+    bmsFlashRedirect(getUrl('invoices'), 'error', t('Invalid Invoice ID'));
     exit();
 }
 
@@ -58,7 +58,7 @@ $stmt->execute([$invoice_id]);
 $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$invoice) {
-    header("Location: " . getUrl('invoices') . "?error=Invoice Not Found");
+    bmsFlashRedirect(getUrl('invoices'), 'error', t('Invoice Not Found'));
     exit();
 }
 

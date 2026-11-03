@@ -107,6 +107,7 @@ require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
 require_once ROOT_DIR . '/core/terminology.php'; // Tenant-conditional Warehouse/Shop display labels (wLabel/wLabelE)
 require_once ROOT_DIR . '/core/tenant_quotas.php'; // Phase 12 — usage quotas (assertUploadWithinQuota, tenantWithinUserLimit)
 require_once ROOT_DIR . '/core/text_display_case.php'; // Global "Text Display Case" setting — read-only display formatting (caseFormat/applyCaseMode)
+require_once ROOT_DIR . '/core/flash.php'; // One-time messages kept in the session, not the URL (bmsFlash / bmsFlashRedirect)
 require_once ROOT_DIR . '/actions/check_auth.php';
 
 // The bootstrap has finished reading the session, so drop the session file lock
@@ -1965,6 +1966,37 @@ $routes = [
 
 ];
 
+// One page, one short address — old address => short address (see the file's
+// header). The short key is registered here for the same file when it is not
+// a route already, so getUrl() and handleRoute() can rely on it existing.
+$GLOBALS['__bms_route_aliases'] = require ROOT_DIR . '/core/route_aliases.php';
+foreach ($GLOBALS['__bms_route_aliases'] as $__old => $__new) {
+    if (isset($routes[$__old]) && !isset($routes[$__new])) {
+        $routes[$__new] = $routes[$__old];
+    }
+}
+unset($__old, $__new);
+
+/**
+ * The single short address for a route key: itself when it has no alias.
+ */
+function canonicalRouteKey(string $key): string {
+    $aliases = $GLOBALS['__bms_route_aliases'] ?? [];
+    return $aliases[$key] ?? $key;
+}
+
+/**
+ * Where an old address must be redirected, or null to serve it as it is.
+ * Only GET/HEAD move; the query string is kept. Split out of handleRoute()
+ * so a CLI test can check the target (CLI cannot read a Location header).
+ */
+function routeAliasRedirectFor(string $cleanUri, string $method, string $queryString): ?string {
+    $method = strtoupper($method);
+    if ($method !== 'GET' && $method !== 'HEAD') return null;
+    if (canonicalRouteKey($cleanUri) === $cleanUri) return null;
+    return getUrl($cleanUri) . ($queryString !== '' ? '?' . $queryString : '');
+}
+
 /**
  * Get the clean URL for a page
  * @param string $page The page identifier (e.g., 'accounts/journals')
@@ -2030,8 +2062,18 @@ function getUrl($page) {
                 $cleanPage = $noExt;
             }
         }
+
+        // Old address → its single short address (core/route_aliases.php).
+        // Anything after ? or # is kept as-is.
+        $cut  = strcspn($cleanPage, '?#');
+        $key  = substr($cleanPage, 0, $cut);
+        $tail = substr($cleanPage, $cut);
+        $short = canonicalRouteKey($key);
+        if ($short !== $key) {
+            $cleanPage = $short . $tail;
+        }
     }
-    
+
     // Always prepend base_url to the result
     return $base_url . '/' . $cleanPage;
 }
@@ -2115,6 +2157,15 @@ function handleRoute() {
             header('Location: ' . $target . ($qs !== '' ? '?' . $qs : ''), true, 301);
             exit();
         }
+    }
+
+    // Old address → single short address (core/route_aliases.php). GET/HEAD
+    // only: a POST to an old address is still served below, so no form or
+    // AJAX call breaks. The query string travels with the redirect.
+    $aliasTarget = routeAliasRedirectFor($clean_uri, $_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['QUERY_STRING'] ?? '');
+    if ($aliasTarget !== null) {
+        header('Location: ' . $aliasTarget, true, 301);
+        exit();
     }
 
     // 1. Map lookup

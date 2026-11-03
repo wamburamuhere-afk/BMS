@@ -229,7 +229,7 @@ try {
     $r = _run(['page' => 'app/bms/restaurant/menu.php', 'session' => $admin, 'features' => $off]);
     ok(strpos($r['out'], 'id="menuTable"') === false, 'menu.php with Restaurant POS off shows no menu');
     $r = _run(['page' => 'app/bms/restaurant/index.php', 'session' => $admin, 'features' => $on]);
-    ok(_clean($r['stderr']) && strpos($r['out'], 'restaurant/menu') !== false, 'hub renders and has the Menu card');
+    ok(_clean($r['stderr']) && strpos($r['out'], '/menu"') !== false, 'hub renders and has the Menu card');
     $hasTables = (int)$pdo->query("SELECT COUNT(*) FROM restaurant_tables WHERE warehouse_id = $rid")->fetchColumn() > 0;
     ok(strpos($r['out'], 'id="rgsCard"') !== false || $hasTables, 'Getting started shows while steps remain');
     ok(strpos($r['out'], 'id="restaurantDropdown"') !== false, 'header: Restaurant dropdown (Menu, Tables, Kitchen…) when the module is on');
@@ -242,7 +242,7 @@ try {
         $setMode($rid, 'restaurant');
     }
     $r = _run(['page' => 'app/bms/pos/pos_dashboard.php', 'session' => $admin, 'features' => $off]);
-    ok(strpos($r['out'], 'restaurantDropdown') === false && strpos($r['out'], 'restaurant/menu') === false, 'Restaurant POS off: no restaurant menu anywhere');
+    ok(strpos($r['out'], 'restaurantDropdown') === false && strpos($r['out'], '/menu"') === false, 'Restaurant POS off: no restaurant menu anywhere');
 } finally {
     foreach ($created as $id) {
         $mv = $pdo->query("SELECT movement_id FROM stock_movements WHERE product_id = $id")->fetchAll(PDO::FETCH_COLUMN);
