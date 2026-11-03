@@ -224,6 +224,8 @@ $routes = [
     // api/stock/generate_shop_catalog_link.php.
     'shop-catalog'   => ROOT_DIR . '/shop_catalog.php',
     'shop_catalog'   => ROOT_DIR . '/shop_catalog.php',
+    // Public restaurant menu + ordering — reached only as /m/<link> (see handleRoute()).
+    'public-menu'    => ROOT_DIR . '/public_menu.php',
     // Public, unauthenticated — a Customer Visits report PDF shared as an expiring
     // link (api/field_reports/share_link.php). Token-gated, read-only.
     'report-pdf'     => ROOT_DIR . '/field_report_pdf.php',
@@ -1178,6 +1180,8 @@ $routes = [
     'restaurant/reservations'       => RESTAURANT_DIR . '/reservations.php',
     'restaurant/menu-type'          => RESTAURANT_DIR . '/menu_type.php',
     'restaurant/menu'               => RESTAURANT_DIR . '/menu.php',   // restaurant_plan.md Phase 1
+    'menu_qr'                       => RESTAURANT_DIR . '/menu_qr.php',        // restaurant_online_menu_plan.md Phase 4
+    'online_orders'                 => RESTAURANT_DIR . '/online_orders.php',  // restaurant_online_menu_plan.md Phase 5
     'restaurant/tables-board'       => RESTAURANT_DIR . '/tables_board.php', // restaurant_plan.md Phase 2
     'restaurant/sales-report'       => RESTAURANT_DIR . '/sales_report.php', // restaurant_plan.md Phase 6
     'restaurant/purchases'          => RESTAURANT_DIR . '/purchases.php',  // restaurant focus pass: buy stock & ingredients
@@ -2205,6 +2209,19 @@ function handleRoute() {
     if (!isset($routes[$clean_uri]) && preg_match('#^([^/]+)/([1-9][0-9]{0,18})$#', $clean_uri, $__dm) && isDetailRoute($__dm[1])) {
         $_GET['id'] = $_REQUEST['id'] = $__dm[2];
         $clean_uri = $__dm[1];
+    }
+
+    // Public restaurant menu (restaurant_online_menu_plan.md): /m/<link> is the
+    // menu, /m/<link>/order places an order (POST), /m/<link>/o/<ref> is that
+    // order's status page (/status = its JSON). Only exact 32-hex tokens match;
+    // public_menu.php validates them again and needs no login.
+    if (preg_match('#^m/([a-f0-9]{32})(?:/(order)|/o/([a-f0-9]{32})(/status)?)?$#', $clean_uri, $__rm)) {
+        $GLOBALS['__ro_route'] = [
+            'token'  => $__rm[1],
+            'action' => !empty($__rm[2]) ? 'order' : (!empty($__rm[3]) ? (!empty($__rm[4]) ? 'status' : 'track') : 'menu'),
+            'ref'    => $__rm[3] ?? '',
+        ];
+        $clean_uri = 'public-menu';
     }
 
     // 1. Map lookup
