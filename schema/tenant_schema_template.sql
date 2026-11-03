@@ -6560,6 +6560,7 @@ CREATE TABLE `products` (
   `client_uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_menu_item` tinyint(1) NOT NULL DEFAULT '0',
   `is_available` tinyint(1) NOT NULL DEFAULT '1',
+  `recipe_yield` int unsigned NOT NULL DEFAULT '1',
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `product_code` (`product_code`),
   UNIQUE KEY `ux_products_client_uuid` (`client_uuid`),
@@ -8118,7 +8119,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

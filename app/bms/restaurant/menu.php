@@ -76,10 +76,12 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
     <?php endif; ?>
 
     <div class="row g-2 g-md-3 mb-3">
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stTotal">0</div><div class="small text-muted"><?= t('Items') ?></div></div></div>
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stAvail">0</div><div class="small text-muted"><?= t('Available today') ?></div></div></div>
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-danger" id="stOut">0</div><div class="small text-muted"><?= t('Sold out') ?></div></div></div>
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stGroups">0</div><div class="small text-muted"><?= t('Groups') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stTotal">0</div><div class="small text-muted"><?= t('Items') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stAvail">0</div><div class="small text-muted"><?= t('Available today') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-danger" id="stOut">0</div><div class="small text-muted"><?= t('Sold out') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stGroups">0</div><div class="small text-muted"><?= t('Groups') ?></div></div></div>
+        <?php /* 2026-11-03: dishes still without a recipe (their cost is unknown) — tap to see them. */ ?>
+        <div class="col-12 col-md"><button type="button" class="card rm-stat rm-need text-center p-2 p-md-3 w-100" id="stNeedBtn" aria-pressed="false"><div class="fs-4 fw-bold" id="stNoRecipe">0</div><div class="small text-muted"><?= t('Dishes without a recipe') ?></div></button></div>
     </div>
 
     <div class="d-flex flex-column flex-md-row gap-2 mb-2 align-items-md-center">
@@ -266,9 +268,19 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <div class="modal-body">
+                <?php /* 2026-11-03: cooking by the pot — "1 pot of pilau = 20 plates". */ ?>
                 <div class="rf-sec">
-                    <div class="rf-sec-title"><i class="bi bi-basket"></i><?= t('Ingredients in one plate') ?></div>
-                    <div class="rf-help mt-0 mb-2"><?= t('What goes into ONE plate. Selling it uses up these ingredients from stock. A dish without a recipe still sells normally.') ?></div>
+                    <div class="rf-sec-title"><i class="bi bi-cup-hot"></i><?= t('How much does this recipe make?') ?></div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <label class="mb-0" for="rcpYield"><?= t('This recipe makes') ?></label>
+                        <input type="number" id="rcpYield" class="form-control text-center fw-bold" style="width:90px;" min="1" max="1000" step="1" value="1" inputmode="numeric">
+                        <span><?= t('plate(s)') ?></span>
+                    </div>
+                    <div class="rf-help"><?= t('Cooking by the pot? Enter everything that goes into the pot and how many plates it gives — each plate sold uses its share. For a single plate, leave 1.') ?></div>
+                </div>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-basket"></i><span id="rcpLinesTitle"><?= t('Ingredients in one plate') ?></span></div>
+                    <div class="rf-help mt-0 mb-2"><?= t('Selling the dish uses up these ingredients from stock. Type grams (g) or millilitres (ml) for small amounts. A dish without a recipe still sells normally.') ?></div>
                     <div id="rcpLines"></div>
                     <div class="rf-field mt-2">
                         <label class="form-label" for="rcpPick"><?= t('Add an ingredient') ?></label>
@@ -281,6 +293,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                 <div class="rf-sec">
                     <div class="rf-sec-title"><i class="bi bi-calculator"></i><?= t('Cost of one plate') ?></div>
                     <div class="card rm-stat p-3">
+                        <div class="d-flex justify-content-between py-1 d-none" id="rcpPotRow"><span><?= t('Cost of the whole recipe') ?></span><strong id="rcpPotCost">0</strong></div>
                         <div class="d-flex justify-content-between py-1"><span><?= t('Cost of one plate') ?></span><strong id="rcpCost">0</strong></div>
                         <div class="d-flex justify-content-between py-1"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
                         <div class="d-flex justify-content-between border-top mt-1 pt-2"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
@@ -320,7 +333,13 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 .rm-thumb { width:40px; height:40px; flex:0 0 40px; border-radius:10px; object-fit:cover; background:#e7f0ff; color:#0d6efd; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; }
 .rm-card .rm-thumb { width:52px; height:52px; flex-basis:52px; font-size:1.2rem; }
 #menuTable td:first-child, #menuTable th:first-child { text-align:center !important; color:#6c757d; }
-.rm-loss { color:#b45309; }   /* selling below cost: amber, never red */
+.rm-loss { color:#b45309; }
+.rm-warn { color:#b45309; }   /* amber: something to do, never red */
+.rm-need { cursor:pointer; border-radius:var(--bs-card-border-radius, .375rem); }
+.rm-need:hover, .rm-need.active { border-color:#0d6efd; background:#dbe8ff; }
+.rm-need.active { box-shadow:0 0 0 .15rem rgba(13,110,253,.35); }   /* selling below cost: amber, never red */
+.rcp-amt { width:150px; }
+.rcp-amt .rcp-unit { max-width:64px; flex:0 0 64px; padding-right:1.4rem; }
 .rcp-no { width:24px; flex:0 0 24px; text-align:center; color:#6c757d; font-size:.85rem; }
 </style>
 
@@ -366,6 +385,10 @@ const RM = {
     ingCost: <?= json_encode(t('Buying price per unit')) ?>,
     noIngredients: <?= json_encode(t('No ingredients yet — this dish sells without stock.')) ?>,
     addRecipe: <?= json_encode(t('Add recipe')) ?>,
+    ingOne: <?= json_encode(t('Ingredients in one plate')) ?>,
+    ingWhole: <?= json_encode(t('Ingredients for the whole recipe (%d plates)')) ?>,
+    perPlateIs: <?= json_encode(t('one plate uses %s')) ?>,
+    unit: <?= json_encode(t('Unit')) ?>,
     addBuyingPrice: <?= json_encode(t('Add buying price')) ?>,
     recipeCost: <?= json_encode(t('recipe')) ?>,
     buying: <?= json_encode(t('buying')) ?>,
@@ -378,6 +401,7 @@ const RM = {
 const nm = s => safeOutput(caseFormatJs(String(s || '')));
 let MENU = [];
 let ACTIVE_CAT = 'all';
+let NEED_RECIPE = false;   // the "Dishes without a recipe" card is pressed: show only those
 let menuTable = null;
 const fmt = n => Number(n || 0).toLocaleString();
 
@@ -400,6 +424,7 @@ $(function () {
     $('#f-photo').on('change', photoPicked);
     $('#photoRemove').on('click', function () { $('#f-photo').val(''); $('#f-remove-photo').val('1'); showPhoto(''); });
     $('#rmSearch').on('input', render);
+    $('#stNeedBtn').on('click', function () { NEED_RECIPE = !NEED_RECIPE; render(); });
     loadMenu();
 
     $('.rm-type').on('click', function () { setType($(this).data('type')); });
@@ -457,6 +482,7 @@ function buildChips() {
 function filtered() {
     const q = ($('#rmSearch').val() || '').toLowerCase().trim();
     return MENU.filter(it => (ACTIVE_CAT === 'all' || catKey(it) === ACTIVE_CAT)
+        && (!NEED_RECIPE || (it.is_service && !it.has_recipe))
         && (!q || it.product_name.toLowerCase().includes(q) || (it.category_name || '').toLowerCase().includes(q)));
 }
 
@@ -516,6 +542,10 @@ function render() {
     $('#stTotal').text(MENU.length);
     $('#stAvail').text(MENU.filter(i => i.is_available).length);
     $('#stOut').text(MENU.filter(i => !i.is_available).length);
+    const need = MENU.filter(i => i.is_service && !i.has_recipe).length;
+    if (!need) NEED_RECIPE = false;
+    $('#stNoRecipe').text(need).toggleClass('rm-warn', need > 0).toggleClass('text-primary', need === 0);
+    $('#stNeedBtn').toggleClass('active', NEED_RECIPE).attr('aria-pressed', NEED_RECIPE ? 'true' : 'false');
 
     menuTable.clear();
     rows.forEach(it => menuTable.row.add([
@@ -567,12 +597,37 @@ function render() {
 }
 
 // ───────── restaurant_plan.md Phase 7 — recipes ─────────
-let RCP = { id: 0, price: 0, lines: [] };
+let RCP = { id: 0, price: 0, yield: 1, lines: [] };
+// Small units for typing (2026-11-03): an ingredient bought in kg can be typed in grams, one in
+// litres in millilitres. The amount is always saved in the ingredient's own unit (250 g -> 0.25 kg).
+const RCP_KG = ['kg', 'kgs', 'kilo', 'kilos', 'kilogram', 'kilograms'];
+const RCP_L  = ['l', 'lt', 'ltr', 'ltrs', 'litre', 'litres', 'liter', 'liters', 'lita'];
+function rcpSmall(unit) {
+    const u = String(unit || '').trim().toLowerCase().replace(/\.+$/, '');
+    if (RCP_KG.includes(u)) return { u: 'g', f: 1000 };
+    if (RCP_L.includes(u))  return { u: 'ml', f: 1000 };
+    return null;
+}
+const r3 = n => Math.round((parseFloat(n) || 0) * 1000) / 1000;
+// One plate's share, exactly as the server keeps it (grams; a pinch is at least 1 g).
+const rcpPerPlate = l => l.qty > 0 ? Math.max(0.001, r3(l.qty / RCP.yield)) : 0;
+function rcpShow(l) { const sm = rcpSmall(l.unit); return sm && l.du === sm.u ? r3(l.qty * sm.f) : r3(l.qty); }
+function rcpFmtQty(q, unit) {
+    const sm = rcpSmall(unit);
+    if (sm && q > 0 && q < 1) return r3(q * sm.f).toLocaleString() + ' ' + sm.u;
+    return r3(q).toLocaleString() + ' ' + safeOutput(unit);
+}
+
 function openRecipe(id) {
     $.getJSON('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'get', product_id: id, warehouse_id: whId() }, function (res) {
         if (!res.success) { Swal.fire({ icon: 'error', title: RM.error, text: res.message }); return; }
-        RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, lines: res.components.map(c => ({ product_id: c.product_id, name: c.product_name, unit: c.unit, qty: c.qty, cost: c.cost_price, stock: c.stock })) };
+        RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, yield: Math.max(1, parseInt(res.yield, 10) || 1),
+                lines: res.components.map(c => {
+                    const sm = rcpSmall(c.unit), q = r3(c.pot_qty || c.qty);
+                    return { product_id: c.product_id, name: c.product_name, unit: c.unit, qty: q, du: sm && q < 1 ? sm.u : c.unit, cost: c.cost_price, stock: c.stock };
+                }) };
         $('#rcpDish').text(caseFormatJs(res.dish.product_name));
+        $('#rcpYield').val(RCP.yield);
         rcpRender();
         const m = $('#recipeModal');
         if (!$('#rcpPick').hasClass('select2-hidden-accessible')) {
@@ -580,36 +635,75 @@ function openRecipe(id) {
                 ajax: { url: '<?= buildUrl('api/restaurant/recipe.php') ?>', dataType: 'json', delay: 300,
                         data: p => ({ action: 'search', q: p.term, warehouse_id: whId() }), processResults: d => ({ results: d.results }), cache: true } })
             .on('select2:select', function (e) { rcpAdd(e.params.data); $(this).val(null).trigger('change'); });
+            $('#rcpYield').on('input change', function () {
+                const y = parseInt(this.value, 10);
+                RCP.yield = y >= 1 && y <= 1000 ? y : 1;
+                rcpRender(true);
+            });
         }
         bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show();
     }).fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));
 }
 function rcpAdd(d) {
     if (!d || !d.id || RCP.lines.some(l => l.product_id === d.id)) return;
-    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: d.unit || 'pcs', qty: 1, cost: parseFloat(d.cost_price) || null, stock: null });
+    const unit = d.unit || 'pcs', sm = rcpSmall(unit);
+    // kg / litre ingredients start in g / ml, empty, ready to type (e.g. 250 g); pieces start at 1.
+    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: unit, qty: sm ? 0 : 1, du: sm ? sm.u : unit, cost: parseFloat(d.cost_price) || null, stock: null });
     rcpRender();
+    if (sm) setTimeout(() => $('#rcpLines .rcp-qty').last().focus(), 50);
 }
-function rcpRender() {
+function rcpSetQty(i, v) {
+    const l = RCP.lines[i]; if (!l) return;
+    const sm = rcpSmall(l.unit), n = parseFloat(String(v).replace(',', '.')) || 0;
+    l.qty = Math.max(0, r3(sm && l.du === sm.u ? n / sm.f : n));
+    rcpRender(true);
+}
+function rcpSetUnit(i, du) { const l = RCP.lines[i]; if (!l) return; l.du = du; rcpRender(); }
+// keepInputs: only refresh the "per plate" notes and totals, so typing is not interrupted.
+function rcpRender(keepInputs) {
+    $('#rcpLinesTitle').text(RCP.yield > 1 ? RM.ingWhole.replace('%d', RCP.yield) : RM.ingOne);
+    if (keepInputs && $('#rcpLines .rcp-line').length === RCP.lines.length) {
+        RCP.lines.forEach((l, i) => $(`#rcpPer${i}`).html(rcpPerNote(l)));
+        rcpTotals();
+        return;
+    }
     if (!RCP.lines.length) { $('#rcpLines').html(`<div class="text-muted small py-2">${RM.noIngredients}</div>`); }
     else {
-        $('#rcpLines').html(RCP.lines.map((l, i) => `
-            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
+        $('#rcpLines').html(RCP.lines.map((l, i) => {
+            const sm = rcpSmall(l.unit);
+            const unitCtl = sm
+                ? `<select class="form-select form-select-sm rcp-unit" onchange="rcpSetUnit(${i}, this.value)" aria-label="${RM.unit}">
+                       <option value="${safeOutput(sm.u)}" ${l.du === sm.u ? 'selected' : ''}>${safeOutput(sm.u)}</option>
+                       <option value="${safeOutput(l.unit)}" ${l.du !== sm.u ? 'selected' : ''}>${safeOutput(l.unit)}</option>
+                   </select>`
+                : `<span class="input-group-text">${safeOutput(l.unit)}</span>`;
+            return `
+            <div class="d-flex align-items-center gap-2 py-2 border-bottom rcp-line">
                 <span class="rcp-no">${i + 1}</span>
                 <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${nm(l.name)}</div>
-                    <div class="small text-muted">${l.cost !== null ? fmt(l.cost) + ' / ' + safeOutput(l.unit) : ''}${l.stock !== null ? ' · ' + fmt(l.stock) + ' ' + RM.inStock : ''}</div></div>
-                <div class="input-group input-group-sm flex-shrink-0" style="width:132px;">
-                    <input type="number" class="form-control text-end" min="0.001" step="any" value="${l.qty}" inputmode="decimal" onchange="RCP.lines[${i}].qty = Math.round((parseFloat(this.value) || 0) * 1000) / 1000; this.value = RCP.lines[${i}].qty; rcpTotals();">
-                    <span class="input-group-text">${safeOutput(l.unit)}</span>
+                    <div class="small text-muted">${l.cost !== null ? fmt(l.cost) + ' / ' + safeOutput(l.unit) : ''}${l.stock !== null ? ' · ' + fmt(l.stock) + ' ' + RM.inStock : ''}</div>
+                    <div class="small text-primary" id="rcpPer${i}">${rcpPerNote(l)}</div></div>
+                <div class="input-group input-group-sm flex-shrink-0 rcp-amt">
+                    <input type="number" class="form-control text-end rcp-qty" min="0" step="any" value="${l.qty > 0 ? rcpShow(l) : ''}" placeholder="0" inputmode="decimal" oninput="rcpSetQty(${i}, this.value)">
+                    ${unitCtl}
                 </div>
-                <button type="button" class="btn btn-sm btn-link text-danger p-0 flex-shrink-0" onclick="RCP.lines.splice(${i}, 1); rcpRender();"><i class="bi bi-x-circle fs-5"></i></button>
-            </div>`).join(''));
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 flex-shrink-0" onclick="RCP.lines.splice(${i}, 1); rcpRender();" aria-label="${RM.remove}"><i class="bi bi-x-circle fs-5"></i></button>
+            </div>`;
+        }).join(''));
     }
     rcpTotals();
 }
+function rcpPerNote(l) {
+    if (RCP.yield <= 1 || !(l.qty > 0)) return '';
+    return RM.perPlateIs.replace('%s', rcpFmtQty(rcpPerPlate(l), l.unit));
+}
 function rcpTotals() {
-    const cost = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
-    $('#rcpCost').text(fmt(cost)); $('#rcpPrice').text(fmt(RCP.price));
-    $('#rcpProfit').text(fmt(RCP.price - cost)).toggleClass('text-danger', RCP.price - cost < 0);
+    const pot  = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
+    const cost = RCP.lines.reduce((s, l) => s + rcpPerPlate(l) * (l.cost || 0), 0);
+    $('#rcpPotRow').toggleClass('d-none', RCP.yield <= 1);
+    $('#rcpPotCost').text(fmt(Math.round(pot)));
+    $('#rcpCost').text(fmt(Math.round(cost))); $('#rcpPrice').text(fmt(RCP.price));
+    $('#rcpProfit').text(fmt(Math.round(RCP.price - cost))).toggleClass('rm-loss', RCP.price - cost < 0);
 }
 function rcpNewIngredient() {
     Swal.fire({ title: RM.newIngredient, confirmButtonText: RM.save || 'OK', showCancelButton: true, cancelButtonText: RM.cancel, confirmButtonColor: '#0d6efd',
@@ -625,7 +719,7 @@ function rcpNewIngredient() {
 }
 function rcpSave() {
     const comps = RCP.lines.filter(l => l.qty > 0).map(l => ({ product_id: l.product_id, qty: l.qty }));
-    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'save', product_id: RCP.id, warehouse_id: whId(), components: JSON.stringify(comps), _csrf: CSRF_FIELD }, function (res) {
+    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'save', product_id: RCP.id, warehouse_id: whId(), yield: RCP.yield, components: JSON.stringify(comps), _csrf: CSRF_FIELD }, function (res) {
         if (res.success) { bootstrap.Modal.getInstance(document.getElementById('recipeModal'))?.hide(); loadMenu(); Swal.fire({ icon: 'success', title: res.message, timer: 1600, showConfirmButton: false }); }
         else Swal.fire({ icon: 'error', title: RM.error, text: res.message });
     }, 'json').fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));

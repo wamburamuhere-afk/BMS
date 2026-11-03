@@ -2,11 +2,18 @@
 /**
  * API: dish recipes (restaurant_plan.md Phase 7).
  *
- * GET  action=get    product_id, warehouse_id → the dish's ingredients (qty per dish, unit, cost, stock here) + cost per dish
+ * GET  action=get    product_id, warehouse_id → the dish's ingredients (qty per plate, amount for the whole
+ *        recipe, unit, cost, stock here), how many plates the recipe makes + cost per plate
  * GET  action=search q, warehouse_id         → Select2: stock items usable as ingredients
- * POST action=save   product_id, warehouse_id, components=JSON [{product_id, qty}]
+ * POST action=save   product_id, warehouse_id, yield (plates the recipe makes, default 1),
+ *        components=JSON [{product_id, qty}] — qty is the amount for the WHOLE recipe, in the
+ *        ingredient's own unit (kg, litre, pcs…).
  *        Replaces the recipe (product_assembly_components) and marks the dish is_combo when it has
  *        ingredients. An empty recipe = the dish sells without stock again (always allowed).
+ *        2026-11-03 — cooking by the pot: "1 pot of pilau = 20 plates". Each line keeps the whole
+ *        recipe's amount (total_qty) and the amount for ONE plate (qty_per_unit = total ÷ plates).
+ *        Selling, stock and cost of goods read qty_per_unit exactly as before, so yield 1 is the old
+ *        behaviour. The plate count is products.recipe_yield (absent on a company not yet migrated → 1).
  * POST action=new_ingredient  warehouse_id, name, unit, cost_price
  *        Creates a stock item (not on the menu) to use as an ingredient; stock arrives via Receive Stock.
  *
@@ -50,6 +57,13 @@ if (!restaurantShopActive($pdo, $warehouse_id)) {
     exit;
 }
 
+/** products.recipe_yield exists (company migrated)? Absent → every recipe is for one plate, as before. */
+$yieldReady = function () use ($pdo): bool {
+    static $ok = null;
+    if ($ok === null) { try { $ok = (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'recipe_yield'")->fetch(); } catch (Throwable $e) { $ok = false; } }
+    return $ok;
+};
+
 /** A Menu dish: no-stock item on the menu. */
 $loadDish = function (int $pid) use ($pdo) {
     $st = $pdo->prepare("SELECT product_id, product_name, selling_price FROM products WHERE product_id = ? AND is_menu_item = 1 AND is_service = 1 AND status = 'active'");
@@ -61,8 +75,14 @@ try {
     if ($action === 'get' && $method === 'GET') {
         $dish = $loadDish((int)($src['product_id'] ?? 0));
         if (!$dish) throw new Exception(t('Menu item not found.'));
+        $yield = 1;
+        if ($yieldReady()) {
+            $y = $pdo->prepare("SELECT recipe_yield FROM products WHERE product_id = ?");
+            $y->execute([(int)$dish['product_id']]);
+            $yield = max(1, (int)$y->fetchColumn());
+        }
         $st = $pdo->prepare("SELECT ac.component_product_id AS product_id, p.product_name, COALESCE(NULLIF(ac.unit,''), NULLIF(p.unit,''), 'pcs') AS unit,
-                                    ac.qty_per_unit AS qty, COALESCE(p.cost_price,0) AS cost_price,
+                                    ac.qty_per_unit AS qty, ac.total_qty AS pot_qty, COALESCE(p.cost_price,0) AS cost_price,
                                     COALESCE((SELECT SUM(ps.stock_quantity) FROM product_stocks ps WHERE ps.product_id = p.product_id AND ps.warehouse_id = ?),0) AS stock
                                FROM product_assembly_components ac JOIN products p ON p.product_id = ac.component_product_id
                               WHERE ac.parent_product_id = ? ORDER BY p.product_name");
@@ -71,10 +91,12 @@ try {
         $cost = 0.0;
         foreach ($rows as &$r) {
             $r['product_id'] = (int)$r['product_id']; $r['qty'] = (float)$r['qty']; $r['cost_price'] = (float)$r['cost_price']; $r['stock'] = (float)$r['stock'];
+            // The amount for the whole recipe; a one-plate recipe (or an older line) is just its per-plate amount.
+            $r['pot_qty'] = ($yield > 1 && (float)$r['pot_qty'] > 0) ? (float)$r['pot_qty'] : $r['qty'] * $yield;
             $cost += $r['qty'] * $r['cost_price'];
         }
         unset($r);
-        echo json_encode(['success' => true, 'dish' => $dish, 'components' => $rows, 'cost' => round($cost, 2)]);
+        echo json_encode(['success' => true, 'dish' => $dish, 'yield' => $yield, 'components' => $rows, 'cost' => round($cost, 2)]);
         return;
     }
 
@@ -89,10 +111,13 @@ try {
         $pid  = (int)$dish['product_id'];
         $list = json_decode((string)($src['components'] ?? '[]'), true);
         if (!is_array($list)) throw new Exception(t('Something went wrong.'));
+        // How many plates the whole recipe makes (1 = a recipe for one plate, as before).
+        $yield = $yieldReady() ? (int)($src['yield'] ?? 1) : 1;
+        if ($yield < 1 || $yield > 1000) throw new Exception(t('Enter how many plates the recipe makes (1 to 1000).'));
         $clean = [];
         foreach ($list as $c) {
             $cid = (int)($c['product_id'] ?? 0);
-            $qty = round((float)($c['qty'] ?? 0), 3);   // 3 places: 5 g of salt in a kg recipe = 0.005 (was cut to 0.01)
+            $qty = round((float)($c['qty'] ?? 0), 3);   // amount for the whole recipe; 3 places: 5 g of salt in kg = 0.005
             if ($cid <= 0 || $qty <= 0 || $cid === $pid) continue;
             $clean[$cid] = ($clean[$cid] ?? 0) + $qty;     // the same ingredient twice → one line
         }
@@ -107,8 +132,14 @@ try {
         $pdo->beginTransaction();
         $pdo->prepare("DELETE FROM product_assembly_components WHERE parent_product_id = ?")->execute([$pid]);
         $ins = $pdo->prepare("INSERT INTO product_assembly_components (parent_product_id, component_product_id, unit, qty_per_unit, total_qty) VALUES (?, ?, ?, ?, ?)");
-        foreach ($clean as $cid => $qty) $ins->execute([$pid, $cid, $units[$cid] ?? 'pcs', $qty, $qty]);
+        foreach ($clean as $cid => $qty) {
+            // One plate's share, kept to grams (3 places) like stock. A pinch that rounds to nothing
+            // still uses 1 g, so the ingredient stays in the recipe and leaves stock.
+            $perPlate = max(0.001, round($qty / $yield, 3));
+            $ins->execute([$pid, $cid, $units[$cid] ?? 'pcs', $perPlate, $qty]);
+        }
         $pdo->prepare("UPDATE products SET is_combo = ?, updated_by = ? WHERE product_id = ?")->execute([$clean ? 1 : 0, $uid, $pid]);
+        if ($yieldReady()) $pdo->prepare("UPDATE products SET recipe_yield = ? WHERE product_id = ?")->execute([$clean ? $yield : 1, $pid]);
         $pdo->commit();
         logActivity($pdo, $uid, ($clean ? 'Saved recipe' : 'Removed recipe') . " for menu item: {$dish['product_name']}");
         echo json_encode(['success' => true, 'message' => $clean ? t('Recipe saved.') : t('Recipe removed — the dish sells without stock.')]);

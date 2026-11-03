@@ -6679,4 +6679,15 @@ return [
     'buying' => 'kununua',
     'Choose a photo (JPG, PNG or WebP).' => 'Chagua picha (JPG, PNG au WebP).',
     'The photo could not be uploaded. Please try again.' => 'Picha haikupakiwa. Tafadhali jaribu tena.',
+    // Restaurant recipes by the pot + g/ml (2026-11-03)
+    'How much does this recipe make?' => 'Mapishi haya yanatoa kiasi gani?',
+    'This recipe makes' => 'Mapishi haya yanatoa',
+    'plate(s)' => 'sahani',
+    'Cooking by the pot? Enter everything that goes into the pot and how many plates it gives — each plate sold uses its share. For a single plate, leave 1.' => 'Unapika kwa sufuria? Weka vyote vinavyoingia kwenye sufuria na idadi ya sahani inazotoa — kila sahani inayouzwa inatumia sehemu yake. Kwa sahani moja, acha 1.',
+    'Selling the dish uses up these ingredients from stock. Type grams (g) or millilitres (ml) for small amounts. A dish without a recipe still sells normally.' => 'Kuuza chakula hiki kunapunguza viungo hivi kwenye stoo. Andika gramu (g) au mililita (ml) kwa kiasi kidogo. Chakula kisicho na mapishi bado kinauzwa kama kawaida.',
+    'Cost of the whole recipe' => 'Gharama ya mapishi yote',
+    'Ingredients for the whole recipe (%d plates)' => 'Viungo vya mapishi yote (sahani %d)',
+    'one plate uses %s' => 'sahani moja inatumia %s',
+    'Dishes without a recipe' => 'Vyakula visivyo na mapishi',
+    'Enter how many plates the recipe makes (1 to 1000).' => 'Weka idadi ya sahani ambazo mapishi yanatoa (1 hadi 1000).',
 ];
