@@ -91,11 +91,11 @@ try {
     ok($clean($o) && strpos($o, 'Quick Links') !== false && strpos($o, 'Restaurant today') !== false && strpos($o, 'class="rd-actions') === false, 'shops + restaurant → shop dashboard + "Restaurant today"');
 
     $o = worker(['page' => 'app/dashboard.php', 'session' => $sess, 'features' => $OFF]);
-    ok($clean($o) && strpos($o, 'Quick Links') !== false && strpos($o, 'Restaurant today') === false && strpos($o, 'restaurant/sales-report') === false, 'module off → shop dashboard, nothing restaurant');
+    ok($clean($o) && strpos($o, 'Quick Links') !== false && strpos($o, 'Restaurant today') === false && strpos($o, '/restaurant-sales') === false, 'module off → shop dashboard, nothing restaurant');
 
     $o = worker(['page' => 'app/bms/restaurant/sales_report.php', 'session' => $sess, 'features' => $ON]);
     ok($clean($o) && strpos($o, 'id="rrTypeTable"') !== false && strpos($o, 'id="rrItemsTable"') !== false, 'Restaurant Sales report renders (by order type + dishes)');
-    ok(strpos($o, 'href="/restaurant/sales-report"') !== false || strpos($o, "restaurant/sales-report") !== false, 'Reports menu links to Restaurant Sales when the module is on');
+    ok(strpos($o, '/restaurant-sales"') !== false, 'Reports menu links to Restaurant Sales when the module is on');
     $o = worker(['page' => 'app/bms/restaurant/sales_report.php', 'session' => $sess, 'features' => $OFF]);
     ok(strpos($o, 'id="rrTypeTable"') === false, 'module off: no report data');
 } finally {

@@ -276,7 +276,7 @@ $(document).ready(function(){
         btn.prop('disabled',true).html('<span class="spinner-border spinner-border-sm me-1"></span> Saving...');
         $.ajax({ url:DN_API_UPDATE, type:'POST', data:fd, processData:false, contentType:false, dataType:'json',
             success:function(res){
-                if(res.success){ Swal.fire({icon:'success',title:'Saved!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>{ window.location.href='debit_note_view?id='+$('[name=debit_note_id]').val()+'<?= $proj_qs ?>'; }); }
+                if(res.success){ Swal.fire({icon:'success',title:'Saved!',text:res.message,timer:1500,showConfirmButton:false}).then(()=>{ window.location.href='<?= getUrl('debit_note_view') ?>?id='+$('[name=debit_note_id]').val()+'<?= $proj_qs ?>'; }); }
                 else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
             },
             error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); },

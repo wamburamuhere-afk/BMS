@@ -67,7 +67,7 @@ if ($proj_ctx_id > 0) {
 // Get supplier ID
 $supplier_id = $_GET['id'] ?? '';
 if (empty($supplier_id)) {
-    header("Location: suppliers.php?error=Supplier ID required");
+    bmsFlashRedirect(getUrl('suppliers'), 'error', t('Supplier ID required'));
     exit();
 }
 // Multi-project scope gate: visible if global, or primary project in scope,

@@ -816,6 +816,7 @@ $(document).ready(function() {
     <?php $exp_edit_id = intval($_GET['edit'] ?? 0); ?>
     const EXP_PAYEE_TYPE = <?= json_encode($exp_payee_type) ?>;
     const EXP_PAYEE_ID   = <?= (int) $exp_payee_id ?>;
+    bmsCleanQuery(['edit', 'add']);   // already read above; a refresh must not reopen the form
 
     if (<?= $exp_edit_id ?> > 0) {
         // The tab has no edit modal of its own, so it hands the record back here.

@@ -18,7 +18,7 @@ includeHeader();
 $employee_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($employee_id <= 0) {
-    header("Location: " . getUrl('employees') . "?error=Invalid+Employee+ID");
+    bmsFlashRedirect(getUrl('employees'), 'error', t('Invalid Employee ID'));
     exit();
 }
 
@@ -55,7 +55,7 @@ $stmt->execute([$employee_id]);
 $employee = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$employee) {
-    header("Location: " . getUrl('employees') . "?error=Employee+Not+Found");
+    bmsFlashRedirect(getUrl('employees'), 'error', t('Employee Not Found'));
     exit();
 }
 
@@ -70,7 +70,7 @@ $is_active_employee = ($employee['status'] === 'active');
 // Phase D — project-scope gate
 $emp_project_id = $employee['project_id'] ?? null;
 if (!empty($emp_project_id) && function_exists('userCan') && !userCan('project', (int)$emp_project_id)) {
-    header("Location: " . getUrl('employees') . "?error=Access+denied:+this+employee+is+not+in+your+project+scope");
+    bmsFlashRedirect(getUrl('employees'), 'error', t('Access denied: this employee is not in your project scope'));
     exit();
 }
 

@@ -10,7 +10,7 @@ autoEnforcePermission('invoices');
 $invoice_id = isset($_GET['invoice']) ? intval($_GET['invoice']) : 0;
 
 if ($invoice_id <= 0) {
-    header("Location: " . getUrl('invoices') . "?error=Invalid Invoice ID");
+    bmsFlashRedirect(getUrl('invoices'), 'error', t('Invalid Invoice ID'));
     exit();
 }
 assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
@@ -30,12 +30,12 @@ $stmt->execute([$invoice_id]);
 $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$invoice) {
-    header("Location: " . getUrl('invoices') . "?error=Invoice Not Found");
+    bmsFlashRedirect(getUrl('invoices'), 'error', t('Invoice Not Found'));
     exit();
 }
 
 if (!in_array($invoice['status'], ['approved', 'overdue', 'partial'], true)) {
-    header("Location: " . getUrl('invoice_view') . "?id={$invoice_id}&error=Payment can only be recorded on open invoices");
+    bmsFlashRedirect(getUrl('invoice_view') . "?id={$invoice_id}", 'error', t('Payment can only be recorded on open invoices'));
     exit();
 }
 

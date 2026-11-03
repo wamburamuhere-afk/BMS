@@ -8,7 +8,7 @@ autoEnforcePermission('invoices');
 $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($invoice_id <= 0) {
-    header("Location: " . getUrl('invoices') . "?error=Invalid Invoice ID");
+    bmsFlashRedirect(getUrl('invoices'), 'error', t('Invalid Invoice ID'));
     exit();
 }
 
@@ -21,14 +21,14 @@ $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
 assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
 
 if (!$invoice) {
-    header("Location: " . getUrl('invoices') . "?error=Invoice Not Found");
+    bmsFlashRedirect(getUrl('invoices'), 'error', t('Invoice Not Found'));
     exit();
 }
 
 // Check status - Allow editing for all but provide a warning/check if needed
 // For now, moving this above includeHeader to prevent "headers already sent"
 if (!in_array($invoice['status'], ['draft', 'pending', 'sent', 'partial', 'paid', 'overdue'])) {
-    header("Location: " . getUrl('invoice_view') . "?id=$invoice_id&error=Cannot edit invoice with status " . $invoice['status']);
+    bmsFlashRedirect(getUrl('invoice_view') . "?id=$invoice_id", 'error', t('Cannot edit invoice with status') . ' ' . $invoice['status']);
     exit();
 }
 

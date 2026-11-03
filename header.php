@@ -183,6 +183,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         $clean     = trim($base !== '' ? ltrim(substr($req_path, strlen('/' . $base)), '/') : ltrim($req_path, '/'), '/');
         $parts     = array_values(array_filter(explode('/', $clean)));
         $last      = array_pop($parts) ?? 'page';
+        // /invoice_view/231: the last segment is the record id — name the page, not the number.
+        if ($parts && ctype_digit($last)) { $last = array_pop($parts); }
         $parent    = $parts ? array_pop($parts) : '';
         // If last segment is a generic action word, prepend the parent segment for context.
         if (in_array(strtolower($last), ['view', 'details', 'edit', 'add', 'create', 'list', 'index', ''], true) && $parent !== '') {
@@ -268,6 +270,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
 <!-- SweetAlert2 (REQUIRED for Swal.fire) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<?= function_exists('bmsFlashScript') ? bmsFlashScript() : '' ?>
 
 <script>
     // Global App Configuration
@@ -350,6 +353,20 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
         return originalSwalFire(...args);
     };
+    // Clean the address bar once a page has used a one-shot value from it.
+    // A link such as /expenses?edit=12 or /customers?action=add opens a form;
+    // after the page has opened it, the value only does harm (a refresh or a
+    // shared link would reopen the form). Only the named keys are removed —
+    // filters, tabs and dates stay, so those pages can still be bookmarked.
+    // Display only: no navigation, no reload, history is replaced in place.
+    function bmsCleanQuery(keys) {
+        try {
+            const u = new URL(window.location.href);
+            let changed = false;
+            (keys || []).forEach(function (k) { if (u.searchParams.has(k)) { u.searchParams.delete(k); changed = true; } });
+            if (changed) window.history.replaceState(window.history.state, '', u.pathname + (u.search || '') + u.hash);
+        } catch (e) { /* old browser: leave the address as it is */ }
+    }
     // Global Activity Logging Helper
     function logActivityAction(action, activity_type, description, entity_type = null, entity_id = null) {
         $.post(APP_URL + '/api/log_audit', { // keeping API name to avoid breakage elsewhere if any

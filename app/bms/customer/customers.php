@@ -1146,6 +1146,7 @@ $(document).ready(function() {
         if (urlParams.get('action') === 'add') {
             const addModal = new bootstrap.Modal(document.getElementById('addCustomerModal'));
             addModal.show();
+            bmsCleanQuery(['action']);   // the form is open; a refresh must not reopen it
         }
 
         let table = $('#customersTable').DataTable({

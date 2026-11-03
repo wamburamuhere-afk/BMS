@@ -701,7 +701,7 @@ $bd = body($dp);
 $dpSrc = file_get_contents("$root/includes/restaurant/dash_panel.php");
 ok(clean($dp) && strpos($bd, 'Money check this month') === false && strpos($bd, 'In stock now') === false && strpos($bd, 'Net Profit') !== false, 'dashboard: Net Profit, and the money check is gone (owner\'s choice)');
 ok(strpos($dpSrc, "t('Cost of Goods')") !== false && strpos($dpSrc, "t('Gross Profit')") !== false && strpos($dpSrc, "t('Food cost')") === false, 'dashboard: same words as the retail Profit Report (shown once there are sales)');
-ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, 'restaurant/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
+ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, '/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
 $dsw = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw'));
 ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: Net Profit in Swahili, no money check');
 $dr = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
@@ -784,7 +784,7 @@ $dc = preg_replace('#<!--.*?-->#s', '', $d9);
 ok(strpos($dc, 'class="rdp rdp-l2"') !== false && strpos($dc, 'class="rd2 ') !== false, 'restaurant-only: the Layout 2 grid is on the page');
 // the 8 quick actions (Take order, Tables, Kitchen, Menu, Purchases, Expenses, Reservations, Sales report), each with its live line
 preg_match('#<nav class="rd2-acts".*?</nav>#s', $dc, $nav9); $nav9 = $nav9[0] ?? '';
-foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaurant/kitchen-dashboard' => 'Kitchen', 'restaurant/menu' => 'Menu', 'restaurant/purchases' => 'Purchases', 'expenses' => 'Expenses', 'restaurant/reservations' => 'Reservations', 'restaurant/sales-report' => 'Sales report'] as $href => $lbl)
+foreach (['pos' => 'Take order', 'tables-board' => 'Tables', 'kitchen-dashboard' => 'Kitchen', 'menu' => 'Menu', 'purchases' => 'Purchases', 'expenses' => 'Expenses', 'reservations' => 'Reservations', 'restaurant-sales' => 'Sales report'] as $href => $lbl)
     ok(strpos($nav9, '/' . $href . '"') !== false && strpos($nav9, "<b>$lbl</b>") !== false, "action: $lbl → /$href");
 ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
 // Redesign 2026-11-03: 4 white tiles (Tables busy is the one solid blue), no per-card colours
@@ -792,7 +792,7 @@ foreach (['Sales', 'Orders', 'Profit', 'Tables busy'] as $lbl)
     ok((bool)preg_match('#class="rd2-tile[^"]*">\s*<span class="rd2-tl">' . preg_quote($lbl, '#') . '#', $dc), "tile: $lbl");
 ok(strpos($dc, 'class="rd2-tile rd2-tile-main"') !== false && strpos($dc, 'rd2-sc ') === false && strpos($dc, 'rd2-c-') === false, 'one solid blue tile (Tables busy); the six coloured cards are gone');
 // money: customers owe us + we owe suppliers (pay-later is built), both linked
-ok(strpos($dc, 'Customers owe us') !== false && strpos($dc, 'We owe suppliers') !== false && strpos($dc, '/restaurant/purchases#rpOwe"') !== false, 'Money: "Customers owe us" and "We owe suppliers" (opens Suppliers you owe)');
+ok(strpos($dc, 'Customers owe us') !== false && strpos($dc, 'We owe suppliers') !== false && strpos($dc, '/purchases#rpOwe"') !== false, 'Money: "Customers owe us" and "We owe suppliers" (opens Suppliers you owe)');
 // sections of the new layout
 foreach (['rd2-chart', 'rd2-panel', 'rd2-dishes', 'rd2-money', 'rd2-orders', 'rd2-staff'] as $sec) ok(strpos($dc, 'class="' . $sec . ' rdp-card"') !== false, "section: $sec");
 ok(strpos($dc, 'data-pt="att"') !== false && strpos($dc, 'data-pt="act"') !== false, 'Needs your attention, with Activities for a user who may see the audit log (admin)');
@@ -813,7 +813,7 @@ try {
     $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode','none') ON DUPLICATE KEY UPDATE setting_value='none'");
     $dn = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1')));
     preg_match('#<nav class="rd2-acts".*?</nav>#s', $dn, $navn);
-    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false && strpos($dn, 'Kitchen right now') === false, 'kitchen "by mouth": no Kitchen action and no "Kitchen right now"');
+    ok(strpos($navn[0] ?? '', '/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false && strpos($dn, 'Kitchen right now') === false, 'kitchen "by mouth": no Kitchen action and no "Kitchen right now"');
 } finally {
     if ($ko === false) $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
     else $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$ko]);
