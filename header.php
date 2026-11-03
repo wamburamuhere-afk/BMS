@@ -522,6 +522,9 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <link rel="stylesheet" href="<?= getUrl('style.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/responsive.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/responsive.css') ?>">
     <link rel="stylesheet" href="<?= getUrl('assets/css/loading.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/loading.css') ?>">
+    <?php if (canView('restaurant_pos')): // restaurant icons (Lucide) — used only on the restaurant screens ?>
+    <link rel="stylesheet" href="<?= getUrl('assets/css/restaurant-icons.css') ?>?v=<?= @filemtime(__DIR__ . '/assets/css/restaurant-icons.css') ?>">
+    <?php endif; ?>
 
     <style>
         /* ── Two-bar fixed header ── */
@@ -976,7 +979,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                     try { $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $q->execute([(int)($_SESSION['user_id'] ?? 0)]); $n = (int)$q->fetchColumn(); } catch (Throwable $e) { /* the icon still shows */ }
                     $open = canView('notification_center');
                     $l = htmlspecialchars(t('Notifications'));
-                    echo '<' . ($open ? 'a href="' . htmlspecialchars(getUrl('notification_center')) . '"' : 'span') . ' id="' . $id . '" class="btn btn-sm btn-outline-light rd-bell position-relative" title="' . $l . '" aria-label="' . $l . '"><i class="bi bi-bell"></i>'
+                    echo '<' . ($open ? 'a href="' . htmlspecialchars(getUrl('notification_center')) . '"' : 'span') . ' id="' . $id . '" class="btn btn-sm btn-outline-light rd-bell position-relative" title="' . $l . '" aria-label="' . $l . '"><i class="ri ri-bell"></i>'
                        . ($n > 0 ? '<span class="rd-bell-n">' . ($n > 99 ? '99+' : $n) . '</span>' : '') . '</' . ($open ? 'a' : 'span') . '>';
                 };
                 if ($__bell_on): ?>
@@ -1026,7 +1029,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <!-- Smart POS desktop: Dashboard is its own first menu item; "My Business" below
                              keeps the rest. Full ERP mode is unchanged (Dashboard stays in "Core"). -->
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i> <?= t('Dashboard') ?></a>
+                            <a class="nav-link" href="<?= getUrl('dashboard') ?>"><i class="<?= $__rf ? 'ri ri-layout-dashboard' : 'bi bi-speedometer2' ?>"></i> <?= t('Dashboard') ?></a>
                         </li>
                         <?php endif; ?>
                         <?php if ($__rf): ?>
@@ -1036,34 +1039,34 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         $__rf_can_buy = (canView('pos') && canView('pos_restock')) || canView('suppliers');
                         ?>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="rfOrdersDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-receipt"></i> <?= t('Orders') ?></a>
+                            <a class="nav-link dropdown-toggle" href="#" id="rfOrdersDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-clipboard-list"></i> <?= t('Orders') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfOrdersDropdown">
-                                <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= t('Take order') ?></a></li><?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li>
-                                <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos/credit-customers') ?>"><i class="bi bi-cash-coin"></i> <?= t('Who Owes Me') ?></a></li><?php endif; ?>
+                                <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="ri ri-hand-platter"></i> <?= t('Take order') ?></a></li><?php endif; ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="ri ri-armchair"></i> <?= t('Tables') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="ri ri-chef-hat"></i> <?= t('Kitchen') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="ri ri-calendar-check"></i> <?= t('Reservations') ?></a></li>
+                                <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos/credit-customers') ?>"><i class="ri ri-hand-coins"></i> <?= t('Who Owes Me') ?></a></li><?php endif; ?>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="rfMenuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-journal-richtext"></i> <?= t('Menu') ?></a>
+                            <a class="nav-link dropdown-toggle" href="#" id="rfMenuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-utensils"></i> <?= t('Menu') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfMenuDropdown">
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i> <?= t('Menu items') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="ri ri-book-open-text"></i> <?= t('Menu items') ?></a></li>
                                 <?php if (canView('categories')): ?><li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Menu groups') ?></a></li><?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Add-on options') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="ri ri-circle-plus"></i> <?= t('Add-on options') ?></a></li>
                             </ul>
                         </li>
                         <?php if ($__rf_can_buy): ?>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="rfBuyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-basket"></i> <?= t('Purchases') ?></a>
+                            <a class="nav-link dropdown-toggle" href="#" id="rfBuyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-shopping-basket"></i> <?= t('Purchases') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfBuyDropdown">
-                                <?php if (canView('pos') && canView('pos_restock')): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/purchases') ?>"><i class="bi bi-box-arrow-in-down"></i> <?= t('Buy stock & ingredients') ?></a></li><?php endif; ?>
+                                <?php if (canView('pos') && canView('pos_restock')): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/purchases') ?>"><i class="ri ri-shopping-basket"></i> <?= t('Buy stock & ingredients') ?></a></li><?php endif; ?>
                                 <?php if (canView('suppliers')): ?><li><a class="dropdown-item" href="<?= getUrl('suppliers') ?>"><i class="bi bi-truck"></i> <?= t('Suppliers') ?></a></li><?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
                         <?php if (canView('customers')): ?>
-                        <li class="nav-item"><a class="nav-link" href="<?= getUrl('customers') ?>"><i class="bi bi-people"></i> <?= t('Customers') ?></a></li>
+                        <li class="nav-item"><a class="nav-link" href="<?= getUrl('customers') ?>"><i class="ri ri-users"></i> <?= t('Customers') ?></a></li>
                         <?php endif; ?>
                         <?php else: ?>
                         <?php ob_start(); ?>
@@ -1170,7 +1173,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <?php elseif(canView('expenses')): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= getUrl('expenses') ?>">
-                                <i class="bi bi-receipt"></i> <?= t('Expenses') ?>
+                                <i class="<?= !empty($__rf) ? 'ri ri-wallet' : 'bi bi-receipt' ?>"></i> <?= t('Expenses') ?>
                             </a>
                         </li>
                         <?php endif; ?>
@@ -1612,7 +1615,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 </div>
                             </div>
                             <?php endif; // posSimpleModeEnabled() ?>
-                        <?php bmsNavMenu(ob_get_clean(), 'reportsDropdown', '<i class="bi bi-graph-up"></i> ' . t('Reports'),
+                        <?php bmsNavMenu(ob_get_clean(), 'reportsDropdown', '<i class="' . (!empty($__rf) ? 'ri ri-chart-column' : 'bi bi-graph-up') . '"></i> ' . t('Reports'),
                             hasReportsAccess(), posSimpleModeEnabled() ? 'nav-item' : 'nav-item mega-dropdown'); ?>
 
                         <!-- Settings — each item gated individually. Everything strictly
@@ -1804,7 +1807,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
     <nav class="bms-bnav d-flex d-lg-none d-print-none" aria-label="<?= htmlspecialchars(t('Main Menu')) ?>">
         <?php // Five items, "Sell" raised in the middle; everything else lives in the ☰ side menu. ?>
         <?php if (canView('dashboard')): ?>
-        <a class="bn-item<?= $__bn_on('dashboard') ? ' active' : '' ?>" href="<?= getUrl('dashboard') ?>"><i class="bi bi-speedometer2"></i><span><?= t('Dashboard') ?></span></a>
+        <a class="bn-item<?= $__bn_on('dashboard') ? ' active' : '' ?>" href="<?= getUrl('dashboard') ?>"><i class="<?= !empty($__rf) ? 'ri ri-layout-dashboard' : 'bi bi-speedometer2' ?>"></i><span><?= t('Dashboard') ?></span></a>
         <?php endif; ?>
         <?php
         // Products opens the centred Add Product window (below the bar): Receive
@@ -1820,20 +1823,20 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         $__bn_rest_only = canView('restaurant_pos') && restaurantOnlyCompany($pdo);
         ?>
         <?php if ($__bn_rest_only): ?>
-        <a class="bn-item<?= $__bn_on('restaurant/menu') ? ' active' : '' ?>" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i><span><?= t('Menu') ?></span></a>
+        <a class="bn-item<?= $__bn_on('restaurant/menu') ? ' active' : '' ?>" href="<?= getUrl('restaurant/menu') ?>"><i class="ri ri-utensils"></i><span><?= t('Menu') ?></span></a>
         <?php elseif (canView('products') && ($__bn_new_product || $__bn_receive_stock)): ?>
         <button type="button" class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" data-bs-toggle="modal" data-bs-target="#bmsAddProductModal" data-apm-from="tab"><i class="bi bi-box"></i><span><?= t('Products') ?></span></button>
         <?php elseif (canView('products')): ?>
         <a class="bn-item<?= $__bn_on('products') ? ' active' : '' ?>" href="<?= getUrl('products') ?>"><i class="bi bi-box"></i><span><?= t('Products') ?></span></a>
         <?php endif; ?>
         <?php if (canView('pos')): ?>
-        <a class="bn-item bn-sell<?= $__bn_on('pos') ? ' active' : '' ?>" href="<?= getUrl('pos') ?>"><span class="bn-circle"><i class="bi bi-cart-check"></i></span><span><?= htmlspecialchars(wLabel('POS', 'Sell')) ?></span></a>
+        <a class="bn-item bn-sell<?= $__bn_on('pos') ? ' active' : '' ?>" href="<?= getUrl('pos') ?>"><span class="bn-circle"><i class="<?= !empty($__rf) ? 'ri ri-hand-platter' : 'bi bi-cart-check' ?>"></i></span><span><?= htmlspecialchars(wLabel('POS', 'Sell')) ?></span></a>
         <?php endif; ?>
         <?php if (canView('expenses')): ?>
-        <a class="bn-item<?= $__bn_on('expenses') ? ' active' : '' ?>" href="<?= getUrl('expenses') ?>"><i class="bi bi-receipt"></i><span><?= t('Expenses') ?></span></a>
+        <a class="bn-item<?= $__bn_on('expenses') ? ' active' : '' ?>" href="<?= getUrl('expenses') ?>"><i class="<?= !empty($__rf) ? 'ri ri-wallet' : 'bi bi-receipt' ?>"></i><span><?= t('Expenses') ?></span></a>
         <?php endif; ?>
         <?php if (hasReportsAccess()): ?>
-        <button type="button" class="bn-item<?= $__bn_reports_on ? ' active' : '' ?>" data-bs-toggle="offcanvas" data-bs-target="#bmsReportsSheet" aria-controls="bmsReportsSheet"><i class="bi bi-graph-up"></i><span><?= t('Reports') ?></span></button>
+        <button type="button" class="bn-item<?= $__bn_reports_on ? ' active' : '' ?>" data-bs-toggle="offcanvas" data-bs-target="#bmsReportsSheet" aria-controls="bmsReportsSheet"><i class="<?= !empty($__rf) ? 'ri ri-chart-column' : 'bi bi-graph-up' ?>"></i><span><?= t('Reports') ?></span></button>
         <?php endif; ?>
     </nav>
 
@@ -1954,19 +1957,19 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             ];
             if (!empty($__rf)) {   // restaurant focus: the same four menus as the desktop bar
                 $__rf_o = [];
-                if (canView('pos')) $__rf_o[] = [getUrl('pos'), 'bi-cart-check', t('Take order')];
-                $__rf_o[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
-                $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'bi-fire', t('Kitchen')];
-                $__rf_o[] = [getUrl('restaurant/reservations'), 'bi-calendar-check', t('Reservations')];
-                if (canView('pos')) $__rf_o[] = [getUrl('pos/credit-customers'), 'bi-cash-coin', t('Who Owes Me')];
-                $__rf_m = [[getUrl('restaurant/menu'), 'bi-journal-richtext', t('Menu items')]];
+                if (canView('pos')) $__rf_o[] = [getUrl('pos'), 'ri ri-hand-platter', t('Take order')];
+                $__rf_o[] = [getUrl('restaurant/tables-board'), 'ri ri-armchair', t('Tables')];
+                $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'ri ri-chef-hat', t('Kitchen')];
+                $__rf_o[] = [getUrl('restaurant/reservations'), 'ri ri-calendar-check', t('Reservations')];
+                if (canView('pos')) $__rf_o[] = [getUrl('pos/credit-customers'), 'ri ri-hand-coins', t('Who Owes Me')];
+                $__rf_m = [[getUrl('restaurant/menu'), 'ri ri-book-open-text', t('Menu items')]];
                 if (canView('categories')) $__rf_m[] = [getUrl('categories'), 'bi-tags', t('Menu groups')];
-                $__rf_m[] = [getUrl('restaurant/modifier-group'), 'bi-list-check', t('Add-on options')];
+                $__rf_m[] = [getUrl('restaurant/modifier-group'), 'ri ri-circle-plus', t('Add-on options')];
                 $__rf_b = [];
-                if (canView('pos') && canView('pos_restock')) $__rf_b[] = [getUrl('restaurant/purchases'), 'bi-box-arrow-in-down', t('Buy stock & ingredients')];
+                if (canView('pos') && canView('pos_restock')) $__rf_b[] = [getUrl('restaurant/purchases'), 'ri ri-shopping-basket', t('Buy stock & ingredients')];
                 if (canView('suppliers')) $__rf_b[] = [getUrl('suppliers'), 'bi-truck', t('Suppliers')];
                 $__rf_c = [];
-                if (canView('customers')) $__rf_c[] = [getUrl('customers'), 'bi-people', t('Customers')];
+                if (canView('customers')) $__rf_c[] = [getUrl('customers'), 'ri ri-users', t('Customers')];
                 $__rf_s = [];
                 if (canView('warehouses')) $__rf_s[] = [getUrl('warehouses'), 'bi-shop', wLabel('Warehouses', 'Shops')];
                 $__side_groups = [[t('Orders'), $__rf_o], [t('Menu'), $__rf_m], [t('Purchases'), $__rf_b], [t('Customers'), $__rf_c], [t('Settings'), $__rf_s]];
@@ -1976,7 +1979,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             <div class="bn-group"><?= htmlspecialchars($__side_gl) ?></div>
             <div class="list-group list-group-flush">
                 <?php foreach ($__side_items as [$__side_u, $__side_i, $__side_l]): ?>
-                <a class="list-group-item list-group-item-action" href="<?= $__side_u ?>"><i class="bi <?= htmlspecialchars(preg_replace('/^bi /', '', $__side_i)) ?>"></i><?= htmlspecialchars($__side_l) ?></a>
+                <a class="list-group-item list-group-item-action" href="<?= $__side_u ?>"><i class="<?= htmlspecialchars(strpos($__side_i, 'ri ') === 0 ? $__side_i : 'bi ' . preg_replace('/^bi /', '', $__side_i)) ?>"></i><?= htmlspecialchars($__side_l) ?></a>
                 <?php endforeach; ?>
             </div>
             <?php endforeach; ?>

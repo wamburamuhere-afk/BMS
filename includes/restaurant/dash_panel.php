@@ -318,7 +318,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     $rdAttRows = [];
     foreach ($rdAttention as $a) {
         if ($a['type'] === 'old_bills')        { $ico = 'bi-receipt'; $txt = sprintf(t('%1$d bill(s) have been open for over 90 minutes (the longest %2$d min).'), $a['n'], $a['extra']); $lnk = getUrl('restaurant/tables-board'); }
-        elseif ($a['type'] === 'kitchen_wait') { $ico = 'bi-egg-fried'; $txt = sprintf(t('%1$d kitchen order(s) have waited over 20 minutes (the longest %2$d min).'), $a['n'], $a['extra']); $lnk = getUrl('restaurant/kitchen-dashboard'); }
+        elseif ($a['type'] === 'kitchen_wait') { $ico = 'ri ri-chef-hat'; $txt = sprintf(t('%1$d kitchen order(s) have waited over 20 minutes (the longest %2$d min).'), $a['n'], $a['extra']); $lnk = getUrl('restaurant/kitchen-dashboard'); }
         elseif ($a['type'] === 'low_stock')    { $ico = 'bi-cup-straw'; $txt = sprintf(t('%d drink(s) or ingredient(s) are running low.'), $a['n']); $lnk = canView('pos_restock') ? getUrl('restaurant/purchases') : getUrl('restaurant/menu'); }
         else                                   { $ico = 'bi-lightbulb'; $txt = sprintf(t('%d item(s) sold have no cost, so profit may look too high.'), $a['n']); $lnk = getUrl('restaurant/menu'); }
         $rdAttRows[] = [$ico, $txt, $lnk];
@@ -329,7 +329,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         <div class="rdp-card-h"><h6><i class="bi bi-bell me-1"></i><?= t('Needs your attention') ?></h6></div>
         <div class="list-group list-group-flush">
         <?php foreach ($rdAttRows as [$ico, $txt, $lnk]): ?>
-        <a href="<?= $lnk ?>" class="list-group-item list-group-item-action d-flex align-items-center gap-2"><i class="bi <?= $ico ?> text-primary"></i><span class="small"><?= $txt ?></span><i class="bi bi-chevron-right ms-auto text-muted"></i></a>
+        <a href="<?= $lnk ?>" class="list-group-item list-group-item-action d-flex align-items-center gap-2"><i class="<?= strpos($ico, 'ri ') === 0 ? $ico : 'bi ' . $ico ?> text-primary"></i><span class="small"><?= $txt ?></span><i class="bi bi-chevron-right ms-auto text-muted"></i></a>
         <?php endforeach; ?>
         </div>
     </div>
@@ -364,20 +364,20 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         // Quick actions: name, a short live line, icon, colour. Same permissions as the menu.
         $acts = [];
         if (canCreate('pos')) {
-            $acts[] = [t('Take order'), t('Open the till'), 'bi-cart-check', '#0b5ed7', getUrl('pos')];
-            $acts[] = [t('Tables'), sprintf(t('%d with order'), $nWith), 'bi-grid-3x3-gap', '#0369a1', getUrl('restaurant/tables-board')];
+            $acts[] = [t('Take order'), t('Open the till'), 'ri ri-hand-platter', '#0b5ed7', getUrl('pos')];
+            $acts[] = [t('Tables'), sprintf(t('%d with order'), $nWith), 'ri ri-armchair', '#0369a1', getUrl('restaurant/tables-board')];
         }
-        if ($rdKitchenOn) $acts[] = [t('Kitchen'), sprintf(t('%d waiting long'), $rdX['kitchen_waiting']), 'bi-fire', '#b45309', getUrl('restaurant/kitchen-dashboard')];
-        $acts[] = [t('Menu'), $rdMoney ? sprintf(t('%d need a cost'), $unc) : t('Dishes and drinks'), 'bi-journal-richtext', '#0f766e', getUrl('restaurant/menu')];
-        if ((canView('pos') && canView('pos_restock')) || canCreate('expenses')) $acts[] = [t('Purchases'), sprintf(t('%d running low'), count($rdData['low_drinks'])), 'bi-basket', '#a16207', getUrl('restaurant/purchases')];
-        if (canView('expenses')) $acts[] = [t('Expenses'), sprintf(t('%d to approve'), $rdX['expenses_pending']), 'bi-receipt', '#4338ca', getUrl('expenses')];
-        $acts[] = [t('Reservations'), sprintf(t('%d today'), $rdX['reservations_today']), 'bi-calendar-check', '#7c3aed', getUrl('restaurant/reservations')];
-        $acts[] = [t('Sales report'), t('Today and past'), 'bi-bar-chart', '#475f8a', getUrl('restaurant/sales-report')];
+        if ($rdKitchenOn) $acts[] = [t('Kitchen'), sprintf(t('%d waiting long'), $rdX['kitchen_waiting']), 'ri ri-chef-hat', '#b45309', getUrl('restaurant/kitchen-dashboard')];
+        $acts[] = [t('Menu'), $rdMoney ? sprintf(t('%d need a cost'), $unc) : t('Dishes and drinks'), 'ri ri-book-open-text', '#0f766e', getUrl('restaurant/menu')];
+        if ((canView('pos') && canView('pos_restock')) || canCreate('expenses')) $acts[] = [t('Purchases'), sprintf(t('%d running low'), count($rdData['low_drinks'])), 'ri ri-shopping-basket', '#a16207', getUrl('restaurant/purchases')];
+        if (canView('expenses')) $acts[] = [t('Expenses'), sprintf(t('%d to approve'), $rdX['expenses_pending']), 'ri ri-wallet', '#4338ca', getUrl('expenses')];
+        $acts[] = [t('Reservations'), sprintf(t('%d today'), $rdX['reservations_today']), 'ri ri-calendar-check', '#7c3aed', getUrl('restaurant/reservations')];
+        $acts[] = [t('Sales report'), t('Today and past'), 'ri ri-chart-column', '#475f8a', getUrl('restaurant/sales-report')];
 
         $card = function (string $colour, string $icon, string $label, string $value, string $sub, string $href = '', bool $now = false) {
             $tag = $href !== '' ? 'a href="' . htmlspecialchars($href) . '"' : 'div';
             $end = $href !== '' ? 'a' : 'div';
-            return '<' . $tag . ' class="rd2-sc rd2-c-' . $colour . '"><span class="rd2-l"><i class="bi ' . $icon . '"></i>' . $label . ($now ? '<span class="rd2-now">' . t('Right now') . '</span>' : '') . '</span><span class="rd2-kv">' . $value . '</span><span class="rd2-ks">' . $sub . '</span></' . $end . '>';
+            return '<' . $tag . ' class="rd2-sc rd2-c-' . $colour . '"><span class="rd2-l"><i class="' . $icon . '"></i>' . $label . ($now ? '<span class="rd2-now">' . t('Right now') . '</span>' : '') . '</span><span class="rd2-kv">' . $value . '</span><span class="rd2-ks">' . $sub . '</span></' . $end . '>';
         };
         $flat = !$rdMoney;                       // without profit access there is no chart to put the side panel next to
         $pTabs = [['att', t('Needs attention')]];
@@ -388,7 +388,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     <div class="rd2 <?= $flat ? 'rd2-flat' : '' ?>">
         <nav class="rd2-acts" aria-label="<?= htmlspecialchars(t('Quick actions')) ?>">
             <?php foreach ($acts as $i => [$an, $as, $ai, $ac, $ah]): ?>
-            <a href="<?= $ah ?>" class="rd2-act"><span class="rd2-sq" style="background:<?= $ac ?>"><i class="bi <?= $ai ?>"></i></span><span class="rd2-at"><b><?= $an ?></b><small><?= $as ?></small></span></a>
+            <a href="<?= $ah ?>" class="rd2-act"><span class="rd2-sq" style="background:<?= $ac ?>"><i class="<?= $ai ?>"></i></span><span class="rd2-at"><b><?= $an ?></b><small><?= $as ?></small></span></a>
             <?php endforeach; ?>
         </nav>
 
@@ -398,14 +398,14 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
             $prevLbl = ['today' => t('Yesterday %s'), 'week' => t('Last week so far %s'), 'month' => t('Last month so far %s'), 'quarter' => t('Last quarter so far %s'), 'year' => t('Last year so far %s')][$rdRange['key']];
             ?>
             <div class="rd2-sum">
-                <?= $card('sales', 'bi-cart-check', t('Sales'), $rdFmt($cur['sales']) . $rdCurTag, sprintf($prevLbl, $rdFmt($rdStory['prev']['sales'])), getUrl('restaurant/sales-report')) ?>
-                <?= $card('orders', 'bi-receipt', t('Orders'), (string)$rdStory['orders'], sprintf(t('Average bill %s'), $rdFmt($rdStory['avg_bill'])), getUrl('restaurant/sales-report')) ?>
+                <?= $card('sales', 'ri ri-banknote', t('Sales'), $rdFmt($cur['sales']) . $rdCurTag, sprintf($prevLbl, $rdFmt($rdStory['prev']['sales'])), getUrl('restaurant/sales-report')) ?>
+                <?= $card('orders', 'ri ri-receipt', t('Orders'), (string)$rdStory['orders'], sprintf(t('Average bill %s'), $rdFmt($rdStory['avg_bill'])), getUrl('restaurant/sales-report')) ?>
                 <?php if ($rdMoney): ?>
-                <?= $card('profit', 'bi-graph-up-arrow', t('Profit'), $rdFmt($cur['profit']) . $rdCurTag, ($hasSales ? rtrim(rtrim(number_format($rdStory['margin'], 1), '0'), '.') . '% ' . t('margin') . ' · ' : '') . (($unc > 0 || $rdWarn) ? t('Estimated') : t('Complete'))) ?>
-                <?= $card('exp', 'bi-basket', t('Expenses'), $rdFmt($cur['expenses']) . $rdCurTag, sprintf(t('%d to approve'), $rdX['expenses_pending']), canView('expenses') ? getUrl('expenses') : '') ?>
+                <?= $card('profit', 'ri ri-trending-up', t('Profit'), $rdFmt($cur['profit']) . $rdCurTag, ($hasSales ? rtrim(rtrim(number_format($rdStory['margin'], 1), '0'), '.') . '% ' . t('margin') . ' · ' : '') . (($unc > 0 || $rdWarn) ? t('Estimated') : t('Complete'))) ?>
+                <?= $card('exp', 'ri ri-wallet', t('Expenses'), $rdFmt($cur['expenses']) . $rdCurTag, sprintf(t('%d to approve'), $rdX['expenses_pending']), canView('expenses') ? getUrl('expenses') : '') ?>
                 <?php endif; ?>
-                <?= $card('tables', 'bi-grid-3x3-gap', t('Open tables'), $rdX['tables_total'] > 0 ? sprintf(t('%1$d of %2$d'), $nWith, $rdX['tables_total']) : (string)$nWith, sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])), getUrl('restaurant/tables-board'), true) ?>
-                <?php if ($rdOwed !== null): ?><?= $card('owed', 'bi-cash-coin', t('Owed to me'), $rdFmt($rdOwed) . $rdCurTag, t('customers who bought on credit'), getUrl('pos/credit-customers'), true) ?><?php endif; ?>
+                <?= $card('tables', 'ri ri-armchair', t('Open tables'), $rdX['tables_total'] > 0 ? sprintf(t('%1$d of %2$d'), $nWith, $rdX['tables_total']) : (string)$nWith, sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])), getUrl('restaurant/tables-board'), true) ?>
+                <?php if ($rdOwed !== null): ?><?= $card('owed', 'ri ri-hand-coins', t('Owed to me'), $rdFmt($rdOwed) . $rdCurTag, t('customers who bought on credit'), getUrl('pos/credit-customers'), true) ?><?php endif; ?>
             </div>
         </section>
 
@@ -420,7 +420,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <div class="rd2-pt" data-pt="att">
                         <?php if (!$rdAttRows): ?><div class="rdp-empty"><i class="bi bi-check2-circle"></i><div><?= t('Nothing needs your attention.') ?></div></div><?php endif; ?>
                         <?php foreach ($rdAttRows as [$ico, $txt, $lnk]): ?>
-                        <a href="<?= $lnk ?>" class="rd2-row"><i class="bi <?= $ico ?> text-primary"></i><span><?= $txt ?></span></a>
+                        <a href="<?= $lnk ?>" class="rd2-row"><i class="<?= strpos($ico, 'ri ') === 0 ? $ico : 'bi ' . $ico ?> text-primary"></i><span><?= $txt ?></span></a>
                         <?php endforeach; ?>
                     </div>
                     <?php if ($rdActs): ?>

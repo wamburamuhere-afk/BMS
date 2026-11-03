@@ -234,10 +234,10 @@ try {
     ok(strpos($r['out'], 'id="rgsCard"') !== false || $hasTables, 'Getting started shows while steps remain');
     ok(strpos($r['out'], 'id="restaurantDropdown"') !== false, 'header: Restaurant dropdown (Menu, Tables, Kitchen…) when the module is on');
     if ($retailId) {
-        ok(strpos($r['out'], 'class="bi bi-journal-richtext"></i><span>') === false, 'mixed company: bottom bar keeps Products (no Menu tab)');
+        ok(strpos($r['out'], 'class="ri ri-utensils"></i><span>') === false, 'mixed company: bottom bar keeps Products (no Menu tab)');
         foreach ($active as $w) $setMode((int)$w['warehouse_id'], 'restaurant');
         $r = _run(['page' => 'app/bms/restaurant/index.php', 'session' => $admin, 'features' => $on]);
-        ok(strpos($r['out'], 'class="bi bi-journal-richtext"></i><span>') !== false, 'restaurant-only company: bottom bar shows Menu');
+        ok(strpos($r['out'], 'class="ri ri-utensils"></i><span>') !== false, 'restaurant-only company: bottom bar shows Menu');
         foreach ($origModes as $wid => $m) $setMode((int)$wid, (string)$m);
         $setMode($rid, 'restaurant');
     }

@@ -33,7 +33,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 
 <div class="container-fluid mt-3 mt-md-4 rm-page">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2 rm-head">
-        <h4 class="mb-0 text-truncate"><i class="bi bi-journal-richtext text-primary me-2"></i><?= t('Menu') ?></h4>
+        <h4 class="mb-0 text-truncate"><i class="ri ri-book-open-text text-primary me-2"></i><?= t('Menu') ?></h4>
         <div class="d-flex gap-2 flex-shrink-0">
             <a href="<?= getUrl('restaurant') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1"><?= t('Restaurant') ?></span></a>
             <?php if ($can_edit && $warehouses): ?>
@@ -129,11 +129,11 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                         <div class="fw-semibold mb-2"><?= t('What is this?') ?></div>
                         <div class="d-grid gap-2">
                             <button type="button" class="btn rm-type text-start" data-type="dish">
-                                <i class="bi bi-egg-fried fs-4 text-primary me-2"></i>
+                                <i class="ri ri-cooking-pot fs-4 text-primary me-2"></i>
                                 <span><strong><?= t('Dish (cooked here)') ?></strong><br><small class="text-muted"><?= t('Chai, mandazi, lunch, soup… sells without stock.') ?></small></span>
                             </button>
                             <button type="button" class="btn rm-type text-start" data-type="bought">
-                                <i class="bi bi-cup-straw fs-4 text-primary me-2"></i>
+                                <i class="ri ri-cup-soda fs-4 text-primary me-2"></i>
                                 <span><strong><?= t('Bought item (has stock)') ?></strong><br><small class="text-muted"><?= t('Water, soda… you buy it and count the stock.') ?></small></span>
                             </button>
                             <?php if (!restaurantOnlyCompany($pdo)): // a restaurant-only company has no retail products to bring in ?>
@@ -196,7 +196,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                             <label class="form-label"><?= t('Prepared at') ?></label>
                             <div class="btn-group w-100" role="group" id="prepGroup">
                                 <input type="radio" class="btn-check" name="prep_area" id="prep-kitchen" value="kitchen">
-                                <label class="btn btn-outline-primary" for="prep-kitchen"><i class="bi bi-fire me-1"></i><?= t('Kitchen') ?></label>
+                                <label class="btn btn-outline-primary" for="prep-kitchen"><i class="ri ri-chef-hat me-1"></i><?= t('Kitchen') ?></label>
                                 <input type="radio" class="btn-check" name="prep_area" id="prep-bar" value="bar">
                                 <label class="btn btn-outline-primary" for="prep-bar"><i class="bi bi-cup me-1"></i><?= t('Bar') ?></label>
                                 <input type="radio" class="btn-check" name="prep_area" id="prep-none" value="none">
@@ -226,7 +226,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
     <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-list-check me-1"></i> <?= t('Recipe') ?> — <span id="rcpDish"></span></h5>
+                <h5 class="modal-title"><i class="ri ri-scroll-text me-1"></i> <?= t('Recipe') ?> — <span id="rcpDish"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -397,7 +397,7 @@ function actionMenu(it) {
         <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear-fill me-1"></i></button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">
             <li><button class="dropdown-item py-2 rounded" onclick="editItem(${it.product_id})"><i class="bi bi-pencil text-primary me-2"></i>${RM.edit}</button></li>
-            ${it.is_service ? `<li><button class="dropdown-item py-2 rounded" onclick="openRecipe(${it.product_id})"><i class="bi bi-list-check text-primary me-2"></i>${RM.recipe}</button></li>` : `<li><a class="dropdown-item py-2 rounded" href="${RM.buyUrl}?item=${it.product_id}"><i class="bi bi-box-arrow-in-down text-primary me-2"></i>${RM.buyStock}</a></li>`}
+            ${it.is_service ? `<li><button class="dropdown-item py-2 rounded" onclick="openRecipe(${it.product_id})"><i class="ri ri-scroll-text text-primary me-2"></i>${RM.recipe}</button></li>` : `<li><a class="dropdown-item py-2 rounded" href="${RM.buyUrl}?item=${it.product_id}"><i class="ri ri-shopping-basket text-primary me-2"></i>${RM.buyStock}</a></li>`}
             <li><hr class="dropdown-divider"></li>
             <li><button class="dropdown-item py-2 rounded text-danger" onclick="removeItem(${it.product_id})"><i class="bi bi-x-circle text-danger me-2"></i>${RM.remove}</button></li>
         </ul></div>`;
