@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-11-03 — feat(restaurant): online menu + ordering by link and table QR (staff accept first)
+
+**Branch:** `feat/restaurant-online-menu` (off `develop`). Plan: `restaurant_online_menu_plan.md` (owner approved; Storefront-style look chosen).
+**New:** `public_menu.php` (public page, no login), `core/restaurant_online.php`, `core/restaurant_online_schema.php`, `api/restaurant/online_menu.php`, `api/restaurant/online_orders.php`, `app/bms/restaurant/online_orders.php`, `app/bms/restaurant/menu_qr.php`, `includes/restaurant/online_menu_share.php`, migration pair `2026_11_03_restaurant_online_menu` (tenant + `_legacy_db`), `tests/test_restaurant_online_menu_cli.php` (+ `_staff.inc.php`).
+**Changed:** `roots.php` (routes `/m/<link>`, `/m/<link>/order`, `/m/<link>/o/<ref>`, `menu_qr`, `online_orders`), `app/bms/restaurant/menu.php` (Share menu button), `header.php` ("Online orders" link + new-order alert, only once a shop is online), `api/pos/hold_sale.php` + `app/bms/pos/pos_scripts_new.php` (table orders only: `loaded_hold_id`), `lang/sw.php` (105 phrases), CI workflow.
+
+- **Share menu** (Restaurant → Menu): switch the menu online; choose *order from the table* and/or *order for pickup*; copy / WhatsApp / open the link; download its QR; print one QR card per table; *Make new links* kills every old link and printed QR at once.
+- **Public menu** (`/m/<link>`, phone first): logo, shop, table, search, menu-group chips, photo grid, sold-out marked, dish panel with add-on choices (required / up to N), basket bar, review, send. Status page: Sent → Accepted → Ready (or the rejection reason), updates by itself. English / Kiswahili.
+- **Staff → Online orders:** New / In progress / Done today, chime on new orders, Accept / Reject (reason shown to the customer) / Ready / Done. Accepting a table order adds it to that table's open order (the same held order the till uses) and sends it to the kitchen when a kitchen mode is on; a pickup order becomes a held order on the accepting staff member's till. Payment and the ledger are unchanged — the till still charges.
+- **Security:** customer only *asks* (pending until staff accept); prices, add-ons, availability and shop membership re-checked on the server from ids (a forged price, another shop's dish, an unlinked −5000 add-on, sold-out items, qty 0/21/1.5 are refused); 128-bit links compared in constant time, every failure looks the same; JSON-only posts (no cross-site forms), signed page token (min 2 s, max 12 h), honeypot, limits per device (3 open, 6/hour), per table and per shop; IP kept only as a salted hash; no cost or stock numbers leave the server; strict CSP with nonce, no-referrer, noindex, no framing; public code never reads the session.
+- **Till safety:** accepting saves a new version of the table's order; if a waiter's till saves an older copy, `hold_sale.php` puts back any accepted online line it lacks. A waiter editing the current version can still remove it on purpose. Retail holds untouched.
+- **Tests:** `test_restaurant_online_menu_cli` 106 checks over real HTTP with a temporary restaurant (removed after); Smart POS is switched on only inside the test server. Checked in Chrome (menu, dish panel, basket, send, status auto-update, staff accept, Share panel, QR print) and at phone width.
+
 ## 2026-11-03 — ui(restaurant): restaurant dashboard redesign — Preline look + Medesk parts, blue only
 
 **Branch:** `feat/restaurant-dashboard-redesign` (off `develop`). Owner approved the mock-up (Design canvas "Restaurant Dashboard Redesign").

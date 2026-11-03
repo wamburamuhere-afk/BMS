@@ -1037,7 +1037,39 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                     // retail, Hybrid, mixed) is false, and every line below that reads it then renders exactly as before.
                     require_once __DIR__ . '/core/restaurant_scope.php';
                     $__rf = posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo);
+                    // Online menu (restaurant_online_menu_plan.md): "Online orders" link + new-order alert, only once a shop switched it on.
+                    $__ro_nav = false;
+                    if (canView('restaurant_pos') && canCreate('pos')) {
+                        require_once __DIR__ . '/core/restaurant_online.php';
+                        $__ro_nav = restaurantModuleOn($pdo) && roAnyShopOnline($pdo);
+                    }
                     ?>
+                    <?php if ($__ro_nav && basename((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) !== 'online_orders.php' && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), 'online_orders') === false): ?>
+                    <script>
+                    // New online order alert (restaurant_online_menu_plan.md): checks every 20 s while the tab is visible.
+                    (function () {
+                        const URL_ = <?= json_encode(buildUrl('api/restaurant/online_orders.php') . '?action=count') ?>, GO = <?= json_encode(getUrl('online_orders')) ?>;
+                        const T_ = <?= json_encode(['title' => t('New online order'), 'table' => t('Table %s'), 'pickup' => t('Pickup'), 'open' => t('Open')], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                        let last = null;
+                        try { last = parseInt(sessionStorage.getItem('bms_ro_last') || '', 10) || null; } catch (e) {}
+                        function check() {
+                            if (document.hidden) return;
+                            fetch(URL_, { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
+                                if (!d || !d.success || !d.latest) return;
+                                const id = d.latest.order_id;
+                                if (last !== null && id > last && window.Swal) {
+                                    Swal.fire({ toast: true, position: 'top-end', icon: 'info', showConfirmButton: true, confirmButtonText: T_.open, timer: 15000,
+                                        titleText: T_.title + ' ' + d.latest.code + ' · ' + (d.latest.table !== null ? T_.table.replace('%s', d.latest.table) : T_.pickup) })
+                                        .then(r => { if (r.isConfirmed) window.location.href = GO; });
+                                }
+                                last = Math.max(last || 0, id);
+                                try { sessionStorage.setItem('bms_ro_last', String(last)); } catch (e) {}
+                            }).catch(() => {});
+                        }
+                        setTimeout(check, 3000); setInterval(check, 20000);
+                    })();
+                    </script>
+                    <?php endif; ?>
                     <ul class="navbar-nav me-auto">
                         <!-- Core Modules — every group below is rendered by bmsNavMenu()
                              (core/nav_menu.php): 0 granted links = hidden, 1 = direct header
@@ -1060,6 +1092,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <ul class="dropdown-menu" aria-labelledby="rfOrdersDropdown">
                                 <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="ri ri-hand-platter"></i> <?= t('Take order') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="ri ri-armchair"></i> <?= t('Tables') ?></a></li>
+                                <?php if ($__ro_nav): ?><li><a class="dropdown-item" href="<?= getUrl('online_orders') ?>"><i class="bi bi-phone"></i> <?= t('Online orders') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="ri ri-chef-hat"></i> <?= t('Kitchen') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="ri ri-calendar-check"></i> <?= t('Reservations') ?></a></li>
                                 <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos/credit-customers') ?>"><i class="ri ri-hand-coins"></i> <?= t('Who Owes Me') ?></a></li><?php endif; ?>
@@ -1280,6 +1313,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <ul class="dropdown-menu" aria-labelledby="restaurantDropdown">
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i> <?= t('Menu') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
+                                <?php if ($__ro_nav): ?><li><a class="dropdown-item" href="<?= getUrl('online_orders') ?>"><i class="bi bi-phone"></i> <?= t('Online orders') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Modifier Group') ?></a></li>
@@ -1963,6 +1997,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 if (!empty($__rest_on)) {
                     $__side_rest[] = [getUrl('restaurant/menu'), 'bi-journal-richtext', t('Menu')];
                     $__side_rest[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
+                    if (!empty($__ro_nav)) $__side_rest[] = [getUrl('online_orders'), 'bi-phone', t('Online orders')];
                 }
                 $__side_rest[] = [getUrl('restaurant'), 'bi-cup-hot', t('Restaurant')];
             }
@@ -1976,6 +2011,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 $__rf_o = [];
                 if (canView('pos')) $__rf_o[] = [getUrl('pos'), 'ri ri-hand-platter', t('Take order')];
                 $__rf_o[] = [getUrl('restaurant/tables-board'), 'ri ri-armchair', t('Tables')];
+                if (!empty($__ro_nav)) $__rf_o[] = [getUrl('online_orders'), 'bi bi-phone', t('Online orders')];
                 $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'ri ri-chef-hat', t('Kitchen')];
                 $__rf_o[] = [getUrl('restaurant/reservations'), 'ri ri-calendar-check', t('Reservations')];
                 if (canView('pos')) $__rf_o[] = [getUrl('pos/credit-customers'), 'ri ri-hand-coins', t('Who Owes Me')];
