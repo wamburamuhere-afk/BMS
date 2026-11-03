@@ -58,7 +58,10 @@ if (!$haveGit && $ref === '') {
         if ($before === '') { ok(true, "$old: (not in the reference version — new file)"); continue; }
         $now = '';
         foreach ($nowFiles as $f) $now .= $src($f);
-        $missing = array_keys(array_diff_key(controls($before), controls($now)));
+        // Fields removed ON PURPOSE later (owner's decision) are not reported as lost:
+        //   2026-11-03 — Menu: a dish no longer asks "what does one plate cost you?"; its cost comes from its recipe.
+        $removedOnPurpose = ['app/bms/restaurant/menu.php' => ['name:plate_cost', 'id:f-plate']];
+        $missing = array_values(array_diff(array_keys(array_diff_key(controls($before), controls($now))), $removedOnPurpose[$old] ?? []));
         ok(!$missing, "$old: every field still there" . ($missing ? ' — missing: ' . implode(', ', $missing) : ' (' . count(controls($before)) . ' names/ids)'));
     }
 }

@@ -94,12 +94,13 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
         <table id="menuTable" class="table table-hover align-middle w-100" data-bms-cards="off">
             <thead class="table-dark">
                 <tr>
+                    <th style="width:48px;"><?= t('S/No.') ?></th>
                     <th><?= t('Item') ?></th>
                     <th><?= t('Group') ?></th>
                     <th><?= t('Type') ?></th>
                     <th><?= t('Prepared at') ?></th>
                     <th class="text-end"><?= t('Selling price') ?></th>
-                    <th class="text-end"><?= t('Cost') ?></th>
+                    <th class="text-end"><?= t('Buying price') ?></th>
                     <th class="text-end"><?= t('Profit') ?></th>
                     <th class="text-end"><?= t('Stock') ?></th>
                     <th class="text-center"><?= t('Available today') ?></th>
@@ -154,6 +155,20 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 
                     <div class="rf-sec">
                         <div class="rf-sec-title"><i class="bi bi-tag"></i><?= t('Item') ?></div>
+                        <?php /* Photo (2026-11-03): shown on the menu, the POS tiles and the online menu. */ ?>
+                        <div class="rm-photo item-field" id="photoField">
+                            <div class="rm-photo-box" id="photoBox"><i class="bi bi-camera"></i></div>
+                            <div class="min-w-0">
+                                <div class="fw-semibold small mb-1"><?= t('Photo') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <label class="btn btn-sm btn-outline-primary rm-photo-btn mb-0" for="f-photo"><i class="bi bi-image me-1"></i><span id="photoPickLabel"><?= t('Choose photo') ?></span></label>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rm-photo-btn d-none" id="photoRemove"><i class="bi bi-x-lg me-1"></i><?= t('Remove') ?></button>
+                                </div>
+                                <div class="rf-help mt-1"><?= t('JPG, PNG or WebP, up to 2 MB. Take it with the phone camera or pick one.') ?></div>
+                            </div>
+                            <input type="file" class="d-none" name="photo" id="f-photo" accept="image/jpeg,image/png,image/webp">
+                            <input type="hidden" name="remove_photo" id="f-remove-photo" value="0">
+                        </div>
                         <div class="rf-grid">
                             <div class="rf-field rf-full d-none" id="existingFields">
                                 <label class="form-label" for="f-existing"><?= t('Product') ?><span class="rf-req">*</span></label>
@@ -195,11 +210,10 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                                 <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
                                     <input type="number" step="any" min="0" class="form-control" name="selling_price" id="f-price" inputmode="decimal"></div>
                             </div>
-                            <div class="rf-field dish-only">
-                                <label class="form-label" for="f-plate"><?= t('What does one plate cost you?') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></label>
-                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
-                                    <input type="number" step="any" min="0" class="form-control" name="plate_cost" id="f-plate" inputmode="decimal"></div>
-                                <div class="rf-help"><?= t('A rough figure, to show the profit on each plate. For an exact cost add a recipe.') ?></div>
+                            <?php /* 2026-11-03: no "cost of one plate" guess for a dish — its cost comes from its
+                                     recipe (ingredients at the price paid in Purchases). */ ?>
+                            <div class="rf-field rf-full dish-only">
+                                <div class="rf-help mt-0"><i class="ri ri-scroll-text me-1"></i><?= t('A dish\'s cost comes from its recipe: the ingredients at the price you paid in Purchases. Add the recipe after saving (Actions → Recipe).') ?></div>
                             </div>
                             <div class="rf-field bought-only new-only">
                                 <label class="form-label" for="f-stock"><?= t('Opening stock') ?></label>
@@ -298,6 +312,16 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 .rm-badge { background:#cfe2ff; color:#084298; font-weight:500; }
 .rm-badge-out { background:#dc3545; color:#fff; }
 #prepGroup .btn { font-size:.85rem; padding-left:4px; padding-right:4px; flex:1 1 0; min-width:0; }
+/* Photos (2026-11-03) */
+.rm-photo { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.rm-photo-box { width:72px; height:72px; flex:0 0 72px; border-radius:12px; border:1px dashed #b6ccfe; background:#f5f9ff; color:#0d6efd; display:flex; align-items:center; justify-content:center; font-size:1.6rem; overflow:hidden; }
+.rm-photo-box img { width:100%; height:100%; object-fit:cover; }
+.rm-photo-btn { width:auto !important; min-width:0 !important; font-size:.85rem !important; }
+.rm-thumb { width:40px; height:40px; flex:0 0 40px; border-radius:10px; object-fit:cover; background:#e7f0ff; color:#0d6efd; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; }
+.rm-card .rm-thumb { width:52px; height:52px; flex-basis:52px; font-size:1.2rem; }
+#menuTable td:first-child, #menuTable th:first-child { text-align:center !important; color:#6c757d; }
+.rm-loss { color:#b45309; }   /* selling below cost: amber, never red */
+.rcp-no { width:24px; flex:0 0 24px; text-align:center; color:#6c757d; font-size:.85rem; }
 </style>
 
 <script>
@@ -341,7 +365,17 @@ const RM = {
     ingUnit: <?= json_encode(t('Unit (kg, litre, pcs)')) ?>,
     ingCost: <?= json_encode(t('Buying price per unit')) ?>,
     noIngredients: <?= json_encode(t('No ingredients yet — this dish sells without stock.')) ?>,
+    addRecipe: <?= json_encode(t('Add recipe')) ?>,
+    addBuyingPrice: <?= json_encode(t('Add buying price')) ?>,
+    recipeCost: <?= json_encode(t('recipe')) ?>,
+    buying: <?= json_encode(t('buying')) ?>,
+    choosePhoto: <?= json_encode(t('Choose photo')) ?>,
+    changePhoto: <?= json_encode(t('Change photo')) ?>,
+    photoTooBig: <?= json_encode(t('The photo is too large. The maximum is 2 MB.')) ?>,
+    photoType: <?= json_encode(t('Choose a photo (JPG, PNG or WebP).')) ?>,
 };
+// Names follow the company's text style (Company Profile → text case), like everywhere else.
+const nm = s => safeOutput(caseFormatJs(String(s || '')));
 let MENU = [];
 let ACTIVE_CAT = 'all';
 let menuTable = null;
@@ -355,9 +389,16 @@ $(function () {
     menuTable = $('#menuTable').DataTable({
         responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtipB',
         buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
-        columnDefs: [{ targets: [8, 9], orderable: false }],
+        columnDefs: [{ targets: [0, 9, 10], orderable: false }],
         language: { emptyTable: RM.empty, zeroRecords: RM.noMatch }
     });
+    // S/No. follows the rows as shown (after sorting / paging), always 1, 2, 3…
+    menuTable.on('draw.dt', function () {
+        const info = menuTable.page.info();
+        menuTable.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((cell, i) => { cell.innerHTML = info.start + i + 1; });
+    });
+    $('#f-photo').on('change', photoPicked);
+    $('#photoRemove').on('click', function () { $('#f-photo').val(''); $('#f-remove-photo').val('1'); showPhoto(''); });
     $('#rmSearch').on('input', render);
     loadMenu();
 
@@ -407,7 +448,7 @@ function buildChips() {
     if (ACTIVE_CAT !== 'all' && !cats[ACTIVE_CAT]) ACTIVE_CAT = 'all';
     let html = `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === 'all' ? 'btn-primary' : 'btn-outline-primary'}" data-cat="all">${RM.all}</button>`;
     Object.keys(cats).forEach(k => {
-        html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === k ? 'btn-primary' : 'btn-outline-primary'}" data-cat="${k}">${safeOutput(cats[k])}</button>`;
+        html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === k ? 'btn-primary' : 'btn-outline-primary'}" data-cat="${k}">${nm(cats[k])}</button>`;
     });
     $('#rmChips').html(html).find('.rm-chip').on('click', function () { ACTIVE_CAT = String($(this).data('cat')); buildChips(); render(); });
     $('#stGroups').text(Object.keys(cats).length);
@@ -434,29 +475,38 @@ function actionMenu(it) {
         </ul></div>`;
 }
 function typeLabel(it) { return it.is_service ? RM.dish : RM.stockItem; }
-// What one item costs: a recipe (exact), a bought item's cost, or the owner's plate estimate. null = nothing known yet.
+// What one item costs you (2026-11-03): a bought item → its buying price; a dish → its recipe
+// (ingredients at the price paid in Purchases). No guessed "cost of one plate". null = not known yet.
 function itemCost(it) {
-    if (it.has_recipe) return { v: it.recipe_cost, est: false };
-    if (!it.is_service && it.cost_price > 0) return { v: it.cost_price, est: false };
-    if (it.is_service && it.plate_cost > 0) return { v: it.plate_cost, est: true };
+    if (it.has_recipe) return { v: it.recipe_cost, kind: 'recipe' };
+    if (!it.is_service && it.cost_price > 0) return { v: it.cost_price, kind: 'buying' };
     return null;
 }
 function costCell(it) {
     const c = itemCost(it);
-    if (!c) return `<span data-order="-1"><a href="#" class="text-danger fw-semibold small" onclick="${it.is_service ? `openRecipe(${it.product_id})` : `editItem(${it.product_id})`};return false;">${RM.noCostYet}</a></span>`;
-    return `<span data-order="${c.v}">${c.est ? '~' : ''}${fmt(c.v)}</span>`;
+    if (!c) return `<span data-order="-1"><a href="#" class="text-primary fw-semibold small text-decoration-none" onclick="${it.is_service ? `openRecipe(${it.product_id})` : `editItem(${it.product_id})`};return false;"><i class="bi bi-plus-circle me-1"></i>${it.is_service ? RM.addRecipe : RM.addBuyingPrice}</a></span>`;
+    return `<span data-order="${c.v}">${fmt(c.v)}${c.kind === 'recipe' ? ` <small class="text-muted">· ${RM.recipeCost}</small>` : ''}</span>`;
 }
 function profitCell(it) {
     const c = itemCost(it);
     if (!c) return '<span data-order="-999999999" class="text-muted">—</span>';
     const p = it.selling_price - c.v, pc = it.selling_price > 0 ? Math.round(p / it.selling_price * 100) : 0;
-    return `<span data-order="${p}" class="${p < 0 ? 'text-danger' : 'text-primary'} fw-semibold">${c.est ? '~' : ''}${fmt(p)} <small class="fw-normal">(${pc}%)</small></span>`;
+    return `<span data-order="${p}" class="${p < 0 ? 'rm-loss' : 'text-primary'} fw-semibold">${fmt(p)} <small class="fw-normal">(${pc}%)</small></span>`;
 }
 // Phone card: the same figures in one line.
 function costLine(it) {
     const c = itemCost(it);
     if (!c) return `<div class="small">${costCell(it)}</div>`;
-    return `<div class="small text-muted">${RM.cost} ${c.est ? '~' : ''}${fmt(c.v)} · ${RM.profit} ${profitCell(it)}</div>`;
+    return `<div class="small text-muted">${c.kind === 'recipe' ? RM.recipeCost : RM.buying} ${fmt(c.v)} · ${RM.profit} ${profitCell(it)}</div>`;
+}
+// The item's photo, or its first letter when it has none.
+function thumb(it) {
+    const letter = safeOutput(caseFormatJs(String(it.product_name || '')).charAt(0).toUpperCase());
+    if (it.image) return `<img class="rm-thumb" src="${safeOutput(it.image)}" alt="" loading="lazy" data-l="${letter}" onerror="rmThumbFallback(this)">`;
+    return `<span class="rm-thumb">${letter}</span>`;
+}
+function rmThumbFallback(img) {
+    const s = document.createElement('span'); s.className = 'rm-thumb'; s.textContent = img.dataset.l || ''; img.replaceWith(s);
 }
 function prepLabel(it) { return it.station_name || RM.noPrep; }
 function stockLabel(it) { return it.is_service ? `<span class="text-muted">${RM.madeToOrder}</span>` : fmt(it.stock); }
@@ -469,8 +519,9 @@ function render() {
 
     menuTable.clear();
     rows.forEach(it => menuTable.row.add([
-        `<span class="fw-semibold">${safeOutput(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}`,
-        safeOutput(it.category_name || RM.noGroup),
+        '',   // S/No. — numbered on draw
+        `<div class="d-flex align-items-center gap-2">${thumb(it)}<div class="min-w-0"><span class="fw-semibold">${nm(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}</div></div>`,
+        it.category_name ? nm(it.category_name) : RM.noGroup,
         `<span class="badge rm-badge">${typeLabel(it)}</span>`,
         safeOutput(prepLabel(it)),
         `<span data-order="${it.selling_price}">${fmt(it.selling_price)}</span>`,
@@ -492,9 +543,10 @@ function render() {
             <div class="card border-0 shadow-sm rm-card ${it.is_available ? '' : 'rm-off'}">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div class="min-w-0">
-                            <div class="rm-name">${safeOutput(it.product_name)}</div>
-                            <div class="small text-muted">${safeOutput(it.category_name || RM.noGroup)} · ${safeOutput(prepLabel(it))}</div>
+                        ${thumb(it)}
+                        <div class="min-w-0 flex-grow-1">
+                            <div class="rm-name">${nm(it.product_name)}</div>
+                            <div class="small text-muted">${it.category_name ? nm(it.category_name) : RM.noGroup} · ${safeOutput(prepLabel(it))}</div>
                             ${costLine(it)}
                         </div>
                         <div class="rm-price">${fmt(it.selling_price)}</div>
@@ -520,7 +572,7 @@ function openRecipe(id) {
     $.getJSON('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'get', product_id: id, warehouse_id: whId() }, function (res) {
         if (!res.success) { Swal.fire({ icon: 'error', title: RM.error, text: res.message }); return; }
         RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, lines: res.components.map(c => ({ product_id: c.product_id, name: c.product_name, unit: c.unit, qty: c.qty, cost: c.cost_price, stock: c.stock })) };
-        $('#rcpDish').text(res.dish.product_name);
+        $('#rcpDish').text(caseFormatJs(res.dish.product_name));
         rcpRender();
         const m = $('#recipeModal');
         if (!$('#rcpPick').hasClass('select2-hidden-accessible')) {
@@ -542,10 +594,11 @@ function rcpRender() {
     else {
         $('#rcpLines').html(RCP.lines.map((l, i) => `
             <div class="d-flex align-items-center gap-2 py-2 border-bottom">
-                <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${safeOutput(l.name)}</div>
+                <span class="rcp-no">${i + 1}</span>
+                <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${nm(l.name)}</div>
                     <div class="small text-muted">${l.cost !== null ? fmt(l.cost) + ' / ' + safeOutput(l.unit) : ''}${l.stock !== null ? ' · ' + fmt(l.stock) + ' ' + RM.inStock : ''}</div></div>
                 <div class="input-group input-group-sm flex-shrink-0" style="width:132px;">
-                    <input type="number" class="form-control text-end" min="0.01" step="0.01" value="${l.qty}" inputmode="decimal" onchange="RCP.lines[${i}].qty = parseFloat(this.value) || 0; rcpTotals();">
+                    <input type="number" class="form-control text-end" min="0.001" step="any" value="${l.qty}" inputmode="decimal" onchange="RCP.lines[${i}].qty = Math.round((parseFloat(this.value) || 0) * 1000) / 1000; this.value = RCP.lines[${i}].qty; rcpTotals();">
                     <span class="input-group-text">${safeOutput(l.unit)}</span>
                 </div>
                 <button type="button" class="btn btn-sm btn-link text-danger p-0 flex-shrink-0" onclick="RCP.lines.splice(${i}, 1); rcpRender();"><i class="bi bi-x-circle fs-5"></i></button>
@@ -619,6 +672,24 @@ function resetForm() {
     $('#f-cat').val('').trigger('change'); $('#f-newcat').addClass('d-none');
     if ($('#f-existing').hasClass('select2-hidden-accessible')) $('#f-existing').val(null).trigger('change');
     $('#f-avail').prop('checked', true);
+    $('#f-photo').val(''); $('#f-remove-photo').val('0'); showPhoto('');
+}
+
+// ── Photo (2026-11-03) ──
+function showPhoto(src) {
+    $('#photoBox').html(src ? `<img src="${safeOutput(src)}" alt="">` : '<i class="bi bi-camera"></i>');
+    $('#photoRemove').toggleClass('d-none', !src);
+    $('#photoPickLabel').text(src ? RM.changePhoto : RM.choosePhoto);
+}
+function photoPicked() {
+    const f = this.files && this.files[0];
+    if (!f) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { this.value = ''; Swal.fire({ icon: 'warning', title: RM.photoType }); return; }
+    if (f.size > 2 * 1024 * 1024) { this.value = ''; Swal.fire({ icon: 'warning', title: RM.photoTooBig }); return; }
+    $('#f-remove-photo').val('0');
+    const r = new FileReader();
+    r.onload = e => showPhoto(e.target.result);
+    r.readAsDataURL(f);
 }
 
 function openAddItem() {
@@ -640,8 +711,8 @@ function editItem(id) {
     $('#f-name').val(it.product_name);
     $('#f-price').val(it.selling_price);
     $('#f-cost').val(it.cost_price);
-    $('#f-plate').val(it.plate_cost > 0 ? it.plate_cost : '');
-    $('.dish-only').toggleClass('d-none', !it.is_service || !!it.has_recipe);   // a recipe gives the exact cost
+    $('.dish-only').toggleClass('d-none', !it.is_service || !!it.has_recipe);   // the recipe hint, until it has one
+    showPhoto(it.image || '');
     $('#f-cat').val(it.category_id ? String(it.category_id) : '').trigger('change');
     $('#prepGroup .rm-extra').remove();
     $('input[name="prep_area"]').prop('checked', false);

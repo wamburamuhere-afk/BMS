@@ -108,6 +108,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
             <table class="table table-hover align-middle mb-0" id="tablesTable">
                 <thead class="table-dark">
                     <tr>
+                        <th style="width:56px;"><?= t('S/No.') ?></th>
                         <th><?= t('Table #') ?></th>
                         <th><?= t('Floor') ?></th>
                         <th><?= t('Seats') ?></th>
@@ -116,7 +117,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     </tr>
                 </thead>
                 <tbody id="tablesTbody">
-                    <tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -187,7 +188,7 @@ function loadTables() {
     const wid = currentWarehouseId();
     if (!wid) return;
     if ($.fn.DataTable.isDataTable('#tablesTable')) $('#tablesTable').DataTable().destroy();
-    $('#tablesTbody').html('<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>');
+    $('#tablesTbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>');
     $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid }, function (res) {
         TABLES_CACHE = res.success ? res.data : [];
         renderTables();
@@ -209,7 +210,7 @@ function renderTables() {
     }
 
     let tbody = '', cards = '';
-    rows.forEach(t => {
+    rows.forEach((t, idx) => {
         const color = STATUS_COLORS[t.status] || '#6c757d';
         const label = STATUS_LABELS[t.status] || t.status;
         const statusSelect = CAN_EDIT ? `
@@ -221,6 +222,7 @@ function renderTables() {
             </select>` : `<span class="badge" style="background:${color};color:#fff;">${safeOutput(label)}</span>`;
 
         tbody += `<tr>
+            <td class="text-muted">${idx + 1}</td>
             <td class="fw-bold">${safeOutput(t.table_number)}</td>
             <td>${safeOutput(t.floor_name === 'Main Area' ? STRINGS.mainArea : t.floor_name)}</td>
             <td>${t.seats}</td>
@@ -238,12 +240,17 @@ function renderTables() {
     });
     $('#tablesTbody').html(tbody);
     if (rows.length) $('#tablesCards').html(cards);
-    $('#tablesTable').DataTable({
+    const dt = $('#tablesTable').DataTable({
         responsive: false, autoWidth: false, pageLength: 25, order: [],
         dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
-        columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+        columnDefs: [{ orderable: false, searchable: false, targets: [0, -1] }],
         language: { emptyTable: STRINGS.noTables }
     });
+    // S/No. follows the rows as shown (after sorting / searching / paging).
+    dt.on('draw.dt', function () {
+        const s = dt.page.info().start;
+        dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((c, i) => { c.innerHTML = s + i + 1; });
+    }).draw(false);
 }
 
 function openTableModal() {

@@ -92,7 +92,7 @@ try {
         $clean = [];
         foreach ($list as $c) {
             $cid = (int)($c['product_id'] ?? 0);
-            $qty = round((float)($c['qty'] ?? 0), 2);
+            $qty = round((float)($c['qty'] ?? 0), 3);   // 3 places: 5 g of salt in a kg recipe = 0.005 (was cut to 0.01)
             if ($cid <= 0 || $qty <= 0 || $cid === $pid) continue;
             $clean[$cid] = ($clean[$cid] ?? 0) + $qty;     // the same ingredient twice → one line
         }

@@ -6667,4 +6667,16 @@ return [
     "The quantity for '%s' must be more than 0." => "Idadi ya '%s' lazima iwe zaidi ya 0.",
     "'%s' is sold in whole numbers. Enter a quantity without decimals." => "'%s' huuzwa kwa idadi kamili. Weka idadi bila desimali.",
     '%s is sold in whole numbers. Enter a quantity without decimals.' => '%s huuzwa kwa idadi kamili. Weka idadi bila desimali.',
+    // Restaurant Menu: photos, buying price, recipe cost (2026-11-03)
+    'Photo' => 'Picha',
+    'Choose photo' => 'Chagua picha',
+    'Change photo' => 'Badilisha picha',
+    'JPG, PNG or WebP, up to 2 MB. Take it with the phone camera or pick one.' => 'JPG, PNG au WebP, hadi MB 2. Piga kwa kamera ya simu au chagua iliyopo.',
+    "A dish's cost comes from its recipe: the ingredients at the price you paid in Purchases. Add the recipe after saving (Actions → Recipe)." => 'Gharama ya chakula inatoka kwenye mapishi yake: viungo kwa bei uliyonunulia kwenye Manunuzi. Weka mapishi baada ya kuhifadhi (Vitendo → Mapishi).',
+    'Add recipe' => 'Weka mapishi',
+    'Add buying price' => 'Weka bei ya kununua',
+    'recipe' => 'mapishi',
+    'buying' => 'kununua',
+    'Choose a photo (JPG, PNG or WebP).' => 'Chagua picha (JPG, PNG au WebP).',
+    'The photo could not be uploaded. Please try again.' => 'Picha haikupakiwa. Tafadhali jaribu tena.',
 ];
