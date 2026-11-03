@@ -2,7 +2,9 @@
 /**
  * API: live Tables board for one restaurant shop (restaurant_plan.md Phase 2b).
  * GET: warehouse_id → tables with area, status and the table's open order
- *      (the one 'held' pos_held_sales row — hold_sale.php keeps one per table).
+ *      (the one 'held' pos_held_sales row — hold_sale.php keeps one per table),
+ *      whether that order was opened today, and today's next booking from Reservations
+ *      (reservation: { time 'HH:MM', party, name } or null — read-only, 2026-11-02).
  * Gate: Restaurant POS + Smart POS on, shop is Restaurant/Hybrid, warehouse scope.
  */
 header('Content-Type: application/json');
@@ -33,7 +35,13 @@ try {
         SELECT t.table_id, t.table_number, t.seats, t.status, f.name AS area,
                h.hold_id, h.total_amount, h.items_data, h.held_at,
                TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS served_by,
-               TIMESTAMPDIFF(MINUTE, h.held_at, NOW()) AS minutes_open
+               TIMESTAMPDIFF(MINUTE, h.held_at, NOW()) AS minutes_open,
+               (DATE(h.held_at) = CURDATE()) AS opened_today,
+               (SELECT CONCAT(DATE_FORMAT(r.reservation_time, '%H:%i'), '|', r.party_size, '|', COALESCE(r.customer_name, ''))
+                  FROM restaurant_reservations r
+                 WHERE r.table_id = t.table_id AND r.warehouse_id = t.warehouse_id AND r.status = 'booked'
+                   AND DATE(r.reservation_time) = CURDATE() AND r.reservation_time >= NOW() - INTERVAL 30 MINUTE
+              ORDER BY r.reservation_time LIMIT 1) AS next_res
           FROM restaurant_tables t
      LEFT JOIN restaurant_floors f ON f.floor_id = t.floor_id
      LEFT JOIN pos_held_sales h ON h.hold_id = (
@@ -48,6 +56,11 @@ try {
         $items = $r['hold_id'] ? (json_decode((string)$r['items_data'], true) ?: []) : [];
         $count = 0;
         foreach ($items as $it) $count += (float)($it['quantity'] ?? 1);
+        $res = null;                                   // today's next booking for this table (from Reservations)
+        if (!empty($r['next_res'])) {
+            [$rt, $rp, $rn] = array_pad(explode('|', (string)$r['next_res'], 3), 3, '');
+            $res = ['time' => $rt, 'party' => (int)$rp, 'name' => $rn];
+        }
         $rows[] = [
             'table_id'     => (int)$r['table_id'],
             'table_number' => $r['table_number'],
@@ -59,6 +72,8 @@ try {
             'item_count'   => $count,
             'minutes_open' => $r['hold_id'] ? (int)$r['minutes_open'] : null,
             'served_by'    => $r['hold_id'] ? $r['served_by'] : null,
+            'opened_today' => $r['hold_id'] ? (bool)$r['opened_today'] : null,
+            'reservation'  => $res,
         ];
     }
     echo json_encode(['success' => true, 'data' => $rows]);
