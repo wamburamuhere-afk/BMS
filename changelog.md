@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-11-03 — ui(restaurant): Menu photos, Buying price column, recipe cost only, S/No. on every restaurant table, 3-decimal recipe amounts
+
+**Branch:** `feat/restaurant-menu-photos` (off `develop`).
+**New:** `core/restaurant_menu_photo.php`, `migrations/tenant/2026_11_03_recipe_qty_three_decimals.php` + `_legacy_db` mirror, `tests/test_restaurant_menu_photos_cli.php`.
+**Changed:** `app/bms/restaurant/menu.php`, `api/restaurant/save_menu_item.php`, `api/restaurant/get_menu_items.php`, `api/restaurant/recipe.php`, `app/bms/restaurant/tables.php`, `reservations.php`, `modifier_group.php`, `purchases.php`, `sales_report.php`, `lang/sw.php`, `schema/tenant_schema_template.sql` + `tenant_seed_defaults.sql` (rebuilt), tests `test_restaurant_focus_cli`, `test_restaurant_form_layout_cli`.
+
+- **Photo:** the Menu form has a photo box (take it with the phone camera or pick one, preview, change, remove). JPG/PNG/WebP up to 2 MB, within the storage limit, saved in this company's own uploads folder with a server-made name. The menu list and phone cards show the photo (or the first letter); the POS tiles and the online menu already use the same photo. A replaced photo's old file is deleted after the save; a failed save leaves no file.
+- **Names** on the Menu (items, groups, recipe ingredients) follow the Company Profile text style (`caseFormatJs`).
+- **Cost column → "Buying price":** a bought item shows what you pay for one; a dish shows its **recipe cost** (ingredients at the price paid in Purchases) or an "Add recipe" link. The "What does one plate cost you?" guess is gone from the form and the list (owner: ingredients are already paid for in Purchases). Stored guesses are not wiped — an edit that doesn't send one keeps it. Selling below cost shows amber, not red.
+- **S/No.** first on Menu, Tables, Reservations, Modifier groups (list + options + products; "#" renamed), Purchases "We owe suppliers", both Restaurant Sales report tables, and numbered recipe lines. The number follows the rows as shown (after sorting/paging).
+- **Recipe amounts keep 3 decimals** (code + `product_assembly_components.qty_per_unit/total_qty` → DECIMAL(15,3)): 5 g of salt in a kg recipe (0.005) was saved as 0.01 (double) and 3 g as 0.
+- **`save_menu_item.php`:** the edit / existing-product branches no longer `exit` mid-file (if / elseif / else), same responses.
+- **Tests:** new `test_restaurant_menu_photos_cli` 29 (real API: photo saved/replaced/removed, fake and >2 MB refused, failed save leaves no file, stored guess kept, recipe 0.005 kept + cost 10, S/No. on every page). Restaurant suites: dashboard 67, form layout 85, online menu 113, pay-later 53, phases 1–7, simplicity 70, pos-mode setup 36 pass; focus 434 + 1, phase0 43 + 1 and restaurant_pos 152 + 1 fail identically on plain develop. Checked in Chrome: a real photo upload from the form, Title Case name, S/No. 1/2, "Add buying price" / "Add recipe", edit shows the photo, every changed page shows S/No., no console errors.
+
 ## 2026-11-03 — feat(restaurant): online menu — bag icon, "My orders", clear "ordering is off" notices
 
 **Branch:** `feat/online-menu-cart` (off `develop`). Owner asked after testing the live link: a cart icon always visible, and a way back to the order page after leaving it.
