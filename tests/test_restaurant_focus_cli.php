@@ -890,7 +890,9 @@ ok(strpos($top, 'rdBell') === false, 'the bell left the top blue bar');
 $bd10 = strpos($pg10, 'id="rdBell"'); $hd10 = strpos($pg10, 'bms-help-btn d-inline-flex align-items-center', $bd10);
 ok($bd10 !== false && $hd10 !== false && strpos($pg10, 'navbar-dark bottom-header') < $bd10, 'computer: the bell is in the lower bar, before Help');
 $bm10 = strpos($pg10, 'id="rdBellM"');
-ok($bm10 !== false && strpos(substr($pg10, $bm10, 900), 'bms-help-btn-round') !== false, 'phone: the bell comes just before Help');
+// The bell is now a dropdown (its list sits inside it), so measure from the end of the bell's list.
+$be10 = $bm10 === false ? false : strpos($pg10, '</div></div>', $bm10);
+ok($bm10 !== false && $be10 !== false && strpos(substr($pg10, $be10, 900), 'bms-help-btn-round') !== false, 'phone: the bell comes just before Help');
 // nothing leaks to others
 foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'full BMS' => [$onlyRest, '0']] as $nm => [$m10, $s10]) {
     $h = body(runWorker(['page' => 'app/dashboard.php', 'get' => ['rd_period' => 'year']], $ON, $m10, $s10));

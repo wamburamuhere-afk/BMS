@@ -524,6 +524,11 @@ if (!function_exists('roPlaceOrder')) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
+        // Restaurant notifications: tell staff (bell + email per Settings → Notification rules).
+        try {
+            require_once __DIR__ . '/restaurant_notify.php';
+            rnNotifyOnlineOrder($pdo, $id);
+        } catch (Throwable $e) { error_log('roPlaceOrder notify: ' . $e->getMessage()); }
         return ['public_ref' => $ref, 'order_code' => $code];
     }
 }

@@ -31,6 +31,20 @@ if (!canView('restaurant_pos')) {
 }
 $module_on  = restaurantModuleOn($pdo);
 $warehouses = $module_on ? restaurantWarehousesForSelect($pdo) : [];
+// Opened from a notification: ?shop=W (low stock in that shop) or ?bill=N (pay that supplier bill) — the bill's shop.
+// Only a shop in the user's own list is ever chosen; otherwise the page opens as usual.
+$focusBill = (int)($_GET['bill'] ?? 0);
+$focusShop = (int)($_GET['shop'] ?? 0);
+if ($focusBill > 0) {
+    $fb = $pdo->prepare("SELECT warehouse_id FROM supplier_invoices WHERE id = ? AND status != 'deleted'");
+    $fb->execute([$focusBill]);
+    $focusShop = (int)$fb->fetchColumn();
+}
+if ($warehouses) {
+    $okShops = array_map(fn($w) => (int)$w['warehouse_id'], $warehouses);
+    if (!in_array($focusShop, $okShops, true)) { $focusShop = 0; $focusBill = 0; }
+    if ($focusShop) usort($warehouses, fn($a, $b) => ((int)$b['warehouse_id'] === $focusShop) <=> ((int)$a['warehouse_id'] === $focusShop));   // that shop first = chosen
+}
 $can_buy    = hasPermission('adjust_stock') || hasPermission('pos_restock') || isAdmin();
 $can_edit   = canEdit('restaurant_pos');
 // Suppliers: needed to buy on credit, so anyone who may buy here can pick (or add, with just a name and phone) one.
@@ -868,6 +882,17 @@ $(function () {
     });
     loadPurchases();
     loadDebts();
+    // ?bill=N from a "Supplier payment due" notification: open Pay for that bill once the list is in.
+    const RP_FOCUS_BILL = <?= (int)$focusBill ?>;
+    if (RP_FOCUS_BILL) {
+        let tries = 0;
+        const t = setInterval(function () {
+            const b = $('#rpOweTable .rp-pay-btn[data-id="' + RP_FOCUS_BILL + '"]');
+            if (b.length) { clearInterval(t); b.closest('tr').addClass('table-primary'); b[0].scrollIntoView({ block: 'center' }); b.trigger('click'); }
+            else if (++tries > 40) clearInterval(t);
+        }, 250);
+    }
+    if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['bill', 'shop']);
     rpPayUi();
     if (location.hash === '#rpOwe') setTimeout(() => document.getElementById('rpOwe').scrollIntoView({ behavior: 'smooth' }), 400);
 });

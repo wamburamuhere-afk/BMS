@@ -311,6 +311,7 @@ if (!empty($user_data['notification_preferences'])) {
 <script src="/assets/js/chart.js"></script>
 
 <script>
+const NC_OPEN = <?= json_encode(getUrl('notification_open')) ?>;   // open one notification's record
 let notificationChart = null;
 
 $(document).ready(function() {
@@ -348,9 +349,11 @@ $(document).ready(function() {
                     if (row.related_loan_id) {
                         related = `<br><small class="text-primary"><i class="bi bi-link-45deg"></i> Loan #${row.related_loan_id} ${row.customer_name ? ' - ' + row.customer_name : ''}</small>`;
                     }
+                    // The title opens the record it is about (and marks it read) — notification_open checks the link.
+                    const open = NC_OPEN + '?id=' + encodeURIComponent(row.notification_id);
                     return `<div class="${row.is_read == 0 ? 'fw-bold' : 'text-muted'}">
-                                ${escapeHtml(data)}
-                                <div class="small text-muted text-truncate" style="max-width: 400px;">${row.message}</div>
+                                <a href="${open}" class="text-reset text-decoration-none">${escapeHtml(data)}</a>
+                                <div class="small text-muted text-truncate" style="max-width: 400px;">${escapeHtml(row.message || '')}</div>
                                 ${related}
                             </div>`;
                 }
@@ -387,7 +390,7 @@ $(document).ready(function() {
                         : '';
                     
                     let linkBtn = row.action_url 
-                        ? `<li><a class="dropdown-item" href="${row.action_url}"><i class="bi bi-box-arrow-up-right me-2"></i> View Details</a></li>`
+                        ? `<li><a class="dropdown-item" href="${NC_OPEN}?id=${encodeURIComponent(row.notification_id)}"><i class="bi bi-box-arrow-up-right me-2"></i> View Details</a></li>`
                         : '';
 
                     return `
