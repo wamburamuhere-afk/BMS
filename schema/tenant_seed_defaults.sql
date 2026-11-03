@@ -3698,6 +3698,9 @@ INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (9
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (98,'2026_11_02_restaurant_held_sales_shift_nullable.php','2026-11-02 00:24:04');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (99,'2026_11_03_products_stock_three_decimals.php','2026-11-03 03:38:54');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (100,'2026_11_03_restaurant_online_menu.php','2026-11-03 04:40:57');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (101,'2026_11_03_recipe_qty_three_decimals.php','2026-11-03 05:58:57');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (102,'2026_11_03_products_recipe_yield.php','2026-11-03 06:32:32');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (103,'2026_11_03_restaurant_notifications.php','2026-11-03 08:15:49');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 

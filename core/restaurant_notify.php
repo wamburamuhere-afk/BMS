@@ -387,7 +387,7 @@ if (!function_exists('rnRunDailyChecks')) {
                 $sum['dishes_no_cost'] += $count(rnDispatch($pdo, 'restaurant.dishes_no_cost', [
                     'entity_type' => 'menu', 'entity_id' => 0,
                     'title'       => count($rows) . ' dish(es) have no cost',
-                    'message'     => "Sold this month with no cost, so profit may look too high: $names. Add a plate cost or a recipe on the Menu.",
+                    'message'     => "Sold this month with no cost, so profit may look too high: $names. Add a recipe on the Menu.",
                     'action_url'  => 'menu?nocost=1',
                     'severity'    => 'low',
                     'dedupe_suffix' => date('o-\WW', strtotime($today)),

@@ -87,10 +87,11 @@ $cur = getSetting('currency', 'TZS');
         <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><?= t('By order type') ?></h6></div>
         <div class="card-body">
             <table id="rrTypeTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark"><tr><th><?= t('Order type') ?></th><th class="text-end"><?= t('Orders') ?></th><th class="text-end"><?= t('Sales') ?></th><th class="text-end"><?= t('Share') ?></th></tr></thead>
+                <thead class="table-dark"><tr><th style="width:56px;"><?= t('S/No.') ?></th><th><?= t('Order type') ?></th><th class="text-end"><?= t('Orders') ?></th><th class="text-end"><?= t('Sales') ?></th><th class="text-end"><?= t('Share') ?></th></tr></thead>
                 <tbody>
-                <?php foreach ($byType as $r): ?>
+                <?php foreach (array_values($byType) as $rn => $r): ?>
                     <tr>
+                        <td class="text-muted"><?= $rn + 1 ?></td>
                         <td class="fw-semibold"><?= safe_output($typeLabels[$r['sale_type']] ?? $r['sale_type']) ?></td>
                         <td class="text-end"><?= (int)$r['orders'] ?></td>
                         <td class="text-end" data-order="<?= $r['sales'] ?>"><?= number_format($r['sales'], 0) ?></td>
@@ -107,10 +108,11 @@ $cur = getSetting('currency', 'TZS');
         <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><?= t('Dishes and drinks sold') ?></h6></div>
         <div class="card-body">
             <table id="rrItemsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark"><tr><th><?= t('Item') ?></th><th><?= t('Group') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Selling price') ?></th><th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Profit on each') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
+                <thead class="table-dark"><tr><th style="width:56px;"><?= t('S/No.') ?></th><th><?= t('Item') ?></th><th><?= t('Group') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Selling price') ?></th><th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Profit on each') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
                 <tbody>
-                <?php foreach ($items as $it): ?>
+                <?php foreach (array_values($items) as $rn => $it): ?>
                     <tr>
+                        <td class="text-muted"><?= $rn + 1 ?></td>
                         <td class="fw-semibold"><?= safe_output($it['product_name']) ?></td>
                         <td><?= safe_output($it['group_name'] ?: t('Other')) ?></td>
                         <td><?= (int)$it['is_service'] ? t('Dish') : t('Stock item') ?></td>
@@ -136,8 +138,14 @@ $(function () {
     const lang = { emptyTable: <?= json_encode(t('No records found.')) ?>, zeroRecords: <?= json_encode(t('No matching records.')) ?> };
     ['#rrTypeTable', '#rrItemsTable'].forEach(function (id) {
         if ($(id).length && !$.fn.DataTable.isDataTable(id)) {
-            $(id).DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtipB', language: lang,
+            const dt = $(id).DataTable({ responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtipB', language: lang,
+                columnDefs: [{ targets: 0, orderable: false, searchable: false }],
                 buttons: [{ extend: 'excelHtml5', className: 'd-none' }] });
+            // S/No. follows the rows as shown (after sorting / paging).
+            dt.on('draw.dt', function () {
+                const s = dt.page.info().start;
+                dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((c, i) => { c.innerHTML = s + i + 1; });
+            });
         }
     });
 });

@@ -64,6 +64,8 @@ try {
         $r['has_recipe']    = (int)$r['is_service'] === 1 && (int)$r['is_combo'] === 1;
         $r['recipe_cost']   = round((float)$r['recipe_cost'], 2);
         $r['stock']         = (float)$r['stock'];
+        // The photo's web address (the same one the POS tiles and the online menu use), '' when none.
+        $r['image'] = !empty($r['image_url']) ? getUrl((string)$r['image_url']) : '';
         $r['kitchen_station_id'] = $r['kitchen_station_id'] !== null ? (int)$r['kitchen_station_id'] : null;
         // Auto-created areas are stored in English: give the form a stable key and show them translated.
         $r['station_key'] = $r['station_name'] === 'Kitchen' ? 'kitchen' : ($r['station_name'] === 'Bar' ? 'bar' : null);

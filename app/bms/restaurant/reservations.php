@@ -87,6 +87,7 @@ if ($focusRes > 0 && $warehouses) {
         <table id="resTable" class="table table-hover align-middle w-100">
             <thead class="table-light">
                 <tr>
+                    <th style="width:56px;"><?= t('S/No.') ?></th>
                     <th><?= t('Time') ?></th>
                     <th><?= t('Customer') ?></th>
                     <th><?= t('Table') ?></th>
@@ -216,7 +217,7 @@ function loadReservations() {
         const rows = res.success ? res.data : [];
         if ($.fn.DataTable.isDataTable('#resTable')) $('#resTable').DataTable().destroy();
         let html = '';
-        rows.forEach(r => {
+        rows.forEach((r, idx) => {
             const time = new Date(r.reservation_time.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const color = STATUS_COLORS[r.status] || '#6c757d';
             const label = STATUS_LABELS[r.status] || r.status;
@@ -229,6 +230,7 @@ function loadReservations() {
                 actions += `<button class="btn btn-sm btn-outline-secondary" onclick="setResStatus(${r.id}, 'completed')" title="${STATUS_LABELS.completed}"><i class="bi bi-check2-circle"></i></button>`;
             }
             html += `<tr data-res-id="${+r.id}"${+r.id === RES_FOCUS.id ? ' class="table-primary"' : ''}>
+                <td class="text-muted">${idx + 1}</td>
                 <td data-order="${safeOutput(r.reservation_time)}">${time}</td>
                 <td>${safeOutput(r.customer_name)}${r.customer_phone ? '<div class="small text-muted">' + safeOutput(r.customer_phone) + '</div>' : ''}</td>
                 <td>${safeOutput(r.table_number)}</td>
@@ -238,12 +240,17 @@ function loadReservations() {
             </tr>`;
         });
         $('#resBody').html(html);
-        $('#resTable').DataTable({
-            responsive: false, autoWidth: false, pageLength: 25, order: [[0, 'asc']],
+        const dt = $('#resTable').DataTable({
+            responsive: false, autoWidth: false, pageLength: 25, order: [[1, 'asc']],
             dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
-            columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+            columnDefs: [{ orderable: false, searchable: false, targets: [0, -1] }],
             language: { emptyTable: STRINGS.noRecords }
         });
+        // S/No. follows the rows as shown (after sorting / searching / paging).
+        dt.on('draw.dt', function () {
+            const s = dt.page.info().start;
+            dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((c, i) => { c.innerHTML = s + i + 1; });
+        }).draw(false);
         if (RES_FOCUS.id && !RES_FOCUS.done) {   // from a notification: show the booking
             RES_FOCUS.done = true;
             const tr = document.querySelector('#resTable tr[data-res-id="' + RES_FOCUS.id + '"]');
