@@ -12,9 +12,12 @@
  *   • the purchase posts like Receive Stock does: a batch (first-expiry-first-out, optional expiry date) and
  *     Dr Inventory / Cr the account it was paid from — one ledger, no new accounting rules.
  *
- * Retail Receive Stock (api/pos/quick_restock.php) is untouched. Not built: "pay supplier later" — recording what
- * is owed to a supplier is Procurement's job (bills, GRN), which Smart POS does not use.
+ * Retail Receive Stock (api/pos/quick_restock.php) is untouched.
+ *
+ * Pay later (2026-11-02): a purchase is PAID by default. It can be PARTLY PAID or on CREDIT — then the unpaid part
+ * is owed to the supplier as a supplier bill (core/restaurant_supplier_credit.php), paid off later.
  */
+require_once __DIR__ . '/restaurant_supplier_credit.php';
 require_once __DIR__ . '/restaurant_scope.php';
 require_once __DIR__ . '/stock_intake.php';
 require_once __DIR__ . '/payment_source.php';
@@ -68,7 +71,8 @@ if (!function_exists('restaurantBuyStock')) {
     /**
      * Buy stock for a restaurant shop. Throws Exception with a user-facing message on any problem; changes nothing then.
      *
-     * @param array $in product_id, warehouse_id, quantity, unit_cost, [date], [supplier_id], [expiry_date], [paid_from_account_id]
+     * @param array $in product_id, warehouse_id, quantity, unit_cost, [date], [supplier_id], [expiry_date], [paid_from_account_id],
+     *                  [payment] 'paid' (default) | 'partial' | 'credit', [amount_paid] (partial), [due_date]
      * @return array{product_id:int,product_name:string,quantity:float,unit_cost:float,total:float,old_cost:float,new_cost:float,on_hand_before:float,on_hand_after:float,reference:string,transaction_id:?int,batch_id:?int,movement_id:?int}
      */
     function restaurantBuyStock(PDO $pdo, array $in, int $userId): array
@@ -113,7 +117,10 @@ if (!function_exists('restaurantBuyStock')) {
             if ($sellIn <= 0) throw new Exception(t('Selling price must be greater than zero.'));
             if (abs($sellIn - (float)$prod['selling_price']) > 0.004) $newSelling = $sellIn;
         }
-        if ($total > 0) {
+        // Paid (default), partly paid or on credit — what is not paid now is owed to the supplier.
+        $split = restaurantPaymentSplit($total, (string)($in['payment'] ?? 'paid'), $in['amount_paid'] ?? 0);
+        if ($split['owed'] > 0 && $supplierId <= 0) throw new Exception(t('Choose the supplier you owe.'));
+        if ($total > 0 && ($split['paid'] > 0 || $split['owed'] > 0)) {
             if ($paidFrom <= 0 && posSimpleModeEnabled()) $paidFrom = (int)(posReceiptAccountId($pdo, 'cash') ?? 0);
             if ($paidFrom <= 0) throw new Exception(t('Select where this was paid from.'));
             $valid = false;
@@ -123,10 +130,8 @@ if (!function_exists('restaurantBuyStock')) {
             if (!$inventoryAcc) throw new Exception(t('Inventory account is not configured — contact your administrator before restocking.'));
         }
         if ($supplierId > 0) {
-            if (!canView('suppliers')) throw new Exception(t('Permission denied'));
-            $sc = $pdo->prepare("SELECT supplier_id FROM suppliers WHERE supplier_id = ? AND status = 'active'");
-            $sc->execute([$supplierId]);
-            if (!$sc->fetchColumn()) throw new Exception(t('Selected supplier was not found.'));
+            if (!canView('suppliers') && !restaurantCanBuy()) throw new Exception(t('Permission denied'));
+            restaurantCheckSupplier($pdo, $supplierId);
         }
 
         $onHand  = restaurantStockOnHand($pdo, $productId);
@@ -161,7 +166,15 @@ if (!function_exists('restaurantBuyStock')) {
             if ($newSelling !== null) {
                 $pdo->prepare("UPDATE products SET selling_price = ? WHERE product_id = ?")->execute([$newSelling, $productId]);
             }
-            if ($total > 0) {
+            $bill = null;
+            if ($total > 0 && $split['owed'] > 0) {
+                // Partly paid / credit: a supplier bill for the whole purchase (Dr Inventory / Cr Payable) and the part paid now.
+                $bill = restaurantRecordSupplierBill($pdo, [
+                    'supplier_id' => $supplierId, 'warehouse_id' => $warehouseId, 'date' => $date, 'total' => $total,
+                    'paid' => $split['paid'], 'ref' => $ref, 'due_date' => $in['due_date'] ?? null, 'cash_account_id' => $paidFrom,
+                    'notes' => "{$prod['product_name']} x{$qty}",
+                ], $userId);
+            } elseif ($total > 0) {
                 $txn = postOutflow($pdo, 'stock_restock', $paidFrom, $inventoryAcc, $total, $date, $ref,
                     "Restaurant purchase: {$prod['product_name']} x{$qty} @ " . number_format($unitCost, 2));
                 if (!$txn) throw new Exception(t('Could not post the payment to the ledger — please check your Chart of Accounts setup.'));
@@ -175,6 +188,7 @@ if (!function_exists('restaurantBuyStock')) {
 
         return ['product_id' => $productId, 'product_name' => $prod['product_name'], 'quantity' => $qty, 'unit_cost' => $unitCost, 'total' => $total,
                 'old_cost' => round($oldCost, 2), 'new_cost' => $newCost, 'selling_price' => $newSelling ?? (float)$prod['selling_price'], 'on_hand_before' => $onHand, 'on_hand_after' => $onHand + $qty,
-                'reference' => $ref, 'transaction_id' => $txn ?: null, 'batch_id' => $intake['batch_id'] ?? null, 'movement_id' => $intake['movement_id'] ?? null];
+                'reference' => $ref, 'transaction_id' => $txn ?: null,
+                'payment' => $split['payment'], 'paid_now' => $split['paid'], 'owed' => $split['owed'], 'bill_id' => $bill['invoice_id'] ?? null, 'batch_id' => $intake['batch_id'] ?? null, 'movement_id' => $intake['movement_id'] ?? null];
     }
 }

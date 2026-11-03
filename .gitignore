@@ -107,3 +107,6 @@ includes/ai_app_secret.php
 # bms_control.tenants. Never commit; never regenerate (that would orphan every
 # stored tenant credential). Production may supply it as $TENANT_CRED_KEY instead.
 includes/tenant_cred_key.php
+
+# Throw-away login probes that tests write at the web root (test_dashboard_kpi_row_cli). Never commit one: it logs anyone in as admin.
+/_*_test_probe.php
