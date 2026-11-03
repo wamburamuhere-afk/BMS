@@ -6383,5 +6383,16 @@ return [
     'Invalid Paid-From account.' => 'Akaunti ya malipo si sahihi.',
     'Inventory account is not configured — contact your administrator before restocking.' => 'Akaunti ya bidhaa haijawekwa — wasiliana na msimamizi kabla ya kuongeza stoo.',
     'Selected supplier was not found.' => 'Msambazaji aliyechaguliwa hajapatikana.',
+    // Restaurant Tables — simpler, calmer screen (2026-11-02)
+    'free' => 'wazi',
+    'busy' => 'zenye oda',
+    'Busy' => 'Ina oda',
+    'open long' => 'zimekaa muda mrefu',
+    'h' => 'saa',
+    'Move / Join' => 'Hamisha / Unganisha',
+    'Since yesterday — still here?' => 'Tangu jana — bado wapo?',
+    'Open %s — still here?' => 'Iko wazi %s — bado wapo?',
+    'Reserved %s' => 'Imehifadhiwa %s',
+    'No table here right now.' => 'Hakuna meza hapa kwa sasa.',
     'Could not post the payment to the ledger — please check your Chart of Accounts setup.' => 'Imeshindikana kuweka malipo kwenye leja — tafadhali angalia mpangilio wa Chati ya Akaunti.',
 ];

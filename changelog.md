@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-11-02 — ui(restaurant): Tables screen — simpler and calmer; long-open bills flagged; today's booking on the table
+
+**Branch:** `feat/restaurant-tables-board-ui` (off `develop`).
+**Changed:** `app/bms/restaurant/tables_board.php`, `api/restaurant/get_tables_board.php` (read-only: `opened_today`, `reservation`), `lang/sw.php`, `tests/test_restaurant_phase2_cli.php`.
+**Not changed:** what tapping a table does (opens its order on the till), Move and Join (same APIs), Take away, table setup.
+
+- **One line instead of three boxes:** `○ 2 free  ● 3 busy  Open bills 43,500 TZS`, plus an amber "1 open long" only when there is one, and "Updated 10:42 ↻" (tap to refresh) instead of "Updates every 20 seconds."
+- **No red:** a free table is a calm white card; a table with an order is a blue card (amount, items, time open, who serves it); reserved / cleaning are grey.
+- **Readable time:** "25 min", "1 h 20 min", "2 days" — not "963 min".
+- **Open 3 h or more, or since yesterday:** the card turns amber and asks "Since yesterday — still here?" / "Open 4 h — still here?", so forgotten bills stand out.
+- **Waiter shown** on a busy table (the data was loaded but never shown).
+- **Today's booking** from Reservations on the table: "Reserved 19:30 · Neema (4)" (booked only, today, from 30 min ago on).
+- **Less noise:** "Tap to take an order" removed from every free card; "Manage tables" is a small ⚙ button; "Move" is now "Move / Join" (it always did both); the page's own compact buttons (the global `.btn` style made them 16px / 85px wide).
+- **All / Free / Busy** filter appears only when a shop has more than 12 tables.
+- **Tests:** `test_restaurant_phase2_cli` 39 (new: opened today, today's booking only, since yesterday, no red, no noise), `test_restaurant_phase4_cli` 22, `test_restaurant_simplicity_cli` 70, `test_restaurant_focus_cli` 394 — all pass. The local DB had `pos_simple_mode = 0` (set by another session); it was set to 1 only while the suites and the browser check ran, then put back to 0.
+
 ## 2026-10-25 — feat(trial): new companies start on a real free trial; superadmin "Set free trial" with start and end dates
 
 **Files:** `core/tenant_registration.php`, `core/tenant_lifecycle_policy.php`, `scripts/setup_control_db.php`, `actions/superadmin_tenant_access.php`, `app/superadmin/tenant_view.php`, `app/superadmin/tenant_new.php`, `api/my_subscription.php`, `tests/test_tenant_free_trial_cli.php` (new), `tests/test_tenant_registration_cli.php`, `tests/test_register_redesign_cli.php`

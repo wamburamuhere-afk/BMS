@@ -153,6 +153,28 @@ try {
     $byId = []; foreach ($b['data'] ?? [] as $r) $byId[$r['table_id']] = $r;
     ok(($byId[$T1]['status'] ?? '') === 'occupied' && abs(($byId[$T1]['total'] ?? 0) - (9000 + $DPRICE)) < 0.01 && (float)($byId[$T1]['item_count'] ?? 0) == 4.0, 'busy table shows its open order: amount and 4 items');
     ok(($byId[$T2]['status'] ?? '') === 'available' && $byId[$T2]['hold_id'] === null, 'other table is free');
+    // 2026-11-02 board: "open since yesterday" and today's next booking
+    ok(($byId[$T1]['opened_today'] ?? null) === true && array_key_exists('opened_today', $byId[$T2] ?? []) && $byId[$T2]['opened_today'] === null, 'busy table says its order was opened today (a free table has no such flag)');
+    ok(array_key_exists('reservation', $byId[$T2] ?? []) && $byId[$T2]['reservation'] === null, 'no booking → no reservation on the table');
+    $pdo->prepare("INSERT INTO restaurant_reservations (table_id, warehouse_id, customer_name, reservation_time, party_size, status) VALUES
+                   (?, ?, 'P2 Tomorrow', NOW() + INTERVAL 1 DAY, 2, 'booked'),
+                   (?, ?, 'P2 Cancelled', NOW() + INTERVAL 10 MINUTE, 3, 'cancelled')")->execute([$T2, $W, $T2, $W]);
+    $soon = (new DateTime())->modify('+1 hour'); if ($soon->format('Y-m-d') !== date('Y-m-d')) $soon = new DateTime('23:59');   // stay today near midnight
+    $pdo->prepare("INSERT INTO restaurant_reservations (table_id, warehouse_id, customer_name, reservation_time, party_size, status) VALUES (?, ?, 'P2 Neema', ?, 4, 'booked')")
+        ->execute([$T2, $W, $soon->format('Y-m-d H:i:00')]);
+    $b2 = call('api/restaurant/get_tables_board.php', 'GET', ['warehouse_id' => $W]);
+    $r2 = null; foreach ($b2['data'] ?? [] as $r) if ($r['table_id'] === $T2) $r2 = $r['reservation'];
+    ok($r2 && $r2['name'] === 'P2 Neema' && $r2['party'] === 4 && $r2['time'] === $soon->format('H:i'), "free table shows today's booking: " . json_encode($r2) . ' (tomorrow\'s and a cancelled one are not shown)');
+    $pdo->prepare("UPDATE pos_held_sales SET held_at = NOW() - INTERVAL 1 DAY WHERE hold_id = ?")->execute([$h2['hold_id']]);
+    $b3 = call('api/restaurant/get_tables_board.php', 'GET', ['warehouse_id' => $W]);
+    $r3 = null; foreach ($b3['data'] ?? [] as $r) if ($r['table_id'] === $T1) $r3 = $r;
+    ok($r3 && $r3['opened_today'] === false && $r3['minutes_open'] >= 1440, 'an order left open since yesterday is flagged (opened_today = false), so the board can ask "still here?"');
+    $pdo->prepare("UPDATE pos_held_sales SET held_at = NOW() WHERE hold_id = ?")->execute([$h2['hold_id']]);
+    $pdo->prepare("DELETE FROM restaurant_reservations WHERE table_id = ?")->execute([$T2]);
+    $tbSrc = file_get_contents("$root/app/bms/restaurant/tables_board.php");
+    ok(strpos($tbSrc, 'function tbDur(') !== false && strpos($tbSrc, 'TB_LATE_MIN = 180') !== false && strpos($tbSrc, 'TB_FILTER_FROM = 13') !== false, 'board: time reads "1 h 20 min", 3 h+ asks "still here?", the filter only from 13 tables');
+    ok(strpos($tbSrc, 'tb-pill-busy') === false && strpos($tbSrc, '#dc3545') === false && strpos($tbSrc, 'text-danger') === false, 'board: no red anywhere (a busy table is good news — blue; urgent is amber)');
+    ok(strpos($tbSrc, 'Tap to take an order') === false && strpos($tbSrc, 'Updates every 20 seconds') === false && strpos($tbSrc, 'served_by') !== false, 'board: no repeated "Tap to take an order", "Updated hh:mm ↻" instead, and the waiter is shown');
 
     section('D. Move order');
     $m = call('api/restaurant/move_table_order.php', 'POST', ['warehouse_id' => $W, 'from_table_id' => $T1, 'to_table_id' => $T2]);
