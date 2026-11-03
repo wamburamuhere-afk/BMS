@@ -114,7 +114,8 @@ try {
                 p.is_service,
                 p.category_id,
                 p.image_url,
-                p.track_serials"
+                p.track_serials,
+                p.unit"
                 . ($withVariants ? $variantSelectSql : "") . "
             FROM products p
             LEFT JOIN product_stocks ps ON p.product_id = ps.product_id $ps_warehouse_filter"
