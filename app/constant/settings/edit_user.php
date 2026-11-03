@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['success_message'] = t('User updated successfully!');
                 // Clear buffer before redirect
                 ob_end_clean();
-                header("Location: users.php");
+                bmsRedirect(getUrl('users'));
                 exit();
             } else {
                 $errors['database'] = t('Error updating user. Please try again.');

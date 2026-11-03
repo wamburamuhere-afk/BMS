@@ -70,8 +70,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['doc_i
         }
     }
 
-    header("Location: /customers/documents?customer_id=" . $customer_id . "&msg=deleted");
-    exit();
+    bmsFlashRedirect(getUrl('customer_documents') . "?customer_id=" . $customer_id, 'success', t('Document deleted'));
 }
 ?>
 

@@ -17,7 +17,7 @@ $project_id = isset($_GET['project']) ? intval($_GET['project']) : 0;
 $is_quote = false;
 
 if ($sales_order_id <= 0) {
-    header("Location: " . getUrl('sales_orders') . "?error=Invalid Order ID");
+    bmsFlashRedirect(getUrl('sales_orders'), 'error', t('Invalid Order ID'));
     exit();
 }
 
@@ -36,7 +36,7 @@ try {
     $sales_order = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$sales_order) {
-        header("Location: " . getUrl('sales_orders') . "?error=Order Not Found");
+        bmsFlashRedirect(getUrl('sales_orders'), 'error', t('Order Not Found'));
         exit();
     }
 
@@ -51,7 +51,7 @@ try {
     $stmt->execute([$sales_order_id]);
     $existing_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    header("Location: " . getUrl('sales_orders') . "?error=Database Error");
+    bmsFlashRedirect(getUrl('sales_orders'), 'error', t('Database Error'));
     exit();
 }
 // Saved lines: what the discount box shows (an amount or a %) — core/sales_line_discount.php.

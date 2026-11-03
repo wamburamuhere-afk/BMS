@@ -569,6 +569,8 @@ $(document).ready(function () {
         loadInvoices(function () { deepLinkPay(RI_PAY_ID); });
     }
 
+    bmsCleanQuery(['edit', 'add', 'pay']);   // the form is open; a refresh must not reopen it
+
     // Auto-compute due_date. Reads the real terms value from the hidden #f-payment-terms-value
     // so it works for both standard selections and custom "Net{N}" strings.
     function recalcDueDate() {

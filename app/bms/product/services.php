@@ -2544,6 +2544,7 @@ $(function () {
     // ?edit=N deep link (C4) — after the handlers above are wired.
     const editSvcOnLoad = <?= json_encode($edit_svc) ?>;
     if (editSvcOnLoad) setTimeout(function () { openEditSvcModal(editSvcOnLoad); }, 0);
+    bmsCleanQuery(['edit']);   // the form is open; a refresh must not reopen it
 });
 </script>
 

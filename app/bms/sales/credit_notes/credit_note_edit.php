@@ -267,7 +267,7 @@ $(document).ready(function(){
         $.ajax({ url:CN_API_UPDATE, type:'POST', data:fd, processData:false, contentType:false, dataType:'json',
             success:function(res){
                 if(res.success){ Swal.fire({icon:'success',title:'Saved!',text:res.message,timer:1500,showConfirmButton:false})
-                    .then(()=>{ window.location.href='credit_note_view?id='+$('[name=credit_note_id]').val(); }); }
+                    .then(()=>{ window.location.href='<?= getUrl('credit_note_view') ?>?id='+$('[name=credit_note_id]').val(); }); }
                 else { Swal.fire({icon:'error',title:'Error',text:res.message}); }
             },
             error:function(){ Swal.fire({icon:'error',title:'Error',text:'Server error.'}); },
