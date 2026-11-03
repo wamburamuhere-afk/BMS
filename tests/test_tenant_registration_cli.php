@@ -196,7 +196,7 @@ try {
 
     $row = $cpdo->prepare("SELECT * FROM tenants WHERE id = ?");
     $row->execute([$res['tenant_id']]); $row = $row->fetch();
-    ok($row['status'] === 'active', 'the tenant is active, so the owner can sign in at once');
+    ok($row['status'] === 'trial' && !empty($row['trial_ends_at']), 'the tenant starts on its free trial (signs in at once; the trial clock runs)');
     ok($row['company_name'] === 'Registration Test Ltd', 'company name stored');
 
     // The owner must actually be able to authenticate.

@@ -177,7 +177,7 @@ try {
         $a = approveBmsTenant($tid);
         ok('approve succeeded', $a['ok'] === true, (string)($a['error'] ?? ''));
         $t = getTenant($tid);
-        ok('now active with no suspension reason', $t['status'] === 'active' && $t['suspension_reason'] === null);
+        ok('now on its free trial with no suspension reason', $t['status'] === 'trial' && $t['suspension_reason'] === null);
         require_once "$root/core/tenant_lifecycle_policy.php";
         $days = (strtotime($t['trial_ends_at']) - time()) / 86400;
         ok('trial starts today', $days > tenantDefaultTrialDays() - 1 && $days <= tenantDefaultTrialDays() + 0.01, (string)$days);
@@ -201,7 +201,7 @@ try {
         ok('the right token switches to Smart POS', $go['ok'] === true, (string)($go['error'] ?? ''));
         ok('it returns the same username', ($go['username'] ?? '') === 'asha');
         $t = getTenant($tid);
-        ok('now active', $t['status'] === 'active' && $t['suspension_reason'] === null);
+        ok('now on its free trial', $t['status'] === 'trial' && $t['suspension_reason'] === null);
         $sm = tenantPdo($t)->query("SELECT setting_value FROM system_settings WHERE setting_key = 'pos_simple_mode'")->fetchColumn();
         ok('Smart POS defaults applied (Simple Mode on)', $sm === '1', var_export($sm, true));
         ok('the link works once only', continueDeclinedAsPos($tid, bmsDeclineToken($tid, $t['subdomain']))['ok'] === false);

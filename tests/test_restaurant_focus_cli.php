@@ -518,7 +518,7 @@ $h = preg_replace('#<!--.*?-->#s', '', body($pg)); preg_match_all('#<script(?![^
 foreach ($mm[1] as $js) { if (trim($js) === '' || strpos($js, 'application/ld+json') !== false) continue; $tmp = tempnam(sys_get_temp_dir(), 'pjs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) { $bad++; echo '     ' . implode(' ', array_slice($oo, 0, 2)) . "\n"; } $oo = []; }
 ok($bad === 0, 'Purchases page: every inline script parses (' . count($mm[1]) . ' scripts)');
 $pgSw = runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $onlyRest, '1', 'sw'); $bsw = body($pgSw);
-foreach (['Buy stock & ingredients' => 'Nunua bidhaa na viungo', 'Total paid' => 'Jumla uliyolipa', 'Recent purchases' => 'Manunuzi ya hivi karibuni', 'Save purchase' => 'Hifadhi ununuzi', 'How it works' => 'Jinsi Inavyofanya Kazi', 'Something else (not counted)' => 'Kitu kingine (hakihesabiwi)'] as $en => $swt) {
+foreach (['Buy stock & ingredients' => 'Nunua bidhaa na viungo', 'Total paid' => 'Jumla uliyolipa', 'Recent purchases' => 'Manunuzi ya hivi karibuni', 'Save purchase' => 'Hifadhi ununuzi', 'How it works' => 'Jinsi Inavyofanya Kazi', 'Counted item' => 'Bidhaa inayohesabiwa', 'Something else' => 'Kitu kingine', 'Summary' => 'Muhtasari'] as $en => $swt) {
     ok(strpos($bsw, $swt) !== false && strpos($bsw, '>' . $en) === false && strpos($bsw, '> ' . $en) === false, "Swahili page: '$en' is '$swt' — no English left in its place");
 }
 $pgRetail = runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $retailAll, '1');
@@ -920,5 +920,23 @@ $rt = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
 ok(strpos($rt, 'bi bi-speedometer2') !== false && strpos($rt, 'class="ri ') === false, 'retail Smart POS dashboard: the old icons, none of the new');
 $noRest = body(runWorker(['page' => 'app/dashboard.php'], $OFF, $retailAll, '1'));
 ok(strpos($noRest, 'restaurant-icons.css') === false, 'without Restaurant POS the icon file is not even loaded');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P12. Purchases screen: simpler, with quiet checks (2026-11-02)');
+$pgU = file_get_contents("$root/app/bms/restaurant/purchases.php");
+$bU  = body(runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $onlyRest, '1'));
+ok(strpos($bU, 'id="rpKindStock"') !== false && strpos($bU, 'id="rpKindOther"') !== false && strpos($pgU, "r.push({ id: '__other'") === false, 'Counted item | Something else is a switch on top, not hidden at the end of the search list');
+ok(strpos($bU, 'id="rpSumBody"') !== false && preg_match('#<button type="submit" form="rpForm"[^>]*id="rpSave"#', $bU) === 1 && strpos($bU, 'class="rp-mbar') === false, 'a live Summary holds the one Save button (it submits the form); no extra bar covering the phone\'s bottom menu');
+ok(preg_match('#<div class="collapse" id="rpHelp">#', $bU) === 1, '"How it works" is behind a ? button, no longer a box taking a third of the screen');
+ok(strpos($bU, 'id="rpNewIngredient"') === false && strpos($pgU, "id: '__new'") !== false, 'a new ingredient is added straight from the search ("+ Add … as a new ingredient")');
+ok(strpos($pgU, 'function rpPriceOff(') !== false && strpos($pgU, 'r >= 1.5') !== false && strpos($pgU, 'r <= 0.5') !== false, 'a price far from the average cost (×1.5 or less than half) asks once before saving');
+ok(strpos($pgU, 'function rpAlreadySaved(') !== false && strpos($pgU, 'RP.s.dupTitle') !== false, 'the same purchase on the same date asks "Already saved?"');
+ok(strpos($pgU, 'rpIsWhole(rpItem.unit)') !== false && strpos($pgU, "'crate'") !== false, 'count units (pcs, crate…) take whole numbers only');
+ok(strpos($pgU, 'function rpCheckMatch(') !== false && strpos($pgU, 'RP.s.countedTitle') !== false, '"Something else" that is really a counted item warns it would count twice, and offers to switch');
+ok(preg_match('#<table[^>]*id="rpTable"[^>]*style="width:100%"#', $bU) === 1 && preg_match('#table-responsive"><table[^>]*id="rpTable"#', $bU) === 0, 'Recent purchases fills the width (width:100%, no second scroll box)');
+ok(strpos($bU, '<th>S/No.</th><th>Item</th><th>Date</th>') !== false && strpos(file_get_contents("$root/assets/js/bms-mobile-cards.js"), "'s/no.'") !== false && strpos($bU, 'id="rpFootTotal"') !== false && strpos($bU, 'id="rpRangeToday"') !== false, 'Recent purchases: S/No. first (skipped as a phone-card title, so the Item names each card), a total row, All / Today / This week');
+ok(strpos($pgU, "c.textContent = i + 1") !== false && strpos($pgU, "order: []") !== false, 'S/No. numbers the list as shown, across pages');
+ok(strpos($pgU, 'rp-again') !== false && strpos($pgU, 'bi-gear-fill') !== false, 'each row has the gear menu with "Buy again"');
+ok(strpos(file_get_contents("$root/api/restaurant/get_purchases.php"), "'product_id' => (int)\$r['product_id']") !== false, 'get_purchases gives each counted row its product_id (for "Buy again")');
 
 // [later phases append here]
