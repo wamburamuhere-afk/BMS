@@ -193,3 +193,6 @@ jobs:
 
       - name: Restaurant online menu & ordering (security + flow)
         run: php tests/test_restaurant_online_menu_cli.php
+
+      - name: Restaurant forms - one layout, no field removed
+        run: php tests/test_restaurant_form_layout_cli.php

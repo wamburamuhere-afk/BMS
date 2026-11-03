@@ -105,6 +105,7 @@ function fx_cleanup(PDO $pdo): void {
         $pdo->exec("DELETE FROM kitchen_stations WHERE warehouse_id = $w");
         $pdo->exec("DELETE FROM pos_held_sales WHERE warehouse_id = $w");
         $pdo->exec("DELETE FROM restaurant_online_orders WHERE warehouse_id = $w");
+        try { $pdo->exec("DELETE FROM restaurant_reservations WHERE warehouse_id = $w"); } catch (Throwable $e) {}
         $pdo->exec("DELETE FROM restaurant_tables WHERE warehouse_id = $w");
         $pdo->exec("DELETE FROM restaurant_floors WHERE warehouse_id = $w");
         $pdo->exec("DELETE FROM warehouses WHERE warehouse_id = $w");

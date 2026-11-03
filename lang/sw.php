@@ -6530,6 +6530,22 @@ return [
     'Sales by staff' => 'Mauzo kwa mfanyakazi',
     '%d orders' => 'Oda %d',
 
+    // Restaurant forms — one professional layout (includes/restaurant/form_kit.php)
+    'Add an ingredient' => 'Ongeza kiungo',
+    'Bill' => 'Bili',
+    'Booking' => 'Uhifadhi',
+    'Choose a table' => 'Chagua meza',
+    'Dishes' => 'Vyakula',
+    'Drinks (counted)' => 'Vinywaji (vinavyohesabiwa)',
+    'How customers choose' => 'Jinsi wateja wanavyochagua',
+    'Ingredients in one plate' => 'Viungo vya sahani moja',
+    'Kitchen & availability' => 'Jikoni na upatikanaji',
+    'Online menu' => 'Menyu ya mtandaoni',
+    'Ordering' => 'Kuagiza',
+    'Quantity & price' => 'Idadi na bei',
+    'Safety' => 'Usalama',
+    'e.g. window seat, birthday' => 'mf. kiti cha dirishani, siku ya kuzaliwa',
+
     // Restaurant online menu & ordering (restaurant_online_menu_plan.md)
     '%d tables' => 'Meza %d',
     '%s is not available right now.' => '%s haipatikani kwa sasa.',

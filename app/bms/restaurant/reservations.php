@@ -91,54 +91,69 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     <?php endif; ?>
 </div>
 
-<div class="modal fade" id="reservationModal" tabindex="-1">
-    <div class="modal-dialog">
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); ?>
+<div class="modal fade rf-modal" id="reservationModal" tabindex="-1" aria-labelledby="resModalTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><?= t('New Reservation') ?></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="resModalTitle"><i class="bi bi-calendar-plus"></i><?= t('New Reservation') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <form id="resForm" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-                    <div id="res-message" class="mb-2"></div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Customer') ?></label>
-                        <select id="f-res-customer" class="form-select" style="width:100%"></select>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Customer Name') ?> <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="customer_name" id="f-res-name" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Phone') ?></label>
-                            <input type="text" class="form-control" name="customer_phone" id="f-res-phone">
-                        </div>
-                    </div>
-                    <div class="row g-2 mt-1">
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Table') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select" name="table_id" id="f-res-table" required></select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Party Size') ?></label>
-                            <input type="number" class="form-control" name="party_size" id="f-res-party" value="2" min="1">
-                        </div>
-                    </div>
-                    <div class="mb-3 mt-2">
-                        <label class="form-label"><?= t('Reservation Time') ?> <span class="text-danger">*</span></label>
-                        <input type="datetime-local" class="form-control" name="reservation_time" id="f-res-time" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Notes') ?></label>
-                        <textarea class="form-control" name="notes" id="f-res-notes" rows="2"></textarea>
-                    </div>
                     <input type="hidden" name="customer_id" id="f-res-customer-id">
+                    <div id="res-message" class="mb-2"></div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-person"></i><?= t('Customer') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="f-res-customer"><?= t('Customer') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></label>
+                                <select id="f-res-customer" class="form-select" style="width:100%"></select>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-name"><?= t('Customer Name') ?><span class="rf-req">*</span></label>
+                                <input type="text" class="form-control" name="customer_name" id="f-res-name" required>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-phone"><?= t('Phone') ?></label>
+                                <input type="tel" class="form-control" name="customer_phone" id="f-res-phone" inputmode="tel">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-calendar-event"></i><?= t('Booking') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-table"><?= t('Table') ?><span class="rf-req">*</span></label>
+                                <select class="form-select rf-select2" name="table_id" id="f-res-table" required data-placeholder="<?= htmlspecialchars(t('Choose a table')) ?>"></select>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-party"><?= t('Party Size') ?></label>
+                                <input type="number" class="form-control" name="party_size" id="f-res-party" value="2" min="1" inputmode="numeric">
+                            </div>
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="f-res-time"><?= t('Reservation Time') ?><span class="rf-req">*</span></label>
+                                <input type="datetime-local" class="form-control" name="reservation_time" id="f-res-time" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-chat-left-text"></i><?= t('Notes') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label visually-hidden" for="f-res-notes"><?= t('Notes') ?></label>
+                                <textarea class="form-control" name="notes" id="f-res-notes" rows="2" placeholder="<?= htmlspecialchars(t('e.g. window seat, birthday')) ?>"></textarea>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer rf-foot">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
                 </div>
             </form>
         </div>
@@ -171,6 +186,7 @@ $(document).ready(function () {
     }
     $('#f-res-customer').select2({
         theme: 'bootstrap-5', width: '100%', placeholder: STRINGS.searchCustomer, allowClear: true,
+        dropdownParent: $('#reservationModal'),   // keeps the search box typeable inside the modal
         ajax: { url: '<?= buildUrl('api/pos/search_customers.php') ?>', dataType: 'json', delay: 250, data: p => ({ q: p.term }) }
     }).on('select2:select', function (e) {
         $('#f-res-customer-id').val(e.params.data.id);
@@ -229,9 +245,9 @@ function openReservationModal() {
     $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid }, function (res) {
         let opts = '';
         (res.success ? res.data : []).forEach(t => { opts += `<option value="${t.table_id}">${safeOutput(t.table_number)} (${t.floor_name})</option>`; });
-        $('#f-res-table').html(opts);
+        $('#f-res-table').html(opts).trigger('change');
     });
-    new bootstrap.Modal(document.getElementById('reservationModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('reservationModal')).show();
 }
 
 $('#resForm').on('submit', function (e) {
