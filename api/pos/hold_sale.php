@@ -97,6 +97,34 @@ try {
     // retail hold (no table_id) is never touched.
     if ($table_id) {
         $pdo->beginTransaction(); // replace + insert + occupy succeed or fail together
+
+        // Online orders (restaurant_online_menu_plan.md): staff may have accepted a
+        // customer's order onto this table AFTER this till loaded it. Saving that
+        // older copy must not silently drop the customer's lines — put back any
+        // accepted online line the incoming cart does not have. A till that loaded
+        // the current order (same hold_id) is trusted: its edits are deliberate.
+        require_once __DIR__ . '/../../core/restaurant_online.php';
+        if (function_exists('roSchemaReady') && roSchemaReady($pdo)) {
+            $loaded = !empty($body['loaded_hold_id']) ? (int)$body['loaded_hold_id'] : null;
+            $cur = $pdo->prepare("SELECT hold_id, items_data FROM pos_held_sales WHERE table_id = ? AND status = 'held' ORDER BY held_at DESC, hold_id DESC LIMIT 1 FOR UPDATE");
+            $cur->execute([$table_id]);
+            $curRow = $cur->fetch(PDO::FETCH_ASSOC);
+            if ($curRow && (int)$curRow['hold_id'] !== $loaded) {
+                $have = [];
+                foreach ($items as $it) if (!empty($it['online_order_id'])) $have[(int)$it['online_order_id']] = true;
+                $open = $pdo->prepare("SELECT order_id FROM restaurant_online_orders WHERE table_id = ? AND status IN ('accepted','ready')");
+                $open->execute([$table_id]);
+                $openIds = array_flip(array_map('intval', $open->fetchAll(PDO::FETCH_COLUMN)));
+                foreach ((array)json_decode((string)$curRow['items_data'], true) as $it) {
+                    $oid = (int)($it['online_order_id'] ?? 0);
+                    if ($oid && isset($openIds[$oid]) && !isset($have[$oid])) {
+                        $items[] = $it;
+                        $subtotal += (float)($it['price'] ?? 0) * (float)($it['quantity'] ?? 0);
+                    }
+                }
+            }
+        }
+
         $pdo->prepare("UPDATE pos_held_sales SET status = 'cancelled' WHERE table_id = ? AND status = 'held'")
             ->execute([$table_id]);
     }

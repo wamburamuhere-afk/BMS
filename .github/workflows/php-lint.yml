@@ -190,3 +190,6 @@ jobs:
           php tests/test_flash_messages_cli.php
           php tests/test_query_cleanup_cli.php
           php tests/test_detail_urls_cli.php
+
+      - name: Restaurant online menu & ordering (security + flow)
+        run: php tests/test_restaurant_online_menu_cli.php

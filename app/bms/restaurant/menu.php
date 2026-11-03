@@ -16,6 +16,7 @@ ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../../core/restaurant_online.php';
 
 $page_title = 'Menu';
 require_once 'header.php';
@@ -28,6 +29,7 @@ $can_edit    = canEdit('restaurant_pos');
 $module_on   = restaurantModuleOn($pdo);
 $warehouses  = $module_on ? restaurantWarehousesForSelect($pdo) : [];
 $categories  = $pdo->query("SELECT category_id, category_name FROM categories WHERE type = 'product' AND status = 'active' ORDER BY sort_order, category_name")->fetchAll(PDO::FETCH_ASSOC);
+$can_share   = $can_edit && $warehouses && roSchemaReady($pdo);   // online menu & QR (restaurant_online_menu_plan.md)
 $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('Drinks')];
 ?>
 
@@ -36,6 +38,9 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
         <h4 class="mb-0 text-truncate"><i class="ri ri-book-open-text text-primary me-2"></i><?= t('Menu') ?></h4>
         <div class="d-flex gap-2 flex-shrink-0">
             <a href="<?= getUrl('restaurant') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1"><?= t('Restaurant') ?></span></a>
+            <?php if ($can_share): ?>
+            <button class="btn btn-outline-primary btn-sm" onclick="openShareMenu()"><i class="bi bi-qr-code"></i><span class="d-none d-md-inline ms-1"><?= t('Share menu') ?></span></button>
+            <?php endif; ?>
             <?php if ($can_edit && $warehouses): ?>
             <button class="btn btn-primary btn-sm" onclick="openAddItem()"><i class="bi bi-plus-circle me-1"></i><?= t('Add Item') ?></button>
             <?php endif; ?>
@@ -654,5 +659,6 @@ function saveItem(e) {
 </script>
 
 <?php
+if ($can_share) require __DIR__ . '/../../../includes/restaurant/online_menu_share.php';
 require_once 'footer.php';
 ob_end_flush();
