@@ -22,8 +22,18 @@ if (!canView('restaurant_pos')) {
 }
 
 $warehouses = restaurantWarehousesForSelect($pdo);
+// Opened from a notification: kitchen-dashboard?ticket=N — that ticket's shop, the ticket highlighted.
+$focusTicket = (int)($_GET['ticket'] ?? 0);
+$focusWh = 0;
+if ($focusTicket > 0 && $warehouses) {
+    $ft = $pdo->prepare("SELECT warehouse_id FROM kitchen_tickets WHERE ticket_id = ?");
+    $ft->execute([$focusTicket]);
+    $fw = (int)$ft->fetchColumn();
+    if (in_array($fw, array_map(fn($w) => (int)$w['warehouse_id'], $warehouses), true)) $focusWh = $fw; else $focusTicket = 0;
+}
 ?>
 
+<style>.kds-focus{box-shadow:0 0 0 4px rgba(13,110,253,.35)!important;}</style>
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h4 class="mb-0"><i class="ri ri-chef-hat text-primary me-2"></i><?= t('Kitchen Display') ?></h4>
@@ -52,7 +62,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select id="whSelect" class="form-select form-select-sm select2-static" style="min-width:220px;">
                         <?php foreach ($warehouses as $w): ?>
-                        <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
+                        <option value="<?= (int)$w['warehouse_id'] ?>"<?= (int)$w['warehouse_id'] === $focusWh ? ' selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -171,7 +181,7 @@ function loadTickets() {
             });
             html += `
             <div class="col-6 col-md-4 col-lg-3">
-                <div class="card border-0 shadow-sm h-100" style="border-top:4px solid ${color} !important;">
+                <div class="card border-0 shadow-sm h-100${+t.ticket_id === KDS_FOCUS ? ' kds-focus' : ''}" data-ticket="${+t.ticket_id}" style="border-top:4px solid ${color} !important;">
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="fw-bold small">${safeOutput(t.station_name)}</span>
@@ -185,8 +195,15 @@ function loadTickets() {
             </div>`;
         });
         $('#ticketsContainer').html(html);
+        if (KDS_FOCUS && !kdsFocused) {   // from a notification: show that ticket
+            kdsFocused = true;
+            const el = document.querySelector('[data-ticket="' + KDS_FOCUS + '"]');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['ticket']);
+        }
     });
 }
+const KDS_FOCUS = <?= (int)$focusTicket ?>; let kdsFocused = false;
 
 function advance(ticketId, status) {
     $.post('<?= buildUrl('api/restaurant/update_ticket_status.php') ?>', { ticket_id: ticketId, status: status, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {

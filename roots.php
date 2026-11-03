@@ -1311,6 +1311,7 @@ $routes = [
     'email_templates' => COMMUNICATION_DIR . '/email_templates.php',
     'email_templates.php' => COMMUNICATION_DIR . '/email_templates.php',
     'notification_center' => COMMUNICATION_DIR . '/notification_center.php',
+    'notification_open'   => COMMUNICATION_DIR . '/notification_open.php',   // mark one read + go to its record
     'notification_center.php' => COMMUNICATION_DIR . '/notification_center.php',
 
     // ========================================================================

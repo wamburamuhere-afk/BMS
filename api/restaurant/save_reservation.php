@@ -81,6 +81,9 @@ if ($id > 0) {
     $pdo->prepare("UPDATE restaurant_tables SET status = 'reserved', updated_at = NOW() WHERE table_id = ? AND status = 'available'")
         ->execute([$table_id]);
     logActivity($pdo, $_SESSION['user_id'], "Created reservation for $customer_name at $reservation_time");
+    // Restaurant notifications: a new booking (bell + email per Settings → Notification rules).
+    require_once __DIR__ . '/../../core/restaurant_notify.php';
+    rnNotifyReservationNew($pdo, $id);
     $message = t('Reservation created successfully.');
 }
 

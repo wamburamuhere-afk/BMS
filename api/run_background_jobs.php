@@ -75,6 +75,18 @@ if (function_exists('get_setting') && get_setting('notif_checks_last_run') !== d
     $ran[] = 'notif_checks';
 }
 
+// Restaurant notifications that need minutes, not days: online orders not accepted, kitchen
+// orders waiting, reservations within the hour, table bills open long (core/restaurant_notify.php).
+if (function_exists('get_setting') && (time() - (int) get_setting('rn_checks_last_ts', '0')) >= 120) {
+    if (function_exists('save_setting')) save_setting('rn_checks_last_ts', (string) time());
+    try {
+        require_once __DIR__ . '/../core/restaurant_notify.php';
+        if (rnModuleOn($pdo)) { rnRunFrequentChecks($pdo); $ran[] = 'restaurant_checks'; }
+    } catch (Throwable $e) {
+        error_log('run_background_jobs restaurant_checks: ' . $e->getMessage());
+    }
+}
+
 if (function_exists('get_setting') && (time() - (int) get_setting('notif_outbox_last_ts', '0')) >= 120) {
     if (function_exists('save_setting')) save_setting('notif_outbox_last_ts', (string) time());
     @include_once __DIR__ . '/../cron/process_notifications.php';

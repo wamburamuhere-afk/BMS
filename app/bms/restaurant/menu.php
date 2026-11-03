@@ -303,7 +303,10 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 <script>
 const CAN_EDIT = <?= json_encode($can_edit) ?>;
 const CSRF_FIELD = <?= json_encode(csrf_token()) ?>;
+let NOCOST = <?= !empty($_GET['nocost']) ? 'true' : 'false' ?>;   // menu?nocost=1 from a notification
+if (NOCOST && typeof bmsCleanQuery === 'function') bmsCleanQuery(['nocost']);
 const RM = {
+    noCostOnly: <?= json_encode(t('Dishes with no cost')) ?>,
     dish: <?= json_encode(t('Dish')) ?>,
     stockItem: <?= json_encode(t('Stock item')) ?>,
     noPrep: <?= json_encode(t('No preparation')) ?>,
@@ -405,17 +408,21 @@ function buildChips() {
     const cats = {};
     MENU.forEach(it => { cats[catKey(it)] = it.category_name || RM.noGroup; });
     if (ACTIVE_CAT !== 'all' && !cats[ACTIVE_CAT]) ACTIVE_CAT = 'all';
-    let html = `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === 'all' ? 'btn-primary' : 'btn-outline-primary'}" data-cat="all">${RM.all}</button>`;
+    // From the "Dishes with no cost" notification (menu?nocost=1): a chip that shows only those; ✕ shows everything again.
+    let html = NOCOST ? `<button class="btn btn-sm rm-chip btn-primary" id="rmNoCost">${RM.noCostOnly} <i class="bi bi-x-lg ms-1"></i></button>` : '';
+    html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === 'all' && !NOCOST ? 'btn-primary' : 'btn-outline-primary'}" data-cat="all">${RM.all}</button>`;
     Object.keys(cats).forEach(k => {
         html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === k ? 'btn-primary' : 'btn-outline-primary'}" data-cat="${k}">${safeOutput(cats[k])}</button>`;
     });
-    $('#rmChips').html(html).find('.rm-chip').on('click', function () { ACTIVE_CAT = String($(this).data('cat')); buildChips(); render(); });
+    $('#rmChips').html(html).find('.rm-chip[data-cat]').on('click', function () { ACTIVE_CAT = String($(this).data('cat')); NOCOST = false; buildChips(); render(); });
+    $('#rmNoCost').on('click', function () { NOCOST = false; buildChips(); render(); });
     $('#stGroups').text(Object.keys(cats).length);
 }
 
 function filtered() {
     const q = ($('#rmSearch').val() || '').toLowerCase().trim();
     return MENU.filter(it => (ACTIVE_CAT === 'all' || catKey(it) === ACTIVE_CAT)
+        && (!NOCOST || (it.is_service && itemCost(it) === null))
         && (!q || it.product_name.toLowerCase().includes(q) || (it.category_name || '').toLowerCase().includes(q)));
 }
 
