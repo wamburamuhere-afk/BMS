@@ -64,6 +64,26 @@ if ($action === 'set_grace_days') {
     exit;
 }
 
+if ($action === 'set_trial') {
+    // Start date + optional end date (blank = start + the default trial length).
+    $r = setTenantTrial($tenantId, (string)($_POST['starts'] ?? ''), (string)($_POST['ends'] ?? ''));
+    if (!$r['ok']) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => $r['error']]);
+        exit;
+    }
+    $days = (int)round((strtotime(substr((string)$r['ends_at'], 0, 10)) - strtotime(substr((string)$r['starts_at'], 0, 10))) / 86400);
+    echo json_encode([
+        'success'   => true,
+        'message'   => 'Free trial set: ' . date('d M Y', strtotime((string)$r['starts_at'])) . ' to '
+                     . date('d M Y', strtotime((string)$r['ends_at'])) . ' (' . $days . ' days).'
+                     . ($r['resumed'] ? ' Service has been restored.' : ''),
+        'starts_at' => $r['starts_at'],
+        'ends_at'   => $r['ends_at'],
+    ]);
+    exit;
+}
+
 if ($action !== 'extend') {
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Unknown action.']);
