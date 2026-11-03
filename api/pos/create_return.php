@@ -33,6 +33,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_combo_products.php';
+require_once __DIR__ . '/../../core/pos_quantity.php';
 
 header('Content-Type: application/json');
 
@@ -84,7 +85,7 @@ if (!is_array($requested) || count($requested) === 0) { echo json_encode(['succe
 $want = [];
 foreach ($requested as $r) {
     $iid = (int)($r['sale_item_id'] ?? 0);
-    $rq  = (float)($r['return_qty'] ?? 0);
+    $rq  = round((float)($r['return_qty'] ?? 0), 3); // same 3 decimal places as the sale line
     if ($iid > 0 && $rq > 0) $want[$iid] = ($want[$iid] ?? 0) + $rq;
 }
 if (!$want) { echo json_encode(['success' => false, 'message' => t('Nothing to return.')]); exit; }
@@ -111,7 +112,7 @@ try {
     }
 
     // Load the original lines being returned, with returnable balance + product flags.
-    $lineStmt = $pdo->prepare("SELECT psi.*, p.is_service, p.is_combo
+    $lineStmt = $pdo->prepare("SELECT psi.*, p.is_service, p.is_combo, p.unit AS product_unit
                                  FROM pos_sale_items psi
                             LEFT JOIN products p ON p.product_id = psi.product_id
                                 WHERE psi.sale_id = ?");
@@ -128,6 +129,13 @@ try {
         $returnable = (float)$l['quantity'] - $already;
         if ($rq > $returnable + 0.0001) {
             throw new Exception("Cannot return {$rq} of '{$l['product_name']}' — only {$returnable} remaining.");
+        }
+        // 2026-11-03 — a part (0.5) may come back only for goods sold by measure (kg, litre …),
+        // or when the sale line itself was a part. Half a bottle can't be returned.
+        $retUnit = trim((string)($l['sold_unit_label'] ?? '')) !== '' ? $l['sold_unit_label'] : ($l['product_unit'] ?? '');
+        $lineWasPart = abs((float)$l['quantity'] - round((float)$l['quantity'])) > 0.0000001;
+        if (abs($rq - round($rq)) > 0.0000001 && !$lineWasPart && !posUnitAllowsDecimal($retUnit)) {
+            throw new Exception(sprintf(t("'%s' is sold in whole numbers. Enter a quantity without decimals."), $l['product_name']));
         }
         $toReturn[$iid] = $rq;
     }

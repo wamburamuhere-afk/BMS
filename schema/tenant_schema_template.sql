@@ -6516,7 +6516,7 @@ CREATE TABLE `products` (
   `tax_rate` decimal(5,2) DEFAULT '0.00',
   `min_stock_level` decimal(10,2) DEFAULT '0.00',
   `max_stock_level` decimal(10,2) DEFAULT '0.00',
-  `current_stock` decimal(10,2) DEFAULT '0.00',
+  `current_stock` decimal(15,3) DEFAULT '0.000',
   `supplier_id` int DEFAULT NULL,
   `contract_item_no` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `assembly_quantity` decimal(15,2) DEFAULT '1.00',
@@ -6530,7 +6530,7 @@ CREATE TABLE `products` (
   `created_by` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `stock_quantity` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `stock_quantity` decimal(15,3) NOT NULL DEFAULT '0.000',
   `unit` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `image_url` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sku` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -8081,7 +8081,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=99 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

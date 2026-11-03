@@ -231,8 +231,47 @@ const PT = {
     nextPage: <?= json_encode(t('Next')) ?>,
     productPages: <?= json_encode(t('Product pages')) ?>,
     pageOfTotal: <?= json_encode(t('%from%–%to% of %total% products')) ?>,
-    addedToCart: <?= json_encode(t('Added to cart')) ?>
+    addedToCart: <?= json_encode(t('Added to cart')) ?>,
+    wholeNumbersOnly: <?= json_encode(t('%s is sold in whole numbers. Enter a quantity without decimals.')) ?>
 };
+
+// 2026-11-03 (core/pos_quantity.php) — goods sold by measure (kg, litre, metre …) can be
+// sold in parts: type 0.5 or 0.25 straight into the quantity box. + / − still add or take
+// away exactly 1. Goods counted one by one stay whole numbers. The server checks the same
+// list again, so the screen is a help, never the only guard.
+<?php require_once ROOT_DIR . '/core/pos_quantity.php'; ?>
+const POS_DECIMAL_UNITS = <?= json_encode(posDecimalUnits()) ?>;
+function posUnitAllowsDecimal(unit) {
+    const u = String(unit || '').trim().toLowerCase().replace(/\.+$/, '');
+    return u !== '' && POS_DECIMAL_UNITS.indexOf(u) !== -1;
+}
+/** A cart line may hold a fraction when its unit is sold by measure (never a serial-tracked line). */
+function posLineAllowsDecimal(item) {
+    if (!item || item.serial_numbers) return false;
+    return posUnitAllowsDecimal(item.unit_label || item.unit);
+}
+/** Round a quantity to 3 decimal places, so 0.1 + 1 never shows as 1.0999999. */
+function posRoundQty(n) {
+    return Math.round((parseFloat(n) || 0) * 1000) / 1000;
+}
+/** Quantity as people read it: 1 → "1", 0.5 → "0.5", 1500 → "1,500". */
+function posFmtQty(n) {
+    return posRoundQty(n).toLocaleString('en-US', { maximumFractionDigits: 3 });
+}
+/**
+ * Read a typed quantity. Returns the clean number, or null when it can't be used
+ * (empty, 0, negative, or a fraction on a whole-number item — a short note says why).
+ */
+function posReadTypedQty(value, allowDecimal, productName) {
+    const n = posRoundQty(String(value === undefined || value === null ? '' : value).replace(',', '.'));
+    if (!(n > 0)) return null;
+    if (!allowDecimal && n !== Math.round(n)) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'info', timer: 2600, showConfirmButton: false,
+            titleText: PT.wholeNumbersOnly.replace('%s', caseFormatJs(productName || '')) });
+        return null;
+    }
+    return n;
+}
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
 // can sell without necessarily being allowed to change a line's price or apply
@@ -989,12 +1028,13 @@ function posTapProduct(productId) {
     const existing = cart.find(item => item.product_id == product.product_id
         && !item.unit_label && !item.serial_numbers && !item.modifiers);
     if (existing) {
-        existing.quantity += 1;
+        existing.quantity = posRoundQty(existing.quantity + 1);
     } else {
         cart.push({
             product_id: product.product_id,
             product_name: product.product_name,
             sku: product.sku,
+            unit: product.unit || '', // decides whether 0.5 may be typed (posLineAllowsDecimal)
             price: price,
             quantity: 1,
             tax_rate: saleVatRate,
@@ -1052,7 +1092,7 @@ function showProductQuickView(productId) {
             <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(-1)">-</button>
                 <input type="number" class="form-control text-center" id="quickViewQty"
-                       value="1" min="1" step="1">
+                       value="1" min="0" step="any" inputmode="${posUnitAllowsDecimal(currentProduct.unit) ? 'decimal' : 'numeric'}">
                 <button class="btn btn-outline-secondary" type="button" onclick="adjustQuantity(1)">+</button>
             </div>
         </div>
@@ -1212,10 +1252,12 @@ function toggleSerialSelection(checkbox) {
 }
 
 function adjustQuantity(amount) {
+    // + / − move by exactly 1. A part quantity (0.5 kg) keeps its part: 0.5 → 1.5 → 0.5;
+    // it never goes to 0 or below. A whole-number item never goes under 1.
     const input = $('#quickViewQty');
-    let current = parseInt(input.val()) || 1;
-    const newValue = Math.max(1, current + amount);
-    input.val(newValue);
+    const current = posRoundQty(input.val()) || 1;
+    const next = posRoundQty(current + amount);
+    if (next > 0) input.val(next);
 }
 
 // ─────────────────── Phase 30 (pos_upgrade_plan.md §9) — modifiers ───────────────────
@@ -1297,7 +1339,13 @@ function addToCart() {
 
     // Phase 26 (pos_upgrade_plan.md §9) — a serial-tracked line's quantity IS
     // the count of serials picked; there is no separate quantity input for it.
-    const quantity = isSerialTracked ? selectedSerials.length : (parseInt($('#quickViewQty').val()) || 1);
+    // A typed part quantity (0.5 kg) is kept as typed; a fraction on a whole-number item,
+    // 0 or a negative number is refused here (and again by the server).
+    const typedQty = String($('#quickViewQty').val() || '').trim();
+    const quickViewUnitLabel = $('#quickViewUnit').length ? ($('#quickViewUnit').val() || '') : '';
+    const quantity = isSerialTracked ? selectedSerials.length
+        : (typedQty === '' ? 1 : posReadTypedQty(typedQty, posUnitAllowsDecimal(quickViewUnitLabel || currentProduct.unit), currentProduct.product_name));
+    if (quantity === null) { $('#quickViewQty').focus().select(); return; }
     const basePrice = parseFloat(currentProduct.effective_price ?? currentProduct.selling_price) || 0;
     // Phase 30 (pos_upgrade_plan.md §9) — chosen modifier options are priced
     // into the line client-side for display; process_sale.php independently
@@ -1337,12 +1385,13 @@ function addToCart() {
         : null;
 
     if (existingItem) {
-        existingItem.quantity += quantity;
+        existingItem.quantity = posRoundQty(existingItem.quantity + quantity);
     } else {
         cart.push({
             product_id: currentProduct.product_id,
             product_name: currentProduct.product_name,
             sku: currentProduct.sku,
+            unit: currentProduct.unit || '', // decides whether 0.5 may be typed (posLineAllowsDecimal)
             // Phase 14 (pos_upgrade_plan.md §8) — the chosen price group's
             // override when one exists for this product, else plain
             // selling_price (effective_price === selling_price when no group
@@ -1388,7 +1437,8 @@ function updateCartDisplay() {
         cartBody.empty();
         
         cart.forEach((item, index) => {
-            const itemTotal = item.discounted_price * item.quantity;
+            // Rounded to the cent for display: 3,000 × 0.5 = 1,500 (never 1,499.9999).
+            const itemTotal = Math.round(item.discounted_price * item.quantity * 100) / 100;
             const originalTotal = item.price * item.quantity;
             
             let priceDisplay = item.price.toLocaleString();
@@ -1422,6 +1472,7 @@ function updateCartDisplay() {
                     <td>
                         <strong class="small">${caseFormatJs(item.product_name)}</strong>
                         ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
+                        ${!item.unit_label && posLineAllowsDecimal(item) ? `<br><span class="small text-muted">${item.price.toLocaleString()} / ${safeOutput(item.unit)}</span>` : ''}
                         ${item.modifiers && item.modifiers.length ? `<br><span class="small text-muted">${item.modifiers.map(m => safeOutput(m.option_name)).join(', ')}</span>` : ''}
                         ${posRestaurantActive() ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none rs-note" onclick="editItemNote(${index})"><i class="bi bi-chat-left-text me-1"></i>${item.note ? safeOutput(item.note) : PT.addNote}</button>` : ''}
                         ${discountBadge}
@@ -1436,13 +1487,15 @@ function updateCartDisplay() {
                             // line's quantity IS its picked serial count; editing it
                             // here would desync from serial_numbers, so it's
                             // read-only (remove and re-add to change the selection).
-                            `<span class="badge bg-secondary" title="${safeOutput(item.serial_numbers.join(', '))}">${item.quantity}</span>` :
+                            `<span class="badge bg-secondary" title="${safeOutput(item.serial_numbers.join(', '))}">${posFmtQty(item.quantity)}</span>` :
                             `<div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
                                 <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)"
                                         style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
-                                <input type="number" class="form-control text-center"
-                                       style="width: 35px; padding: 2px; font-size: 11px; height: 22px;"
-                                       value="${item.quantity}" min="1"
+                                <input type="number" class="form-control text-center${posLineAllowsDecimal(item) ? ' pos-qty-part' : ''}"
+                                       style="width: ${posLineAllowsDecimal(item) ? 46 : 35}px; padding: 2px; font-size: 11px; height: 22px;"
+                                       value="${posRoundQty(item.quantity)}" min="0" step="any"
+                                       inputmode="${posLineAllowsDecimal(item) ? 'decimal' : 'numeric'}"
+                                       onfocus="this.select()"
                                        onchange="updateCartQuantityInput(${index}, this.value)">
                                 <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, 1)"
                                         style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">+</button>
@@ -1470,10 +1523,13 @@ function updateCartDisplay() {
     updateMobileCartFab();
 }
 
+// + / − always move by exactly 1. A part quantity keeps its part (0.5 → 1.5 → 0.5) and
+// never goes to 0 or below — removing a line is the trash button's job. A whole-number
+// line never goes under 1, exactly as before.
 function updateCartQuantity(index, change) {
     if (cart[index]) {
-        const newQuantity = cart[index].quantity + change;
-        if (newQuantity >= 1) {
+        const newQuantity = posRoundQty(cart[index].quantity + change);
+        if (newQuantity > 0) {
             cart[index].quantity = newQuantity;
             updateCartDisplay();
             saveCartToStorage();
@@ -1481,13 +1537,16 @@ function updateCartQuantity(index, change) {
     }
 }
 
+// A typed quantity: 0.5 / 0.25 for goods sold by measure, whole numbers for the rest.
+// Anything that can't be used (empty, 0, negative, a fraction on a whole item) puts the
+// old quantity back instead of silently changing it to 1.
 function updateCartQuantityInput(index, value) {
-    const quantity = parseInt(value) || 1;
-    if (quantity >= 1 && cart[index]) {
-        cart[index].quantity = quantity;
-        updateCartDisplay();
-        saveCartToStorage();
-    }
+    const item = cart[index];
+    if (!item) return;
+    const quantity = posReadTypedQty(value, posLineAllowsDecimal(item), item.product_name);
+    if (quantity !== null) item.quantity = quantity;
+    updateCartDisplay();
+    saveCartToStorage();
 }
 
 // Phase 16 (pos_upgrade_plan.md §8) — manual price override, only reachable
@@ -1974,8 +2033,8 @@ function buildWhatsAppReceiptText(receiptNumber) {
     let lines = [];
     lines.push(<?= json_encode(t('Receipt #')) ?> + receiptNumber);
     cart.forEach(item => {
-        const total = (item.discounted_price * item.quantity).toLocaleString();
-        lines.push(`${applyCaseModeJs(item.product_name)} x${item.quantity} = ${POS_CURRENCY} ${total}`);
+        const total = (Math.round(item.discounted_price * item.quantity * 100) / 100).toLocaleString();
+        lines.push(`${applyCaseModeJs(item.product_name)} x${posFmtQty(item.quantity)} = ${POS_CURRENCY} ${total}`);
     });
     const total = $('#cartTotal').text().trim();
     lines.push('---');
@@ -2151,7 +2210,7 @@ function openSplitBill() {
     cart.forEach((it, i) => {
         html += `<div class="d-flex align-items-center gap-2 py-2 border-bottom">
             <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${caseFormatJs(it.product_name)}</div>
-                <div class="small text-muted">${it.quantity} × ${Number(it.discounted_price).toLocaleString()}</div></div>
+                <div class="small text-muted">${posFmtQty(it.quantity)} × ${Number(it.discounted_price).toLocaleString()}</div></div>
             <div class="input-group input-group-sm flex-shrink-0" style="width:120px;">
                 <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, -1)">−</button>
                 <input type="number" class="form-control text-center rs-split-qty" data-i="${i}" min="0" max="${it.quantity}" value="0" oninput="rsSplitTotal()">
@@ -3345,12 +3404,13 @@ function updateCashBalanceUI() {
         });
 
         if (existing) {
-            existing.quantity += 1;
+            existing.quantity = posRoundQty(existing.quantity + 1);
         } else {
             cart.push({
                 product_id:        product.product_id,
                 product_name:      product.product_name,
                 sku:               product.sku || '',
+                unit:              product.unit || '',
                 price:             price,
                 quantity:          1,
                 tax_rate:          saleVatRate,
@@ -3550,8 +3610,8 @@ function updateMobileCartFab() {
     // Build compact item rows for the offcanvas body
     let html = '';
     cart.forEach(function(item, index) {
-        const lineTotal = (item.discounted_price * item.quantity)
-            .toLocaleString('en-US', {minimumFractionDigits: 2});
+        const lineTotal = (Math.round(item.discounted_price * item.quantity * 100) / 100)
+            .toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         const hasDiscount = item.discounted_price < item.price;
         const priceStr = hasDiscount
             ? '<span class="text-decoration-line-through text-muted me-1">' + item.price.toLocaleString() + '</span>'
@@ -3560,19 +3620,23 @@ function updateMobileCartFab() {
         if (POS_SIMPLE_MODE) {
             // Same handlers as the desktop cart table; serial lines keep a read-only qty.
             const qtyCtl = item.serial_numbers
-                ? '<span class="badge bg-secondary fs-6">' + item.quantity + '</span>'
+                ? '<span class="badge bg-secondary fs-6">' + posFmtQty(item.quantity) + '</span>'
                 : '<button type="button" class="btn btn-outline-secondary pos-sheet-btn" onclick="updateCartQuantity(' + index + ', -1)" aria-label="-">&minus;</button>'
-                  // Typeable qty (numeric keypad). Empty/0 reverts — removing is the trash button's job.
-                  + '<input type="number" class="form-control fw-bold text-center pos-sheet-qty" inputmode="numeric" pattern="[0-9]*" min="1" step="1"'
-                  +   ' value="' + item.quantity + '" aria-label="' + PT.quantityLabel + '"'
+                  // Typeable qty. Goods sold by measure (kg, litre …) get a keypad with "." so 0.5 can
+                  // be typed; the rest keep the plain number keypad. Empty/0 reverts — removing is the
+                  // trash button's job.
+                  + '<input type="number" class="form-control fw-bold text-center pos-sheet-qty" min="0" step="any"'
+                  +   (posLineAllowsDecimal(item) ? ' inputmode="decimal"' : ' inputmode="numeric" pattern="[0-9]*"')
+                  +   ' value="' + posRoundQty(item.quantity) + '" aria-label="' + PT.quantityLabel + '"'
                   +   ' onfocus="this.select()"'
                   +   ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}"'
-                  +   ' onchange="var q=parseInt(this.value,10);if(q>=1){updateCartQuantityInput(' + index + ',q);}else{this.value=cart[' + index + '].quantity;}">'
+                  +   ' onchange="updateCartQuantityInput(' + index + ', this.value)">'
                   + '<button type="button" class="btn btn-outline-secondary pos-sheet-btn" onclick="updateCartQuantity(' + index + ', 1)" aria-label="+">+</button>';
             html += '<div class="py-2 border-bottom">'
                 + '<div class="d-flex justify-content-between align-items-start">'
                 +   '<div class="fw-semibold" style="min-width:0;flex:1;padding-right:8px;font-size:0.95rem;">' + safeOutput(caseFormatJs(item.product_name))
-                +     (item.unit_label ? ' <span class="badge bg-light text-dark border">' + safeOutput(item.unit_label) + '</span>' : '') + '</div>'
+                +     (item.unit_label ? ' <span class="badge bg-light text-dark border">' + safeOutput(item.unit_label) + '</span>' : '')
+                +     (!item.unit_label && posLineAllowsDecimal(item) ? ' <span class="badge bg-light text-dark border">' + safeOutput(item.price.toLocaleString() + ' / ' + item.unit) + '</span>' : '') + '</div>'
                 +   '<div class="fw-bold text-end" style="white-space:nowrap;font-size:0.95rem;">' + POS_CURRENCY + ' ' + lineTotal + '</div>'
                 + '</div>'
                 + '<div class="d-flex justify-content-between align-items-center mt-1">'
@@ -3587,7 +3651,7 @@ function updateMobileCartFab() {
         html += '<div class="d-flex justify-content-between align-items-center py-2 border-bottom">'
             + '<div style="min-width:0;flex:1;padding-right:10px;">'
             +   '<div class="fw-semibold text-truncate" style="font-size:0.82rem;">' + safeOutput(item.product_name) + '</div>'
-            +   '<div class="text-muted" style="font-size:0.72rem;">' + priceStr + ' &times; ' + item.quantity + '</div>'
+            +   '<div class="text-muted" style="font-size:0.72rem;">' + priceStr + ' &times; ' + posFmtQty(item.quantity) + '</div>'
             + '</div>'
             + '<div class="fw-bold text-end" style="font-size:0.82rem;white-space:nowrap;">'
             +   POS_CURRENCY + ' ' + lineTotal
