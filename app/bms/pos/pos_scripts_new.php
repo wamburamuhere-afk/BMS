@@ -2271,7 +2271,8 @@ function saveRemainderToTable(items, tableId, label, warehouseId) {
             reference: PT.tableLabel + ' ' + label, customer_id: null, items: items,
             subtotal: items.reduce((s, i) => s + (i.price * i.quantity), 0),
             tax: items.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
-            warehouse_id: warehouseId, table_id: tableId
+            warehouse_id: warehouseId, table_id: tableId,
+            loaded_hold_id: currentHoldId || null   // online orders: lets the server keep lines accepted since this was loaded
         }),
         success: function (res) {
             if (res.success) Swal.fire({ toast: true, position: 'top', icon: 'info', title: PT.splitKept.replace('%s', label), timer: 2600, showConfirmButton: false });
@@ -2328,7 +2329,8 @@ function saveOrderToTable() {
             subtotal: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
             tax: cart.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
             warehouse_id: parseInt($('#posWarehouseId').val(), 10),
-            table_id: currentTableId
+            table_id: currentTableId,
+            loaded_hold_id: currentHoldId || null   // online orders: lets the server keep lines accepted since this was loaded
         }),
         success: function (res) {
             if (!res.success) { Swal.fire({ icon: 'error', title: PT.error, text: res.message }); return; }
@@ -2473,7 +2475,8 @@ function sendCurrentOrderToKitchen() {
         subtotal: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
         tax: cart.reduce((sum, item) => sum + (item.discounted_price * item.quantity) * ((parseFloat(item.tax_rate) || 0) / 100), 0),
         warehouse_id: wid,
-        table_id: currentTableId
+        table_id: currentTableId,
+        loaded_hold_id: currentHoldId || null   // online orders: lets the server keep lines accepted since this was loaded
     };
 
     $.ajax({
