@@ -59,48 +59,59 @@ $can_edit = canEdit('restaurant_pos');
     <div id="cardView" class="row g-2 d-none"></div>
 </div>
 
-<!-- Add/Edit Group Modal -->
-<div class="modal fade" id="groupModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Add/Edit Group Modal (one form for both; restaurant form layout — includes/restaurant/form_kit.php) -->
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); ?>
+<div class="modal fade rf-modal" id="groupModal" tabindex="-1" aria-labelledby="groupModalTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><span id="groupModalTitle"><?= t('New Group') ?></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title"><i class="bi bi-list-check"></i><span id="groupModalTitle"><?= t('New Group') ?></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <form id="groupForm" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="group_id" id="f-group-id">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="group-message" class="mb-2"></div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Name') ?> <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="name" id="f-group-name" required maxlength="150" placeholder="<?= t('e.g. Size, Toppings, Spice Level') ?>">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Selection Type') ?></label>
-                        <select class="form-select" name="selection_type" id="f-group-type" onchange="toggleMaxField()">
-                            <option value="single"><?= t('Single choice') ?></option>
-                            <option value="multiple"><?= t('Multiple choice') ?></option>
-                        </select>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Min Select') ?></label>
-                            <input type="number" class="form-control" name="min_select" id="f-group-min" value="0" min="0">
-                        </div>
-                        <div class="col-6" id="f-group-max-wrap">
-                            <label class="form-label"><?= t('Max Select') ?></label>
-                            <input type="number" class="form-control" name="max_select" id="f-group-max" value="1" min="1">
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-tag"></i><?= t('Group') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="f-group-name"><?= t('Name') ?><span class="rf-req">*</span></label>
+                                <input type="text" class="form-control" name="name" id="f-group-name" required maxlength="150" placeholder="<?= t('e.g. Size, Toppings, Spice Level') ?>">
+                            </div>
                         </div>
                     </div>
-                    <div class="form-check mt-3">
-                        <input class="form-check-input" type="checkbox" name="is_required" id="f-group-required" value="1">
-                        <label class="form-check-label" for="f-group-required"><?= t('Required — customer must choose before adding to cart') ?></label>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-ui-checks"></i><?= t('How customers choose') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="f-group-type"><?= t('Selection Type') ?></label>
+                                <select class="form-select rf-select2" name="selection_type" id="f-group-type" onchange="toggleMaxField()">
+                                    <option value="single"><?= t('Single choice') ?></option>
+                                    <option value="multiple"><?= t('Multiple choice') ?></option>
+                                </select>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-group-min"><?= t('Min Select') ?></label>
+                                <input type="number" class="form-control" name="min_select" id="f-group-min" value="0" min="0" inputmode="numeric">
+                            </div>
+                            <div class="rf-field" id="f-group-max-wrap">
+                                <label class="form-label" for="f-group-max"><?= t('Max Select') ?></label>
+                                <input type="number" class="form-control" name="max_select" id="f-group-max" value="1" min="1" inputmode="numeric">
+                            </div>
+                            <div class="rf-field rf-full">
+                                <label class="rf-choice" for="f-group-required">
+                                    <input type="checkbox" name="is_required" id="f-group-required" value="1">
+                                    <span><span class="rf-ct"><?= t('Required') ?></span><span class="rf-cd"><?= t('Required — customer must choose before adding to cart') ?></span></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer rf-foot">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
                 </div>
             </form>
         </div>
@@ -271,17 +282,17 @@ function escAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot
 
 function openGroupModal() {
     $('#groupModalTitle').text(<?= json_encode(t('New Group')) ?>);
-    $('#f-group-id').val(''); $('#f-group-name').val(''); $('#f-group-type').val('single');
+    $('#f-group-id').val(''); $('#f-group-name').val(''); $('#f-group-type').val('single').trigger('change.select2');
     $('#f-group-min').val(0); $('#f-group-max').val(1); $('#f-group-required').prop('checked', false);
     toggleMaxField();
-    new bootstrap.Modal(document.getElementById('groupModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('groupModal')).show();
 }
 function editGroup(g) {
     $('#groupModalTitle').text(<?= json_encode(t('Edit Group')) ?>);
-    $('#f-group-id').val(g.group_id); $('#f-group-name').val(g.name); $('#f-group-type').val(g.selection_type);
+    $('#f-group-id').val(g.group_id); $('#f-group-name').val(g.name); $('#f-group-type').val(g.selection_type).trigger('change.select2');
     $('#f-group-min').val(g.min_select); $('#f-group-max').val(g.max_select); $('#f-group-required').prop('checked', g.is_required == 1);
     toggleMaxField();
-    new bootstrap.Modal(document.getElementById('groupModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('groupModal')).show();
 }
 
 $('#groupForm').on('submit', function (e) {
