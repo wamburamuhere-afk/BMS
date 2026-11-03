@@ -27,7 +27,7 @@ $can_sell   = canCreate('pos');
 
 <div class="container-fluid mt-3 mt-md-4">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
-        <h4 class="mb-0 text-truncate"><i class="bi bi-grid-3x3-gap text-primary me-2"></i><?= t('Tables') ?></h4>
+        <h4 class="mb-0 text-truncate"><i class="ri ri-armchair text-primary me-2"></i><?= t('Tables') ?></h4>
         <div class="d-flex gap-2 flex-shrink-0">
             <?php if (canEdit('restaurant_pos')): ?>
             <a href="<?= getUrl('restaurant/floors') ?>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square"></i><span class="d-none d-md-inline ms-1"><?= t('Manage tables') ?></span></a>

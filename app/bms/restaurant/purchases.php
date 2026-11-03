@@ -43,7 +43,7 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
 
 <div class="container-fluid mt-3 mt-md-4 rp-page">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
-        <h4 class="mb-0"><i class="bi bi-basket text-primary me-2"></i><?= t('Purchases') ?></h4>
+        <h4 class="mb-0"><i class="ri ri-shopping-basket text-primary me-2"></i><?= t('Purchases') ?></h4>
         <?php if (count($warehouses) > 1): ?>
         <div style="width:260px;max-width:55%;"><select id="rpShop" class="form-select form-select-sm select2-static">
             <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
@@ -60,7 +60,7 @@ $other_account = ($module_on && canCreate('expenses')) ? restaurantIngredientsAc
     <div class="row g-3 mb-3">
         <div class="col-lg-8">
             <div class="rp-card h-100">
-                <div class="rp-card-h"><h6><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></h6></div>
+                <div class="rp-card-h"><h6><i class="ri ri-shopping-basket me-1"></i><?= t('Buy stock & ingredients') ?></h6></div>
                 <form id="rpForm" class="p-3" autocomplete="off">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="warehouse_id" id="rpWarehouse" value="<?= (int)$warehouses[0]['warehouse_id'] ?>">
