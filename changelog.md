@@ -11,6 +11,21 @@
 - Live finding (bjprestaurant demo): the shared shop link takes **pickup** orders, so it only accepts orders when "Order for pickup" is on — with it on, order W-0004 went through and was accepted.
 - Checked in headless Chrome at 390 px: add → bag shows 2 → open basket from the icon → send → status page shows My orders (1) → back to menu → My orders lists W-0055 and reopens it; ordering-off note and Share warning shown.
 
+## 2026-11-03 — feat(pos): sell goods by measure in parts (0.5 kg), Products stock without ".000"
+
+**Branch:** `feat/pos-decimal-qty` (off `develop`).
+**New:** `core/pos_quantity.php` (one list of units sold by measure + line quantity check), `migrations/tenant/2026_11_03_products_stock_three_decimals.php` + `_legacy_db` mirror, `tests/test_pos_decimal_qty_cli.php`.
+**Changed:** `app/bms/pos/pos_scripts_new.php`, `api/pos/process_sale.php`, `api/pos/simple_products.php`, `api/pos/create_return.php`, `app/bms/product/products.php`, `lang/sw.php`, `schema/tenant_schema_template.sql` + `tenant_seed_defaults.sql` (rebuilt).
+
+- **POS:** goods whose unit is kg, g, litre, ml or metre (also kilo, ltr, lita, mita, gramu …) can be sold in parts — type 0.5 or 0.25 straight into the quantity box (cart, phone cart, product pop-up). The phone keypad shows "." for those items. **+ / −** still add or take away exactly 1 (0.5 → 1.5 → 0.5) and never reach 0. pcs, bottle, box and the rest stay whole numbers; typing 1.5 for them puts the old quantity back with a short note instead of silently changing it to 1. Serial-tracked items stay whole.
+- **Price stays known:** the cart shows "3,000 / kg" under the item; the line is 3,000 × 0.5 = 1,500, rounded to the cent on screen, receipt and WhatsApp text.
+- **Stock and money:** a 0.5 kg sale takes exactly 0.5 off the shop stock, the product's own stock copy and the stock movement; cost of goods in the ledger is 0.5 × cost. Returns of 0.25 kg bring back exactly 0.25.
+- **Stronger server rules (`process_sale.php`):** every line is checked before any stock is touched — more than 0, at most 3 decimal places, decimals only for goods sold by measure. Before this, a 0 or −1 line was accepted and −1 pushed stock **up**. The same check covers the mobile app (same endpoint). Returns refuse a part of a whole-number item.
+- **Migration:** `products.stock_quantity` / `current_stock` 2 → 3 decimal places (DECIMAL(15,3)), so 0.125 kg is no longer saved as 0.13. Only widens; idempotent.
+- **Products page:** stock shows as typed — 12.000 → 12, 2.500 → 2.5, 1500 → 1,500 — in the table, the phone cards, the stock pop-up and the warehouse list.
+- **Cart box (`pos.php` CSS):** the browser's tiny number arrows are hidden in the cart (the − / + buttons do that job) — they covered "0.5"; a part quantity gets a little more room on a phone.
+- **Tests:** new `test_pos_decimal_qty_cli` 73 (real sale/return/ledger + the real cart code run in Node); `test_pos_simple_ux_cli` now also loads the quantity helpers (95). 124 POS / product / stock / return / restaurant suites run: 85 pass; the other 39 fail identically on the base commit `dec554a3` without this change. Checked in Chrome: Products page and stock pop-up without ".000"; POS cart, phone cart sheet and product pop-up — typing 0.5 / 0.25 / 0.75, + / −, a whole-number item refusing 1.5; no console errors.
+
 ## 2026-11-03 — ui(restaurant): one professional layout for every restaurant form (phone + desktop)
 
 **Branch:** `feat/restaurant-form-layout` (off `develop`). Owner approved the layout and the list of 11 forms.
