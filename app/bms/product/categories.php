@@ -16,7 +16,13 @@ $can_delete = canDelete('categories');
 
 // Get categories tree
 try {
-    $stmt = $pdo->query("SELECT * FROM categories WHERE type = 'product' ORDER BY category_name ASC");
+    // Restaurant focus (2026-11-02): a restaurant-only Smart POS company sees only its menu groups — those used by a menu
+    // item, or not used by any product yet (just created). Old retail groups stay in the database, untouched. Everyone else: unchanged.
+    require_once ROOT_DIR . '/core/restaurant_scope.php';
+    $rf_cat_sql = (posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo))
+        ? " AND (EXISTS (SELECT 1 FROM products rp WHERE rp.category_id = categories.category_id AND rp.is_menu_item = 1 AND rp.status = 'active')
+                OR NOT EXISTS (SELECT 1 FROM products rq WHERE rq.category_id = categories.category_id))" : '';
+    $stmt = $pdo->query("SELECT * FROM categories WHERE type = 'product'$rf_cat_sql ORDER BY category_name ASC");
     $all_categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $all_categories = [];

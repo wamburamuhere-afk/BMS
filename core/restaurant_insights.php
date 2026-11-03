@@ -64,6 +64,19 @@ if (!function_exists('rdPeriod')) {
             $first = strtotime(date('Y-m-01', $t));
             for ($i = 11; $i >= 0; $i--) { $d = strtotime("-$i months", $first); $keys[] = date('Y-m', $d); $labels[] = date('M y', $d); }
             $sql = "DATE_FORMAT(je.entry_date, '%Y-%m')";
+        } elseif ($period === 'quarterly') {
+            $q = (int)ceil((int)date('n', $t) / 3); $y = (int)date('Y', $t);
+            for ($i = 7; $i >= 0; $i--) {
+                $n = ($y * 4 + $q - 1) - $i; $yy = (int)floor($n / 4); $qq = $n % 4 + 1;
+                $keys[] = $yy . '-Q' . $qq; $labels[] = 'Q' . $qq . ' ' . $yy;
+                if ($i === 7) $qStart = sprintf('%04d-%02d-01', $yy, ($qq - 1) * 3 + 1);
+            }
+            $sql = "CONCAT(YEAR(je.entry_date), '-Q', QUARTER(je.entry_date))";
+            return ['start' => $qStart, 'end' => date('Y-m-d', $t), 'sql' => $sql, 'keys' => $keys, 'labels' => $labels];
+        } elseif ($period === 'yearly') {
+            $y = (int)date('Y', $t);
+            for ($i = 4; $i >= 0; $i--) { $keys[] = (string)($y - $i); $labels[] = (string)($y - $i); }
+            return ['start' => ($y - 4) . '-01-01', 'end' => date('Y-m-d', $t), 'sql' => "DATE_FORMAT(je.entry_date, '%Y')", 'keys' => $keys, 'labels' => $labels];
         } else {
             $period = 'daily';
             for ($i = 29; $i >= 0; $i--) { $d = strtotime("-$i days", $t); $keys[] = date('Y-m-d', $d); $labels[] = date('d M', $d); }
@@ -277,6 +290,112 @@ if (!function_exists('rdProfitWarnings')) {
         if ($noRecipe > 0 && $groceries <= 0) $w[] = ['type' => 'no_food_bought', 'n' => $noRecipe];
         if (($cur['expenses'] ?? 0) <= 0) $w[] = ['type' => 'no_expenses', 'n' => 0];
         return $w;
+    }
+}
+
+if (!function_exists('rdPeriodRange')) {
+    /**
+     * The "Showing" choice on the restaurant dashboard: from the start of the period to today, and the same stretch of the
+     * period before it, so a part of this week is never compared with a whole last week.
+     * @param string $p today|week|month|quarter|year (anything else means today)
+     */
+    function rdPeriodRange(string $p, ?string $today = null): array
+    {
+        $today = $today ?? date('Y-m-d'); $t = strtotime($today);
+        $back = function (string $from, int $months) use ($today): array {   // the same number of days, a period earlier
+            $pf = date('Y-m-d', strtotime("-$months months", strtotime($from)));
+            $days = (int)((strtotime($today) - strtotime($from)) / 86400);
+            $pt = date('Y-m-d', strtotime("+$days days", strtotime($pf)));
+            $last = date('Y-m-d', strtotime('-1 day', strtotime($from)));
+            return [$pf, $pt > $last ? $last : $pt];
+        };
+        if ($p === 'week') {
+            $from = date('Y-m-d', strtotime('monday this week', $t));
+            $days = (int)(($t - strtotime($from)) / 86400);
+            $pf = date('Y-m-d', strtotime('-7 days', strtotime($from)));
+            return ['key' => 'week', 'from' => $from, 'to' => $today, 'prev_from' => $pf, 'prev_to' => date('Y-m-d', strtotime("+$days days", strtotime($pf)))];
+        }
+        if ($p === 'month')   { $from = date('Y-m-01', $t); [$a, $b] = $back($from, 1);  return ['key' => 'month', 'from' => $from, 'to' => $today, 'prev_from' => $a, 'prev_to' => $b]; }
+        if ($p === 'quarter') { $from = date('Y', $t) . '-' . sprintf('%02d', ((int)ceil((int)date('n', $t) / 3) - 1) * 3 + 1) . '-01'; [$a, $b] = $back($from, 3); return ['key' => 'quarter', 'from' => $from, 'to' => $today, 'prev_from' => $a, 'prev_to' => $b]; }
+        if ($p === 'year')    { $from = date('Y-01-01', $t); [$a, $b] = $back($from, 12); return ['key' => 'year', 'from' => $from, 'to' => $today, 'prev_from' => $a, 'prev_to' => $b]; }
+        $y = date('Y-m-d', strtotime('-1 day', $t));
+        return ['key' => 'today', 'from' => $today, 'to' => $today, 'prev_from' => $y, 'prev_to' => $y];
+    }
+}
+
+if (!function_exists('rdPeriodStory')) {
+    /** Sales, costs and profit for a period from the one ledger, its number of orders, and the same stretch before it. Same shape as rdProfitStory(). */
+    function rdPeriodStory(PDO $pdo, string $jeScope, array $ids, array $r): array
+    {
+        $f = function (array $pl): array {
+            $sales = round(($pl['total_revenue'] ?? 0) + ($pl['total_other_income'] ?? 0), 2);
+            $cost = round((float)($pl['total_cogs'] ?? 0), 2);
+            $exp = round((float)($pl['total_expense'] ?? 0) + (float)($pl['total_finance_cost'] ?? 0), 2);
+            return ['sales' => $sales, 'cost' => $cost, 'expenses' => $exp, 'profit' => round($sales - $cost - $exp, 2)];
+        };
+        $cur = $f(glProfitLoss($pdo, $r['from'], $r['to'], null, $jeScope));
+        $prev = $f(glProfitLoss($pdo, $r['prev_from'], $r['prev_to'], null, $jeScope));
+        $orders = 0;
+        try {
+            $st = $pdo->prepare("SELECT COUNT(*) FROM pos_sales ps WHERE ps.sale_status = 'completed' AND ps.is_return_sale = 0
+                                  AND DATE(ps.sale_date) BETWEEN ? AND ? AND ps.warehouse_id IN (" . rdIn($ids) . ")");
+            $st->execute([$r['from'], $r['to']]);
+            $orders = (int)$st->fetchColumn();
+        } catch (Throwable $e) { error_log('rdPeriodStory: ' . $e->getMessage()); }
+        $per100 = $cur['sales'] > 0
+            ? ['cost' => round($cur['cost'] / $cur['sales'] * 100, 1), 'expenses' => round($cur['expenses'] / $cur['sales'] * 100, 1), 'profit' => round($cur['profit'] / $cur['sales'] * 100, 1)]
+            : ['cost' => 0.0, 'expenses' => 0.0, 'profit' => 0.0];
+        return ['from' => $r['from'], 'to' => $r['to'], 'prev_from' => $r['prev_from'], 'prev_to' => $r['prev_to'], 'cur' => $cur, 'prev' => $prev,
+                'margin' => $per100['profit'], 'per100' => $per100, 'profit_vs_prev' => rdPct($cur['profit'], $prev['profit']),
+                'sales_vs_prev' => rdPct($cur['sales'], $prev['sales']), 'orders' => $orders,
+                'avg_bill' => $orders > 0 ? round($cur['sales'] / $orders, 2) : 0.0];
+    }
+}
+
+if (!function_exists('rdDashExtras')) {
+    /**
+     * The small counts the Layout-2 restaurant dashboard shows on its action buttons and summary cards (2026-11-02).
+     * Counts only, from the operational tables, scoped to the restaurant shops $ids (and the user's expense scope).
+     * @return array{tables_total:int, kitchen_waiting:int, kitchen_longest:int, reservations_today:int, expenses_pending:int, expenses_pending_amount:float, expenses_month:float}
+     */
+    function rdDashExtras(PDO $pdo, array $ids): array
+    {
+        $in = rdIn($ids);
+        $o = ['tables_total' => 0, 'kitchen_waiting' => 0, 'kitchen_longest' => 0, 'reservations_today' => 0,
+              'expenses_pending' => 0, 'expenses_pending_amount' => 0.0];
+        try { $o['tables_total'] = (int)$pdo->query("SELECT COUNT(*) FROM restaurant_tables WHERE warehouse_id IN ($in)")->fetchColumn(); }
+        catch (Throwable $e) { error_log('rdDashExtras tables: ' . $e->getMessage()); }
+        try {
+            $r = $pdo->query("SELECT COUNT(*) AS n, COALESCE(MAX(TIMESTAMPDIFF(MINUTE, created_at, NOW())),0) AS m FROM kitchen_tickets
+                               WHERE status = 'queued' AND warehouse_id IN ($in) AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) >= 20")->fetch(PDO::FETCH_ASSOC) ?: [];
+            $o['kitchen_waiting'] = (int)($r['n'] ?? 0); $o['kitchen_longest'] = (int)($r['m'] ?? 0);
+        } catch (Throwable $e) { /* kitchen tables are optional */ }
+        try {
+            $o['reservations_today'] = (int)$pdo->query("SELECT COUNT(*) FROM restaurant_reservations
+                WHERE warehouse_id IN ($in) AND DATE(reservation_time) = CURDATE() AND status IN ('booked','confirmed','pending','seated')")->fetchColumn();
+        } catch (Throwable $e) { /* reservations are optional */ }
+        try {
+            $st = $pdo->query("SELECT COUNT(*) AS c, COALESCE(SUM(e.amount),0) AS a FROM expenses e WHERE e.status = 'pending'"
+                . scopeFilterSqlNullable('warehouse', 'e') . scopeFilterSqlNullable('project', 'e'));
+            $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+            $o['expenses_pending'] = (int)($r['c'] ?? 0); $o['expenses_pending_amount'] = (float)($r['a'] ?? 0);
+        } catch (Throwable $e) { error_log('rdDashExtras expenses: ' . $e->getMessage()); }
+        return $o;
+    }
+}
+
+if (!function_exists('rdRecentActivities')) {
+    /** The latest things that happened (sales, payments, edits — not page views), newest first. Caller checks the permission. */
+    function rdRecentActivities(PDO $pdo, int $limit = 8): array
+    {
+        try {
+            $st = $pdo->query("SELECT al.action, al.description, al.created_at, u.username
+                                 FROM activity_logs al LEFT JOIN users u ON u.user_id = al.user_id
+                                WHERE NOT (al.action LIKE 'View%' OR al.action IN ('VIEW', 'view_list', 'FILTER') OR al.action LIKE 'Filter%' OR al.action LIKE 'Searched%'
+                                           OR COALESCE(al.description, '') LIKE 'User viewed%' OR COALESCE(al.description, '') LIKE '[LOG] User viewed%' OR COALESCE(al.description, '') LIKE '[VIEW]%')
+                             ORDER BY al.created_at DESC LIMIT " . (int)$limit);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { error_log('rdRecentActivities: ' . $e->getMessage()); return []; }
     }
 }
 

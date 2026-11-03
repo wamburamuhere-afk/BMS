@@ -51,7 +51,7 @@ $cur = getSetting('currency', 'TZS');
 
 <div class="container-fluid mt-3 mt-md-4 rp-page">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
-        <h4 class="mb-0"><i class="bi bi-basket text-primary me-2"></i><?= t('Purchases') ?></h4>
+        <h4 class="mb-0"><i class="ri ri-shopping-basket text-primary me-2"></i><?= t('Purchases') ?></h4>
         <?php if (count($warehouses) > 1): ?>
         <div style="width:260px;max-width:55%;"><select id="rpShop" class="form-select form-select-sm select2-static">
             <?php foreach ($warehouses as $w): ?><option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option><?php endforeach; ?>
@@ -69,7 +69,7 @@ $cur = getSetting('currency', 'TZS');
         <div class="col-lg-8">
             <div class="rp-card h-100">
                 <div class="rp-card-h d-flex justify-content-between align-items-center">
-                    <h6><i class="bi bi-box-arrow-in-down me-1"></i><?= t('Buy stock & ingredients') ?></h6>
+                    <h6><i class="ri ri-shopping-basket me-1"></i><?= t('Buy stock & ingredients') ?></h6>
                     <a class="rp-help" data-bs-toggle="collapse" href="#rpHelp" role="button" aria-expanded="false" title="<?= htmlspecialchars(t('How it works')) ?>"><i class="bi bi-question-lg"></i></a>
                 </div>
                 <form id="rpForm" class="p-3" autocomplete="off">

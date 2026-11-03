@@ -246,7 +246,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         <div>
             <div class="pos-hdr-top">
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> <span class="pos-hdr-title"><?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?></span>
+                <i class="bi bi-cash-register"></i> <span class="pos-hdr-title"><?= htmlspecialchars(($restaurant_pos_enabled && $pos_simple && restaurantOnlyCompany($pdo)) ? t('Take order') : wLabel('Point of Sale', 'Sell')) ?></span>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
                       title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>"
@@ -605,7 +605,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                             <i class="bi bi-grid-3x3-gap"></i>
                         </button>
                         <button class="btn btn-outline-dark d-none" id="sendToKitchenBtn" onclick="sendCurrentOrderToKitchen()" title="<?= t('Send to Kitchen') ?>">
-                            <i class="bi bi-fire"></i>
+                            <i class="ri ri-chef-hat"></i>
                         </button>
                     </div>
                 </div>
@@ -616,15 +616,15 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 <div class="d-none mb-2" id="restaurantOrderBar">
                     <div class="btn-group w-100 rs-order-type" role="group" aria-label="<?= htmlspecialchars(t('Order type')) ?>">
                         <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDine" value="dine_in">
-                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDine"><i class="bi bi-cup-hot me-1"></i><?= t('Dine in') ?></label>
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDine"><i class="ri ri-utensils me-1"></i><?= t('Dine in') ?></label>
                         <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeTake" value="take_away">
-                        <label class="btn btn-outline-primary btn-sm" for="rsTypeTake"><i class="bi bi-bag me-1"></i><?= t('Take away') ?></label>
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeTake"><i class="ri ri-shopping-bag me-1"></i><?= t('Take away') ?></label>
                         <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDelivery" value="delivery">
-                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDelivery"><i class="bi bi-scooter me-1"></i><?= t('Delivery') ?></label>
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDelivery"><i class="ri ri-bike me-1"></i><?= t('Delivery') ?></label>
                     </div>
                     <div class="d-flex gap-2 mt-2" id="rsTableRow">
                         <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-truncate" id="rsTableBtn" onclick="openTablePicker()">
-                            <i class="bi bi-grid-3x3-gap me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
+                            <i class="ri ri-armchair me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
                         </button>
                         <button type="button" class="btn btn-sm btn-primary d-none text-nowrap" id="rsSaveTableBtn" onclick="saveOrderToTable()">
                             <i class="bi bi-bookmark-check me-1"></i><?= t('Save to table') ?>
@@ -676,8 +676,9 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </table>
                 <div id="emptyCart" class="text-center py-5 bg-white rounded">
                     <i class="bi bi-cart-x" style="font-size: 3rem; color: #6c757d;"></i>
-                    <p class="text-muted mt-2 mb-1"><?= t('Cart is empty') ?></p>
-                    <p class="text-muted small"><?= t('Search or browse products to add items') ?></p>
+                    <?php $_rf_till = $restaurant_pos_enabled && $pos_simple && restaurantOnlyCompany($pdo); ?>
+                    <p class="text-muted mt-2 mb-1"><?= $_rf_till ? t('No items on this order yet') : t('Cart is empty') ?></p>
+                    <p class="text-muted small"><?= $_rf_till ? t('Tap a dish or drink to add it.') : t('Search or browse products to add items') ?></p>
                 </div>
             </div>
 

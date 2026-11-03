@@ -527,7 +527,7 @@ $menuSrc = file_get_contents("$root/app/bms/restaurant/menu.php");
 ok(strpos($menuSrc, 'RM.buyUrl}?item=') !== false && strpos($menuSrc, "buyStock: <?= json_encode(t('Buy stock & ingredients')) ?>") !== false, 'the Menu offers "Buy stock & ingredients" on a bought item (not on a dish)');
 $hdr = file_get_contents("$root/header.php");
 ok(substr_count($hdr, "getUrl('restaurant/purchases')") === 2, 'the Purchases menu (desktop and phone) opens the new page');
-ok(strpos(file_get_contents("$root/includes/restaurant/dashboard.php"), "getUrl('restaurant/purchases')") !== false && strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "getUrl('restaurant/purchases')") !== false, 'the dashboard\'s low-stock links open Purchases');
+ok(substr_count(file_get_contents("$root/includes/restaurant/dash_panel.php"), "getUrl('restaurant/purchases')") >= 3, 'the dashboard\'s purchase and low-stock links open Purchases');
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('P4. Selling Settings — Restaurant first; retail-only options hidden for a restaurant-only company');
@@ -699,11 +699,11 @@ ok(clean($sr6) && strpos(body($sr6), 'Estimated profit') !== false && strpos(bod
 $dp = runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1');
 $bd = body($dp);
 $dpSrc = file_get_contents("$root/includes/restaurant/dash_panel.php");
-ok(clean($dp) && strpos($bd, 'Money check this month') !== false && strpos($bd, 'In stock now') !== false && strpos($bd, 'Net Profit') !== false, 'dashboard: the money check, and Net Profit');
+ok(clean($dp) && strpos($bd, 'Money check this month') === false && strpos($bd, 'In stock now') === false && strpos($bd, 'Net Profit') !== false, 'dashboard: Net Profit, and the money check is gone (owner\'s choice)');
 ok(strpos($dpSrc, "t('Cost of Goods')") !== false && strpos($dpSrc, "t('Gross Profit')") !== false && strpos($dpSrc, "t('Food cost')") === false, 'dashboard: same words as the retail Profit Report (shown once there are sales)');
 ok(strpos($bd, 'rbiOpen()') === false && strpos($bd, 'restaurant/purchases') !== false, 'dashboard: the tile goes to the one Purchases page');
 $dsw = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw'));
-ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') !== false && strpos($dsw, 'Money check this month') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: the money check is in Swahili, no English left');
+ok(strpos($dsw, 'Ukaguzi wa fedha mwezi huu') === false && strpos($dsw, 'Faida Halisi') !== false, 'Swahili dashboard: Net Profit in Swahili, no money check');
 $dr = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
 ok(strpos($dr, 'Money check this month') === false, 'a retail company\'s dashboard does not get any of this');
 // Stock report limited for a restaurant, untouched otherwise (static + the gate)
@@ -725,11 +725,204 @@ $ae = file_get_contents("$root/api/account/add_expense.php");
 $iA = strpos($ae, '$bank_account_id = defaultCashAccountId($pdo);'); $iB = strpos($ae, 'if (restaurantOnlyCompany($pdo))');
 ok($iA !== false && $iB > $iA && strpos($ae, "\$bank_account_id = posReceiptAccountId(\$pdo, 'cash') ?: \$bank_account_id;") !== false, 'Add Expense: only a restaurant-only company changes account; everyone else keeps the default');
 ok((int)posReceiptAccountId($pdo, 'cash') > 0, 'the cash account resolves');
-ok(strpos(file_get_contents("$root/includes/restaurant/dash_panel.php"), "Stock is below zero") !== false, 'dashboard explains a stock value below zero instead of only showing the number');
 ok(strpos($pgP, 'text-truncate') === false && strpos($pgP, 'name="cost_price" min=') === false, 'Purchases: the title is not cut, and the New ingredient window asks no price');
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('P8. Purchases screen: simpler, with quiet checks (2026-11-02)');
+section('P8. Found on the live demo: Swahili groceries, retail groups, retail products, till words');
+// (a) a grocery saved in Swahili ("Viungo: …") is listed, with the Swahili prefix removed
+$accG = (int)restaurantIngredientsAccountId($pdo);
+$sfx8 = substr(bin2hex(random_bytes(3)), 0, 6);
+$pdo->prepare("INSERT INTO expenses (expense_date, expense_account_id, amount, description, status, warehouse_id, created_by) VALUES (?, ?, 4200, ?, 'paid', ?, ?)")->execute([date('Y-m-d'), $accG, "Viungo: RF8 nyanya $sfx8", $W2, $admin]);
+$EXP8 = (int)$pdo->lastInsertId();
+try {
+    $gpSw = runWorker(['page' => 'api/restaurant/get_purchases.php', 'get' => ['warehouse_id' => $W2]], $ON, [$W2 => 'restaurant'] + $retailAll, '1', 'sw');
+    $jSw = json_decode(trim(explode('___OUT___', $gpSw, 2)[1] ?? ''), true) ?: [];
+    $hit = null; foreach (($jSw['data'] ?? []) as $r) if (strpos((string)$r['item'], "RF8 nyanya $sfx8") !== false) $hit = $r;
+    ok($hit && $hit['kind'] === 'grocery' && near3($hit['total'], 4200), 'a grocery saved in Swahili ("Viungo: …") is in the Purchases list');
+    ok($hit && $hit['item'] === "RF8 nyanya $sfx8", 'its Swahili prefix is removed, like the English one');
+} finally {
+    $pdo->prepare("DELETE FROM expenses WHERE expense_id = ?")->execute([$EXP8]);
+}
+// (b) Menu groups: a restaurant-only company sees only groups its menu uses (or still-empty ones)
+$pdo->prepare("INSERT INTO categories (category_name, type) VALUES (?, 'product')")->execute(["RF8 Retail Group $sfx8"]); $RCAT = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO categories (category_name, type) VALUES (?, 'product')")->execute(["RF8 Menu Group $sfx8"]); $MCAT = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO categories (category_name, type) VALUES (?, 'product')")->execute(["RF8 Empty Group $sfx8"]); $ECAT = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, selling_price, min_selling_price, is_service, track_inventory, warehouse_id, is_menu_item, status, created_by, category_id) VALUES (?, 'pcs', 'pcs', 1, 2, 0, 0, 1, ?, 0, 'active', ?, ?)")->execute(["RF8 Retail Thing $sfx8", $W2, $admin, $RCAT]); $RP8 = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, selling_price, min_selling_price, is_service, track_inventory, warehouse_id, is_menu_item, status, created_by, category_id) VALUES (?, 'pcs', 'pcs', 0, 5, 0, 1, 0, ?, 1, 'active', ?, ?)")->execute(["RF8 Dish $sfx8", $W2, $admin, $MCAT]); $MP8 = (int)$pdo->lastInsertId();
+try {
+    $cRest = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $onlyRest, '1'));
+    $cRet  = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $retailAll, '1'));
+    $cMix  = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $mixed, '1'));
+    $cFull = body(runWorker(['page' => 'app/bms/product/categories.php'], $ON, $onlyRest, '0'));
+    ok(strpos($cRest, "RF8 Menu Group $sfx8") !== false && strpos($cRest, "RF8 Empty Group $sfx8") !== false, 'restaurant-only: Menu groups shows its menu groups and a new empty group');
+    ok(strpos($cRest, "RF8 Retail Group $sfx8") === false, 'restaurant-only: a retail group (used only by retail products) is not shown');
+    foreach (['retail company' => $cRet, 'mixed company' => $cMix, 'full BMS' => $cFull] as $nm => $h)
+        ok(strpos($h, "RF8 Retail Group $sfx8") !== false && strpos($h, "RF8 Menu Group $sfx8") !== false, "$nm: every group still shown (unchanged)");
+} finally {
+    $pdo->exec("DELETE FROM products WHERE product_id IN ($RP8, $MP8)");
+    $pdo->exec("DELETE FROM categories WHERE category_id IN ($RCAT, $MCAT, $ECAT)");
+}
+// (c) Menu: no "Already in my products" for a restaurant-only company
+$mRest = body(runWorker(['page' => 'app/bms/restaurant/menu.php'], $ON, $onlyRest, '1'));
+$mMix  = body(runWorker(['page' => 'app/bms/restaurant/menu.php'], $ON, $mixed, '1'));
+ok(strpos($mRest, 'data-type="existing"') === false && strpos($mRest, 'data-type="dish"') !== false && strpos($mRest, 'data-type="bought"') !== false, 'restaurant-only Menu: Dish and Bought item, no "Already in my products"');
+ok(strpos($mMix, 'data-type="existing"') !== false, 'mixed company Menu: "Already in my products" still there (it has retail products)');
+// (d) the till speaks restaurant for a restaurant-only company only
+$tRest = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $onlyRest, '1'));
+$tRet  = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $retailAll, '1'));
+$tMix  = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $mixed, '1'));
+$title = fn($h) => preg_match('#<span class="pos-hdr-title">([^<]*)</span>#', $h, $m) ? $m[1] : '?';
+ok($title($tRest) === 'Take order' && strpos($tRest, 'No items on this order yet') !== false && strpos($tRest, 'Tap a dish or drink to add it.') !== false, 'restaurant-only till: "Take order", "No items on this order yet"');
+ok($title($tRet) === $title($tMix) && $title($tRet) !== 'Take order' && strpos($tRet, 'Search or browse products to add items') !== false && strpos($tRet, 'No items on this order yet') === false, 'retail and mixed tills: the same words as before ("' . $title($tRet) . '")');
+$tSw = body(runWorker(['page' => 'app/bms/pos/pos.php'], $ON, $onlyRest, '1', 'sw'));
+ok($title($tSw) === 'Weka Oda' && strpos($tSw, 'Bado hakuna kitu kwenye oda hii') !== false && strpos($tSw, 'No items on this order yet') === false, 'Swahili till: "Weka Oda", no English left');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P9. Dashboard Layout 2 (Side actions) — restaurant-only company only; notification bell');
+$d9 = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1'));
+$dc = preg_replace('#<!--.*?-->#s', '', $d9);
+ok(strpos($dc, 'class="rdp rdp-l2"') !== false && strpos($dc, 'class="rd2 ') !== false, 'restaurant-only: the Layout 2 grid is on the page');
+// the 8 quick actions (Take order, Tables, Kitchen, Menu, Purchases, Expenses, Reservations, Sales report), each with its live line
+preg_match('#<nav class="rd2-acts".*?</nav>#s', $dc, $nav9); $nav9 = $nav9[0] ?? '';
+foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaurant/kitchen-dashboard' => 'Kitchen', 'restaurant/menu' => 'Menu', 'restaurant/purchases' => 'Purchases', 'expenses' => 'Expenses', 'restaurant/reservations' => 'Reservations', 'restaurant/sales-report' => 'Sales report'] as $href => $lbl)
+    ok(strpos($nav9, '/' . $href . '"') !== false && strpos($nav9, "<b>$lbl</b>") !== false, "action: $lbl → /$href");
+ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
+// Today and Money cards; the supplier-credit card is deliberately NOT there
+foreach (['sales' => 'Sales', 'orders' => 'Orders', 'profit' => 'Profit', 'exp' => 'Expenses', 'tables' => 'Open tables', 'owed' => 'Owed to me'] as $cc => $lbl)
+    ok((bool)preg_match('#class="rd2-sc rd2-c-' . $cc . '"><span class="rd2-l"><i class="ri ri-[a-z-]+"></i>' . preg_quote($lbl, '#') . '#', $dc), "card with its own colour: $lbl");
+ok(stripos($dc, 'We owe suppliers') === false && stripos($dc, 'owe suppliers') === false, 'no "We owe suppliers" card (supplier credit is not built)');
+// side panel
+foreach (['att', 'low', 'ord'] as $pt) ok(strpos($dc, 'data-pt="' . $pt . '"') !== false, "side panel tab: $pt");
+ok(strpos($dc, 'data-pt="act"') !== false, 'side panel: Activities tab for a user who may see the audit log (admin)');
+$dsrc9 = file_get_contents("$root/includes/restaurant/dash_panel.php");
+ok(strpos($dsrc9, "\$rdActs = canView('audit_logs') ?") !== false, 'Activities are read only with the audit_logs permission, like the retail dashboard');
+// colours of the chosen design: sales blue, costs orange
+ok(strpos($dc, '.rdp-l2 .rdp-bar-food { background:#d97706; }') !== false && strpos($dc, "backgroundColor: L2 ? AMBER : NAVY") !== false && strpos($dc, "AMBER = '#d97706'") !== false, 'colours: costs are orange in the bar, the legend and the chart');
+// the old stand-alone rows are gone from the page body (they moved into the panel)
+ok(strpos($dc, 'class="rd-actions') === false && strpos($dc, '>Recent orders<') === false, 'the old action row and the separate "Recent orders" card are gone (now in Layout 2)');
+// phone: one column, actions wrap
+ok(strpos($dc, '@media (max-width:1199.98px)') !== false && strpos($dc, 'grid-template-areas:none') !== false && strpos($dc, '.rd2-acts { flex-direction:row; flex-wrap:wrap; }') !== false, 'phone/tablet: single column, the actions become a wrapping row');
+// Kitchen action and card follow the kitchen setting
+$get9 = fn($k) => $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = " . $pdo->quote($k))->fetchColumn();
+$ko = $get9('restaurant_kitchen_mode');
+try {
+    $pdo->exec("INSERT INTO system_settings (setting_key, setting_value) VALUES ('restaurant_kitchen_mode','none') ON DUPLICATE KEY UPDATE setting_value='none'");
+    $dn = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1')));
+    preg_match('#<nav class="rd2-acts".*?</nav>#s', $dn, $navn);
+    ok(strpos($navn[0] ?? '', 'restaurant/kitchen-dashboard"') === false && strpos($navn[0] ?? '', '<b>Kitchen</b>') === false, 'kitchen "by mouth": no Kitchen action');
+} finally {
+    if ($ko === false) $pdo->exec("DELETE FROM system_settings WHERE setting_key = 'restaurant_kitchen_mode'");
+    else $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'restaurant_kitchen_mode'")->execute([$ko]);
+}
+// the helpers
+$x9 = rdDashExtras($pdo, [$W2]);
+ok(array_keys($x9) === ['tables_total', 'kitchen_waiting', 'kitchen_longest', 'reservations_today', 'expenses_pending', 'expenses_pending_amount'] && $x9['tables_total'] >= 0 && $x9['expenses_pending'] >= 0, 'rdDashExtras returns the six counts');
+$ac9 = rdRecentActivities($pdo, 5);
+$viewish = 0; foreach ($ac9 as $a) if (preg_match('/^(View|Filter|Searched)/', (string)$a['action']) || strpos((string)$a['description'], 'User viewed') === 0) $viewish++;
+ok(is_array($ac9) && count($ac9) <= 5 && $viewish === 0, 'rdRecentActivities: at most the limit, and no page views');
+// retail, mixed, Hybrid, full BMS: none of it
+foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'Hybrid shops' => [$hybridAll, '1'], 'full BMS (Smart POS off)' => [$onlyRest, '0']] as $nm => [$modes9, $simple9]) {
+    $h = body(runWorker(['page' => 'app/dashboard.php'], $ON, $modes9, $simple9));
+    ok(strpos($h, 'rd2-acts') === false && strpos($h, 'rdp-l2') === false && strpos($h, 'id="rdBell"') === false, "$nm: no Layout 2 and no notification bell");
+}
+$strip = (string)(json_decode(trim(body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'))), true)['html'] ?? '');
+ok(strpos($strip, 'class="rd2 ') === false && strpos($strip, 'class="rd2-acts"') === false && strpos($strip, 'rdp-stat') !== false, 'the mixed-company strip keeps its own layout (no Layout 2)');
+// the bell
+ok(strpos($dc, 'id="rdBell"') !== false, 'restaurant-only: the notification bell is in the top bar');
+ok(strpos($dc, 'href="' . '/notification_center"') !== false || preg_match('#id="rdBell"#', $dc) && preg_match('#<a href="[^"]*notification_center"[^>]*id="rdBell"|id="rdBell"[^>]*>#', $dc), 'the bell opens the existing Notification Center');
+$hdr9 = file_get_contents("$root/header.php");
+ok(strpos($hdr9, '$__bell_on = posSimpleModeEnabled() && canView(\'restaurant_pos\') && restaurantOnlyCompany($pdo);') !== false && strpos($hdr9, 'notifications WHERE user_id = ? AND is_read = 0') !== false, 'the bell is for a restaurant-only Smart POS company only and counts the user\'s unread notifications');
+// Swahili: everything new is translated, none left in English
+$dsw9 = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1', 'sw')));
+foreach (['Inaonyesha' => 'Showing', 'Sasa hivi' => 'Right now', 'Kila Robo Mwaka' => 'Quarterly', 'Fungua kaunta ya mauzo' => 'Open the till', 'Yanayohitaji hatua' => 'Needs attention', 'Zinakaribia kuisha' => 'Running low', 'Ninazodai' => 'Owed to me', 'Ripoti ya mauzo' => 'Sales report'] as $swt => $en)
+    ok(strpos($dsw9, $swt) !== false && strpos($dsw9, '>' . $en . '<') === false && strpos($dsw9, '<b>' . $en . '</b>') === false, "Swahili: '$en' is '$swt', none left in English");
+// every inline script parses
+preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $dc, $m9); $bad9 = 0;
+foreach ($m9[1] as $js) { if (trim($js) === '') continue; $tmp = tempnam(sys_get_temp_dir(), 'djs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) $bad9++; $oo = []; }
+ok($bad9 === 0, 'dashboard: every inline script parses (' . count($m9[1]) . ' scripts)');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P10. Dashboard arrangement A: period choices, removed blocks, bell beside Help, no red');
+// the "Showing" dates, on fixed days
+$rg = fn($p, $d) => rdPeriodRange($p, $d);
+$r = $rg('today', '2026-11-04'); ok($r['from'] === '2026-11-04' && $r['to'] === '2026-11-04' && $r['prev_from'] === '2026-11-03' && $r['prev_to'] === '2026-11-03', 'Today: compared with yesterday');
+$r = $rg('week', '2026-11-04'); ok($r['from'] === '2026-11-02' && $r['prev_from'] === '2026-10-26' && $r['prev_to'] === '2026-10-28', 'This week: Monday to today, against the same days last week');
+$r = $rg('month', '2026-11-04'); ok($r['from'] === '2026-11-01' && $r['prev_from'] === '2026-10-01' && $r['prev_to'] === '2026-10-04', 'This month: against the same days last month');
+$r = $rg('month', '2026-03-31'); ok($r['prev_from'] === '2026-02-01' && $r['prev_to'] === '2026-02-28', 'This month on the 31st: last month stops at its own end, not in this month');
+$r = $rg('quarter', '2026-11-04'); ok($r['from'] === '2026-10-01' && $r['prev_from'] === '2026-07-01' && $r['prev_to'] === '2026-08-04', 'This quarter: from 1 Oct, against the same days of the last quarter');
+$r = $rg('year', '2026-11-04'); ok($r['from'] === '2026-01-01' && $r['prev_from'] === '2025-01-01' && $r['prev_to'] === '2025-11-04', 'This year: against last year up to the same day');
+ok($rg('nonsense', '2026-11-04')['key'] === 'today', 'an unknown choice in the address falls back to Today');
+// the five chart periods
+$q = rdPeriod('quarterly', '2026-11-04'); ok(count($q['keys']) === 8 && $q['keys'][7] === '2026-Q4' && $q['keys'][0] === '2025-Q1' && $q['start'] === '2025-01-01' && $q['labels'][7] === 'Q4 2026', 'chart Quarterly: 8 quarters, 2025-Q1 to 2026-Q4');
+$q = rdPeriod('quarterly', '2026-02-10'); ok($q['keys'][7] === '2026-Q1' && $q['keys'][6] === '2025-Q4' && $q['keys'][0] === '2024-Q2' && $q['start'] === '2024-04-01', 'chart Quarterly crosses a year correctly');
+$y = rdPeriod('yearly', '2026-11-04'); ok($y['keys'] === ['2022', '2023', '2024', '2025', '2026'] && $y['start'] === '2022-01-01', 'chart Yearly: 5 years');
+ok(count(rdPeriod('daily', '2026-11-04')['keys']) === 30 && count(rdPeriod('weekly', '2026-11-04')['keys']) === 12 && count(rdPeriod('monthly', '2026-11-04')['keys']) === 12, 'chart Daily, Weekly and Monthly unchanged');
+// figures agree: chart year = story year = the Income Statement function
+$js9 = rdJeScope([$W2], 'company');
+$st9 = rdPeriodStory($pdo, $js9, [$W2], rdPeriodRange('year'));
+$pl9 = glProfitLoss($pdo, date('Y-01-01'), date('Y-m-d'), null, $js9);
+ok(near3($st9['cur']['sales'], ($pl9['total_revenue'] ?? 0) + ($pl9['total_other_income'] ?? 0)) && near3($st9['cur']['cost'], (float)($pl9['total_cogs'] ?? 0)), 'This year: the cards match the Income Statement figures');
+$tr9 = rdTrend($pdo, 'yearly', $js9);
+ok(near3(end($tr9['sales']), $st9['cur']['sales'], 0.02) && near3(end($tr9['profit']), $st9['cur']['profit'], 0.02), 'This year: the Yearly chart\'s last bar equals the cards');
+$qr = rdPeriodRange('quarter'); $sq = rdPeriodStory($pdo, $js9, [$W2], $qr); $tq = rdTrend($pdo, 'quarterly', $js9);
+ok(near3(end($tq['sales']), $sq['cur']['sales'], 0.02), 'This quarter: the Quarterly chart\'s last bar equals the cards');
+// the page
+$pg10 = preg_replace('#<!--.*?-->#s', '', $dc);
+preg_match('#<select class="form-select form-select-sm w-auto rdp-period-sel".*?</select>#s', $pg10, $ps);
+ok(preg_match_all('#<option value="(daily|weekly|monthly|quarterly|yearly)"#', $ps[0] ?? '') === 5, 'Performance period is a dropdown with all 5 retail periods');
+ok(strpos($pg10, 'class="btn-group btn-group-sm rdp-period"') === false, 'the Daily / Weekly / Monthly buttons are gone');
+preg_match('#<select id="rdPeriodSel".*?</select>#s', $pg10, $ps2);
+ok(preg_match_all('#<option value="(today|week|month|quarter|year)"#', $ps2[0] ?? '') === 5, 'the "Showing" dropdown has 5 choices');
+ok(strpos($pg10, 'Money check this month') === false && strpos($pg10, 'Busy hours') === false && strpos($pg10, '-hours"') === false, 'Money check and Busy hours are gone');
+ok(strpos($pg10, 'class="rd2-sl"') === false && strpos($pg10, 'Kitchen waiting') === false, 'the "Today" heading and the Kitchen waiting card are gone (Kitchen stays as an action)');
+preg_match('#\.rdp-l2 \.text-danger \{[^}]*\}#', $pg10, $td);
+ok(strpos($td[0] ?? '', '#b45309') !== false && strpos(preg_replace('#<(style|script)[ >].*?</\1>#s', '', substr($pg10, strpos($pg10, 'class="rd2 '))), '#dc3545') === false, 'no red in the new layout: warnings are amber');
+$wk = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/dashboard.php', 'get' => ['rd_period' => 'year']], $ON, $onlyRest, '1')));
+ok(preg_match('#<option value="year" selected#', $wk) === 1 && strpos($wk, 'Net Profit · This year') !== false, 'choosing This year: the choice stays selected and the money story says so');
+// the bell: lower bar, left of Help, on computer and phone
+$tp10 = strpos($pg10, 'class="top-header"'); $top = substr($pg10, $tp10, strpos($pg10, 'navbar-dark bottom-header', $tp10) - $tp10);
+ok(strpos($top, 'rdBell') === false, 'the bell left the top blue bar');
+$bd10 = strpos($pg10, 'id="rdBell"'); $hd10 = strpos($pg10, 'bms-help-btn d-inline-flex align-items-center', $bd10);
+ok($bd10 !== false && $hd10 !== false && strpos($pg10, 'navbar-dark bottom-header') < $bd10, 'computer: the bell is in the lower bar, before Help');
+$bm10 = strpos($pg10, 'id="rdBellM"');
+ok($bm10 !== false && strpos(substr($pg10, $bm10, 900), 'bms-help-btn-round') !== false, 'phone: the bell comes just before Help');
+// nothing leaks to others
+foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'full BMS' => [$onlyRest, '0']] as $nm => [$m10, $s10]) {
+    $h = body(runWorker(['page' => 'app/dashboard.php', 'get' => ['rd_period' => 'year']], $ON, $m10, $s10));
+    ok(strpos($h, 'id="rdBell') === false && strpos($h, 'id="rdPeriodSel"') === false, "$nm: no bell and no Showing dropdown");
+}
+$strip10 = (string)(json_decode(trim(body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'))), true)['html'] ?? '');
+ok(strpos($strip10, 'rdp-period"') !== false && strpos($strip10, 'Busy hours') !== false, 'the mixed-company strip keeps its buttons and Busy hours');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P11. Restaurant icons (Lucide) — restaurant screens only');
+$css11 = file_get_contents("$root/assets/css/restaurant-icons.css");
+foreach (['hand-platter', 'armchair', 'chef-hat', 'book-open-text', 'shopping-basket', 'wallet', 'calendar-check', 'chart-column', 'banknote', 'receipt', 'trending-up', 'hand-coins', 'layout-dashboard', 'clipboard-list', 'utensils', 'users', 'bell', 'cooking-pot', 'cup-soda', 'scroll-text', 'circle-plus', 'shopping-bag', 'bike'] as $n)
+    ok(strpos($css11, ".ri-$n{--ri:url(\"data:image/svg+xml,") !== false, "icon file has $n");
+ok(strpos($css11, 'ISC licence') !== false && strpos($css11, 'mask:var(--ri)') !== false, 'icon file: licence noted; icons take the text colour (CSS mask)');
+$all = function (string $html): array { preg_match_all('#class="ri (ri-[a-z-]+)#', $html, $m); return array_values(array_unique($m[1])); };
+$rd11 = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1'));
+$got = $all($rd11);
+foreach (['ri-layout-dashboard', 'ri-clipboard-list', 'ri-hand-platter', 'ri-armchair', 'ri-chef-hat', 'ri-calendar-check', 'ri-hand-coins', 'ri-utensils', 'ri-book-open-text', 'ri-circle-plus', 'ri-shopping-basket', 'ri-users', 'ri-wallet', 'ri-chart-column', 'ri-bell', 'ri-banknote', 'ri-receipt', 'ri-trending-up'] as $c)
+    ok(in_array($c, $got, true), "restaurant-only dashboard + menus use $c");
+ok(strpos($rd11, 'restaurant-icons.css') !== false, 'the icon file is loaded for a restaurant company');
+foreach ([['app/bms/restaurant/menu.php', ['ri-book-open-text', 'ri-cooking-pot', 'ri-cup-soda', 'ri-scroll-text', 'ri-chef-hat']], ['app/bms/pos/pos.php', ['ri-utensils', 'ri-shopping-bag', 'ri-bike', 'ri-armchair', 'ri-chef-hat']], ['app/bms/restaurant/purchases.php', ['ri-shopping-basket']]] as [$pg, $want]) {
+    $h = body(runWorker(['page' => $pg], $ON, $onlyRest, '1')); $g = $all($h);
+    ok(!array_diff($want, $g), basename($pg) . ': ' . implode(', ', $want));
+}
+// retail, mixed, Hybrid and full BMS keep every Bootstrap icon in their menus and dashboard
+foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'Hybrid shops' => [$hybridAll, '1'], 'full BMS' => [$onlyRest, '0']] as $nm => [$m11, $s11]) {
+    $h = body(runWorker(['page' => 'app/dashboard.php'], $ON, $m11, $s11));
+    $nav = substr($h, 0, (int)strpos($h, '</nav>', (int)strpos($h, 'bms-bnav')) ?: strlen($h));
+    ok(strpos($nav, 'class="ri ') === false && strpos($h, 'id="rdBell"') === false, "$nm: menus show no new icons");
+}
+$rt = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
+ok(strpos($rt, 'bi bi-speedometer2') !== false && strpos($rt, 'class="ri ') === false, 'retail Smart POS dashboard: the old icons, none of the new');
+$noRest = body(runWorker(['page' => 'app/dashboard.php'], $OFF, $retailAll, '1'));
+ok(strpos($noRest, 'restaurant-icons.css') === false, 'without Restaurant POS the icon file is not even loaded');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P12. Purchases screen: simpler, with quiet checks (2026-11-02)');
 $pgU = file_get_contents("$root/app/bms/restaurant/purchases.php");
 $bU  = body(runWorker(['page' => 'app/bms/restaurant/purchases.php'], $ON, $onlyRest, '1'));
 ok(strpos($bU, 'id="rpKindStock"') !== false && strpos($bU, 'id="rpKindOther"') !== false && strpos($pgU, "r.push({ id: '__other'") === false, 'Counted item | Something else is a switch on top, not hidden at the end of the search list');

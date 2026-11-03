@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-03 — merge(restaurant): bring `develop` into `feat/restaurant-pay-later` (PR #2695 conflicts)
+
+**Branch:** `feat/restaurant-pay-later`.
+- **Dashboard and bell:** `develop` already has the newer restaurant dashboard (Layout 2 with arrangement A, bell beside Help). It is kept exactly; this branch's older dashboard and its second header bell are dropped. `includes/restaurant/dashboard.php`, `includes/restaurant/dash_panel.php` and `header.php` are now identical to `develop`. `core/restaurant_notifications.php` (used only by the dropped bell and dashboard) is removed.
+- **Kept whole:** buying on credit or partly paid, paying suppliers later, and the simpler Purchases screen. `app/bms/restaurant/purchases.php` keeps this branch's version plus `develop`'s basket icon.
+- **Security:** removed `_dashboard_kpi_row_test_probe.php`, a test helper committed by mistake at the web root that logged anyone in as admin. `.gitignore` now blocks `/_*_test_probe.php`.
+- **Tests:** `tests/test_restaurant_focus_cli.php` keeps both sides' new sections (develop's P8–P11; this branch's Purchases screen section, now P12).
+
 ## 2026-11-02 — ui(restaurant): Purchases screen — simpler, with quiet checks; Recent purchases full width with S/No.
 
 **Branch:** `feat/restaurant-purchases-ui` (stacked on `feat/restaurant-pay-later`, PR #2695).
@@ -44,6 +52,55 @@
 - **Recent purchases** marks Credit / Partly paid with what is still owed, and lists groceries bought on credit.
 - **For the dashboard:** `restaurantOwedToSuppliers()` reads what is owed from the ledger (the bills' payable and their payments).
 - **Known, not changed:** `apSupplierInvoicesPosition()` in `core/receivables_payables.php` ignores part-payments; nothing uses it now.
+
+## 2026-11-02 — feat(restaurant): restaurant icons (Lucide) on the restaurant screens only
+
+**New:** `assets/css/restaurant-icons.css` (23 Lucide icons, ISC licence, drawn as CSS masks so they take the text colour and size like Bootstrap icons).
+**Changed:** `header.php`, `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `app/bms/pos/pos.php`, `app/bms/restaurant/{menu,purchases,tables_board,kitchen_dashboard,reservations,modifier_group,sales_report}.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_phase1_cli.php`.
+**Only icons changed:** no arrangement, text or colour. Retail Smart POS and Smart BMS keep every icon they had (tested). The icon file loads only for users with Restaurant POS.
+
+- Menu bar (restaurant-only company): Dashboard, Orders, Take order, Tables, Kitchen, Reservations, Who Owes Me, Menu, Menu items, Add-on options, Purchases, Buy stock & ingredients, Customers, Expenses, Reports, bell. The same in the phone side menu and bottom bar.
+- Dashboard: the 8 quick actions and 6 cards; kitchen-wait notice.
+- Till (restaurant shops): Dine in, Take away, Delivery, Choose table, Send to Kitchen.
+- Menu page: title, Dish, Bought item, Kitchen, Recipe, Buy stock. Page titles: Purchases, Tables, Kitchen, Reservations, Add-on options, Restaurant Sales.
+
+## 2026-11-02 — feat(restaurant): dashboard arrangement A — period dropdowns, coloured cards, bell beside Help; Money check and Busy hours removed
+
+**Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `api/restaurant/dashboard_panel.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Not changed:** the retail dashboard and the mixed-company strip (it keeps its buttons and Busy hours). Restaurant-only Smart POS company only.
+
+- **Performance period** is a dropdown with all 5 retail periods: Daily, Weekly, Monthly, Quarterly, Yearly.
+- **"Today" heading replaced** by a "Showing" dropdown (Today, This week, This month, This quarter, This year). It drives the cards, Where your money went, What earns you money and How customers order. Each period is compared with the same stretch of the period before.
+- **Six cards, each its own colour:** Sales blue, Orders teal, Profit green, Expenses orange, Open tables purple, Owed to me indigo. Open tables and Owed to me are marked "Right now". The Kitchen waiting card is dropped; the Kitchen action still shows the count.
+- **Removed:** Money check this month, Busy hours.
+- **Bell** moved to the lower bar, left of Help, on computer and phone.
+- **No black or red** in the new layout: warnings are amber, profit is green.
+- The profit warnings still look at the whole month in every view, because no expenses today is normal and none this month is not.
+
+## 2026-11-02 — feat(restaurant): dashboard Layout 2 "Side actions" with the chosen design's colours, and a notification bell
+
+**Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_dashboard_cli.php`, `tests/test_restaurant_phase6_cli.php`.
+**Not changed:** the retail dashboard (`app/dashboard.php`) and the mixed-company "Restaurant today" strip keep their layouts. Tested for retail, mixed, Hybrid and full BMS.
+
+Applies only to a restaurant-only Smart POS company, built from the owner's chosen design (layouts artifact, Layout 2):
+- **Quick actions down the left** (blue column), each with a live line: Take order, Tables (n with order), Kitchen (n waiting long, only when the kitchen screen/printer is on), Menu (n need a cost), Purchases (n running low), Expenses (n to approve), Reservations (n today), Sales report. On a phone they become a wrapping grid above the cards.
+- **Today cards:** sales today (with yesterday and the 7-day trend), orders today (with average bill), open tables ("2 of 14", with the unpaid amount), kitchen waiting.
+- **Money cards:** owed to me, expenses this month, profit this month (margin, Estimated/Complete). "We owe suppliers" is left out until supplier credit exists.
+- **Side panel with tabs:** Needs attention, Activities (only with the audit-log permission, like the retail dashboard), Running low, Orders. These replace the separate "Recent orders" and "Drinks and ingredients running low" cards.
+- **Colours as designed:** sales blue, costs orange, profit a dark line; the bar, legend, busy-hours and order-type charts follow. The charts keep their previous blue-only look for the mixed strip.
+- **Notification bell** in the top bar with the unread count; it opens the existing Notification Center. What appears there is decided later.
+- Money check, profit warnings and Performance / Where your money went / What earns you money / Busy hours are unchanged apart from layout and colour.
+
+## 2026-11-02 — fix(restaurant): fixes found by testing on the live demo — Swahili groceries listed, only restaurant groups, no retail products to add, restaurant words on the till
+
+**Changed:** `api/restaurant/get_purchases.php`, `app/bms/product/categories.php`, `app/bms/restaurant/menu.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+All four changes apply only to a restaurant-only Smart POS company (every active shop is a Restaurant). Retail, mixed, Hybrid and full BMS are unchanged (tested).
+
+- **Groceries entered in Swahili were missing from the Purchases list.** They are saved as "Viungo: …", and the list looked only for "Ingredients:". It now finds groceries by their cost-of-food account and removes the prefix in either language. The money was always counted; only the list missed them.
+- **Menu groups showed 25 old retail groups** (Baby Products, Engine Part, Hair Care…). A restaurant-only company now sees only groups used by a menu item, or new empty ones. Old groups stay in the database, untouched.
+- **Menu → "Already in my products"** offered old retail products. It is hidden for a restaurant-only company; a mixed company keeps it.
+- **Till words:** "Take order" (not "Sell"), "No items on this order yet / Tap a dish or drink to add it." (not "Search or browse products"). Swahili: "Weka Oda".
+
 ## 2026-11-02 — fix(pos): a paid order no longer comes back into the till's cart (retail and restaurant)
 
 **Changed:** `app/bms/pos/pos_scripts_new.php` (one line in `submitPayment()`). **New:** `tests/test_pos_paid_cart_not_restored_cli.php`.
