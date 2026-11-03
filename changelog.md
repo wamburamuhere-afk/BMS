@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-11-02 — ui(restaurant): Purchases screen — simpler, with quiet checks; Recent purchases full width with S/No.
+
+**Branch:** `feat/restaurant-purchases-ui` (stacked on `feat/restaurant-pay-later`, PR #2695).
+**Changed:** `app/bms/restaurant/purchases.php`, `api/restaurant/get_purchases.php` (adds `product_id` to counted rows, read-only), `assets/js/bms-mobile-cards.js` (`s/no.` and `na.` count as serial-number headers, so they are never a phone card's title), `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Not changed:** how a purchase is saved — the same APIs receive the same fields (checked in the browser); pay-later (Paid / Partly paid / Credit, Suppliers you owe) as it was.
+
+- **Removed:** the "How it works" box that took a third of the screen (now behind a **?** button); the long help sentence (now an "or" before Total paid); the "On hand · Cost" line that the preview repeated; the separate "New ingredient" link.
+- **Counted item | Something else** is a switch on top instead of the last line of the search list.
+- **Search results** show the unit, on hand and cost, and an "On the menu" tag; "+ Add "…" as a new ingredient" when nothing matches, opening the small window with the name filled in.
+- **Live Summary** beside the form (below it on a phone): item, quantity × price, on hand before → after, cost before → after, profit on each, what is owed; the Date and the one **Save purchase** button live there.
+- **Selling price** shows as a line and opens for editing only with the pencil.
+- **Quiet checks (only speak when something looks wrong):** a price 1.5× or more, or half or less, of the average cost asks once; the same purchase already saved for that date asks "Already saved?"; count units (pcs, crate, loaf…) take whole numbers only; a "Something else" whose name matches a counted item warns it would count twice and offers "Buy as counted item".
+- **Recent purchases:** fills the whole width (it sat on the left — `width:100%`, no second scroll box), **S/No.** first and counted across pages, Item before Date (also the phone card title), headers aligned with their columns, a **Total** row, All / Today / This week, a count badge, and a gear menu with **Buy again** (fills the form from that row).
+- **Tests:** restaurant focus 227 (new section P8), pay-later 53 — all pass.
+
 ## 2026-11-02 — feat(restaurant): smarter restaurant dashboard — Layout 2, summary cards that open their page, a notification bell, activity
 
 **Branch:** `feat/restaurant-pay-later` (second commit).

@@ -46,7 +46,7 @@ if (typeof window.safeOutput !== 'function') {
 
     // ── Column detection ─────────────────────────────────────────────
 
-    var SKIP_HEADERS = ['s/no', '#', 'sno', 'no.', 'no', 'sl', 'sr', 'serial', 'sr no'];
+    var SKIP_HEADERS = ['s/no', 's/no.', '#', 'sno', 'no.', 'no', 'na.', 'sl', 'sr', 'serial', 'sr no'];
 
     function detectTitleCol(headers) {
         for (var i = 0; i < headers.length; i++) {
