@@ -240,6 +240,25 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 .notice.good{background:#ecfdf5;color:#065f46}
 .backlink{display:inline-flex;align-items:center;gap:6px;color:var(--ink);font-weight:600;text-decoration:none;margin-top:16px}
 .min-w-0{min-width:0}
+.tb-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.tb-actions .lang{margin-left:0}
+.tb-btn{position:relative;width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;padding:0}
+.tb-btn:hover{border-color:#d1d5db}
+.tb-btn.bump{animation:tbBump .35s ease}
+@keyframes tbBump{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+.tb-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--brand);color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+#myOrdersCnt{background:var(--accent)}
+@media(max-width:400px){.lang .lang-t{display:none}.lang{padding:6px 10px}.lang i{margin:0!important}}
+.ord-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--soft);text-decoration:none;color:var(--ink)}
+.ord-row:last-child{border-bottom:0}
+.ord-row .oc{font-weight:800;font-size:1.05rem;letter-spacing:.01em}
+.ord-row .ot{font-size:.8rem;color:var(--muted)}
+.ord-row .os{margin-left:auto;font-size:.75rem;font-weight:600;border-radius:999px;padding:4px 10px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.ord-row .os.s-accepted{background:#e7f0ff;color:#084298}
+.ord-row .os.s-ready{background:#ecfdf5;color:#047857}
+.ord-row .os.s-rejected,.ord-row .os.s-cancelled{background:#fef2f2;color:#991b1b}
+.ord-row .bi-chevron-right{color:#9ca3af}
+.notice.info{background:#f3f4f6;color:#374151;margin-top:12px}
 .foot{color:var(--muted);font-size:.75rem;text-align:center;padding:24px 0 100px}
 </style>
 </head>
@@ -255,9 +274,26 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
       <h1><?= $e($companyName) ?></h1>
       <?php if ($ctx): ?><small><?= $e($ctx['warehouse']['warehouse_name']) ?></small><?php endif; ?>
     </div>
-    <a class="lang" href="<?= $e($langUrl) ?>" rel="nofollow"><i class="bi bi-translate me-1"></i><?= $e($otherLangLabel) ?></a>
+    <div class="tb-actions">
+      <?php if (!$notFound): ?>
+      <button type="button" class="tb-btn d-none" id="myOrdersBtn" aria-label="<?= $e(t('My orders')) ?>" title="<?= $e(t('My orders')) ?>"><i class="bi bi-receipt"></i><span class="tb-badge d-none" id="myOrdersCnt">0</span></button>
+      <?php endif; ?>
+      <?php if ($canOrder): ?>
+      <button type="button" class="tb-btn" id="cartBtn" aria-label="<?= $e(t('Your order')) ?>" title="<?= $e(t('Your order')) ?>"><i class="bi bi-bag"></i><span class="tb-badge d-none" id="cartCnt">0</span></button>
+      <?php endif; ?>
+      <a class="lang" href="<?= $e($langUrl) ?>" rel="nofollow"><i class="bi bi-translate me-1"></i><span class="lang-t"><?= $e($otherLangLabel) ?></span></a>
+    </div>
   </div>
 </header>
+
+<?php if (!$notFound): ?>
+<!-- My orders: the orders sent from THIS phone (kept in this browser only), each with its live status. -->
+<div class="scrim" id="ordScrim"></div>
+<section class="sheet" id="ordSheet" role="dialog" aria-modal="true" aria-labelledby="ordTitle">
+  <div class="hd"><h3 id="ordTitle"><?= $e(t('My orders')) ?></h3><button type="button" class="x" id="ordClose" aria-label="<?= $e(t('Close')) ?>"><i class="bi bi-x-lg"></i></button></div>
+  <div class="bd" id="ordList"></div>
+</section>
+<?php endif; ?>
 
 <?php if ($notFound): ?>
 <main class="wrap">
@@ -315,6 +351,9 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     <?php elseif ($canOrder): ?>
       <span class="pill ok"><i class="bi bi-bag"></i><?= $e(t('Order now, pick up when ready')) ?></span>
     <?php endif; ?>
+    <?php if (!$canOrder): ?>
+      <div class="notice info"><i class="bi bi-info-circle me-1"></i><?= $e(t('Online ordering is not available right now. Please order with a waiter or at the counter.')) ?></div>
+    <?php endif; ?>
   </section>
 
   <div class="tools">
@@ -367,6 +406,71 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 <?php endif; ?>
 <?php endif; ?>
 
+<?php if (!$notFound): ?>
+<script nonce="<?= $e($nonce) ?>">
+// My orders — remembered in THIS browser only (no account, nothing sent anywhere): code, time, status page.
+(function () {
+  'use strict';
+  var KEY = 'bms_my_orders', DAY = 864e5;
+  var L = <?= json_encode([
+      'none' => t('No orders yet from this phone.'),
+      'st'   => ['pending' => t('Waiting'), 'accepted' => t('Accepted'), 'ready' => t('Ready'), 'completed' => t('Done'), 'rejected' => t('Rejected'), 'cancelled' => t('Cancelled')],
+  ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+  var OK_URL = /^\/(?:[A-Za-z0-9_.-]+\/)*m\/[a-f0-9]{32}\/o\/[a-f0-9]{32}(?:\?lang=(?:en|sw))?$/;
+  function load() {
+    var a = [];
+    try { a = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { a = []; }
+    if (!Array.isArray(a)) a = [];
+    var now = Date.now();
+    // Only this site's status pages, only the last 24 hours, at most 10.
+    return a.filter(function (o) { return o && typeof o.url === 'string' && OK_URL.test(o.url) && now - (o.at || 0) < DAY; }).slice(0, 10);
+  }
+  function store(a) { try { localStorage.setItem(KEY, JSON.stringify(a.slice(0, 10))); } catch (e) {} }
+  window.roRememberOrder = function (url, code) {
+    if (typeof url !== 'string' || !OK_URL.test(url)) return;
+    var path = url.split('?')[0], a = load().filter(function (o) { return o.url.split('?')[0] !== path; });
+    a.unshift({ url: url, code: String(code || '').slice(0, 12), at: Date.now() });
+    store(a); paint();
+  };
+  var btn = document.getElementById('myOrdersBtn'), cnt = document.getElementById('myOrdersCnt');
+  var sheet = document.getElementById('ordSheet'), scrim = document.getElementById('ordScrim'), list = document.getElementById('ordList');
+  function paint() {
+    var a = load();
+    if (!btn) return;
+    btn.classList.toggle('d-none', a.length === 0);
+    cnt.textContent = String(a.length); cnt.classList.toggle('d-none', a.length === 0);
+  }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+  function open() {
+    var a = load(); list.textContent = '';
+    if (!a.length) list.appendChild(el('p', 'hint py-3', L.none));
+    a.forEach(function (o) {
+      var row = el('a', 'ord-row'); row.href = o.url;
+      var t = el('div', ''); t.appendChild(el('div', 'oc', o.code || '—'));
+      t.appendChild(el('div', 'ot', new Date(o.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
+      var st = el('span', 'os', '…');
+      row.appendChild(t); row.appendChild(st); row.appendChild(el('i', 'bi bi-chevron-right'));
+      list.appendChild(row);
+      fetch(o.url.split('?')[0] + '/status', { cache: 'no-store', credentials: 'omit' }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.success) { st.textContent = L.st[d.status] || d.status; st.className = 'os s-' + String(d.status).replace(/[^a-z]/g, ''); }
+        else st.textContent = '—';
+      }).catch(function () { st.textContent = '—'; });
+    });
+    sheet.classList.add('on'); scrim.classList.add('on'); document.body.style.overflow = 'hidden';
+  }
+  function close() { sheet.classList.remove('on'); scrim.classList.remove('on'); document.body.style.overflow = ''; }
+  if (btn) btn.addEventListener('click', open);
+  if (scrim) scrim.addEventListener('click', close);
+  var cl = document.getElementById('ordClose'); if (cl) cl.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+<?php if ($action === 'track' && $order): ?>
+  // Opening a status page (even from a shared link) remembers it, so it can be found again.
+  window.roRememberOrder(<?= json_encode(roStatusUrl($ctx['token'], (string)$route['ref']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($order['code'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>);
+<?php endif; ?>
+  paint();
+})();
+</script>
+<?php endif; ?>
 <script nonce="<?= $e($nonce) ?>">
 (function () {
   'use strict';
@@ -566,6 +670,13 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     document.getElementById('barCnt').textContent = String(n);
     document.getElementById('barTot').textContent = money(tot);
     var cs = document.getElementById('csTot'); if (cs) cs.textContent = money(tot);
+    // Bag icon in the top bar: always visible, so the basket is one tap away from anywhere on the page.
+    var cc = document.getElementById('cartCnt'), cb = document.getElementById('cartBtn');
+    if (cc && cb) {
+      var before = Number(cc.textContent) || 0;
+      cc.textContent = String(n); cc.classList.toggle('d-none', n === 0);
+      if (n > before) { cb.classList.remove('bump'); void cb.offsetWidth; cb.classList.add('bump'); }
+    }
   }
   function renderCart() {
     var box = document.getElementById('csLines'); box.textContent = '';
@@ -591,7 +702,9 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
   }
   function csErr(m) { var e = document.getElementById('csErr'); e.textContent = m; e.classList.toggle('d-none', !m); }
   if (CAN_ORDER) {
-    document.getElementById('barBtn').addEventListener('click', function () { csErr(''); renderCart(); show(document.getElementById('cartSheet')); });
+    function openCart() { csErr(''); renderCart(); show(document.getElementById('cartSheet')); }
+    document.getElementById('barBtn').addEventListener('click', openCart);
+    document.getElementById('cartBtn').addEventListener('click', openCart);
     var sending = false;
     document.getElementById('csSend').addEventListener('click', function () {
       if (sending) return;
@@ -615,7 +728,9 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
       }).then(function (r) { return r.json().catch(function () { return { success: false, message: T.offline }; }); })
         .then(function (d) {
           if (d && d.success && typeof d.status_url === 'string' && d.status_url.charAt(0) === '/') {
-            cart = []; save(); window.location.replace(d.status_url); return;
+            cart = []; save();
+            if (window.roRememberOrder) window.roRememberOrder(d.status_url, d.order_code);
+            window.location.assign(d.status_url); return;   // assign, not replace: Back returns to the menu
           }
           if (d && d.refresh) { setTimeout(function () { window.location.reload(); }, 1500); }
           csErr((d && d.message) || T.offline);

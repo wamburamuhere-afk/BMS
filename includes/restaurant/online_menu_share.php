@@ -59,6 +59,7 @@
                                         <a class="btn btn-sm btn-outline-primary" id="smOpen" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i><?= t('Open') ?></a>
                                         <button class="btn btn-sm btn-outline-primary" type="button" id="smDownload"><i class="bi bi-download me-1"></i><?= t('Download QR') ?></button>
                                     </div>
+                                    <div class="alert alert-warning py-2 px-3 small mt-2 mb-0 d-none" id="smLinkNote" role="status"><i class="bi bi-exclamation-triangle me-1"></i><?= t('This link shows the menu only. Turn on "Order for pickup" so customers can order from it.') ?></div>
                                 </div>
                                 <div class="rf-field rf-full text-center"><div id="smQr" class="d-inline-block p-2 bg-white border rounded-3"></div></div>
                             </div>
@@ -70,6 +71,7 @@
                                 <small class="text-muted" id="smTablesCount"></small>
                                 <a class="btn btn-sm btn-primary" id="smPrint" target="_blank" rel="noopener"><i class="bi bi-printer me-1"></i><?= t('Print') ?></a>
                             </div>
+                            <div class="alert alert-warning py-2 px-3 small mt-2 mb-0 d-none" id="smTablesNote" role="status"><i class="bi bi-exclamation-triangle me-1"></i><?= t('Table QR codes show the menu only. Turn on "Order from the table" so customers can order from their table.') ?></div>
                         </div>
 
                         <div class="rf-sec">
@@ -117,6 +119,9 @@
         $('#smOn').toggleClass('d-none', !d.enabled);
         if (!d.enabled || !d.link) return;
         $('#smLink').val(d.link);
+        // Say plainly when a shared link / printed QR can only show the menu (ordering switched off).
+        $('#smLinkNote').toggleClass('d-none', !!d.order_pickup);
+        $('#smTablesNote').toggleClass('d-none', !!d.order_table || !d.tables.length);
         $('#smOpen').attr('href', d.link);
         $('#smWhatsapp').attr('href', 'https://wa.me/?text=' + encodeURIComponent(SM.waText + ' ' + d.link));
         $('#smPrint').attr('href', SM.print + '?warehouse_id=' + encodeURIComponent(whId())).toggleClass('disabled', !d.tables.length);

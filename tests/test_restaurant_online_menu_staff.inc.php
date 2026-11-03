@@ -40,6 +40,7 @@ $t6Tok = substr((string)$r['data']['tables'][1]['link'], -32);
 ok($c === 200 && substr_count($b, 'data-link="') === 4 && str_contains($b, "/m/$t5Tok"), 'print page has a QR card per table + the shop card');
 [$c, , $b] = $sget('/menu');
 ok($c === 200 && str_contains($b, 'openShareMenu()') && str_contains($b, 'id="shareMenuModal"'), 'Menu page shows the Share menu button and panel');
+ok(str_contains($b, 'id="smLinkNote"') && str_contains($b, "toggleClass('d-none', !!d.order_pickup)") && str_contains($b, 'id="smTablesNote"') && str_contains($b, "toggleClass('d-none', !!d.order_table"), 'Share panel warns when the link / table QRs can only show the menu (ordering off)');
 
 echo "\n── 8. Staff: accept into a table that already has an order ──\n";
 $pdo->exec("UPDATE restaurant_online_orders SET status = 'completed' WHERE warehouse_id = $wid");
