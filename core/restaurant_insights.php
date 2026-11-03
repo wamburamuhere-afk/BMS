@@ -540,3 +540,137 @@ if (!function_exists('rdAreaTotals')) {
                 'total' => ['sales' => round($r['sales'] + $o['sales'], 2), 'profit' => round($pf($r) + $pf($o), 2)]];
     }
 }
+
+/* ───────────── Dashboard redesign (2026-11-03): chart, kitchen, open orders, staff ───────────── */
+
+if (!function_exists('rdCompareSeries')) {
+    /**
+     * The "Sales | Orders" chart for the chosen period, against the same stretch of the period before (rdPeriodRange()):
+     * Today → by hour vs yesterday · This week → by day vs last week · This month → by day vs last month ·
+     * This quarter → by week vs last quarter · This year → by month vs last year. Slots stop at today.
+     * Sales: the one ledger (revenue + other income, the same as the Sales card); a POS sale's hour comes from its sale time.
+     * Orders: counts of completed POS sales (operational).
+     * @return array{key:string,labels:string[],sales:float[],sales_prev:float[],orders:int[],orders_prev:int[],peak:?string}
+     */
+    function rdCompareSeries(PDO $pdo, string $jeScope, array $ids, array $r): array
+    {
+        $key = in_array($r['key'] ?? '', ['today', 'week', 'month', 'quarter', 'year'], true) ? $r['key'] : 'today';
+        $from = strtotime($r['from']); $to = strtotime($r['to']);
+        // slot labels, up to today
+        if ($key === 'week')        { $n = (int)date('N', $to); $labels = []; for ($i = 0; $i < $n; $i++) $labels[] = t(date('D', strtotime("+$i days", $from))); }
+        elseif ($key === 'month')   { $n = (int)date('j', $to); $labels = array_map('strval', range(1, $n)); }
+        elseif ($key === 'quarter') { $n = intdiv((int)(($to - $from) / 86400), 7) + 1; $labels = []; for ($i = 0; $i < $n; $i++) $labels[] = date('d M', strtotime('+' . ($i * 7) . ' days', $from)); }
+        elseif ($key === 'year')    { $n = (int)date('n', $to); $labels = []; for ($i = 1; $i <= $n; $i++) $labels[] = t(date('M', mktime(0, 0, 0, $i, 1, 2000))); }
+        else                        { $n = 24; $labels = array_map(fn($h) => sprintf('%02d', $h), range(0, 23)); }
+        // where a row falls: $d = its date column, $tm = its date-and-time column, $start = the window's first day
+        $pos = function (string $d, string $tm, string $start) use ($key, $pdo): string {
+            if ($key === 'week')    return "WEEKDAY($d)";
+            if ($key === 'month')   return "(DAY($d) - 1)";
+            if ($key === 'quarter') return "FLOOR(DATEDIFF($d, " . $pdo->quote($start) . ") / 7)";
+            if ($key === 'year')    return "(MONTH($d) - 1)";
+            return "HOUR($tm)";
+        };
+        $in = rdIn($ids);
+        $sales = function (string $a, string $b) use ($pdo, $jeScope, $pos, $n): array {
+            $out = array_fill(0, $n, 0.0);
+            try {
+                $st = $pdo->prepare("
+                    SELECT " . $pos('je.entry_date', 'COALESCE(ps.sale_date, je.created_at)', $a) . " AS p,
+                           SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE -jei.amount END) AS s
+                      FROM journal_entry_items jei
+                      JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
+                      JOIN accounts a         ON a.account_id = jei.account_id
+                      JOIN account_types at   ON at.type_id = a.account_type_id AND at.category IN ('revenue','other_income')
+                 LEFT JOIN pos_sales ps       ON je.entity_type = 'pos_sale' AND ps.sale_id = je.entity_id
+                     WHERE je.entry_date BETWEEN ? AND ? $jeScope
+                  GROUP BY p");
+                $st->execute([$a, $b]);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) { $p = (int)$row['p']; if ($p >= 0 && $p < $n) $out[$p] = round((float)$row['s'], 2); }
+            } catch (Throwable $e) { error_log('rdCompareSeries sales: ' . $e->getMessage()); }
+            return $out;
+        };
+        $orders = function (string $a, string $b) use ($pdo, $in, $pos, $n): array {
+            $out = array_fill(0, $n, 0);
+            try {
+                $st = $pdo->prepare("SELECT " . $pos('DATE(ps.sale_date)', 'ps.sale_date', $a) . " AS p, COUNT(*) AS c FROM pos_sales ps
+                    WHERE ps.sale_status = 'completed' AND ps.is_return_sale = 0 AND DATE(ps.sale_date) BETWEEN ? AND ? AND ps.warehouse_id IN ($in)
+                    GROUP BY p");
+                $st->execute([$a, $b]);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) { $p = (int)$row['p']; if ($p >= 0 && $p < $n) $out[$p] = (int)$row['c']; }
+            } catch (Throwable $e) { error_log('rdCompareSeries orders: ' . $e->getMessage()); }
+            return $out;
+        };
+        $o = ['key' => $key, 'labels' => $labels,
+              'sales' => $sales($r['from'], $r['to']), 'sales_prev' => $sales($r['prev_from'], $r['prev_to']),
+              'orders' => $orders($r['from'], $r['to']), 'orders_prev' => $orders($r['prev_from'], $r['prev_to'])];
+        if ($key === 'today') {                    // trim the night: from 08:00 (or the first sale) to 21:00 (or the last)
+            $busy = []; for ($h = 0; $h < 24; $h++) if ($o['sales'][$h] != 0 || $o['sales_prev'][$h] != 0 || $o['orders'][$h] || $o['orders_prev'][$h]) $busy[] = $h;
+            $lo = $busy ? min($busy[0], 8) : 8; $hi = $busy ? max(end($busy), 21) : 21;
+            foreach (['labels', 'sales', 'sales_prev', 'orders', 'orders_prev'] as $k) $o[$k] = array_slice($o[$k], $lo, $hi - $lo + 1);
+        }
+        $mx = $o['sales'] ? max($o['sales']) : 0;
+        $o['peak'] = $mx > 0 ? $o['labels'][array_search($mx, $o['sales'], true)] : null;
+        return $o;
+    }
+}
+
+if (!function_exists('rdKitchenLoad')) {
+    /** Kitchen tickets waiting or cooking right now, per kitchen area (operational counts). @return array{total:int,areas:array<int,array{name:string,n:int}>} */
+    function rdKitchenLoad(PDO $pdo, array $ids): array
+    {
+        $out = ['total' => 0, 'areas' => []];
+        try {
+            $st = $pdo->query("SELECT COALESCE(NULLIF(ks.name, ''), '') AS name, COUNT(*) AS n FROM kitchen_tickets kt
+                LEFT JOIN kitchen_stations ks ON ks.station_id = kt.station_id
+                WHERE kt.status IN ('queued','preparing') AND kt.warehouse_id IN (" . rdIn($ids) . ")
+                GROUP BY kt.station_id, ks.name ORDER BY n DESC");
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $out['areas'][] = ['name' => $r['name'] !== '' ? $r['name'] : t('Kitchen'), 'n' => (int)$r['n']];
+                $out['total'] += (int)$r['n'];
+            }
+        } catch (Throwable $e) { /* kitchen tables are optional */ }
+        return $out;
+    }
+}
+
+if (!function_exists('rdOpenOrders')) {
+    /** Table orders not paid yet, newest first (operational: the held order of each table). */
+    function rdOpenOrders(PDO $pdo, array $ids, int $limit = 5): array
+    {
+        try {
+            return $pdo->query("SELECT h.hold_id, t.table_number, COALESCE(h.item_count, 0) AS item_count, h.total_amount, h.held_at,
+                       TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS waiter
+                  FROM pos_held_sales h JOIN restaurant_tables t ON t.table_id = h.table_id LEFT JOIN users u ON u.user_id = h.user_id
+                 WHERE h.status = 'held' AND t.warehouse_id IN (" . rdIn($ids) . ")
+              ORDER BY h.held_at DESC LIMIT " . max(1, (int)$limit))->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { error_log('rdOpenOrders: ' . $e->getMessage()); return []; }
+    }
+}
+
+if (!function_exists('rdStaffSales')) {
+    /**
+     * Sales by staff for the period: the "served by" person picked on the till, otherwise who rang the sale up.
+     * Amounts from the one ledger (the POS sale's revenue lines); order counts from the same sales.
+     * @return array<int,array{name:string,orders:int,sales:float}>
+     */
+    function rdStaffSales(PDO $pdo, string $jeScope, array $ids, string $from, string $to, int $limit = 5): array
+    {
+        try {
+            $st = $pdo->prepare("
+                SELECT COALESCE(ps.assigned_to, ps.user_id) AS uid, COUNT(DISTINCT ps.sale_id) AS orders,
+                       SUM(CASE WHEN jei.type = 'credit' THEN jei.amount ELSE -jei.amount END) AS sales,
+                       MAX(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')))) AS name, MAX(u.username) AS uname
+                  FROM journal_entry_items jei
+                  JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted' AND je.entity_type = 'pos_sale'
+                  JOIN accounts a         ON a.account_id = jei.account_id
+                  JOIN account_types at   ON at.type_id = a.account_type_id AND at.category = 'revenue'
+                  JOIN pos_sales ps       ON ps.sale_id = je.entity_id
+             LEFT JOIN users u            ON u.user_id = COALESCE(ps.assigned_to, ps.user_id)
+                 WHERE je.entry_date BETWEEN ? AND ? AND ps.warehouse_id IN (" . rdIn($ids) . ") $jeScope
+              GROUP BY uid ORDER BY sales DESC LIMIT " . max(1, (int)$limit));
+            $st->execute([$from, $to]);
+            return array_map(fn($r) => ['name' => trim((string)$r['name']) !== '' ? trim((string)$r['name']) : (string)($r['uname'] ?? '—'),
+                                        'orders' => (int)$r['orders'], 'sales' => round((float)$r['sales'], 2)], $st->fetchAll(PDO::FETCH_ASSOC));
+        } catch (Throwable $e) { error_log('rdStaffSales: ' . $e->getMessage()); return []; }
+    }
+}

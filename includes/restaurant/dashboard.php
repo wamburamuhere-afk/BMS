@@ -11,22 +11,30 @@ $rdCur = getSetting('currency', 'TZS');
 $rdFmt = fn($n) => number_format((float)$n, 0);
 $rdTypes = ['dine_in' => t('Dine in'), 'take_away' => t('Take away'), 'delivery' => t('Delivery')];
 $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: ($_SESSION['username'] ?? '');
+$rdFirst = trim((string)($_SESSION['first_name'] ?? '')) ?: $rdName;
+$rdHour = (int)date('G');
+$rdHello = $rdHour < 12 ? t('Good morning') : ($rdHour < 17 ? t('Good afternoon') : t('Good evening'));
 ?>
 <div class="container-fluid mt-3 mt-md-4 rd-page">
-    <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+    <div class="d-flex justify-content-between align-items-end mb-3 gap-3 flex-wrap">
         <div class="min-w-0">
-            <h4 class="mb-0 text-truncate"><i class="ri ri-layout-dashboard text-primary me-2"></i><?= t('Dashboard') ?></h4>
-            <div class="small text-muted"><?= $rdName !== '' ? sprintf(t('Welcome back, %s!'), safe_output($rdName)) . ' · ' : '' ?><?= date('d M Y') ?></div>
+            <h4 class="mb-0 rd-hello"><?= $rdHello ?><?= $rdFirst !== '' ? ', ' . safe_output($rdFirst) : '' ?>.</h4>
+            <div class="rd-sub"><?= t('Here is how the restaurant is doing.') ?> · <?= date('d M Y') ?></div>
         </div>
-        <form method="get" class="d-flex align-items-center gap-2 mb-0">
-            <label for="rdPeriodSel" class="small text-muted mb-0"><?= t('Showing') ?></label>
-            <select id="rdPeriodSel" name="rd_period" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
-                <?php $rdPSel = (string)($_GET['rd_period'] ?? 'today');
-                foreach (['today' => t('Today'), 'week' => t('This week'), 'month' => t('This month'), 'quarter' => t('This quarter'), 'year' => t('This year')] as $k => $l): ?>
-                <option value="<?= $k ?>" <?= $rdPSel === $k ? 'selected' : '' ?>><?= $l ?></option>
-                <?php endforeach; ?>
-            </select>
-        </form>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <form method="get" class="d-flex align-items-center gap-2 mb-0">
+                <label for="rdPeriodSel" class="rd-sub mb-0"><?= t('Showing') ?></label>
+                <select id="rdPeriodSel" name="rd_period" class="form-select w-auto rd-sel" onchange="this.form.submit()">
+                    <?php $rdPSel = (string)($_GET['rd_period'] ?? 'today');
+                    foreach (['today' => t('Today'), 'week' => t('This week'), 'month' => t('This month'), 'quarter' => t('This quarter'), 'year' => t('This year')] as $k => $l): ?>
+                    <option value="<?= $k ?>" <?= $rdPSel === $k ? 'selected' : '' ?>><?= $l ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+            <?php if (canCreate('pos')): ?>
+            <a href="<?= getUrl('pos') ?>" class="rd-take"><i class="bi bi-plus-lg me-1"></i><?= t('Take order') ?></a>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php
@@ -45,6 +53,12 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
 
 
 <style>
+.rd-page .rd-hello { font-size:24px; font-weight:700; color:#0b3d91; }
+.rd-page .rd-sub { font-size:14px; color:#5b6472; }
+.rd-page .rd-sel { height:40px; font-size:14px; border-radius:10px; border-color:#cfdcf3; }
+.rd-page .rd-take { display:inline-flex; align-items:center; height:44px; padding:0 18px; border-radius:10px; background:#0d6efd; color:#fff; font-size:14px; font-weight:600; text-decoration:none; white-space:nowrap; }
+.rd-page .rd-take:hover { background:#0b5ed7; color:#fff; }
+@media (max-width:575.98px) { .rd-page .rd-hello { font-size:20px; } .rd-page .rd-take { flex:1 1 100%; justify-content:center; height:48px; } }
 .rd-actions { display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:1fr; gap:8px; }
 @media (min-width:768px) { .rd-actions { grid-template-columns:repeat(5, 1fr); gap:12px; } }
 .rd-act { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:12px 6px; border:1px solid #b6ccfe;
