@@ -7535,6 +7535,41 @@ CREATE TABLE `restaurant_floors` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `restaurant_online_orders`
+--
+
+DROP TABLE IF EXISTS `restaurant_online_orders`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_online_orders` (
+  `order_id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `table_id` int DEFAULT NULL,
+  `order_type` enum('table','pickup') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'table',
+  `order_code` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `public_ref` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_name` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `items_json` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subtotal` decimal(14,2) NOT NULL DEFAULT '0.00',
+  `status` enum('pending','accepted','ready','completed','rejected','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `reject_reason` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `hold_id` int DEFAULT NULL,
+  `handled_by` int DEFAULT NULL,
+  `client_hash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `accepted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`order_id`),
+  UNIQUE KEY `uq_roo_public_ref` (`public_ref`),
+  KEY `idx_roo_wh_status` (`warehouse_id`,`status`),
+  KEY `idx_roo_client` (`client_hash`,`created_at`),
+  KEY `idx_roo_table_status` (`table_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `restaurant_reservation_reminders`
 --
 
@@ -7596,7 +7631,9 @@ CREATE TABLE `restaurant_tables` (
   `status` enum('available','occupied','reserved','cleaning') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'available',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `qr_token` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`table_id`),
+  UNIQUE KEY `uq_rt_qr_token` (`qr_token`),
   KEY `idx_rt_warehouse` (`warehouse_id`),
   KEY `idx_rt_floor` (`floor_id`),
   KEY `idx_rt_status` (`status`)
@@ -8081,7 +8118,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -9644,11 +9681,16 @@ CREATE TABLE `warehouses` (
   `public_catalog_token_created_at` datetime DEFAULT NULL,
   `pos_mode` enum('retail','restaurant','hybrid') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'retail',
   `client_uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `online_menu_token` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `online_menu_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `online_order_table` tinyint(1) NOT NULL DEFAULT '0',
+  `online_order_pickup` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`warehouse_id`),
   UNIQUE KEY `warehouse_code` (`warehouse_code`),
   UNIQUE KEY `idx_warehouses_public_catalog_token_hash` (`public_catalog_token_hash`),
   UNIQUE KEY `ux_warehouses_client_uuid` (`client_uuid`),
   UNIQUE KEY `uq_warehouses_client_uuid` (`client_uuid`),
+  UNIQUE KEY `uq_wh_online_menu_token` (`online_menu_token`),
   KEY `idx_warehouse_code` (`warehouse_code`),
   KEY `idx_warehouse_name` (`warehouse_name`),
   KEY `idx_status` (`status`),
