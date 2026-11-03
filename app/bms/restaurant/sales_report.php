@@ -44,7 +44,7 @@ $cur = getSetting('currency', 'TZS');
 
 <div class="container-fluid mt-3 mt-md-4">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-        <h4 class="mb-0"><i class="bi bi-bar-chart text-primary me-2"></i><?= t('Restaurant Sales') ?></h4>
+        <h4 class="mb-0"><i class="ri ri-chart-column text-primary me-2"></i><?= t('Restaurant Sales') ?></h4>
         <div class="d-flex gap-2">
             <?php if (canView('pos_user_sales_report')): ?>
             <a href="<?= getUrl('pos_user_sales_report') ?>" class="btn btn-outline-primary btn-sm"><i class="bi bi-person-badge me-1"></i><?= t('By waiter') ?></a>

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-02 — feat(restaurant): restaurant icons (Lucide) on the restaurant screens only
+
+**New:** `assets/css/restaurant-icons.css` (23 Lucide icons, ISC licence, drawn as CSS masks so they take the text colour and size like Bootstrap icons).
+**Changed:** `header.php`, `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `app/bms/pos/pos.php`, `app/bms/restaurant/{menu,purchases,tables_board,kitchen_dashboard,reservations,modifier_group,sales_report}.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_phase1_cli.php`.
+**Only icons changed:** no arrangement, text or colour. Retail Smart POS and Smart BMS keep every icon they had (tested). The icon file loads only for users with Restaurant POS.
+
+- Menu bar (restaurant-only company): Dashboard, Orders, Take order, Tables, Kitchen, Reservations, Who Owes Me, Menu, Menu items, Add-on options, Purchases, Buy stock & ingredients, Customers, Expenses, Reports, bell. The same in the phone side menu and bottom bar.
+- Dashboard: the 8 quick actions and 6 cards; kitchen-wait notice.
+- Till (restaurant shops): Dine in, Take away, Delivery, Choose table, Send to Kitchen.
+- Menu page: title, Dish, Bought item, Kitchen, Recipe, Buy stock. Page titles: Purchases, Tables, Kitchen, Reservations, Add-on options, Restaurant Sales.
+
 ## 2026-11-02 — feat(restaurant): dashboard arrangement A — period dropdowns, coloured cards, bell beside Help; Money check and Busy hours removed
 
 **Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `api/restaurant/dashboard_panel.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.

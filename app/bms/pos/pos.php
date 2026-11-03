@@ -605,7 +605,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                             <i class="bi bi-grid-3x3-gap"></i>
                         </button>
                         <button class="btn btn-outline-dark d-none" id="sendToKitchenBtn" onclick="sendCurrentOrderToKitchen()" title="<?= t('Send to Kitchen') ?>">
-                            <i class="bi bi-fire"></i>
+                            <i class="ri ri-chef-hat"></i>
                         </button>
                     </div>
                 </div>
@@ -616,15 +616,15 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 <div class="d-none mb-2" id="restaurantOrderBar">
                     <div class="btn-group w-100 rs-order-type" role="group" aria-label="<?= htmlspecialchars(t('Order type')) ?>">
                         <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDine" value="dine_in">
-                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDine"><i class="bi bi-cup-hot me-1"></i><?= t('Dine in') ?></label>
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDine"><i class="ri ri-utensils me-1"></i><?= t('Dine in') ?></label>
                         <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeTake" value="take_away">
-                        <label class="btn btn-outline-primary btn-sm" for="rsTypeTake"><i class="bi bi-bag me-1"></i><?= t('Take away') ?></label>
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeTake"><i class="ri ri-shopping-bag me-1"></i><?= t('Take away') ?></label>
                         <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDelivery" value="delivery">
-                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDelivery"><i class="bi bi-scooter me-1"></i><?= t('Delivery') ?></label>
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDelivery"><i class="ri ri-bike me-1"></i><?= t('Delivery') ?></label>
                     </div>
                     <div class="d-flex gap-2 mt-2" id="rsTableRow">
                         <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-truncate" id="rsTableBtn" onclick="openTablePicker()">
-                            <i class="bi bi-grid-3x3-gap me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
+                            <i class="ri ri-armchair me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
                         </button>
                         <button type="button" class="btn btn-sm btn-primary d-none text-nowrap" id="rsSaveTableBtn" onclick="saveOrderToTable()">
                             <i class="bi bi-bookmark-check me-1"></i><?= t('Save to table') ?>

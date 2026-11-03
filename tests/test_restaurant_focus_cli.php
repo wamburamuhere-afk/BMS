@@ -789,7 +789,7 @@ foreach (['pos' => 'Take order', 'restaurant/tables-board' => 'Tables', 'restaur
 ok(preg_match('#<small>\d+ with order</small>#', $nav9) && preg_match('#<small>\d+ to approve</small>#', $nav9) && preg_match('#<small>\d+ today</small>#', $nav9) && strpos($nav9, 'Open the till') !== false, 'the actions carry a live line (tables with order, expenses to approve, reservations today)');
 // Today and Money cards; the supplier-credit card is deliberately NOT there
 foreach (['sales' => 'Sales', 'orders' => 'Orders', 'profit' => 'Profit', 'exp' => 'Expenses', 'tables' => 'Open tables', 'owed' => 'Owed to me'] as $cc => $lbl)
-    ok((bool)preg_match('#class="rd2-sc rd2-c-' . $cc . '"><span class="rd2-l"><i class="bi [^"]+"></i>' . preg_quote($lbl, '#') . '#', $dc), "card with its own colour: $lbl");
+    ok((bool)preg_match('#class="rd2-sc rd2-c-' . $cc . '"><span class="rd2-l"><i class="ri ri-[a-z-]+"></i>' . preg_quote($lbl, '#') . '#', $dc), "card with its own colour: $lbl");
 ok(stripos($dc, 'We owe suppliers') === false && stripos($dc, 'owe suppliers') === false, 'no "We owe suppliers" card (supplier credit is not built)');
 // side panel
 foreach (['att', 'low', 'ord'] as $pt) ok(strpos($dc, 'data-pt="' . $pt . '"') !== false, "side panel tab: $pt");
@@ -893,5 +893,32 @@ foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'
 }
 $strip10 = (string)(json_decode(trim(body(runWorker(['page' => 'api/restaurant/dashboard_panel.php', 'get' => ['scope' => 'restaurant']], $ON, $mixed, '1'))), true)['html'] ?? '');
 ok(strpos($strip10, 'rdp-period"') !== false && strpos($strip10, 'Busy hours') !== false, 'the mixed-company strip keeps its buttons and Busy hours');
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('P11. Restaurant icons (Lucide) — restaurant screens only');
+$css11 = file_get_contents("$root/assets/css/restaurant-icons.css");
+foreach (['hand-platter', 'armchair', 'chef-hat', 'book-open-text', 'shopping-basket', 'wallet', 'calendar-check', 'chart-column', 'banknote', 'receipt', 'trending-up', 'hand-coins', 'layout-dashboard', 'clipboard-list', 'utensils', 'users', 'bell', 'cooking-pot', 'cup-soda', 'scroll-text', 'circle-plus', 'shopping-bag', 'bike'] as $n)
+    ok(strpos($css11, ".ri-$n{--ri:url(\"data:image/svg+xml,") !== false, "icon file has $n");
+ok(strpos($css11, 'ISC licence') !== false && strpos($css11, 'mask:var(--ri)') !== false, 'icon file: licence noted; icons take the text colour (CSS mask)');
+$all = function (string $html): array { preg_match_all('#class="ri (ri-[a-z-]+)#', $html, $m); return array_values(array_unique($m[1])); };
+$rd11 = body(runWorker(['page' => 'app/dashboard.php'], $ON, $onlyRest, '1'));
+$got = $all($rd11);
+foreach (['ri-layout-dashboard', 'ri-clipboard-list', 'ri-hand-platter', 'ri-armchair', 'ri-chef-hat', 'ri-calendar-check', 'ri-hand-coins', 'ri-utensils', 'ri-book-open-text', 'ri-circle-plus', 'ri-shopping-basket', 'ri-users', 'ri-wallet', 'ri-chart-column', 'ri-bell', 'ri-banknote', 'ri-receipt', 'ri-trending-up'] as $c)
+    ok(in_array($c, $got, true), "restaurant-only dashboard + menus use $c");
+ok(strpos($rd11, 'restaurant-icons.css') !== false, 'the icon file is loaded for a restaurant company');
+foreach ([['app/bms/restaurant/menu.php', ['ri-book-open-text', 'ri-cooking-pot', 'ri-cup-soda', 'ri-scroll-text', 'ri-chef-hat']], ['app/bms/pos/pos.php', ['ri-utensils', 'ri-shopping-bag', 'ri-bike', 'ri-armchair', 'ri-chef-hat']], ['app/bms/restaurant/purchases.php', ['ri-shopping-basket']]] as [$pg, $want]) {
+    $h = body(runWorker(['page' => $pg], $ON, $onlyRest, '1')); $g = $all($h);
+    ok(!array_diff($want, $g), basename($pg) . ': ' . implode(', ', $want));
+}
+// retail, mixed, Hybrid and full BMS keep every Bootstrap icon in their menus and dashboard
+foreach (['retail company' => [$retailAll, '1'], 'mixed company' => [$mixed, '1'], 'Hybrid shops' => [$hybridAll, '1'], 'full BMS' => [$onlyRest, '0']] as $nm => [$m11, $s11]) {
+    $h = body(runWorker(['page' => 'app/dashboard.php'], $ON, $m11, $s11));
+    $nav = substr($h, 0, (int)strpos($h, '</nav>', (int)strpos($h, 'bms-bnav')) ?: strlen($h));
+    ok(strpos($nav, 'class="ri ') === false && strpos($h, 'id="rdBell"') === false, "$nm: menus show no new icons");
+}
+$rt = body(runWorker(['page' => 'app/dashboard.php'], $ON, $retailAll, '1'));
+ok(strpos($rt, 'bi bi-speedometer2') !== false && strpos($rt, 'class="ri ') === false, 'retail Smart POS dashboard: the old icons, none of the new');
+$noRest = body(runWorker(['page' => 'app/dashboard.php'], $OFF, $retailAll, '1'));
+ok(strpos($noRest, 'restaurant-icons.css') === false, 'without Restaurant POS the icon file is not even loaded');
 
 // [later phases append here]

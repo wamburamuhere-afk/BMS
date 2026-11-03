@@ -15,7 +15,7 @@ $rdName = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?
 <div class="container-fluid mt-3 mt-md-4 rd-page">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
         <div class="min-w-0">
-            <h4 class="mb-0 text-truncate"><i class="bi bi-cup-hot text-primary me-2"></i><?= t('Dashboard') ?></h4>
+            <h4 class="mb-0 text-truncate"><i class="ri ri-layout-dashboard text-primary me-2"></i><?= t('Dashboard') ?></h4>
             <div class="small text-muted"><?= $rdName !== '' ? sprintf(t('Welcome back, %s!'), safe_output($rdName)) . ' · ' : '' ?><?= date('d M Y') ?></div>
         </div>
         <form method="get" class="d-flex align-items-center gap-2 mb-0">
