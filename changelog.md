@@ -4,7 +4,7 @@
 
 **Branch:** `feat/restaurant-pay-later` (PR #2695). Merged `develop` again (free-trial PR #2552 had landed); only `changelog.md` clashed, both entries kept.
 - **`api/restaurant/get_purchases.php`:** `rgpPayment()` is now declared once (`function_exists` guard). Called twice in one process it was a fatal error, which silently cut `test_restaurant_focus_cli` short (it reported 227 checks instead of 409). Live requests were not affected (one process each).
-- **`lang/sw.php`:** removed two duplicate keys the pay-later work added ('Open the till', 'Running low'); they silently overrode develop's words. Develop's are kept: "Fungua kaunta ya mauzo", "Zinakaribia kuisha".
+- **`lang/sw.php`:** removed two duplicate keys the pay-later work added ('Open the till', 'Running low'); they silently overrode develop's words. Develop's are kept: "Fungua kaunta ya mauzo", "Zinakaribia kuisha". After the Tables PR (#2705) landed, a third merge found 7 more pay-later duplicates of develop's restaurant-dashboard words ('Money', '%d with order', '%d waiting long', '%d need a cost', '%d running low', 'Today and past', 'Kitchen waiting'); removed the same way. The 5 duplicates already on develop are untouched.
 - **Tests:** restaurant focus 409/409, pay-later 53/53 (twice), dashboard 67, simplicity 70, phases 0–7 all pass. `test_restaurant_pos_cli` (1) and `test_restaurant_pos_mode_setup_cli` (10) fail identically on plain `develop` — not caused here.
 
 ## 2026-11-03 — merge(restaurant): bring `develop` into `feat/restaurant-pay-later` (PR #2695 conflicts)
@@ -59,6 +59,22 @@
 - **Recent purchases** marks Credit / Partly paid with what is still owed, and lists groceries bought on credit.
 - **For the dashboard:** `restaurantOwedToSuppliers()` reads what is owed from the ledger (the bills' payable and their payments).
 - **Known, not changed:** `apSupplierInvoicesPosition()` in `core/receivables_payables.php` ignores part-payments; nothing uses it now.
+
+## 2026-11-02 — ui(restaurant): Tables screen — simpler and calmer; long-open bills flagged; today's booking on the table
+
+**Branch:** `feat/restaurant-tables-board-ui` (off `develop`).
+**Changed:** `app/bms/restaurant/tables_board.php`, `api/restaurant/get_tables_board.php` (read-only: `opened_today`, `reservation`), `lang/sw.php`, `tests/test_restaurant_phase2_cli.php`.
+**Not changed:** what tapping a table does (opens its order on the till), Move and Join (same APIs), Take away, table setup.
+
+- **One line instead of three boxes:** `○ 2 free  ● 3 busy  Open bills 43,500 TZS`, plus an amber "1 open long" only when there is one, and "Updated 10:42 ↻" (tap to refresh) instead of "Updates every 20 seconds."
+- **No red:** a free table is a calm white card; a table with an order is a blue card (amount, items, time open, who serves it); reserved / cleaning are grey.
+- **Readable time:** "25 min", "1 h 20 min", "2 days" — not "963 min".
+- **Open 3 h or more, or since yesterday:** the card turns amber and asks "Since yesterday — still here?" / "Open 4 h — still here?", so forgotten bills stand out.
+- **Waiter shown** on a busy table (the data was loaded but never shown).
+- **Today's booking** from Reservations on the table: "Reserved 19:30 · Neema (4)" (booked only, today, from 30 min ago on).
+- **Less noise:** "Tap to take an order" removed from every free card; "Manage tables" is a small ⚙ button; "Move" is now "Move / Join" (it always did both); the page's own compact buttons (the global `.btn` style made them 16px / 85px wide).
+- **All / Free / Busy** filter appears only when a shop has more than 12 tables.
+- **Tests:** `test_restaurant_phase2_cli` 39 (new: opened today, today's booking only, since yesterday, no red, no noise), `test_restaurant_phase4_cli` 22, `test_restaurant_simplicity_cli` 70, `test_restaurant_focus_cli` 394 — all pass. The local DB had `pos_simple_mode = 0` (set by another session); it was set to 1 only while the suites and the browser check ran, then put back to 0.
 
 ## 2026-10-25 — feat(trial): new companies start on a real free trial; superadmin "Set free trial" with start and end dates
 
