@@ -12,7 +12,7 @@ includeHeader();
 
 $payroll_id = $_GET['id'] ?? null;
 if (!$payroll_id) {
-    header('Location: payroll.php');
+    bmsRedirect(getUrl('payroll'));
     exit;
 }
 $page_title = 'Payroll Details';
@@ -171,7 +171,7 @@ $page_title = 'Payroll Details';
                 <p class="text-muted" id="payroll_number_display">Loading record...</p>
             </div>
             <div class="d-flex gap-2">
-                <a href="payslip?id=<?= $payroll_id ?>" target="_blank" class="btn btn-clean-white">
+                <a href="<?= getUrl('payslip') ?>?id=<?= $payroll_id ?>" target="_blank" class="btn btn-clean-white">
                     <i class="bi bi-printer me-2"></i>Print Slip
                 </a>
                 <div id="action_buttons"></div>

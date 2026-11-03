@@ -183,3 +183,10 @@ jobs:
           php tests/test_plan_line_columns_fast_cli.php
           php tests/test_smart_products_cli.php
           php tests/test_legacy_migration_mirrors_cli.php
+
+      - name: Clean URLs (short addresses, flash messages, form-address cleanup, record paths)
+        run: |
+          php tests/test_clean_urls_cli.php
+          php tests/test_flash_messages_cli.php
+          php tests/test_query_cleanup_cli.php
+          php tests/test_detail_urls_cli.php

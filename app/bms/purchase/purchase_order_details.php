@@ -95,7 +95,7 @@ if ($order_id) {
         ?>
         <?php if(!empty($c_logo)): ?>
             <div class="mb-3 text-center">
-                <img src="<?= htmlspecialchars('../../../' . $c_logo) ?>" alt="Logo" style="max-height: 80px; width: auto;">
+                <img src="<?= htmlspecialchars(getUrl($c_logo)) ?>" alt="Logo" style="max-height: 80px; width: auto;">
             </div>
         <?php endif; ?>
         <h1 style="color: #0d6efd; font-weight: 800; text-transform: uppercase; margin: 0; font-size: 24pt;" class="text-center"><?= caseFormat($c_name) ?></h1>

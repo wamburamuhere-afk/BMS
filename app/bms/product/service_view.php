@@ -53,7 +53,7 @@ $hideMaterialComponents = posSimpleModeEnabled() && !advancedProductEnabled();
 // Phase D — project-scope gate
 $svc_project_id = $svc['project_id'] ?? null;
 if (!empty($svc_project_id) && function_exists('userCan') && !userCan('project', (int)$svc_project_id)) {
-    header("Location: " . getUrl('services') . "?error=Access+denied:+this+service+is+not+in+your+project+scope");
+    bmsFlashRedirect(getUrl('services'), 'error', t('Access denied: this service is not in your project scope'));
     exit();
 }
 

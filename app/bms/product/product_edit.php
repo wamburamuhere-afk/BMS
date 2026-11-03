@@ -8,7 +8,7 @@ autoEnforcePermission('products');
 
 // Check if product ID is provided
 if (!isset($_GET['id'])) {
-    header("Location: products.php?error=Invalid Product ID");
+    bmsFlashRedirect(getUrl('products'), 'error', t('Invalid Product ID'));
     exit();
 }
 
@@ -27,7 +27,7 @@ try {
     $product = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$product) {
-        header("Location: products.php?error=Product not found");
+        bmsFlashRedirect(getUrl('products'), 'error', t('Product not found'));
         exit();
     }
 
@@ -40,12 +40,12 @@ try {
     // Phase D — project-scope gate
     $prod_project_id = $product['project_id'] ?? null;
     if (!empty($prod_project_id) && function_exists('userCan') && !userCan('project', (int)$prod_project_id)) {
-        header("Location: products.php?error=Access+denied:+this+product+is+not+in+your+project+scope");
+        bmsFlashRedirect(getUrl('products'), 'error', t('Access denied: this product is not in your project scope'));
         exit();
     }
 
 } catch (PDOException $e) {
-    header("Location: products.php?error=Database error");
+    bmsFlashRedirect(getUrl('products'), 'error', t('Database error'));
     exit();
 }
 

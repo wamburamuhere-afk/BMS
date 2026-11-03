@@ -1,7 +1,7 @@
 <?php
 // Check permissions
 if (!isAuthenticated()) {
-    header("Location: login.php");
+    bmsRedirect(getUrl('login'));
     exit();
 }
 
@@ -20,7 +20,7 @@ $so_is_admin    = isAdmin();
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($order_id <= 0) {
-    header("Location: " . getUrl('sales_orders') . "?error=Invalid Order ID");
+    bmsFlashRedirect(getUrl('sales_orders'), 'error', t('Invalid Order ID'));
     exit();
 }
 
@@ -57,7 +57,7 @@ $stmt->execute([$order_id]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$order) {
-    header("Location: " . getUrl('sales_orders') . "?error=Order Not Found");
+    bmsFlashRedirect(getUrl('sales_orders'), 'error', t('Order Not Found'));
     exit();
 }
 

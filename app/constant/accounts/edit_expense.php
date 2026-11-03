@@ -8,7 +8,7 @@ includeHeader();
 
 // Get Expense ID
 if (!isset($_GET['id']) || empty($_GET['id'])) {
-    header("Location: expenses.php");
+    bmsRedirect(getUrl('expenses'));
     exit;
 }
 
@@ -21,7 +21,7 @@ $stmt->execute([$expense_id]);
 $expense = $stmt->fetch();
 
 if (!$expense) {
-    echo "<div class='container mt-5'><div class='alert alert-danger'>Expense not found. <a href='expenses.php'>Return to list</a></div></div>";
+    echo "<div class='container mt-5'><div class='alert alert-danger'>Expense not found. <a href='" . getUrl('expenses') . "'>Return to list</a></div></div>";
     includeFooter();
     exit;
 }
@@ -44,9 +44,9 @@ $method_labels = [
         <div class="col">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="expenses.php">Expenses</a></li>
-                    <li class="breadcrumb-item"><a href="expense_details.php?id=<?php echo $expense_id; ?>">Details</a></li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('dashboard') ?>">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('expenses') ?>">Expenses</a></li>
+                    <li class="breadcrumb-item"><a href="<?= getUrl('expense_details') ?>?id=<?php echo $expense_id; ?>">Details</a></li>
                     <li class="breadcrumb-item active" aria-current="page">Edit Expense</li>
                 </ol>
             </nav>
@@ -61,7 +61,7 @@ $method_labels = [
                 <i class="bi bi-kanban"></i> Back to Project
             </a>
             <?php endif; ?>
-            <a href="expense_details.php?id=<?php echo $expense_id; ?>" class="btn btn-outline-secondary">
+            <a href="<?= getUrl('expense_details') ?>?id=<?php echo $expense_id; ?>" class="btn btn-outline-secondary">
                 <i class="bi bi-x-circle"></i> Cancel
             </a>
         </div>
@@ -168,7 +168,7 @@ document.getElementById('editExpenseForm').addEventListener('submit', function(e
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Saving...';
 
-    fetch('api/update_expense.php', {
+    fetch('<?= buildUrl('api/update_expense.php') ?>', {
         method: 'POST',
         body: formData
     })
@@ -176,7 +176,7 @@ document.getElementById('editExpenseForm').addEventListener('submit', function(e
     .then(data => {
         if (data.success) {
             logReportAction('Updated Expense', 'User updated expense #<?php echo $expense_id; ?>');
-            window.location.href = 'expense_details.php?id=<?php echo $expense_id; ?>&success=1';
+            window.location.href = '<?= getUrl('expense_details') ?>?id=<?php echo $expense_id; ?>';
         } else {
             alert('Error: ' + data.message);
             submitBtn.disabled = false;
