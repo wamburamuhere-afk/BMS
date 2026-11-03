@@ -161,6 +161,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
             <div class="modal-body">
                 <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                 <input type="hidden" name="visit_id" id="vId">
+                <input type="hidden" name="from_follow_up_id" id="vFromFollowUp"><!-- "New visit" from To follow up: saving closes that follow-up -->
                 <input type="hidden" name="latitude" id="vLat"><input type="hidden" name="longitude" id="vLng"><input type="hidden" name="gps_accuracy_m" id="vAcc">
                 <div class="row g-3">
                     <!-- 1. Phone first: a known number fills the rest -->
@@ -242,6 +243,7 @@ $interestStyles = ['interested' => ['success', 'bi-emoji-smile'], 'thinking' => 
                             <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-fu="7"><?= t('In a week') ?></button>
                             <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-fu="0"><?= t('No follow-up') ?></button>
                         </div>
+                        <div class="form-text"><?= t('A new date sets the next follow-up; every follow-up is kept in View details.') ?></div>
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label fw-bold" for="vNotes"><?= t('Notes') ?></label>
@@ -369,6 +371,7 @@ $(function () {
     const API = '<?= buildUrl('api/field_reports/') ?>', PRINT_URL = '<?= getUrl('field_reports/print') ?>';
     const CSRF = <?= json_encode(csrf_token()) ?>, USER_LANG = <?= json_encode($userLang) ?>;
     const IS_VENDOR = <?= json_encode($isVendor) ?>, BASE_DOMAIN = <?= json_encode((string)(tenantBaseDomain() ?? '')) ?>, CUSTOMER_URL = '<?= getUrl('customers/details') ?>';
+    const DETAILS_URL = '<?= getUrl('field_reports/details') ?>';
     // One clock — the server's (EAT), whatever the phone's clock or time zone says
     // (customer_visits_ux_plan 1.3): "now" = server time at page load + time elapsed since.
     const SERVER_NOW = <?= json_encode(date('Y-m-d H:i:s')) ?>, LOADED_AT = Date.now();
@@ -404,7 +407,7 @@ $(function () {
         'submitOneDay' => t('Choose a single day to submit its report.'),
         'cardShort' => t('Business card'), 'trialShort' => t('Trial link'), 'trainingShort' => t('Training'),
         'now' => t('Now'), 'when' => t('Visit time: %when%'), 'joinedBtn' => t('Joined'),
-        'call' => t('Call'), 'followedUp' => t('Followed up'), 'newVisit' => t('New visit'),
+        'call' => t('Call'), 'followedUp' => t('Followed up'), 'newVisit' => t('New visit'), 'viewDetails' => t('View details'),
         'dueToday' => t('due today'), 'daysLate' => t('%d days late'), 'followUp' => t('Follow-up'), 'gpsConfirmed' => t('GPS confirmed'),
         'interest' => array_map('t', frInterestLabels()),
         'services' => t('Services offered'), 'chooseServices' => t('Choose services...'),
@@ -473,13 +476,13 @@ $(function () {
     }
 
     function actions(r) {
-        let items = '';
+        // View details first: every field of the row, the follow-up history, the customer's other visits.
+        let items = `<li><a class="dropdown-item py-2 rounded" href="${DETAILS_URL}?id=${r.visit_id}"><i class="bi bi-eye text-primary me-2"></i>${L.viewDetails}</a></li>`;
         if (r.can_edit) items += `<li><button class="dropdown-item py-2 rounded" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}"><i class="bi ${r.joined ? 'bi-person-x' : 'bi-person-check'} text-primary me-2"></i>${r.joined ? L.unmarkJoined : L.markJoined}</button></li>`;
         const vs = vendorStep(r);
         if (vs) items += `<li><button class="dropdown-item py-2 rounded" data-act="${vs.act}" data-id="${r.visit_id}"><i class="bi ${vs.icon} text-primary me-2"></i>${vs.label}</button></li>`;
         if (r.can_edit) items += `<li><button class="dropdown-item py-2 rounded" data-act="edit" data-id="${r.visit_id}"><i class="bi bi-pencil text-primary me-2"></i>${L.edit}</button></li>`;
         if (r.can_delete) items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" data-act="delete" data-id="${r.visit_id}"><i class="bi bi-trash text-danger me-2"></i>${L.delete}</button></li>`;
-        if (!items) return '';
         return `<div class="dropdown d-flex justify-content-end"><button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-width:0"><i class="bi bi-gear-fill me-1"></i></button><ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul></div>`;
     }
 
@@ -496,12 +499,13 @@ $(function () {
                     <div class="d-flex flex-wrap gap-1 mt-1">${ynL(L.cardShort, r.gave_business_card)} ${ynL(L.trialShort, r.gave_trial_link)} ${ynL(L.trainingShort, r.gave_training)} ${r.interest ? interestBadge(r) : ''}${joinedBadge(r)}</div>
                     ${r.follow_up_date ? `<div class="mt-1 small"><i class="bi bi-calendar-event text-primary"></i> ${L.followUp}: ${followTxt(r)}</div>` : ''}
                 </div>
-                ${r.can_edit || r.can_delete || vendorStep(r) ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                <div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">
+                    <a class="btn btn-sm btn-outline-primary" href="${DETAILS_URL}?id=${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.viewDetails)}" aria-label="${esc(L.viewDetails)}"><i class="bi bi-eye"></i></a>
                     ${vendorStep(r) ? `<button class="btn btn-sm btn-outline-primary" data-act="${vendorStep(r).act}" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(vendorStep(r).label)}" aria-label="${esc(vendorStep(r).label)}"><i class="bi ${vendorStep(r).icon}"></i></button>` : ''}
                     ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="joined" data-id="${r.visit_id}" data-joined="${r.joined ? 0 : 1}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(r.joined ? L.unmarkJoined : L.markJoined)}" aria-label="${esc(r.joined ? L.unmarkJoined : L.markJoined)}"><i class="bi ${r.joined ? 'bi-person-x' : 'bi-person-check'}"></i></button>` : ''}
                     ${r.can_edit ? `<button class="btn btn-sm btn-outline-primary" data-act="edit" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.edit)}" aria-label="${esc(L.edit)}"><i class="bi bi-pencil"></i></button>` : ''}
                     ${r.can_delete ? `<button class="btn btn-sm btn-outline-danger" data-act="delete" data-id="${r.visit_id}" style="flex:1;min-width:0;padding:3px 4px" title="${esc(L.delete)}" aria-label="${esc(L.delete)}"><i class="bi bi-trash"></i></button>` : ''}
-                </div></div>` : ''}
+                </div></div>
             </div></div>`).join(''));
     }
 
@@ -526,14 +530,15 @@ $(function () {
         $('#followList').html(follows.map(f => `
             <li class="list-group-item">
                 <div class="d-flex justify-content-between gap-2">
-                    <div class="text-break"><div class="fw-bold">${esc(f.client_name)}</div>
-                        <small class="text-muted">${esc(f.location)} · ${esc(f.business_label)}${IS_ADMIN ? ' · ' + esc(f.staff_name) : ''}</small></div>
+                    <div class="text-break"><a class="fw-bold text-decoration-none" href="${DETAILS_URL}?id=${f.visit_id}">${esc(f.client_name)}</a>
+                        <small class="text-muted d-block">${esc(f.location)} · ${esc(f.business_label)}${IS_ADMIN ? ' · ' + esc(f.staff_name) : ''}</small>
+                        ${f.purpose ? `<small class="d-block"><i class="bi bi-info-circle text-primary"></i> ${esc(f.purpose)}</small>` : ''}</div>
                     <span class="badge ${f.days_overdue > 0 ? 'bg-danger' : 'bg-primary'} align-self-start text-nowrap">${f.days_overdue > 0 ? esc(L.daysLate.replace('%d', f.days_overdue)) : esc(L.dueToday)}</span>
                 </div>
                 <div class="d-flex gap-1 mt-2 fr-follow-actions">
                     ${f.client_phone ? `<a class="btn btn-sm btn-primary" href="tel:${esc(f.client_phone)}"><i class="bi bi-telephone me-1"></i>${L.call}</a>` : ''}
-                    ${CAN_CREATE ? `<button class="btn btn-sm btn-outline-primary" data-fact="visit" data-id="${f.visit_id}"><i class="bi bi-plus-circle me-1"></i>${L.newVisit}</button>` : ''}
-                    ${f.can_edit ? `<button class="btn btn-sm btn-outline-success" data-fact="done" data-id="${f.visit_id}"><i class="bi bi-check2 me-1"></i>${L.followedUp}</button>` : ''}
+                    ${CAN_CREATE ? `<button class="btn btn-sm btn-outline-primary" data-fact="visit" data-id="${f.follow_up_id}"><i class="bi bi-plus-circle me-1"></i>${L.newVisit}</button>` : ''}
+                    ${f.can_edit ? `<button class="btn btn-sm btn-outline-success" data-fact="done" data-id="${f.follow_up_id}"><i class="bi bi-check2 me-1"></i>${L.followedUp}</button>` : ''}
                 </div>
             </li>`).join(''));
     }
@@ -564,7 +569,7 @@ $(function () {
             <div class="small text-muted">${L.cardShort}: ${s.cards} · ${L.trialShort}: ${s.trials} · ${L.trainingShort}: ${s.trainings}</div></li>`).join(''));
     }
 
-    function loadData() {
+    function loadData(after) {
         $.getJSON(API + 'list.php', filters()).done(function (res) {
             if (!res.success) { Swal.fire({ icon: 'error', title: L.error, text: res.message }); return; }
             FrShare.invalidate();   // visits changed — the next PDF is built fresh
@@ -584,6 +589,7 @@ $(function () {
             renderServiceStats(res.service_counts || []);
             renderDayStatus(res);
             renderStaff(res.staff_summary || []);
+            if (typeof after === 'function') after();
         }).fail(() => Swal.fire({ icon: 'error', title: L.error, text: L.serverError }));
     }
 
@@ -659,7 +665,7 @@ $(function () {
         const keepOpen = !$('#vWhenFields').hasClass('d-none'), keepDate = $('#vDate').val();
         stopGps(); gpsRequired = true;
         $('#visitForm')[0].reset();
-        $('#vId').val(''); $('#vBusiness').val('').trigger('change'); $('#vServices').val(null).trigger('change');
+        $('#vId').val(''); $('#vFromFollowUp').val(''); $('#vBusiness').val('').trigger('change'); $('#vServices').val(null).trigger('change');
         $('#phoneWarn').addClass('d-none').empty(); $('#vOtherWrap').addClass('d-none');
         $('#visitForm .is-invalid').removeClass('is-invalid');
         const now = serverNow();
@@ -674,10 +680,15 @@ $(function () {
             setWhen(day !== now.date, day, day !== now.date ? '' : now.time);
         }
     }
-    function openNew(prefillPhone) {
+    function openNew(prefillPhone, fromFollowUpId) {
         resetForm(false);
-        $('#visitModalTitle').html(`<i class="bi bi-geo-alt me-1"></i>${L.addVisit}`); $('#btnSaveAgain').removeClass('d-none');
+        $('#visitModalTitle').html(`<i class="bi bi-geo-alt me-1"></i>${L.addVisit}`); $('#btnSaveAgain').toggleClass('d-none', !!fromFollowUpId);
         if (prefillPhone) $('#vPhone').val(prefillPhone);
+        if (fromFollowUpId) {
+            const f = follows.find(x => x.follow_up_id == fromFollowUpId);
+            $('#vFromFollowUp').val(fromFollowUpId);
+            if (f) { $('#vName').val(f.client_name); $('#vLocation').val(f.location); }
+        }
         bootstrap.Modal.getOrCreateInstance(document.getElementById('visitModal')).show();
         if (prefillPhone) lookupPhone(true);
     }
@@ -776,23 +787,27 @@ $(function () {
         Swal.fire({ icon: 'error', title: L.error, text: r.message || L.serverError });
     }
 
+    function openEdit(r) {
+        resetForm(false);
+        $('#visitModalTitle').html(`<i class="bi bi-pencil me-1"></i>${L.editVisit}`); $('#btnSaveAgain').addClass('d-none');
+        $('#vId').val(r.visit_id); setWhen(true, r.visit_date, r.visit_time); $('#vLocation').val(r.location);
+        $('#vName').val(r.client_name); $('#vPhone').val(r.client_phone); $('#vOther').val(r.business_other);
+        $('#vCard').prop('checked', !!r.gave_business_card); $('#vTrial').prop('checked', !!r.gave_trial_link); $('#vTraining').prop('checked', !!r.gave_training);
+        $('.fr-interest').prop('checked', false); if (r.interest) $(`#vInt_${r.interest}`).prop('checked', true);
+        $('#vFollowUp').val(r.follow_up_date || '').attr('min', r.visit_date);
+        gpsRequired = r.latitude !== null;   // an older visit saved without GPS stays editable
+        $('#vNotes').val(r.notes); setGps(r.latitude, r.longitude, r.gps_accuracy_m);   // the stored accuracy, re-saved unchanged
+        // Set before showing: Select2 (initialised on first show) reads the current value.
+        $('#vBusiness').val(r.business_type).trigger('change');
+        $('#vServices').val((r.service_ids || []).map(String)).trigger('change');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('visitModal')).show();
+    }
+
     $(document).on('click', '[data-act]', function () {
         const id = $(this).data('id'), r = rows.find(x => x.visit_id == id), act = $(this).data('act');
         if (!r) return;
         if (act === 'edit') {
-            resetForm(false);
-            $('#visitModalTitle').html(`<i class="bi bi-pencil me-1"></i>${L.editVisit}`); $('#btnSaveAgain').addClass('d-none');
-            $('#vId').val(r.visit_id); setWhen(true, r.visit_date, r.visit_time); $('#vLocation').val(r.location);
-            $('#vName').val(r.client_name); $('#vPhone').val(r.client_phone); $('#vOther').val(r.business_other);
-            $('#vCard').prop('checked', !!r.gave_business_card); $('#vTrial').prop('checked', !!r.gave_trial_link); $('#vTraining').prop('checked', !!r.gave_training);
-            $('.fr-interest').prop('checked', false); if (r.interest) $(`#vInt_${r.interest}`).prop('checked', true);
-            $('#vFollowUp').val(r.follow_up_date || '').attr('min', r.visit_date);
-            gpsRequired = r.latitude !== null;   // an older visit saved without GPS stays editable
-            $('#vNotes').val(r.notes); setGps(r.latitude, r.longitude, r.gps_accuracy_m);   // the stored accuracy, re-saved unchanged
-            // Set before showing: Select2 (initialised on first show) reads the current value.
-            $('#vBusiness').val(r.business_type).trigger('change');
-            $('#vServices').val((r.service_ids || []).map(String)).trigger('change');
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('visitModal')).show();
+            openEdit(r);
         } else if (act === 'delete') {
             Swal.fire({ title: L.deleteQ, text: L.cannotUndo, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: L.yesDelete, cancelButtonText: L.cancel })
                 .then(x => { if (x.isConfirmed) post('delete.php', { visit_id: id }); });
@@ -809,10 +824,12 @@ $(function () {
         }
     });
     $(document).on('click', '[data-fact]', function () {
-        const id = $(this).data('id'), f = follows.find(x => x.visit_id == id);
+        const id = $(this).data('id'), f = follows.find(x => x.follow_up_id == id);
         if (!f) return;
-        if ($(this).data('fact') === 'done') post('followup_done.php', { visit_id: id, done: 1 });
-        else openNew(f.client_phone);
+        // Done: how it went + the next date (includes/field_reports/followup_kit.php).
+        // New visit: saving it also closes this follow-up (customer_visit_followups_plan.md D5).
+        if ($(this).data('fact') === 'done') FrFollow.done({ follow_up_id: f.follow_up_id, client_name: f.client_name, due_date: f.follow_up_date, purpose: f.purpose }, loadData);
+        else openNew(f.client_phone, f.follow_up_id);
     });
     $('#visitModal').on('hidden.bs.modal', () => { stopGps(); $('#vFollowUp').attr('min', TODAY); });
 
@@ -896,9 +913,20 @@ $(function () {
     // as soon as the menu opens, so a WhatsApp tap can hand it to the share sheet at once.
     document.getElementById('btnReportMenu').addEventListener('show.bs.dropdown', () => FrShare.prepare(reportParams()));
     $('[data-frs]').on('click', function () { FrShare[$(this).data('frs')](reportParams(), this); });
-    loadData();
+
+    // From View details: ?date= shows that day, ?edit= opens that visit's form.
+    const qs = new URLSearchParams(window.location.search), qDate = qs.get('date') || '', qEdit = +(qs.get('edit') || 0);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(qDate) && qDate <= TODAY) $('#fFrom, #fTo').val(qDate);
+    loadData(() => {
+        if (qEdit) {
+            const r = rows.find(x => x.visit_id === qEdit);
+            if (r && r.can_edit) openEdit(r);
+        }
+        if (qDate || qEdit) window.history.replaceState(null, '', window.location.pathname);   // a reload starts clean
+    });
 });
 </script>
 
 <?php require_once ROOT_DIR . '/includes/field_reports/report_share.php'; frRenderShareKit(); ?>
+<?php require_once ROOT_DIR . '/includes/field_reports/followup_kit.php'; frRenderFollowUpKit(); ?>
 <?php includeFooter(); ?>

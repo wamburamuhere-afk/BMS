@@ -93,8 +93,58 @@ require_once ROOT_DIR . '/core/pos_denominations.php';
 $pos_denomination_list = posDenominationList();
 
 // Phase 30 (pos_upgrade_plan.md §9) — restaurant module entitlement + the
-// per-warehouse pos_mode map built above.
+// per-warehouse pos_mode map.
 $restaurant_pos_enabled = canView('restaurant_pos');
+
+// Shared Project ↔ Warehouse mechanism (core/warehouse_scope.php) narrows
+// by project scope first; then narrowed again to this specific user's own
+// warehouse assignment (Phase 6, pos_upgrade_plan.md) — a cashier only ever
+// sees the warehouse(s) they're personally assigned to here, never every
+// warehouse their project touches. Still calls warehousesForSelect() /
+// renderWarehouseOptions() per tests/test_warehouse_project_filter_cli.php.
+require_once ROOT_DIR . '/core/warehouse_scope.php';
+$_pos_project_scoped = warehousesForSelect($pdo);
+$_pos_warehouse_scoped = array_values(array_filter(
+    $_pos_project_scoped,
+    fn($w) => userCan('warehouse', (int)$w['warehouse_id'])
+));
+
+// Phase 30 (pos_upgrade_plan.md §9) — a warehouse-scoped pos_mode map, so the
+// JS layer can show/hide restaurant affordances (table picker, send-to-kitchen)
+// purely client-side on warehouse change, no extra round trip. Built here, BEFORE
+// the <script> that prints POS_WAREHOUSE_MODES — it used to be built further
+// down inside the warehouse <select>, after it had already been printed, so the
+// map was always empty and every shop behaved as retail (2026-10-31).
+// Only looked up when Restaurant POS is enabled: with it off every shop stays
+// 'retail' (the JS reads a missing id as 'retail') — today's behaviour exactly.
+// Defensive: a tenant whose database hasn't yet had the Phase 30 migration
+// applied (warehouses.pos_mode missing) must NEVER crash the whole POS terminal
+// over this — degrade to treating every warehouse as 'retail' instead.
+$_pos_warehouse_modes = [];
+if ($restaurant_pos_enabled && !empty($_pos_warehouse_scoped)) {
+    try {
+        $_ids = array_column($_pos_warehouse_scoped, 'warehouse_id');
+        $_ph = implode(',', array_fill(0, count($_ids), '?'));
+        $_modeStmt = $pdo->prepare("SELECT warehouse_id, pos_mode FROM warehouses WHERE warehouse_id IN ($_ph)");
+        $_modeStmt->execute($_ids);
+        foreach ($_modeStmt->fetchAll(PDO::FETCH_ASSOC) as $_mr) {
+            $_pos_warehouse_modes[(int)$_mr['warehouse_id']] = $_mr['pos_mode'];
+        }
+    } catch (PDOException $_e) {
+        error_log('pos.php: pos_mode lookup failed (tenant DB likely missing the Phase 30 migration) — degrading to retail-only: ' . $_e->getMessage());
+        $_pos_warehouse_modes = [];
+    }
+}
+
+// Restaurant focus pass — the shops that are plain Restaurant (not Hybrid) of a Smart POS company with the module on.
+// Only these get the Menu-only till; for every other shop this is an empty object and nothing changes.
+$_pos_rest_only = [];
+if ($restaurant_pos_enabled && !empty($_pos_warehouse_modes)) {
+    require_once ROOT_DIR . '/core/restaurant_scope.php';
+    if (restaurantModuleOn($pdo)) {
+        foreach ($_pos_warehouse_modes as $_wid => $_wm) { if ($_wm === 'restaurant') $_pos_rest_only[(int)$_wid] = true; }
+    }
+}
 
 // "Add Product" shortcut (pos_upgrade_plan.md-style) — two options gated
 // independently: New Product needs the same permission product_create.php
@@ -103,6 +153,12 @@ $restaurant_pos_enabled = canView('restaurant_pos');
 // stock/pricing action reachable from POS, not a sales action).
 $can_add_new_product = canCreate('products');
 $can_restock_product  = canView('pos_restock');
+
+// Record Old Sale (Rekodi Mauzo ya Zamani) — a sale made on an earlier day,
+// typed in now. Role-granted permission; rules live in core/pos_old_sales.php.
+require_once ROOT_DIR . '/core/pos_old_sales.php';
+$can_record_old_sale = canView('pos_past_sales');
+$old_sale_max_days   = posOldSaleMaxDays();
 
 $pos_simple = posSimpleModeEnabled();
 // A shift still open from an earlier day: cash totals keep accumulating into it.
@@ -115,6 +171,16 @@ $cashier_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_na
 // per warehouse-change; the JS layer just looks up the selected id.
 const POS_WAREHOUSE_MODES = <?= json_encode($_pos_warehouse_modes ?? []) ?>;
 const POS_RESTAURANT_ENABLED = <?= json_encode($restaurant_pos_enabled) ?>;
+const POS_REST_ONLY = <?= json_encode((object)$_pos_rest_only) ?>; // warehouse_id => true for a plain Restaurant shop
+// restaurant_plan.md Phase 2 — the Tables screen opens a table's order here (?table=ID&wid=ID&tlabel=T3).
+const POS_OPEN_TABLE = <?= json_encode(($restaurant_pos_enabled && !empty($_GET['table']))
+    ? ['id' => (int)$_GET['table'], 'wid' => (int)($_GET['wid'] ?? 0), 'label' => mb_substr((string)($_GET['tlabel'] ?? ''), 0, 50)]
+    : null) ?>;
+const POS_OPEN_ORDER_TYPE = <?= json_encode(($restaurant_pos_enabled && in_array($_GET['ot'] ?? '', ['take_away', 'delivery'], true)) ? $_GET['ot'] : null) ?>;
+// restaurant_plan.md Phase 3 — Selling Settings: how orders reach the kitchen + order types offered.
+<?php require_once ROOT_DIR . '/core/restaurant_scope.php'; $_rest_mod = $restaurant_pos_enabled && restaurantModuleOn($pdo); ?>
+const POS_KITCHEN_MODE = <?= json_encode($_rest_mod ? restaurantKitchenMode() : 'screen') ?>;
+const POS_ORDER_TYPES = <?= json_encode($_rest_mod ? restaurantOrderTypes() : ['dine_in', 'take_away', 'delivery']) ?>;
 // Shop scope (2026-09-16) — non-null when the active shift was opened on a
 // shop-assigned register; the Shop dropdown gets locked to this value so a
 // cashier can never sell against a different shop mid-shift (see the lock
@@ -141,6 +207,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             align-items: stretch !important;
             gap: 10px;
             padding: 14px 14px !important;
+            border-radius: 12px;   /* rounded like the Actions button inside it */
         }
         #posHeaderBar > .d-flex.align-items-center.gap-3 {
             width: 100%;
@@ -159,19 +226,44 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             flex: 1 1 0;
             margin-right: 0 !important;
         }
+        #posHeaderBar .pos-hdr-top { display: flex; align-items: center; gap: 8px; }
+        /* Phones: the bar is one line; shift info, balance and the buttons move
+           into the Actions sheet. The button block is kept in the page (height 0,
+           hidden) because the Record Old Sale pop-up lives inside it and is
+           shown from there as a fixed bottom sheet. */
+        #posHeaderBar.pos-hdr-collapsed #posShiftInfoLine { display: none !important; }
+        #posHeaderBar.pos-hdr-collapsed > .d-flex.align-items-center.gap-3 {
+            display: block !important; height: 0; overflow: hidden; visibility: hidden;
+            padding: 0 !important; border: 0 !important; margin-top: -10px;
+        }
+        #posHeaderBar.pos-hdr-collapsed #oldSalePopover { visibility: visible; }
     }
     </style>
     <!-- POS Header -->
-    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center">
+    <!-- Phones: the bar is one line (title · scanner dot · balance · Actions);
+         "Actions" opens #posActionsSheet with the shift details and every action. -->
+    <div id="posHeaderBar" class="bg-primary text-white py-2 px-3 d-flex justify-content-between align-items-center pos-hdr-collapsed">
         <div>
+            <div class="pos-hdr-top">
             <h4 class="mb-0">
-                <i class="bi bi-cash-register"></i> <?= htmlspecialchars(wLabel('Point of Sale', 'Sell')) ?>
+                <i class="bi bi-cash-register"></i> <span class="pos-hdr-title"><?= htmlspecialchars(($restaurant_pos_enabled && $pos_simple && restaurantOnlyCompany($pdo)) ? t('Take order') : wLabel('Point of Sale', 'Sell')) ?></span>
                 <span id="scannerReadyBadge" class="badge bg-light text-success ms-2 small fw-normal"
                       style="font-size:0.65rem;vertical-align:middle;display:none;"
-                      title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>">
-                    <i class="bi bi-upc-scan"></i> <?= t('SCANNER READY') ?>
+                      title="<?= t('Barcode scanner active — scan a product to add it to the cart') ?>"
+                      aria-label="<?= htmlspecialchars(t('Scanner ready')) ?>">
+                    <i class="bi bi-upc-scan"></i> <span class="pos-scan-txt"><?= t('SCANNER READY') ?></span>
                 </span>
             </h4>
+            <?php if ($shift_active): ?>
+            <span class="pos-hdr-mini-bal d-md-none"><small><?= t('Cash in drawer') ?></small><span class="cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></span></span>
+            <?php else: ?>
+            <span class="pos-hdr-mini-bal d-md-none"><?= t('No shift') ?></span>
+            <?php endif; ?>
+            <button type="button" class="pos-hdr-actions d-md-none" id="posActionsBtn"
+                    data-bs-toggle="offcanvas" data-bs-target="#posActionsSheet" aria-controls="posActionsSheet" aria-haspopup="dialog">
+                <i class="bi bi-grid-fill"></i> <?= t('Actions') ?> <i class="bi bi-chevron-down"></i>
+            </button>
+            </div>
             <small class="opacity-75" id="posShiftInfoLine">
                 <?php if ($shift_active): ?>
                 <span class="pos-shift-info-item"><?= t('Shift:') ?> <?= $shift_active['shift_code'] ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Cashier:') ?> <?= htmlspecialchars($cashier_name) ?></span>
@@ -193,14 +285,49 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                      the stats/shift-history/catalog-setup hub for whoever wants it,
                      without forcing every cashier through it first every day. -->
                 <a href="<?= getUrl('pos/dashboard') ?>" class="btn btn-outline-light btn-sm me-2" title="<?= wLabel('POS Workspace — stats, shift history, catalog setup', 'Sales Overview — stats, shift history, catalog setup') ?>">
-                    <i class="bi bi-speedometer2"></i> <?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?>
+                    <i class="bi bi-speedometer2"></i> <span><?= htmlspecialchars(wLabel('Workspace', 'Overview')) ?></span>
                 </a>
+                <?php if ($can_record_old_sale): ?>
+                <div class="pos-old-sale-wrap me-2" id="oldSaleWrap">
+                    <button type="button" class="btn btn-outline-light btn-sm" id="oldSaleBtn" onclick="toggleOldSalePopover()"
+                            aria-haspopup="dialog" aria-expanded="false" aria-controls="oldSalePopover"
+                            title="<?= htmlspecialchars(t('Record a sale made on an earlier day')) ?>">
+                        <i class="bi bi-clock-history"></i>
+                        <span class="d-none d-md-inline"><?= t('Record Old Sale') ?></span><span class="d-md-none"><?= t('Old Sale') ?></span>
+                    </button>
+                    <span class="pos-old-sale-chip d-none" id="oldSaleChip">
+                        <button type="button" class="pos-old-sale-chip-open" onclick="toggleOldSalePopover()" title="<?= htmlspecialchars(t('Change the date or time')) ?>">
+                            <i class="bi bi-clock-history"></i> <span id="oldSaleChipText"></span>
+                        </button>
+                        <button type="button" class="pos-old-sale-chip-x" onclick="exitOldSaleMode()" aria-label="<?= htmlspecialchars(t('Exit old-sale mode')) ?>" title="<?= htmlspecialchars(t('Exit old-sale mode')) ?>">&times;</button>
+                    </span>
+                    <div class="pos-old-sale-pop d-none" id="oldSalePopover" role="dialog" aria-modal="false" aria-labelledby="oldSalePopTitle">
+                        <div class="fw-semibold mb-2" id="oldSalePopTitle"><?= t('When was this sale made?') ?></div>
+                        <!-- One "When" field; tapping it opens a day list (last N days) and a time list. -->
+                        <input type="hidden" id="oldSaleDate">
+                        <input type="hidden" id="oldSaleTime" value="12:00">
+                        <button type="button" class="pos-old-sale-when mb-2" id="oldSaleWhenBtn" onclick="toggleOldSalePicker()"
+                                aria-expanded="false" aria-controls="oldSalePicker">
+                            <i class="bi bi-calendar-event"></i><span id="oldSaleWhenText"></span><i class="bi bi-chevron-down"></i>
+                        </button>
+                        <div class="pos-old-sale-picker d-none mb-2" id="oldSalePicker">
+                            <ul id="oldSaleDayList" aria-label="<?= htmlspecialchars(t('Day')) ?>"></ul>
+                            <ul id="oldSaleTimeList" aria-label="<?= htmlspecialchars(t('Time')) ?>"></ul>
+                        </div>
+                        <div class="small mb-2" id="oldSalePreview" aria-live="polite"></div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-sm btn-light border" onclick="closeOldSalePopover()"><?= t('Cancel') ?></button>
+                            <button type="button" class="btn btn-sm btn-primary" id="oldSaleStartBtn" onclick="startOldSaleMode()" disabled><?= t('Start recording') ?></button>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <?php if ($shift_active): ?>
                 <button class="btn btn-light btn-sm me-2" onclick="openCashDrawer()">
-                    <i class="bi bi-cash"></i> <?= t('Open Drawer') ?>
+                    <i class="bi bi-cash"></i> <span><?= t('Open Drawer') ?></span>
                 </button>
-                <button class="btn btn-outline-light btn-sm" onclick="endShift()">
-                    <i class="bi bi-power"></i> <?= t('End Shift') ?>
+                <button class="btn btn-outline-light btn-sm pos-end-shift-btn" onclick="endShift()">
+                    <i class="bi bi-power"></i> <span><?= t('End Shift') ?></span>
                 </button>
                 <?php else: ?>
                 <button class="btn btn-warning btn-sm" onclick="startShift()">
@@ -208,6 +335,74 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </button>
                 <?php endif; ?>
             </div>
+        </div>
+    </div>
+
+    <?php if ($can_record_old_sale): ?>
+    <!-- Phones: while an old sale is being recorded, say so right under the bar
+         (the desktop shows the date chip in the header buttons instead). -->
+    <div class="pos-old-sale-strip d-none d-md-none" id="posOldSaleStrip" role="status">
+        <i class="bi bi-clock-history"></i>
+        <span id="posOldSaleStripText"></span>
+        <button type="button" onclick="toggleOldSalePopover()"><?= t('Change') ?></button>
+        <button type="button" onclick="exitOldSaleMode()"><?= t('Stop') ?></button>
+    </div>
+    <?php endif; ?>
+
+    <!-- Phones: every header action in one sheet, each explained in a line, so a
+         new cashier knows what each one does. Rows call the same functions as the
+         desktop buttons, after the sheet has closed (posAction()). -->
+    <div class="offcanvas offcanvas-bottom pos-actions-sheet d-md-none" tabindex="-1" id="posActionsSheet" aria-labelledby="posActionsTitle">
+        <div class="pos-actions-grab" aria-hidden="true"></div>
+        <div class="pos-actions-head">
+            <?php if ($shift_active): ?>
+            <div style="min-width:0">
+                <div class="fw-bold" id="posActionsTitle"><?= sprintf(t('Shift open since %s'), date('H:i', strtotime($shift_active['start_time']))) ?></div>
+                <small class="text-muted"><?= htmlspecialchars($shift_active['shift_code']) ?> · <?= htmlspecialchars($cashier_name) ?></small>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold text-nowrap cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></div>
+                <small class="text-muted text-nowrap"><?= t('Starting:') ?> <?= htmlspecialchars($currency) ?> <?= number_format((float)$starting_cash, 2) ?></small>
+            </div>
+            <?php else: ?>
+            <div>
+                <div class="fw-bold" id="posActionsTitle"><?= t('No shift open') ?></div>
+                <small class="text-muted"><?= t('Start a shift before you sell today') ?></small>
+            </div>
+            <?php endif; ?>
+            <button type="button" class="btn-close ms-2" data-bs-dismiss="offcanvas" aria-label="<?= t('Close') ?>"></button>
+        </div>
+        <div class="pos-actions-list">
+            <?php if (!$shift_active): ?>
+            <button type="button" class="pos-act pos-act-warn" onclick="posAction(startShift)">
+                <span class="pos-act-i"><i class="bi bi-play-circle"></i></span>
+                <span><b><?= t('Start Shift') ?></b><small><?= t('Count the cash in the drawer and begin selling') ?></small></span>
+            </button>
+            <?php endif; ?>
+            <button type="button" class="pos-act" onclick="posAction(openCashDrawer)" <?= $shift_active ? '' : 'disabled' ?>>
+                <span class="pos-act-i"><i class="bi bi-cash"></i></span>
+                <span><b><?= t('Open Drawer') ?></b><small><?= $shift_active ? t('Open the cash drawer without a sale') : t('Start a shift first') ?></small></span>
+            </button>
+            <?php if ($can_record_old_sale): ?>
+            <button type="button" class="pos-act" id="posActOldSale" onclick="posAction(toggleOldSalePopover)">
+                <span class="pos-act-i"><i class="bi bi-clock-history"></i></span>
+                <span><b id="posActOldSaleTitle"><?= t('Record Old Sale') ?></b><small id="posActOldSaleHelp"><?= t('A sale from an earlier day you forgot to enter') ?></small></span>
+            </button>
+            <button type="button" class="pos-act d-none" id="posActOldSaleExit" onclick="posAction(exitOldSaleMode)">
+                <span class="pos-act-i"><i class="bi bi-x-circle"></i></span>
+                <span><b><?= t('Stop recording old sale') ?></b><small><?= t("Go back to today's sales") ?></small></span>
+            </button>
+            <?php endif; ?>
+            <a class="pos-act" href="<?= getUrl('pos/dashboard') ?>">
+                <span class="pos-act-i"><i class="bi bi-speedometer2"></i></span>
+                <span><b><?= htmlspecialchars(wLabel('Workspace', 'Sales Overview')) ?></b><small><?= t("Today's totals, past shifts and receipts") ?></small></span>
+            </a>
+            <?php if ($shift_active): ?>
+            <button type="button" class="pos-act pos-act-danger" onclick="posAction(endShift)">
+                <span class="pos-act-i"><i class="bi bi-power"></i></span>
+                <span><b><?= t('End Shift') ?></b><small><?= t('Count your cash and close the day') ?></small></span>
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -259,12 +454,8 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                                 // sees the warehouse(s) they're personally assigned to here, never every
                                 // warehouse their project touches. Still calls warehousesForSelect() /
                                 // renderWarehouseOptions() per tests/test_warehouse_project_filter_cli.php.
-                                require_once ROOT_DIR . '/core/warehouse_scope.php';
-                                $_pos_project_scoped = warehousesForSelect($pdo);
-                                $_pos_warehouse_scoped = array_values(array_filter(
-                                    $_pos_project_scoped,
-                                    fn($w) => userCan('warehouse', (int)$w['warehouse_id'])
-                                ));
+                                // $_pos_warehouse_scoped is built near the top of this file,
+                                // before POS_WAREHOUSE_MODES is printed.
                                 // Shop scope (2026-09-16): a shift opened on a shop-assigned
                                 // register locks every sale in that shift to that one shop —
                                 // pre-select it here so the dropdown already reflects it on
@@ -274,35 +465,6 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                                 $_pos_shift_locked_warehouse_id = ($shift_active && !empty($shift_active['warehouse_id']))
                                     ? (int)$shift_active['warehouse_id'] : null;
                                 echo renderWarehouseOptions($_pos_warehouse_scoped, $_pos_shift_locked_warehouse_id);
-
-                                // Phase 30 (pos_upgrade_plan.md §9) — a warehouse-scoped
-                                // pos_mode map, so the JS layer can show/hide restaurant
-                                // affordances (table picker, send-to-kitchen) purely
-                                // client-side on warehouse change, no extra round trip.
-                                // A plain 'retail' warehouse (the default, every warehouse
-                                // until an admin explicitly changes it) never triggers any
-                                // of this — byte-for-byte unchanged behaviour.
-                                // Defensive: a tenant whose database hasn't yet had the
-                                // Phase 30 migration applied (warehouses.pos_mode missing)
-                                // must NEVER crash the whole POS terminal over this —
-                                // degrade to treating every warehouse as 'retail' instead,
-                                // identical to how the JS side already reads a warehouse
-                                // absent from this map (POS_WAREHOUSE_MODES[wid] || 'retail').
-                                $_pos_warehouse_modes = [];
-                                if (!empty($_pos_warehouse_scoped)) {
-                                    try {
-                                        $_ids = array_column($_pos_warehouse_scoped, 'warehouse_id');
-                                        $_ph = implode(',', array_fill(0, count($_ids), '?'));
-                                        $_modeStmt = $pdo->prepare("SELECT warehouse_id, pos_mode FROM warehouses WHERE warehouse_id IN ($_ph)");
-                                        $_modeStmt->execute($_ids);
-                                        foreach ($_modeStmt->fetchAll(PDO::FETCH_ASSOC) as $_mr) {
-                                            $_pos_warehouse_modes[(int)$_mr['warehouse_id']] = $_mr['pos_mode'];
-                                        }
-                                    } catch (PDOException $_e) {
-                                        error_log('pos.php: pos_mode lookup failed (tenant DB likely missing the Phase 30 migration) — degrading to retail-only: ' . $_e->getMessage());
-                                        $_pos_warehouse_modes = [];
-                                    }
-                                }
                                 ?>
                             </select>
                         </div>
@@ -377,6 +539,19 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                         </button>
                     </div>
                     <?php endif; ?>
+                    <?php if ($restaurant_pos_enabled): ?>
+                    <!-- Restaurant simplicity pass — Menu | All products (restaurant/hybrid shops only;
+                         shown by applyPosModeUi(), so a retail shop never sees it). -->
+                    <div class="col-12 mt-2 d-none" id="posMenuSwitchRow">
+                        <div class="btn-group btn-group-sm" id="posMenuSwitchGroup" role="group" aria-label="<?= htmlspecialchars(t('Menu')) ?>">
+                            <input type="radio" class="btn-check" name="posView" id="posViewMenu" value="menu" checked>
+                            <label class="btn btn-outline-primary" for="posViewMenu"><i class="bi bi-journal-text me-1"></i><?= t('Menu') ?></label>
+                            <input type="radio" class="btn-check" name="posView" id="posViewAll" value="all">
+                            <label class="btn btn-outline-primary" for="posViewAll"><i class="bi bi-grid me-1"></i><?= t('All Products') ?></label>
+                        </div>
+                        <div class="category-scroll-strip d-none mt-2" id="menuCategoryButtons"></div>
+                    </div>
+                    <?php endif; ?>
                     <div class="col-12 mt-2">
                         <div class="category-scroll-strip" id="categoryButtons">
                             <button type="button" class="btn btn-sm btn-outline-primary active" onclick="loadProductsByCategory('all')">
@@ -406,7 +581,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             <!-- Current Sale Header -->
             <div class="p-3 border-bottom bg-white">
                 <div id="cartHeaderTop" class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0"><i class="bi bi-cart3"></i> <?= t('Current Sale') ?></h5>
+                    <h5 class="mb-0"><i class="bi bi-cart3" id="cartTitleIcon"></i> <span id="cartTitleText"><?= t('Current Sale') ?></span></h5>
                     <div id="cartHeaderActions" class="btn-group btn-group-sm">
                         <?php if (canEdit('pos_discount_override')): ?>
                         <button class="btn btn-outline-warning" onclick="openDiscountModal()" title="<?= t('Apply Discount') ?>">
@@ -430,10 +605,43 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                             <i class="bi bi-grid-3x3-gap"></i>
                         </button>
                         <button class="btn btn-outline-dark d-none" id="sendToKitchenBtn" onclick="sendCurrentOrderToKitchen()" title="<?= t('Send to Kitchen') ?>">
-                            <i class="bi bi-fire"></i>
+                            <i class="ri ri-chef-hat"></i>
                         </button>
                     </div>
                 </div>
+                <div class="alert alert-primary py-2 px-2 small mb-2 d-none" id="oldSaleCartNote" role="status"></div>
+                <?php if ($restaurant_pos_enabled): ?>
+                <!-- restaurant_plan.md Phase 2 — order type + table, restaurant/hybrid shops only
+                     (shown by applyPosModeUi(); a retail shop never sees it). -->
+                <div class="d-none mb-2" id="restaurantOrderBar">
+                    <div class="btn-group w-100 rs-order-type" role="group" aria-label="<?= htmlspecialchars(t('Order type')) ?>">
+                        <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDine" value="dine_in">
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDine"><i class="ri ri-utensils me-1"></i><?= t('Dine in') ?></label>
+                        <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeTake" value="take_away">
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeTake"><i class="ri ri-shopping-bag me-1"></i><?= t('Take away') ?></label>
+                        <input type="radio" class="btn-check" name="rsOrderType" id="rsTypeDelivery" value="delivery">
+                        <label class="btn btn-outline-primary btn-sm" for="rsTypeDelivery"><i class="ri ri-bike me-1"></i><?= t('Delivery') ?></label>
+                    </div>
+                    <div class="d-flex gap-2 mt-2" id="rsTableRow">
+                        <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-truncate" id="rsTableBtn" onclick="openTablePicker()">
+                            <i class="ri ri-armchair me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary d-none text-nowrap" id="rsSaveTableBtn" onclick="saveOrderToTable()">
+                            <i class="bi bi-bookmark-check me-1"></i><?= t('Save to table') ?>
+                        </button>
+                    </div>
+                    <!-- restaurant_plan.md Phase 4 — split the table's bill (pay some items now). -->
+                    <div class="mt-2 d-none" id="rsSplitRow">
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="rsSplitBtn" onclick="openSplitBill()">
+                            <i class="bi bi-scissors me-1"></i><?= t('Split bill') ?>
+                        </button>
+                        <div class="alert alert-primary py-1 px-2 small mb-0 mt-1 d-none d-flex justify-content-between align-items-center gap-2" id="rsSplitNote">
+                            <span id="rsSplitNoteText"></span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-nowrap" onclick="cancelSplitBill()"><?= t('Cancel split') ?></button>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <div class="row g-2 small">
                     <div class="col-6">
                         <div class="text-muted"><?= t('Receipt #') ?></div>
@@ -468,8 +676,9 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </table>
                 <div id="emptyCart" class="text-center py-5 bg-white rounded">
                     <i class="bi bi-cart-x" style="font-size: 3rem; color: #6c757d;"></i>
-                    <p class="text-muted mt-2 mb-1"><?= t('Cart is empty') ?></p>
-                    <p class="text-muted small"><?= t('Search or browse products to add items') ?></p>
+                    <?php $_rf_till = $restaurant_pos_enabled && $pos_simple && restaurantOnlyCompany($pdo); ?>
+                    <p class="text-muted mt-2 mb-1"><?= $_rf_till ? t('No items on this order yet') : t('Cart is empty') ?></p>
+                    <p class="text-muted small"><?= $_rf_till ? t('Tap a dish or drink to add it.') : t('Search or browse products to add items') ?></p>
                 </div>
             </div>
 
@@ -647,7 +856,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     <div class="offcanvas-header border-bottom py-2 px-3">
         <h6 class="offcanvas-title mb-0 fw-bold">
             <i class="bi bi-cart3 me-1 text-primary"></i>
-            <?= t('Current Sale') ?>
+            <span id="mobileCartTitleText"><?= t('Current Sale') ?></span>
             <span id="mobileCartOffcanvasCount" class="badge bg-primary ms-1 fw-normal">0</span>
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="<?= t('Close') ?>"></button>
@@ -668,7 +877,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         </div>
         <button class="btn btn-success w-100 fw-bold"
                 data-bs-dismiss="offcanvas"
-                onclick="processPayment()">
+                onclick="processPayment()" id="mobilePayBtn">
             <i class="bi bi-check-circle me-1"></i><?= t('PROCESS PAYMENT') ?>
         </button>
     </div>
@@ -683,6 +892,64 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 </script>
 
 <style>
+/* Record Old Sale — header button, pop-up (a bottom sheet on phones), chip
+   while the mode is on, and the cart header tint. White and blue, like the POS. */
+.pos-old-sale-wrap { display: inline-block; position: relative; vertical-align: middle; }
+.pos-old-sale-pop {
+    position: absolute; top: calc(100% + 8px); right: 0; width: 320px; z-index: 1085;
+    background: #fff; color: #212529; text-align: left; font-size: .875rem;
+    border: 1px solid #dee2e6; border-radius: 10px; padding: 12px 14px;
+    box-shadow: 0 10px 30px rgba(13, 32, 64, .22);
+}
+.pos-old-sale-pop::before {
+    content: ""; position: absolute; top: -7px; right: 28px; width: 12px; height: 12px;
+    background: #fff; border-left: 1px solid #dee2e6; border-top: 1px solid #dee2e6; transform: rotate(45deg);
+}
+.pos-old-sale-pop .btn-outline-primary.active { background: #0d6efd; color: #fff; }
+.pos-old-sale-when {
+    display: flex; align-items: center; gap: 8px; width: 100%; min-height: 46px; padding: 6px 12px;
+    border: 1px solid #0d6efd; border-radius: 10px; background: #fff; color: #212529; text-align: left; font-weight: 600;
+}
+.pos-old-sale-when .bi-calendar-event { color: #0d6efd; font-size: 1.05rem; }
+.pos-old-sale-when span { flex: 1; min-width: 0; }
+.pos-old-sale-when .bi-chevron-down { transition: transform .2s; }
+.pos-old-sale-when[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
+.pos-old-sale-when:focus-visible { outline: 2px solid #0d6efd; outline-offset: 2px; }
+.pos-old-sale-picker {
+    display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); height: 210px;
+    border: 1px solid #dee2e6; border-radius: 10px; overflow: hidden;
+}
+.pos-old-sale-picker ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.pos-old-sale-picker ul + ul { border-left: 1px solid #dee2e6; }
+.pos-old-sale-picker button {
+    display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 8px;
+    border-radius: 6px; font-size: .84rem; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-old-sale-picker button small { display: block; font-size: .72rem; opacity: .75; }
+.pos-old-sale-picker button:hover { background: #f1f4f8; }
+.pos-old-sale-picker button.active { background: #0d6efd; color: #fff; }
+.pos-old-sale-backdrop { position: fixed; inset: 0; background: rgba(13, 32, 64, .42); z-index: 1084; }
+.pos-old-sale-chip {
+    display: inline-flex; align-items: center; gap: 4px; background: #fff; color: #0a58ca;
+    border-radius: 20px; padding: 2px 4px 2px 10px; font-size: .82rem; font-weight: 600; white-space: nowrap;
+}
+.pos-old-sale-chip button { border: 0; background: transparent; color: inherit; font-weight: 600; padding: 2px 0; }
+.pos-old-sale-chip .pos-old-sale-chip-x {
+    width: 24px; height: 24px; border-radius: 50%; background: #e7f1ff; line-height: 1; font-size: 1rem; padding: 0;
+}
+.pos-old-sale-chip button:focus-visible, .pos-old-sale-wrap .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.pos-old-sale-head { background: #e7f1ff !important; border-bottom: 2px solid #0d6efd !important; }
+.pos-old-sale-head #cartTitleText { color: #0b3a82; }
+@media (max-width: 767.98px) {
+    #posShiftButtons .pos-old-sale-wrap { flex: 1 1 0; display: flex; margin-right: 0 !important; }
+    #posShiftButtons .pos-old-sale-wrap > .btn { width: 100%; }
+    #posShiftButtons .pos-old-sale-chip { width: 100%; justify-content: space-between; }
+    .pos-old-sale-pop {
+        position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto;
+        border-radius: 16px 16px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .pos-old-sale-pop::before { display: none; }
+}
 #pos-container {
     height: 100vh;
     overflow: hidden;
@@ -778,6 +1045,10 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 }
 
 /* Category scroll strip — single horizontal row, scroll sideways on overflow */
+/* Restaurant focus: a plain Restaurant shop hides the retail-only controls. The class is only ever added by the till script
+   for such a shop — never on Retail / Hybrid. (Global rule: it must apply on desktop too, not only inside a phone media query.) */
+.pos-rest-hide { display: none !important; }
+
 .category-scroll-strip {
     display: flex;
     flex-wrap: nowrap;
@@ -826,16 +1097,45 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         gap: 6px;
         margin-bottom: 2px;
     }
-    /* Scanner badge, when the scanner is active, drops to its own line
-       under the title instead of squeezing the title text. */
-    #posHeaderBar h4 #scannerReadyBadge {
-        flex-basis: 100%;
-        margin-left: 0 !important;
-        width: fit-content;
-    }
+    /* Scanner badge: a small green dot beside the title instead of a
+       full-width "SCANNER READY" bar (the text stays as its tooltip/label). */
+    #posHeaderBar h4 { min-width: 0; }
+    #posHeaderBar .pos-hdr-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     #posHeaderBar #scannerReadyBadge {
-        font-size: 0.62rem !important;
+        flex: none; width: 9px; height: 9px; padding: 0; margin-left: 2px !important;
+        border-radius: 50%; background: #3ddc84 !important; box-shadow: 0 0 0 3px rgba(61, 220, 132, .3);
+        font-size: 0 !important;
     }
+    #posHeaderBar #scannerReadyBadge > * { display: none; }
+
+    /* One-line bar: balance (or "No shift") + the Actions button share the title line. */
+    .pos-hdr-mini-bal {
+        margin-left: auto; font-weight: 800; font-size: .95rem; white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15;
+    }
+    #posHeaderBar .pos-hdr-mini-bal small { font-size: .62rem; font-weight: 600; opacity: .85; }
+    /* Old-sale strip under the bar (phones). */
+    .pos-old-sale-strip {
+        display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 8px 8px 8px 12px;
+        background: #e7f1ff; color: #0b3a82; border: 1px solid #b6d4fe; border-radius: 10px;
+        font-size: .82rem; font-weight: 600;
+    }
+    .pos-old-sale-strip.d-none { display: none !important; }
+    .pos-old-sale-strip span { flex: 1; min-width: 0; }
+    .pos-old-sale-strip button {
+        border: 0; border-radius: 6px; background: #fff; color: #0a58ca; font-weight: 600; font-size: .78rem; padding: 4px 10px;
+    }
+    /* A solid white button on the blue bar, so it plainly reads as tappable. */
+    .pos-hdr-actions {
+        flex: none; height: 36px; border: 0; border-radius: 10px; padding: 0 10px;
+        background: #fff; color: #0d6efd; font-size: .82rem; font-weight: 700;
+        display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .18);
+    }
+    .pos-hdr-actions .bi-chevron-down { font-size: .75rem; }
+    .pos-hdr-actions:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+    .pos-hdr-actions:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     /* Shift info: each piece (Shift/Started/Cashier) is its own nowrap
        chip, wrapping cleanly between items — never mid-value. The "|"
        separators (meaningful only as an inline run-on) are hidden in
@@ -898,12 +1198,39 @@ const POS_USER_ID = <?= (int)$user_id ?>;
         font-weight: 600;
     }
 
+    /* Actions sheet (phones): shift details on top, one row per action. */
+    .pos-actions-sheet.offcanvas-bottom { height: auto; max-height: 85vh; border-radius: 16px 16px 0 0; }
+    .pos-actions-grab { width: 40px; height: 4px; border-radius: 2px; background: #ced4da; margin: 8px auto 4px; }
+    .pos-actions-head {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+        padding: 8px 16px 12px; border-bottom: 1px solid #dee2e6;
+    }
+    .pos-actions-head small { display: block; font-size: .75rem; }
+    .pos-actions-list { overflow-y: auto; padding: 4px 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
+    .pos-act {
+        display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none;
+        padding: 10px 4px; border-bottom: 1px solid #f0f2f5; color: #212529; text-decoration: none;
+    }
+    .pos-act:last-child { border-bottom: 0; }
+    .pos-act b { display: block; font-size: .92rem; }
+    .pos-act small { display: block; color: #6c757d; font-size: .76rem; line-height: 1.35; }
+    .pos-act-i {
+        width: 40px; height: 40px; border-radius: 10px; background: #e7f1ff; color: #0d6efd;
+        display: grid; place-items: center; flex: none; font-size: 1.15rem;
+    }
+    .pos-act:disabled { opacity: .45; }
+    .pos-act:focus-visible { outline: 2px solid #0d6efd; outline-offset: -2px; border-radius: 8px; }
+    .pos-act-warn .pos-act-i { background: #ffc107; color: #3d2c00; }
+    .pos-act-danger .pos-act-i { background: #fde8ea; color: #dc3545; }
+    .pos-act-danger b { color: #b02a37; }
+    .pos-act-on .pos-act-i { background: #0d6efd; color: #fff; }
+
     /* Warehouse/project selectors + search + category row — smaller text,
        tighter spacing, still full width so nothing needs pinch-zoom. */
     #posWarehouseId, #posProjectId, #productSearch {
         font-size: 0.85rem;
     }
-    #categoryButtons .btn {
+    #categoryButtons .btn, #menuCategoryButtons .btn {
         font-size: 0.72rem;
         padding: 3px 10px;
     }
@@ -1024,6 +1351,9 @@ const POS_USER_ID = <?= (int)$user_id ?>;
 /* style.css gives every .btn min-width:85px — it turned the round cart button
    into an oval and pushed the search row's buttons onto a second line. */
 #mobileCartFab { min-width: 0; }
+body.pos-actions-open #mobileCartFab { visibility: hidden; }
+/* Shop not chosen yet: red outline only (Bootstrap's is-invalid icon hides the text in the narrow phone picker). */
+#posWarehouseId.pos-shop-needed { border-color: #dc3545; box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .25); }
 .pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 .pos-sheet-qty { width: 64px; height: 40px; padding: 0 4px; font-size: 1.05rem; -moz-appearance: textfield; }

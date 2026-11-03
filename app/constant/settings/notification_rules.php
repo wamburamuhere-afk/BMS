@@ -89,7 +89,10 @@ require_once __DIR__ . '/../../../header.php';
               <option value="permission"><?= t('Everyone with access') ?></option>
               <option value="role"><?= t('A specific role') ?></option>
               <option value="user"><?= t('A specific user') ?></option>
+              <option value="record_owner"><?= t('The person who recorded it') ?></option>
+              <option value="admins"><?= t('All admins') ?></option>
             </select>
+            <div class="form-text d-none" id="t_owner_help"><?= t('Worked out for each record when the alert goes out — e.g. the staff member who recorded that customer visit. Everyone gets only their own.') ?></div>
           </div>
 
           <div class="mb-3 d-none" id="t_role_wrap">
@@ -162,7 +165,12 @@ const NR_STRINGS = {
     selectUser: <?= json_encode(t('-- Select user --')) ?>,
     selectRolePlaceholder: <?= json_encode(t('Select role')) ?>,
     typeToSearchUser: <?= json_encode(t('Type to search user')) ?>,
+    recordOwner: <?= json_encode(t('The person who recorded it')) ?>,
+    allAdmins: <?= json_encode(t('All admins')) ?>,
+    recordOwnerNote: <?= json_encode(t('Plus the person who recorded each record — a different person each time, so not listed here.')) ?>,
 };
+// record_owner / admins chips: the screen's own wording (the API label is English).
+const ruleLabel = r => r.target_type === 'record_owner' ? NR_STRINGS.recordOwner : (r.target_type === 'admins' ? NR_STRINGS.allAdmins : r.label);
 
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -206,7 +214,7 @@ function renderAccordion(events) {
 function eventCard(e) {
     const chips = (e.rules || []).map(r => `
         <span class="badge bg-light text-dark border me-1 mb-1" style="font-weight:500;">
-            ${esc(r.label)} <span class="text-muted">· ${esc(r.channels)}</span>
+            ${esc(ruleLabel(r))} <span class="text-muted">· ${esc(r.channels)}</span>
             <a href="#" class="text-danger ms-1" onclick="delRule(${r.id});return false;" title="${NR_STRINGS.remove}"><i class="bi bi-x-circle"></i></a>
         </span>`).join('');
     const noRules = (e.rules || []).length === 0
@@ -263,6 +271,7 @@ function openAdd(key, title) {
 $('#t_target_type').on('change', function () {
     $('#t_role_wrap').toggleClass('d-none', this.value !== 'role');
     $('#t_user_wrap').toggleClass('d-none', this.value !== 'user');
+    $('#t_owner_help').toggleClass('d-none', this.value !== 'record_owner');
 });
 
 $('#addTargetForm').on('submit', function (e) {
@@ -298,13 +307,17 @@ function previewEvent(key, title) {
     new bootstrap.Modal(document.getElementById('previewModal')).show();
     $.getJSON(NR_API, { action: 'preview', event_key: key }, function (res) {
         if (!res.success) { $('#previewBody').html('<div class="text-danger">'+esc(res.message)+'</div>'); return; }
-        if (!res.count) { $('#previewBody').html('<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i>'+NR_STRINGS.nobodyNotified+' <strong>'+esc(title)+'</strong>.</div>'); return; }
+        const ownerNote = res.record_owner ? '<div class="alert alert-primary py-2 small mb-2"><i class="bi bi-person-check me-1"></i>' + esc(NR_STRINGS.recordOwnerNote) + '</div>' : '';
+        if (!res.count) {
+            $('#previewBody').html(ownerNote || ('<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i>'+NR_STRINGS.nobodyNotified+' <strong>'+esc(title)+'</strong>.</div>'));
+            return;
+        }
         let rows = res.recipients.map(r => `<tr>
             <td>${esc(r.name)} ${r.is_admin?'<span class="badge bg-primary ms-1">' + NR_STRINGS.admin + '</span>':''}</td>
             <td class="text-muted">${esc(r.email||'—')}</td>
             <td>${r.channels.inapp?'<span class="badge" style="background:#cfe2ff;color:#084298;">' + NR_STRINGS.inApp + '</span> ':''}${r.channels.email?'<span class="badge bg-primary">' + NR_STRINGS.email + '</span>':''}</td>
         </tr>`).join('');
-        $('#previewBody').html('<p class="small text-muted">'+res.count+' '+NR_STRINGS.recipientsFor+' <strong>'+esc(title)+'</strong>:</p>'+
+        $('#previewBody').html(ownerNote + '<p class="small text-muted">'+res.count+' '+NR_STRINGS.recipientsFor+' <strong>'+esc(title)+'</strong>:</p>'+
             '<table class="table table-sm align-middle"><thead><tr><th>'+NR_STRINGS.name+'</th><th>'+NR_STRINGS.email+'</th><th>'+NR_STRINGS.channels+'</th></tr></thead><tbody>'+rows+'</tbody></table>');
     });
 }

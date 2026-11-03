@@ -11,6 +11,968 @@
 - New control-DB column `tenants.trial_starts_at` (added by `scripts/setup_control_db.php`).
 - Not changed automatically: companies that signed up before this fix are still "active" with no end date. Give each one a trial with **Set free trial**, or a paid period with **Extend access**.
 
+## 2026-11-02 — feat(restaurant): restaurant icons (Lucide) on the restaurant screens only
+
+**New:** `assets/css/restaurant-icons.css` (23 Lucide icons, ISC licence, drawn as CSS masks so they take the text colour and size like Bootstrap icons).
+**Changed:** `header.php`, `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `app/bms/pos/pos.php`, `app/bms/restaurant/{menu,purchases,tables_board,kitchen_dashboard,reservations,modifier_group,sales_report}.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_phase1_cli.php`.
+**Only icons changed:** no arrangement, text or colour. Retail Smart POS and Smart BMS keep every icon they had (tested). The icon file loads only for users with Restaurant POS.
+
+- Menu bar (restaurant-only company): Dashboard, Orders, Take order, Tables, Kitchen, Reservations, Who Owes Me, Menu, Menu items, Add-on options, Purchases, Buy stock & ingredients, Customers, Expenses, Reports, bell. The same in the phone side menu and bottom bar.
+- Dashboard: the 8 quick actions and 6 cards; kitchen-wait notice.
+- Till (restaurant shops): Dine in, Take away, Delivery, Choose table, Send to Kitchen.
+- Menu page: title, Dish, Bought item, Kitchen, Recipe, Buy stock. Page titles: Purchases, Tables, Kitchen, Reservations, Add-on options, Restaurant Sales.
+
+## 2026-11-02 — feat(restaurant): dashboard arrangement A — period dropdowns, coloured cards, bell beside Help; Money check and Busy hours removed
+
+**Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `api/restaurant/dashboard_panel.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Not changed:** the retail dashboard and the mixed-company strip (it keeps its buttons and Busy hours). Restaurant-only Smart POS company only.
+
+- **Performance period** is a dropdown with all 5 retail periods: Daily, Weekly, Monthly, Quarterly, Yearly.
+- **"Today" heading replaced** by a "Showing" dropdown (Today, This week, This month, This quarter, This year). It drives the cards, Where your money went, What earns you money and How customers order. Each period is compared with the same stretch of the period before.
+- **Six cards, each its own colour:** Sales blue, Orders teal, Profit green, Expenses orange, Open tables purple, Owed to me indigo. Open tables and Owed to me are marked "Right now". The Kitchen waiting card is dropped; the Kitchen action still shows the count.
+- **Removed:** Money check this month, Busy hours.
+- **Bell** moved to the lower bar, left of Help, on computer and phone.
+- **No black or red** in the new layout: warnings are amber, profit is green.
+- The profit warnings still look at the whole month in every view, because no expenses today is normal and none this month is not.
+
+## 2026-11-02 — feat(restaurant): dashboard Layout 2 "Side actions" with the chosen design's colours, and a notification bell
+
+**Changed:** `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `core/restaurant_insights.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`, `tests/test_restaurant_dashboard_cli.php`, `tests/test_restaurant_phase6_cli.php`.
+**Not changed:** the retail dashboard (`app/dashboard.php`) and the mixed-company "Restaurant today" strip keep their layouts. Tested for retail, mixed, Hybrid and full BMS.
+
+Applies only to a restaurant-only Smart POS company, built from the owner's chosen design (layouts artifact, Layout 2):
+- **Quick actions down the left** (blue column), each with a live line: Take order, Tables (n with order), Kitchen (n waiting long, only when the kitchen screen/printer is on), Menu (n need a cost), Purchases (n running low), Expenses (n to approve), Reservations (n today), Sales report. On a phone they become a wrapping grid above the cards.
+- **Today cards:** sales today (with yesterday and the 7-day trend), orders today (with average bill), open tables ("2 of 14", with the unpaid amount), kitchen waiting.
+- **Money cards:** owed to me, expenses this month, profit this month (margin, Estimated/Complete). "We owe suppliers" is left out until supplier credit exists.
+- **Side panel with tabs:** Needs attention, Activities (only with the audit-log permission, like the retail dashboard), Running low, Orders. These replace the separate "Recent orders" and "Drinks and ingredients running low" cards.
+- **Colours as designed:** sales blue, costs orange, profit a dark line; the bar, legend, busy-hours and order-type charts follow. The charts keep their previous blue-only look for the mixed strip.
+- **Notification bell** in the top bar with the unread count; it opens the existing Notification Center. What appears there is decided later.
+- Money check, profit warnings and Performance / Where your money went / What earns you money / Busy hours are unchanged apart from layout and colour.
+
+## 2026-11-02 — fix(restaurant): fixes found by testing on the live demo — Swahili groceries listed, only restaurant groups, no retail products to add, restaurant words on the till
+
+**Changed:** `api/restaurant/get_purchases.php`, `app/bms/product/categories.php`, `app/bms/restaurant/menu.php`, `app/bms/pos/pos.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+All four changes apply only to a restaurant-only Smart POS company (every active shop is a Restaurant). Retail, mixed, Hybrid and full BMS are unchanged (tested).
+
+- **Groceries entered in Swahili were missing from the Purchases list.** They are saved as "Viungo: …", and the list looked only for "Ingredients:". It now finds groceries by their cost-of-food account and removes the prefix in either language. The money was always counted; only the list missed them.
+- **Menu groups showed 25 old retail groups** (Baby Products, Engine Part, Hair Care…). A restaurant-only company now sees only groups used by a menu item, or new empty ones. Old groups stay in the database, untouched.
+- **Menu → "Already in my products"** offered old retail products. It is hidden for a restaurant-only company; a mixed company keeps it.
+- **Till words:** "Take order" (not "Sell"), "No items on this order yet / Tap a dish or drink to add it." (not "Search or browse products"). Swahili: "Weka Oda".
+
+## 2026-11-02 — fix(pos): a paid order no longer comes back into the till's cart (retail and restaurant)
+
+**Changed:** `app/bms/pos/pos_scripts_new.php` (one line in `submitPayment()`). **New:** `tests/test_pos_paid_cart_not_restored_cli.php`.
+
+- **Cause:** the till keeps the cart in the browser (`localStorage` `pos_cart`) and reloads it when the page opens. The saved copy was cleared only when the "Sale Completed" popup closed. A refresh, closed tab or power cut while the popup showed brought the paid order back, and paying it again recorded the sale twice. Normal web sales send no `client_uuid`, so the server cannot refuse the repeat.
+- **Proof (browser, retail shop, throwaway database):** old code, one "ZZ Proof Soap" sold, refreshed with the popup open, paid again: two sales (2616, 2617), stock down by 2. New code, same steps: one sale (2618), cart empty after the refresh.
+- **Fix:** clear the saved copy as soon as the server confirms the sale. The in-memory cart stays until the popup closes (the WhatsApp receipt is built from it). A failed payment keeps the cart. An unpaid order still survives a refresh. "Next Customer" is unchanged.
+
+## 2026-11-02 — feat(restaurant): true profit you can see — one Purchases form like Receive Stock, buying and selling price together, cost and profit on the Menu, a money check on the dashboard
+
+**Plan:** `restaurant_plan.md` → "Profit truth pass (2026-11-02)". Branch `feat/restaurant-profit-truth`.
+**Changed:** `app/bms/restaurant/purchases.php`, `core/restaurant_purchases.php`, `api/restaurant/buy_stock.php`, `api/restaurant/search_stock_items.php`, `api/restaurant/get_purchases.php`, `app/bms/restaurant/menu.php`, `api/restaurant/get_menu_items.php`, `api/restaurant/save_menu_item.php`, `core/restaurant_scope.php`, `core/restaurant_insights.php`, `core/restaurant_dashboard.php`, `app/bms/restaurant/sales_report.php`, `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/buy_ingredients_modal.php`, `header.php`, `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Shared files, gated to a restaurant-only Smart POS company:** `api/account/add_expense.php` (default cash account), `api/account/get_inventory_report.php` and `app/constant/reports/inventory_report.php` (counted items only). Retail, mixed, Hybrid and full BMS behave as before; `api/pos/quick_restock.php` is untouched.
+
+- **No account list in Smart POS.** My Purchases page wrongly showed "Paid from: 1-1130 — Cash Drawer". Removed; paid from the default cash account, like every other Smart POS screen.
+- **One form.** Pick what you bought; "Something else (not counted)" covers tomatoes and greens (saved through the Expenses engine). Everything bought is in one list.
+- **Price for one OR total paid.** A goat: 14 kg, 350,000 total, gives 25,000 per kg. The ledger gets the exact total.
+- **Buying and selling price together.** An item you sell shows its selling price (editable, as in Receive Stock) and the live profit on each.
+- **Menu list:** Selling price, Cost, Profit (with %). No cost shows a red "No cost yet — add it". A dish may state a rough plate cost.
+- **A plate cost is an estimate and never reaches the books:** it is stored in `purchase_price`, because the Income Statement drill-down reads `cost_price`, and posting it would count food twice with groceries.
+- **Sales report:** cost and profit per item, labelled an estimate.
+- **Dashboard:** same words as the retail Profit Report (Cost of Goods, Gross Profit, Net Profit); red reasons when the profit is not yet real (no cost, dishes sold but no food bought, no expenses); a money check from the ledger (added to stock, used, in stock now, groceries, owed to me).
+- **Stock report is back** for a restaurant (Phase 1 hid it by mistake), limited to what it counts.
+- **Bug found by using the system:** food "paid from cash" left the Cheque Account, because `defaultCashAccountId()` picks a different account from `posReceiptAccountId()`. Fixed for restaurant screens. The retail default is unchanged.
+- **Not built:** paying a supplier later (retail has none either; awaiting a decision). Multi-line purchases dropped at the owner's request.
+
+## 2026-11-02 — feat(restaurant): Smart POS focus pass — a restaurant-only company sees a restaurant (menu, orders, purchases, settings), no retail leftovers
+
+**Plan:** `restaurant_plan.md` → "Focus pass (2026-11-02)". Branch `feat/restaurant-focus`.
+**New:** `core/restaurant_purchases.php`, `api/restaurant/buy_stock.php`, `api/restaurant/search_stock_items.php`, `api/restaurant/get_purchases.php`, `app/bms/restaurant/purchases.php`, `tests/test_restaurant_focus_cli.php`.
+**Changed:** `header.php`, `core/pos_nav.php`, `core/restaurant_scope.php`, `roots.php`, `app/bms/stock/warehouses.php`, `ajax_get_warehouse.php`, `api/mobile/warehouses/create.php`, `api/mobile/warehouses/update.php`, `api/pos/simple_products.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/menu.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/dash_panel.php`, `app/constant/settings/pos_config_settings.php`, `lang/sw.php`, `tests/test_restaurant_mode_gating_cli.php`, `tests/test_restaurant_simplicity_cli.php`, `tests/test_shop_pages_i18n_and_modules_cli.php`.
+**Not changed (proved by tests + side-by-side renders against develop):** full BMS menus, GRN / LPO / DN / procurement, retail Receive Stock (`api/pos/quick_restock.php`), and every retail, mixed or Hybrid Smart POS screen — apart from the removed Comms menu (see below).
+
+- **POS Mode only in Smart POS.** The shop form's POS Mode choice (add/edit, web and mobile API) now needs Smart POS on as well as Restaurant POS. Full BMS never sees it and cannot save it.
+- **Menu for a restaurant-only company** (every active shop is a Restaurant): Dashboard, Orders (take order, tables, kitchen, reservations, who owes me), Menu (menu items, groups, add-ons), Purchases, Customers; Restaurant Sales first under Reports, no Inventory report, Shops under Settings; same on the phone menu.
+- **Comms menu removed from Smart POS** (the floating Ask BMS icon replaces it; Campaigns/Leads were dead links). Full BMS untouched.
+- **The till for a Restaurant shop:** Menu items only (no All switch, no retail-only buttons: restock, add product, scanner, hold, loyalty, price group), "Your menu is empty" message instead of falling back to retail stock.
+- **Purchases page ("Buy stock & ingredients"):** drinks and ingredients (no selling price needed), cost follows what you pay (weighted average) so cost of sales and profit per plate stay true; posts to the one ledger (Dr Inventory / Cr cash or bank), batch with optional expiry, optional supplier; groceries (not counted) reuse the existing Buy Ingredients window. "Pay supplier later" deliberately not built (Procurement's job).
+- **Selling Settings:** for a restaurant-only company the Restaurant options come first and Record Old Sale / Loyalty are hidden; saving never resets a hidden setting.
+- All new text through `t()` with Swahili. Tests: `test_restaurant_focus_cli.php` 212 assertions; related suites re-run, remaining failures identical to develop.
+
+## 2026-11-02 — feat(restaurant): a real dashboard — today vs yesterday, performance chart, "where your money went", profit per plate, busy hours, and an All | Restaurant | Shop switch for mixed companies
+
+**Plan:** `restaurant_plan.md` → "Dashboard pass (2026-11-02)".
+**New:** `core/restaurant_insights.php`, `includes/restaurant/dash_panel.php`, `api/restaurant/dashboard_panel.php`, `tests/test_restaurant_dashboard_cli.php`.
+**Changed:** `includes/restaurant/dashboard.php`, `includes/restaurant/today_strip.php`, `lang/sw.php`, `tests/test_restaurant_phase6_cli.php`, `tests/test_restaurant_simplicity_cli.php`.
+**Not changed:** `app/dashboard.php` — the retail dashboard — is untouched (a test says so), and a retail-only company sees nothing new.
+
+The restaurant dashboard was a handful of numbers with no chart, while the retail dashboard has a Performance chart; a mixed company saw only three numbers for the restaurant and no restaurant profit at all.
+
+- **One panel, three views.** The same panel (`dash_panel.php`) is the restaurant-only dashboard and, for a mixed company, loads into the "Restaurant today" strip behind a switch: **All** (company profit, split restaurant / shops & other, with a stacked chart), **Restaurant** (the full panel), **Shop** (folds the panel away — the shop dashboard below is exactly as before). The choice is remembered per browser.
+- **Hero.** Sales, orders, average bill, open tables. Today is never compared with a full day (that showed a scary "▼ 65%" at ten in the morning): each card shows *Yesterday* and a **last-7-days vs the 7 days before** chip, which compares complete days only.
+- **Performance chart.** Sales, costs and profit, Daily / Weekly / Monthly (30 days, 12 weeks, 12 months), same chart library and look as the retail card.
+- **Where your money went.** This month's profit and margin, one bar (food cost / other expenses / profit), a plain sentence ("For every 100 you sell: 42 goes to food, 19 to other costs, and 39 is yours"), compared with the same days last month. An **Estimated** badge appears while items sold have no cost, and **Complete** when every item has one.
+- **Profit per plate and menu engineering.** *Best earners* ranks items by estimated profit: price actually charged minus recipe cost (dish) or purchase cost (bought item), with margin and a class — **Star**, **Hidden gem**, **Popular, small profit**, **Review** (popularity and profit per plate split at the median; shown only with 3+ costed items). An item with no cost is never guessed: it is listed under "no cost yet" with a link to the Menu, which also nudges owners to add recipes. *Best sellers* is the plain ranking by plates.
+- **Busy hours, how customers order, needs attention.** Orders by hour of day (peak highlighted), dine in / take away / delivery split, and at most 3 attention items (bills open over 90 min, kitchen orders waiting over 20 min, low stock, items with no cost).
+- **Money comes from the one ledger.** Sales, food cost, expenses and profit read `journal_entries` ⨝ `journal_entry_items` ⨝ `accounts` (posted only, dated by `entry_date`, standard project/warehouse scope), so they equal the Income Statement for the same scope and dates — the new test reconciles them against `glProfitLoss`. Counts (orders, hours, open bills) come from the operational tables; profit per plate is a labelled estimate that never feeds the ledger figure above it.
+- **Who sees profit.** Profit, cost and earner figures follow the same rule as the retail Performance card (reports access, `invoices` or `sales_report`); other staff keep the hero, best sellers, busy hours and order-type split. The endpoint refuses everyone else and writes nothing.
+- **Replaced:** the four old number cards, the expenses strip and the "Best sellers today" card on the restaurant dashboard; recent orders, low-stock list, quick actions and Getting started stay. The phase-6 and simplicity tests that pinned the old "Food profit" card were updated to the new profit story.
+- **Checked:** `test_restaurant_dashboard_cli` 67/0 on both a busy database and a clean one (every money figure reconciled with the Income Statement; scoping; recipe, purchase and missing cost; panels and pages rendered and script-parsed; retail-only company shows nothing new). Browser walk-through on a month of generated orders: all three views, Daily/Weekly/Monthly, Best earners/Best sellers, Shop collapse and memory, 390px phone width, and the empty "no orders yet" state.
+## 2026-11-02 — feat(restaurant): simplicity pass — a waiter can take an order without a shift, one tap per dish, a till that shows the Menu, and a kitchen screen that explains itself
+
+**Plan:** `restaurant_plan.md` → "Simplicity pass (2026-11-02)".
+**New:** `api/restaurant/set_kitchen_mode.php`, `migrations/tenant/2026_11_02_restaurant_held_sales_shift_nullable.php`, `migrations/2026_11_02_restaurant_held_sales_shift_nullable_legacy_db.php`, `tests/test_restaurant_simplicity_cli.php`.
+**Changed:** `api/pos/hold_sale.php`, `api/pos/simple_products.php`, `api/restaurant/get_tables.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/kitchen_dashboard.php`, `app/bms/restaurant/floors.php`, `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`.
+
+Found by walking one real order through the restaurant on the demo, then fixed and re-checked in a browser. **Retail is untouched:** every change is behind an active restaurant shop; a retail shop's till, products list and hold rules are unchanged (each has a test that says so).
+
+- **Take an order with no cash shift.** Saving a table's order moved no money, yet it was refused with "Please start a cash register shift". `hold_sale.php` now allows a *table* order on an active restaurant shop with no shift (`pos_held_sales.shift_id` is nullable; migration for tenants + the legacy database). Paying still needs a shift. Retail holds, and table orders on a retail shop, still need one.
+- **The till shows the Menu.** A *Menu | All products* switch on restaurant/hybrid shops (default *Menu*): only Menu dishes and drinks, with the Menu's own group chips instead of the shop's retail categories; an empty Menu falls back to all products. `simple_products.php` takes `menu_only=1` (ignored on a retail shop). A barcode that is not on the Menu is looked up on the server before "not found".
+- **One tap per dish.** A dish with no add-on groups is added by one tap (the popup opens only for dishes with add-ons). `simple_products.php` returns `modifier_group_count` for restaurant shops only.
+- **Bug: "Choose table" on the till did nothing.** The table card's `onclick` embedded unescaped quotes, so the attribute broke and tapping a table did nothing. Fixed with the same escaping the other restaurant pages already use.
+- **Bug: choosing a table emptied the cart.** Items added before picking a table vanished. A table with no open order now keeps the cart; one with an open order still loads that order.
+- **Bug: picker and Tables board disagreed.** Opening a table marked it "occupied" in the database even with no order, so the picker showed it red while the board showed it free. A table is now busy only while it holds an open order (`get_tables.php` adds `has_open_order`; opening a table no longer sets the status).
+- **Kitchen Display explains itself.** "By mouth" is the default, so the screen stayed empty with no reason given. It now says orders are not sent to it and offers *Turn on kitchen screen* (new `set_kitchen_mode.php`: sets only `screen`, Selling Settings permission, CSRF). Ticket quantities read `1x`, not `1.000x`.
+- **Dashboard profit warning.** Food profit counts ingredient cost only for dishes with a recipe, so a dish with no recipe made profit look too high with no hint. The card now says how many such dishes were sold this month and links to the Menu (an operational count; every money figure still comes from the ledger).
+- **Floors & Tables: Add several tables.** The "I have N tables" action only existed in the Getting-started box, which disappears after first use. Same endpoint, now on the Floors & Tables page.
+- **Not changed (checked, and my first reading was wrong):** the till already has a payment-method choice (Cash by default) and an amount-received field that fills itself; they sit below the cart on a short screen. The Getting-started checklist is correct (earlier sales existed in the demo).
+- **Checked:** `test_restaurant_simplicity_cli` 72/0 (real endpoints in a rolled-back transaction, the till and pages rendered and script-parsed, retail regression cases); restaurant phases 0–7, mode gating and i18n coverage green; the new-company template refreshed (1 migration). Browser walk-through on localhost: tap Pilau ×2 → choose table from the popup → save with no shift → Tables board shows the order → Send to Kitchen → ticket on the Kitchen Display; retail shop control unchanged.
+
+## 2026-11-02 — fix(print): wider Description column on service documents (default templates)
+
+**Changed:** `app/bms/invoice/invoice_print.php`, `app/bms/sales/print_sales_order.php`, `app/bms/sales/quotations/print_quotation.php`.
+**New:** `tests/test_print_service_description_width_cli.php`.
+
+- **Why:** on a service document the Description column was only about 175px wide (Service Name took 30% and Qty / Unit Price / Total are fixed), so a long description wrapped to dozens of lines. The shared auto-fit shrinks a page only to 75%, so the totals spilled onto a 2nd page.
+- **Service layout only:** Service Name 30% → 20%, Qty 80 → 70px, Unit Price 105 → 100px. Description grows to about 265px, and its text is 11px / 1.35 line height (was 13px / 1.6).
+- **Unchanged:** product layout and its widths, the shared auto-fit (75% floor), and every other print design (onyx, summit, wave, meadow, noir, terra, confirmation, ledger, studio).
+- **Checked:** the new test passes 75 checks, including real renders of all three pages. An invoice with five long service lines printed to PDF takes 2 pages with the old widths and 1 page with the new ones. `test_service_print_columns_cli`, `test_invoices_print_layout_cli` and `test_sales_orders_print_layout_cli` still pass.
+
+## 2026-11-01 — fix(legal): Privacy Policy shows the serving company's own name and contact
+
+**Changed:** `privacy.php`, `tests/test_privacy_page_cli.php`.
+
+- **Why:** `/privacy` is reachable by any tenant's staff and customers, but named only BJP and its email. It now reads the serving tenant's Company Profile (`system_settings`: `company_name`, `company_email`, `company_phone`).
+- **Behaviour:** blank values and the install placeholders ("My Company", "info@example.com") fall back to BJP's details. When the company is not BJP, a "BMS provider" line names BJP. All values are HTML-escaped. The Google backup email is not used as a contact.
+- **Checked:** `test_privacy_page_cli` — 11 passes, including a temporary Company Profile set and restored, escaping, and the placeholder fallback.
+
+## 2026-11-01 — feat(legal): public Privacy Policy page at /privacy
+
+**Plan:** `backup_plan.md` §4 (Google Drive setup).
+**New:** `privacy.php`, `tests/test_privacy_page_cli.php`.
+**Changed:** `roots.php` (route `privacy`).
+
+- **Why:** Google keeps the BMS Backups OAuth app's Publish button disabled until it has a privacy policy link. While the app stays in Testing, its Google Drive authorization expires after 7 days, which would stop the off-site backups.
+- **Page:** static and public, with no session, database or app code. Covers the information BMS handles, separation between companies, encrypted backups on Google Drive, the `drive.file` permission, Google's Limited Use requirements, sharing, retention and contact.
+- **Checked:** `test_privacy_page_cli` renders `/privacy` through the real router with no session: no PHP warnings, no login form.
+
+## 2026-11-01 — ui(nav): Smart POS desktop menu — Dashboard is its own first item, ahead of My Business
+
+**Changed:** `header.php`, `tests/test_header_nav_menu_cli.php`.
+
+- **Smart POS desktop top menu:** *Dashboard* is now a direct first item; the *My Business* dropdown keeps the rest (Customers, Suppliers, Shop Products, Categories, Service). Same label, icon, link and Swahili as before (`t('Dashboard')`); nothing about the dashboard itself changes.
+- **Only Smart POS mode:** the full ERP menu is unchanged (Dashboard stays inside *Core*). A role with only Dashboard no longer gets a one-item dropdown. Phone bottom bar and side menu untouched.
+- **Checked:** `test_header_nav_menu_cli` 22/0 — the Smart POS header equals the previous one except for exactly this move; ERP header byte-identical; other menu suites compared with `develop`.
+
+## 2026-11-01 — feat(backup): superadmin Backups page + daily alert when any backup or the off-site copy needs attention
+
+**Plan:** `backup_plan.md` PR 3.
+**New:** `core/backup_health.php`, `app/superadmin/backups.php`, `tests/test_backup_health_cli.php`.
+**Changed:** `cron/backup_all_tenants.php` (health check + alert after each all-company run), `core/superadmin_auth.php` (route `/backups`), `core/superadmin_ui.php` (nav "Backups"; `backup_problem` bell items open the Backups page), `scripts/setup_control_db.php` (`superadmin_notifications.type` gains `backup_problem`), `backup_plan.md` (PR 3 section; production path is `/var/www/<host>/public_html`).
+
+- **Before:** backups ran on schedule, but nobody would know if one failed, stopped, or if the off-site copy was never set up — the only record was a log file on the server.
+- **Page (Platform Administration → Backups):** every database the backup run covers (main install, each company, control DB) with last good full backup (when, file, size, files), last snapshot, state and last error. States: Healthy; Failed (latest attempt failed); Overdue (no good full backup for 26 h); Never; Pending (company created < 26 h ago — not a problem). Plus counts, the off-site copy (last run, uploaded/removed, files and MB on Drive, setup hint) and failures of the last 30 days. Read-only; reads `tenant_backup_log` and `offsite_status.json`; never decrypts credentials or touches a company database.
+- **Alert:** after every scheduled all-company run, any problem (failed / overdue / never; off-site failed / overdue / never ran / not configured) → one bell notification + one email to every superadmin through the platform mail settings, at most once per day (`backups/_platform/.backup_alert_day`, claimed before sending so a failing mailer can't repeat it). The off-site job runs as root without database access, so the next www-data run reports on it. Problems are also written to `backup.log`.
+- **Not built:** an automatic weekly test-restore (reason in `backup_plan.md`).
+- **Checked:** `test_backup_health_cli` 45 checks — state rules (incl. snapshot failing after the nightly, new company pending), off-site status file cases, the real local control DB (same 59 databases as the backup run, inserted rows classified Healthy / Overdue / Failed, then removed), alert once per day and again the next day (email captured, bell row platform-wide), wiring, ENUM upgraded with earlier types kept, and the page rendered through the real router as superadmin (no PHP warnings, one row per database) and refused when signed out. Related suites (superadmin URLs, platform settings, activity alerts, control DB, plans, support, registration, migration runner, all backup suites incl. the real-rclone off-site run) match a clean `develop`; `security_coverage` counts the page under `pages_no_gate` exactly like every other `app/superadmin/` page (the scanner does not recognise `requireSuperadmin()`).
+
+## 2026-11-01 — fix: shared CSS/JS reach the browser immediately (cache-busting for responsive.css and bms-mobile-cards.js)
+
+**Changed:** `header.php`.
+
+- **Problem:** `.htaccess` lets browsers keep CSS/JS for 1 hour, and `responsive.css` and `bms-mobile-cards.js` were the only two local assets linked without a `?v=` version. After a deploy, a browser that already had the old copy showed the NEW page markup (e.g. the `stat-edge` classes on the Customers/Suppliers cards) with the OLD stylesheet, so the coloured edge bars did not appear and the cards stayed green until the cache expired.
+- **Fix:** both links now carry `?v=<file modification time>`, exactly like every other asset in the header, so any edit to them is picked up on the next page load.
+
+## 2026-11-01 — ui: Customers & Suppliers — edge-bar summary cards, one named Actions menu on the record cards
+
+**Changed:** `assets/css/responsive.css`, `app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`.
+
+- **Shared card look (new, `responsive.css`):** `.custom-stat-card.stat-edge` = white card + coloured edge bar, with one colour per meaning — blue (totals, default), green (active / good), amber (caution: suspended, pending), slate (blocked / blacklisted), gray (inactive). Any page can opt in by adding the class; red stays reserved for errors and destructive actions. Cards without `stat-edge` are unchanged.
+- **Customers:** the four summary cards (Customers, Active, Inactive, Blacklisted) use it.
+- **Suppliers:** Suppliers, Active, Suspended / Blacklisted (or Inactive) use it. When only three cards show, the first spans the row on a phone so nothing hangs half-empty.
+- **Record cards (phone / card view):** the row of 3–4 icon-only buttons on each customer and supplier card is replaced by one small **Actions** button at the right with a compact menu of written-out options. Customers: View Details, Edit, View Account, Delete. Suppliers: View Details, Edit, View Orders, New Order. Same permissions and conditions as before.
+
+## 2026-11-01 — ui: summary-card labels follow the company's Text Display Case setting (system-wide)
+
+**New:** `assets/js/bms-card-case.js` (loaded from `footer.php` on every page).
+**Changed:** `footer.php`, `app/bms/product/services.php`, `app/bms/pos/pos_credit_customers.php`, `app/bms/stock/warehouses.php`.
+
+- **Problem:** summary-card labels were typed straight in the page and many were forced to CAPITALS (a `text-uppercase` class or a CSS rule), so they ignored Settings → General → *Display Text Format*. The cards I restyled (Services, Who Owes Me, Shops) added the same forced capitals.
+- **Fix, once for the whole system:** a small script finds the label of each summary card (`.custom-stat-card`, `.stat-card`, `.stat-mini-card`, `.dn-stat-card`, `.cn-stat-card`, `.rm-stat`, `.rd-stat`, `.tb-stat`, `.summary-card`, `.planning-summary-card`, `.svc-stat`, `.wh-stat`, `.stat-card-green`) and applies the company's mode — *Each Word Capitalised* (default), *Sentence*, *lower*, *UPPER*, *tOGGLE* or *As typed* — and switches off any forced capitals. In "as typed" the label shows exactly as written.
+- **Safe by construction:** it only touches label elements (`p`, `small`, `h6`, `.stat-label` …) inside those cards; never the headline number (h1–h5), never any text that contains a digit (figures, dates, "TSh 12,000"); runs once per element (so "toggle" cannot flip twice); display-only, nothing stored or written back. In a mixed-case label a 2–3 letter ALL-CAPS word (VAT, TIN, POS) is kept as an acronym.
+- **Removed** the forced-capitals CSS I had added on the Services, Who Owes Me and Shops cards.
+- **Not changed:** print summary blocks and table headers (they keep their own style), and the customer/record cards.
+
+## 2026-11-01 — ui: Receive Stock closes to Products; Shops page cards, filters and toolbar tidied
+
+**Changed:** `app/bms/pos/receive_stock.php`, `app/bms/stock/warehouses.php`.
+
+- **Receive Stock (Pokea Mzigo):** closing the window (X / Cancel) now always goes to the **Products** list (users without Products access go to the dashboard). It used to rely on the browser's "referrer", which could be missing — and a page restored from the back/forward cache never ran the redirect — leaving an empty page with only a title. It now uses `location.replace` (so the shell page does not stay in history) and a `pageshow` guard sends a restored empty page to Products.
+- **Shops page, summary cards:** the four green blocks (full-width, one per row on a phone) are now white cards with a coloured edge bar — blue for totals, green for Active — laid out 2 x 2 on a phone.
+- **Shops page, filters:** Apply and Reset share one full-width row on a phone (they were pushed right and unevenly sized).
+- **Shops page, toolbar:** Print / Export on the left and "Show: N" on the right on one row (they were centred boxes of different widths). The green "18 shops" pill is hidden on phones because the table header right below already says "Showing 18 of 18 results".
+
+## 2026-11-01 — ui(pos): Who Owes Me — Actions button is small and right-aligned; menu is a compact floating panel
+
+**Changed:** `assets/js/pos-credit-aging.js`, `app/bms/pos/pos_credit_customers.php`.
+
+- The phone card's **Actions** button was full-width and took too much room; it is now a normal small button at the right of the card.
+- Its menu was stretched across the whole screen; it is now a compact rounded panel (min-width 200px, soft shadow, padded rows, icons aligned) that opens under the button, right-aligned. Same options and permissions (View / Repay / Edit / Delete).
+
+## 2026-11-01 — ui(services): Huduma / Services — summary cards get a coloured edge bar
+
+**Changed:** `app/bms/product/services.php`.
+
+- The four summary cards (Total, Active, Inactive, Categories) were plain white with a faint shadow and faded into the page. They now have a thin border and a coloured left edge bar — blue / green / amber / teal — with left-aligned text and small uppercase labels, the same look as Expenses and Who Owes Me.
+- "Inactive" count is amber instead of red.
+- Same text and counts as before (only classes and CSS added), on all screen sizes.
+
+## 2026-11-01 — ui(pos): Who Owes Me (Wanaodaiwa) — phone summary cards, no red, one labelled Actions menu
+
+**Changed:** `app/bms/pos/pos_credit_customers.php`, `assets/js/pos-credit-aging.js`, `app/bms/customer/customer_details.php` (one i18n key for the Madeni tab, which shares the JS).
+
+- **Summary cards (phone only, <768px):** the three cards were half-width, so the third sat alone with an empty space beside it. The first ("Total Owed") now spans the row and the other two share the next row; all three are white with a coloured edge bar (blue / amber / teal), like the Expenses page. Desktop keeps the green cards unchanged.
+- **No red:** overdue is a deep amber badge (was `bg-danger` red) and the amount owed is navy (was `text-danger`). Shared code, so the desktop table and the customer "Madeni" tab follow.
+- **Card actions:** the row of four icon-only buttons (it also ran past the card edge) is replaced by ONE full-width **Actions** button whose menu lists the written-out options — View, Repay, Edit, Delete — with the same permissions as the desktop gear (`canEdit` → Repay/Edit, `canDelete` → Delete; view-only users get just View). The menu uses a fixed position so the card or bottom bar never clips it.
+
+## 2026-11-01 — feat(currency): "Other country (USD)" at registration
+
+**Changed:** `core/currency.php`, `register.php`, `app/superadmin/tenant_new.php`.
+
+- The country list on public sign-up and superadmin New Company now ends with **Other country (USD)** (Swahili: *Nchi nyingine (USD)*). Choosing it seeds the new company's currency as **USD**; the five countries keep their own currency and Tanzania (TZS) stays the default.
+- Only that explicit choice maps to USD: an empty country (mobile sign-up sends none) or any other value still gives TZS, exactly as before. Existing companies are untouched (the currency is only seeded when a company is created).
+
+## 2026-11-01 — feat(currency): one operating currency per company — Tanzania (default), Kenya, Burundi, Rwanda, South Sudan, USD
+
+**New:** `core/currency.php` (single source: supported list, company currency, symbols, country → currency, document-currency rules).
+**Changed (main):** `helpers.php` (`format_currency()`), `header.php`, `app/constant/settings/system_settings.php`, `app/constant/settings/company_profile.php`, `register.php`, `app/superadmin/tenant_new.php`, `core/tenant_provisioner.php`, `api/mobile/{me,tenant_info,register_status,company/profile}.php`, document forms (quotation, sales order, LPO, PO, invoice, customers, suppliers, sub-contractors, supplier/project payments, employees), the APIs that save them, print templates, and display labels across Smart POS and Smart BMS pages (171 files in total). `lang/sw.php` (currency names).
+
+- **Safety rule — a TZS company sees and behaves exactly as before.** Every new helper returns the old hard-coded value for TZS. Verified: `format_currency()` old vs new = 315 checks, 0 differences; 151 of the changed files render byte-for-byte / semantically identical for a TZS company after substituting the helper output; the other 21 are the intended changes (settings, registration, mobile key, form currency lists that return the same 5 options for TZS).
+- **Supported operating currencies:** TZS (default), KES, BIF, RWF, SSP, USD. Chosen in Settings → System Settings (and Company Profile). A company still on a legacy code (e.g. EUR) keeps it listed and selected, so saving never changes it by accident; an empty post no longer blanks the currency (before, a never-configured company saving General settings was silently set to USD — the first option).
+- **One key:** `currency` (what ~50 web pages read) is the source of truth; `company_currency` (Company Profile / mobile app) is written alongside it on every save, and the mobile app now reads the same value.
+- **Registration:** country list = Tanzania (default), Kenya, Burundi, Rwanda, South Sudan; the country sets the new company's currency (Tanzania writes nothing → TZS as before). Works for Smart POS and Smart BMS (both go through `provisionTenant()`), public sign-up and superadmin New Company.
+- **Everywhere money is shown:** `format_currency()` (245 call sites that passed no currency) now uses the company currency; hard-coded "TZS"/"TSh" labels, input prefixes, JS formatters, Intl formatters, print templates, CSV sample rows, log messages and "Shillings Only" (→ Shillings / Francs / Pounds / Dollars) follow it.
+- **No foreign exchange in the ledger:** a non-TZS company can only issue documents in its own currency (forms show only that currency; every save API enforces it server-side). A TZS company keeps today's document currency list (TZS, USD, EUR, GBP, KES) unchanged.
+- **Deliberately left as TZS:** platform billing / subscription prices (BJP's own TZS pricing), Tenders' bid-currency choice (Tshs / USD / both), Tanzania tax-law amounts (PAYE bands, TRA penalties) and fallbacks used only when a stored field is empty. Decimals stay at 2 for every currency.
+
+## 2026-10-31 — feat(categories): Categories reachable in Smart POS with full CRUD by permission; phone-friendly
+
+**Changed:** `app/bms/product/categories.php`, `api/delete_category.php`, `header.php`.
+
+- **Problem:** in Smart POS a user could only *create* a category (the quick-add inside product registration). The Categories page existed but had no menu entry in Smart POS, and its New/Edit/Delete buttons were always shown (gated only by Products permissions) while the APIs check the Categories permissions.
+- **Menu:** Smart POS desktop — **Categories** next to Shop Products in the My Business menu. Phones — ☰ → **Shop** → **Categories**. Needs `canView('categories')`; the full-ERP Inventory menu is unchanged.
+- **Page:** view needs the Categories view permission (or Products view, as before). **New Category** needs `canCreate('categories')`, **Edit** `canEdit('categories')`, **Delete** `canDelete('categories')` — the same permissions the create/update/delete APIs enforce — so a user only sees what they can do; no actions → "—".
+- **Phone layout:** compact one-row header (short Back button, shorter title, no subtitle), tips card hidden, row menu button reads "Actions".
+- **Safety (gap found):** `api/delete_category.php` did a plain DELETE although nothing links products/sub-categories to categories by FK. It now refuses, with a clear message, when products use the category or it has sub-categories (Inactive is offered as the alternative).
+
+## 2026-10-31 — ui(menu): phone ☰ side menu regrouped (Sales / Shop / My Business / Restaurant); Shops added
+
+**Changed:** `header.php` (☰ side menu only; the desktop nav is untouched).
+
+- **Before:** everything sat under one "My Business" heading — Shift History and Who Owes Me (selling side) mixed with Customers, Suppliers, Receive Stock, Service, Restaurant, and Subscription floating under it with no heading.
+- **Now, grouped by what each item is:**
+  - **Sales:** Shift History, Who Owes Me, Catalog Setup.
+  - **Shop** (named "Inventory" when not in Smart POS): **Shops** (new — opens `warehouses.php`, so the user sees all their shops there), Receive Stock, Service.
+  - **My Business:** Customers, Suppliers, Customer Visits.
+  - **Restaurant:** Menu, Tables, Restaurant (only when the restaurant module is allowed).
+  - **Subscription** moved into **My Account**.
+- Same `canView()` gates as before; an empty group is not shown. "Shops" needs `canView('warehouses')`, same as the desktop Shop menu.
+
+## 2026-10-31 — ui(pos): Sales History — named actions (one "Actions" dropdown) instead of icon-only buttons
+
+**Changed:** `app/bms/pos/pos_dashboard.php`.
+
+- **Before:** on phones each Sales History card had 1–4 icon-only buttons (receipt / cash / return arrow / void) with no names; the desktop table's menu button was a bare gear icon.
+- **Now:** one **Actions** dropdown on both the desktop table and the phone cards, listing the real names: **View Receipt**, **Receive Payment**, **Return / Refund**, **Void Sale**. Same permission and sale-status rules as before (an item only appears when the user may do it and the sale allows it). Both views build the menu from one function, `actionItems()`, so they cannot drift apart.
+
+## 2026-10-31 — ui(pos): Sales Overview — phones keep only Sales Dashboard + Start Selling; the rest moves into the ☰ side menu
+
+**Changed:** `app/bms/pos/pos_dashboard.php`, `header.php`.
+
+- **Before (phone):** the top had 3 buttons (Sales Dashboard / Shift History / Start Selling) plus a block of hub cards (Who Owes Me, Settings, …) before the real content.
+- **Now (<lg, i.e. wherever the ☰ side menu exists):** the top row is only **Sales Dashboard** and **Start Selling**; the hub-card block is hidden. Everything that was hidden is reachable from ☰ → **My Business**: **Shift History**, **Who Owes Me** (Smart POS only), **Catalog Setup** (pos_advanced only). Restaurant and Selling Settings already had entries in that menu. The extra entries reuse `posNavGroups()` so the gates match the hub cards exactly.
+- **Desktop (lg and up):** unchanged — the elements are still in the page, just hidden below lg with Bootstrap display classes.
+
+## 2026-10-31 — ui(expenses): phone view — one list, one Actions dropdown with every action
+
+**Changed:** `app/constant/accounts/expenses.php`, `includes/tables/expenses_table.php`, `assets/js/bms-mobile-cards.js`.
+
+- **Before (phone):** the expense list appeared twice — the global mobile cards (3 icon buttons only: first 3 menu items, so Edit/Approve/Delete etc. were unreachable) and then the page's own second card list below it.
+- **Now:** one list. Each card has a single **Actions** dropdown with the same full menu as the desktop gear (view, print, edit, status changes, delete — still gated by the same permissions/status rules). The page-owned second list is removed.
+- **Scope:** opt-in via `'actions_dropdown' => true` on the shared expenses table (`data-actions-dropdown` on the `<table>`); other pages and the supplier Expenses tab are unchanged.
+
+## 2026-10-31 — ui(products): phone layout polish on Product Management; Import label always visible
+
+**Changed:** `app/bms/product/products.php`.
+
+- **Import:** the button now always shows the word "Import" (was icon-only on phones).
+- **Phone only (<768px):** header is one row (short title + small Add New / Import buttons); stat cards are compact white 2x2 with a green accent bar; the Filters header no longer stacks (a global `max-width:768px` rule forced it into a column, which centred an oversized chevron); Supplier is full width, Category/Brand and Status/Stock Status sit in pairs, and Filter/Reset share one labelled row. Desktop unchanged.
+
+## 2026-10-31 — ui(pos): Create Product — remove redundant top buttons on phones
+
+**Changed:** `app/bms/product/product_create.php`.
+
+- The top "Add New Product" button duplicated "Save Product" at the bottom of the form, so it is removed (Smart POS simple form).
+- On phones nothing is shown above the form; "Back" remains on desktop only.
+
+## 2026-10-31 — ui(expenses): phone layout polish on Expenses Management
+
+**Changed:** `app/constant/accounts/expenses.php`.
+
+- **Before (phone):** "Add New Expense" wrapped onto 3 lines beside a 2-line title + subtitle; stat cards were large green blocks; every filter field took a full row.
+- **Now (phone only, <768px):** header is one row (short title + small Add button, subtitle hidden); stat cards are compact white 2x2 with a green accent bar; Status is full width, Date From/To sit side by side, Apply/Clear share one row. Desktop layout unchanged.
+
+## 2026-10-31 — ui(pos): Create Product page — compact header in Smart POS mode
+
+**Changed:** `app/bms/product/product_create.php`.
+
+- **Before:** on a phone the blue banner wrapped "Create New Product" + subtitle onto 5 lines and squeezed the Back / Create Product buttons beside it.
+- **Now (Smart POS simple form only):** no banner/title/subtitle — just a small Back button and a small "Add New Product" button on one row at the left. Shop mode / advanced product form keep the existing header.
+
+## 2026-10-31 — feat(restaurant): Phase 7 — simple recipes, ingredient stock, profit per plate
+
+**New:** `api/restaurant/recipe.php`, `tests/test_restaurant_phase7_cli.php`.
+**Changed:** `api/pos/process_sale.php`, `core/sales_posting.php`, `api/pos/void_sale.php`, `api/restaurant/get_menu_items.php`, `app/bms/restaurant/menu.php`, `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `lang/sw.php`.
+
+- **Recipe** (Menu → dish → gear → Recipe): what goes into ONE plate (ingredient + quantity per plate, e.g. rice 0.30 kg, meat 0.15 kg), live cost / price / profit per plate, quick *New ingredient* (a stock item off the menu; stock arrives with Receive Stock). The Menu shows "Recipe · cost … · profit …" under each dish that has one. An empty recipe = the dish sells without stock again.
+- **A dish with a recipe** (no-stock item + recipe — a kind of item that did not exist before) reuses the combo engine: selling uses up its ingredients; **its cost (Σ ingredient qty × cost) is posted to Cost of Sales** (`posSaleCogs`, added only for this kind); **a short ingredient never blocks the sale** (stock may go under zero and shows as running low); **a void puts the ingredients back** to match the reversed cost entry. A return of cooked food does not restock ingredients (consistent with its cost staying booked).
+- **Retail combos unchanged:** short components still block, cost still uses the combo's own cost price; NIP products are not combos and are unaffected.
+- **Dashboard:** "Drinks and ingredients running low" includes recipe ingredients.
+- **Checked:** new test 26/0 (ingredients, recipe validation/merge, plate cost, ingredients used up, cost of sales = Σ qty × cost, short ingredient never blocks, void restores ingredients and nets the cost to 0, ledger balanced, retail combo still blocked and costed as before, Menu/dashboard data, Menu page + scripts parse); combo, batch-COGS, void, returns, void-drawer, invoice-COGS and profit-report suites green.
+
+## 2026-10-31 — feat(restaurant): Phase 6 — dashboard and reports follow what the company has
+
+**New:** `core/restaurant_dashboard.php`, `includes/restaurant/dashboard.php`, `includes/restaurant/today_strip.php`, `app/bms/restaurant/sales_report.php` (route `restaurant/sales-report`), `tests/test_restaurant_phase6_cli.php`.
+**Changed:** `app/dashboard.php`, `header.php`, `core/pos_nav.php`, `roots.php`, `lang/sw.php`.
+
+- **Restaurant-only company** (every active shop a Restaurant, Restaurant POS + Smart POS on): the dashboard is the restaurant dashboard — Take order / Tables / Menu / Buy Ingredients / Expenses, Sales today, Orders today, Tables with order (unpaid amount), Food profit this month (sales − ingredients) and profit after expenses, Recent orders, Best sellers today, Drinks running low, Getting started. Picked at the top of `app/dashboard.php` with an early exit — the shop dashboard code is untouched.
+- **Shops + restaurant company:** the shop dashboard unchanged plus one "Restaurant today" row (orders, tables with order, unpaid amount, Tables / Take order).
+- **Money figures from the one ledger** (`glProfitLoss`, project + warehouse scope); counts and lists from operational tables, restaurant shops only.
+- **Restaurant Sales report:** sales by order type (Dine in / Take away / Delivery) from posted revenue lines of POS sale entries (same classification as the Income Statement), plus dishes/drinks sold (quantities). Links to the existing By waiter and Profit reports. Added to the Reports menu, the phone Reports sheet and the restaurant hub — only when the restaurant module is on.
+- **Checked:** new test 18/0 (real dine-in + take-away sales and an open table: ledger sales today, orders, open tables/amount, best seller, low drink, food profit; by-order-type totals = ledger; restaurant-only → restaurant dashboard, mixed → shop dashboard + strip, module off → nothing restaurant; report + menu link only when on). Phone checks (390px): restaurant dashboard and Restaurant settings fit with no sideways scroll (quick-action rows evened out).
+
+## 2026-10-31 — feat(restaurant): Phase 5 — Buy Ingredients (Cost of Sales)
+
+**New:** `includes/restaurant/buy_ingredients_modal.php`, `tests/test_restaurant_phase5_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `app/constant/accounts/expenses.php`, `app/bms/restaurant/index.php`, `lang/sw.php`.
+
+- **Buy Ingredients** window (Expenses page + restaurant hub; only when the restaurant module is on): *What did you buy?*, amount, date, shop. Saved through the existing Expenses engine (`api/add_expense.php`) as a paid expense from cash on the restaurant shop, debited to **Cost of Sales — 5-2000 Purchases** (`restaurantIngredientsAccountId()`: setting → 5-2000 → 5-1000 → normal expense fallback). So it shows in Expenses, posts through the one ledger, and the Income Statement counts it as the cost of the food sold (Sales − Ingredients = food profit), not as an operating expense.
+- **Retail:** the Expenses page is unchanged when the restaurant module is off (no button, window or script).
+- **Checked:** new test 11/0 (account = 5-2000; real save → paid expense on the shop, ledger debit posted, Cost of Sales up by exactly the amount, operating expenses unchanged, ledger balanced; renders on/off).
+
+## 2026-10-31 — feat(restaurant): Phase 4 — split the bill, join tables
+
+**New:** `api/restaurant/join_table_orders.php`, `tests/test_restaurant_phase4_cli.php`, `tests/helpers/restaurant_inproc.php` (shared in-process test harness).
+**Changed:** `api/pos/process_sale.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/tables_board.php`, `lang/sw.php`.
+
+- **Split bill (till, table orders):** choose what is paid now (− / + per item); the rest stays on the table. The part payment is sent with `keep_table` so the table and its open order stay; the remaining items are saved straight back as the table's one open order; the final payment frees the table. *Cancel split* restores the full order. (Paying one bill with several payment methods = the existing Split Payment.)
+- **Join tables (Tables screen):** the Move window also lists tables that have an order — joining adds this table's items to that table's open order (total recalculated), closes this order, moves its open kitchen tickets and frees this table.
+- **UI standard:** the table picker's header is now blue (was green).
+- **Not built:** service charge — it needs a server-side price for a charge line inside the shared sale engine; left out on purpose to keep retail sales untouched (optional in the plan).
+- **Checked:** new test 22/0 (part payment keeps table/order, remainder = one open order, final payment frees, both sales on the table, ledger balanced; join merges items/total, frees the first table, moves its ticket, refuses bad targets; keep_table without a table harmless; till renders split only with the module on; all inline scripts parse); restaurant phases 2–3 + POS/i18n suites green.
+
+## 2026-10-31 — feat(restaurant): Phase 3 — how orders reach the kitchen (by mouth / screen / printer)
+
+**New:** `api/restaurant/kitchen_slip.php`, `migrations/tenant/2026_10_31_restaurant_kitchen_ticket_label.php` + `migrations/2026_10_31_restaurant_kitchen_ticket_label_legacy_db.php`, `tests/test_restaurant_phase3_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `api/restaurant/send_to_kitchen.php`, `api/restaurant/get_kitchen_tickets.php`, `app/bms/restaurant/kitchen_dashboard.php`, `app/constant/settings/pos_config_settings.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `schema/*` (template rebuilt), `tests/test_restaurant_phase0_cli.php`.
+
+- **Selling Settings → Restaurant** (only when the restaurant module is on; ignored otherwise): *How do orders reach the kitchen?* **By mouth** (default — no kitchen step), **Kitchen screen**, **Printer**; order types Take away / Delivery on/off (Dine in always on).
+- **Till:** Send to Kitchen only shows in screen/printer mode; printer mode opens a kitchen slip (window opened inside the click so pop-up blockers allow it); a paid take-away/delivery order is sent to the kitchen automatically. Disabled order types are hidden. Advanced-POS restaurant tenants keep today's behaviour.
+- **Kitchen slip:** receipt-width page (58/80 mm from Selling Settings), order label, time, waiter, only items that need preparing grouped by Kitchen/Bar with add-ons/notes; prints itself. Works with any receipt printer set as the device's default.
+- **Schema:** `kitchen_tickets.order_label` + `sale_id` (nullable) — the kitchen screen shows "Table T3" / "Take away · RCP-…"; a paid sale is sent once (repeat refreshes, no duplicate).
+- **Checked:** new test 23/0 (settings shown/saved only with the module on and ignored when off, safe default, take-away ticket + label + note, no duplicate, table label, kitchen screen labels, slip content/width, retail refused, till receives the settings); restaurant phases 0–2 + POS/i18n suites green. Pre-existing: `test_pos_old_sale_flow_cli` fails on local fixture data ('Bread Loaf' below its minimum price).
+
+## 2026-10-31 — feat(restaurant): Phase 2 — Take Order on the till + live Tables screen
+
+**New:** `app/bms/restaurant/tables_board.php` (route `restaurant/tables-board`), `api/restaurant/get_tables_board.php`, `api/restaurant/move_table_order.php`, `tests/test_restaurant_phase2_cli.php`.
+**Changed:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/hold_sale.php`, `api/pos/process_sale.php`, `api/restaurant/send_to_kitchen.php`, `core/pos_nav.php`, `header.php`, `roots.php`, `lang/sw.php`.
+
+- **Bug fixed:** Menu dishes (no-stock items) were never sent to the kitchen — `send_to_kitchen.php` skipped every service line. Dishes now route by their kitchen area; item notes go on the ticket.
+- **Bug fixed:** every table save/Send to Kitchen added another held order and paid orders stayed 'held'. Now one open order per table (a new save replaces the old one, in one transaction) and paying closes it. Re-sending updates the same kitchen ticket (no duplicates).
+- **Till (restaurant/hybrid shops only):** Dine in / Take away / Delivery bar, table picker in the cart, **Save to table**, per-item kitchen note, dish tiles show 'made to order', add-ons now offered on dishes. Opens a table straight from `?table=` and Take away from `?ot=`. Retail shops: unchanged (bar not rendered without Restaurant POS; hidden on retail shops).
+- **Tables screen:** live board per shop (free / has order, amount, items, minutes open), tap to open the order on the till, Move order to a free table, refreshes every 20 s. Menu link 'Tables' now opens it; setup stays on Floors.
+- **Checked:** new test 32/0 (real endpoints in a rolled-back transaction: dish+note to kitchen, one order per table, board, move, pay the table — dish with no recipe sells, note on sale line, table freed, ledger balanced; take away; retail hold untouched; till renders + every inline script parses); phone/desktop previews of the Tables board, Move window and till bar (fixed: status pill overflow).
+
+## 2026-10-31 — feat(restaurant): Phase 1 — Menu page, Getting started checklist, restaurant menus
+
+**New:** `app/bms/restaurant/menu.php` (route `restaurant/menu`), `api/restaurant/{get_menu_items,save_menu_item,update_menu_item,search_products_for_menu,quick_setup}.php`, `includes/restaurant/getting_started.php`, `migrations/tenant/2026_10_31_restaurant_menu_columns.php` + `migrations/2026_10_31_restaurant_menu_columns_legacy_db.php`, `tests/test_restaurant_phase1_cli.php`.
+**Changed:** `core/restaurant_scope.php`, `core/pos_nav.php`, `header.php`, `roots.php`, `api/pos/simple_products.php`, `app/bms/restaurant/index.php`, `lang/sw.php`, `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql` (template rebuilt).
+
+- **Schema:** `products.is_menu_item` (default 0) and `products.is_available` (default 1) — existing products unchanged. Until the migration runs the restaurant gate stays off (retail behaviour, no crash).
+- **Menu page** (Smart POS + Restaurant POS, Restaurant/Hybrid shops only): one list of dishes and drinks per shop — stat cards, group chips, search, phone cards, desktop DataTable, gear actions. Add Item asks *What is this?*: **Dish (cooked here)** = no-stock item that always sells, no recipe needed; **Bought item (has stock)** = water/soda with opening stock through the same batch + ledger path as Add Product; **Already in my products** = only the menu flags change, never price (a retail shop selling it is unaffected). Each item: group, price, *Prepared at* Kitchen / Bar / No preparation, **Available today** switch.
+- **Sold out today:** the till's product list hides `is_available = 0` items **only for a restaurant shop**; retail shops never get the clause.
+- **Getting started** on the restaurant hub: ticks itself from real data (tables, menu items, first sale); *Add tables* ("How many tables?" → T1…Tn) and *Quick add* (tick chai, mandazi, lunch, soup, water, soda + prices; existing names skipped).
+- **Menus:** Restaurant becomes a dropdown (Menu, Tables, Kitchen, Reservations, Add-ons) when the restaurant module is on; phone side menu gets Menu + Tables; a restaurant-only company's bottom bar shows Menu instead of Products. Retail tenants: no change.
+- **Swahili:** 85 new restaurant strings (each checked unused on retail screens).
+- **Checked:** new test 47/0 (real POSTs, opening stock batch + ledger balanced, existing-product price untouched, sold-out hidden only on restaurant till, retail shop never filtered, module/Smart POS off refuse, quick start idempotent, renders); restaurant/POS/i18n suites green; phone (390px) + desktop previews of Menu, Add Item, hub checklist, Quick add — found and fixed: opening-stock field showing for dishes, group chips clipped on phones. Pre-existing unrelated failures: `test_feature_gating_cli` (78 local tenant_features rows), `test_project_scope_cli` (22 older unscoped files).
+
+## 2026-10-31 — feat(restaurant): Phase 0 — safety finish, tables without floors, plain Swahili words
+
+**Plan:** `restaurant_plan.md` (Smart POS restaurant, v2 after the Levanda review).
+**New:** `actions/superadmin_tenant_restaurant_shops.php`, `tests/test_restaurant_phase0_cli.php`, `restaurant_plan.md`.
+**Changed:** `core/restaurant_scope.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `api/restaurant/save_table.php`, `app/bms/restaurant/floors.php`, `app/bms/restaurant/tables.php`, `lang/sw.php`.
+
+- **Gate helpers:** `restaurantModuleOn()` (Restaurant POS + Smart POS + schema), `restaurantShopActive()`, `restaurantOnlyCompany()` — every later restaurant change sits behind them; with Restaurant POS off they are false and retail is unchanged.
+- **Superadmin warning:** switching Restaurant POS from off to on first lists the tenant's shops already stored as Restaurant/Hybrid (read-only lookup; a failed lookup never blocks the save).
+- **Tables without floors:** the area is optional; no area chosen = the shop's default area ("Main Area", created on first use). Add Table no longer breaks on a shop with no floors. No schema change.
+- **Floors page:** the empty-area text no longer says "No floors yet" under an existing floor; phone table cards have a full-width status picker and a corner edit button; Tables page filters no longer scroll sideways on phones.
+- **Swahili:** restaurant-only keys reworded (Mgahawa, Eneo, Skrini ya Jikoni, Vikundi vya Nyongeza, Ina Oda, Inapikwa, Kulia Hapa, Rudi Mauzo, Kuhifadhi Meza…); a free table shows "Wazi" via its own key. A test proves none of the changed keys is used on a retail screen; shared keys (Available, Reserved, optional) untouched.
+- **Checked:** new test 44/0 (gate truth table, real save_table POSTs, default-area creation, renders, real tenant-DB lookup, superadmin JS parse, wording leak guard); restaurant/POS/i18n suites green; phone (390px) and desktop previews of Floors and Tables.
+
+## 2026-10-31 — fix(restaurant): till now sees the shop's Restaurant mode; Restaurant choice only exists when superadmin enables it
+
+**New:** `tests/test_restaurant_mode_gating_cli.php`.
+**Changed:** `app/bms/pos/pos.php`, `header.php`, `app/bms/stock/warehouses.php`, `api/mobile/warehouses/create.php`, `api/mobile/warehouses/update.php`.
+
+- **Bug (confirmed live on shop.demo):** `pos.php` printed `POS_WAREHOUSE_MODES` near the top but built it later inside the shop `<select>`, so it was always `{}` — every shop behaved as retail and Select Table / Send to Kitchen / dish add-ons never appeared, since Phase 30. The shop list and mode map are now built before the `<script>`; the dropdown markup is unchanged.
+- **Retail untouched:** the mode map is only looked up when Restaurant POS is on; with it off the till is exactly today's (map empty → every shop retail).
+- **Restaurant choice only when enabled:** with Restaurant POS off, a new shop is always saved as retail and a posted POS Mode is ignored on update (stored value kept) — web Shops page and mobile create/update. The form field was already hidden.
+- **Menu:** "Restaurant" link in the top menu and phone side menu, only when Restaurant POS is on (`canView('restaurant_pos')` checks the tenant entitlement first, even for admins).
+- **Checked:** new test 22/0 (real renders of the till + header with the module on/off, real Shops update POSTs; fails on the old `pos.php`); `test_restaurant_pos_mode_setup_cli` 36/0, `test_pos_simple_ux_cli` 94/0, `test_warehouse_project_filter_cli` 84/0; `test_restaurant_pos_cli` 152/1 — the 1 is a sibling suite `test_pos_phase8_registers_cli` failing on open/close_shift.php (pre-existing, files not touched).
+
+## 2026-10-31 — feat(backup): nightly backups copied off the server, encrypted, to Google Drive (rclone)
+
+**Plan:** `backup_plan.md` §4 (PR 2).
+**New:** `core/offsite_backup.php`, `cron/offsite_backup.php`, `tests/test_offsite_backup_cli.php`.
+**Changed:** `core/tenant_backups.php` (`bmsBackupCronFile()` adds the off-site line), `tests/test_tenant_backups_cli.php`, `backup_plan.md`.
+
+- **Before:** every company was backed up, but only onto the same server. Server lost = every backup lost.
+- **Now:** at 01:30 Dar es Salaam (an hour after the full backup; waits if a backup is still running) each night's `auto_backup_*.zip` of the main install, every tenant and the control database is uploaded to Google Drive (`bjptechnologieslimited@gmail.com`) through rclone. Only files of the last 7 days that are not already there; an existing copy is never overwritten; each upload is verified with `rclone cryptcheck`. Snapshots, manual, pre-restore and uploaded files never leave the server.
+- **Encryption:** the rclone remote must be type `crypt` (contents and file/folder names encrypted on the server before upload); a plain remote is refused. The job runs as root — the one root line in `/etc/cron.d/bms-backup-<host>` — because only root can read the rclone config holding the Drive token and the encryption password; it loads no database or app bootstrap. Its lock lives in the temp dir and it opens the backup lock read-only, so it can never block the www-data backup run.
+- **Retention on Drive:** after a fully successful upload only — 30 days of nightlies, the first of each month for 12 months (+5 days), and the 3 newest per folder always. Always a superset of what the server keeps, so nothing is deleted then re-uploaded. Only `auto_backup_*.zip` in main / `t{id}` / `_platform` folders is ever deleted.
+- **Visibility:** `backups/_platform/offsite.log` and `offsite_status.json` (files created as root are handed back to www-data). Until the one-time rclone setup (§4) is done on the server, the job logs `NOT CONFIGURED` and changes nothing. Exit 0 ok / 1 failed / 2 bad args or running / 3 not configured. `--check` tests the setup.
+- **Checked:** `test_offsite_backup_cli` 40 checks — retention rules incl. a 400-night simulation (off-site always ⊇ server, no re-upload loop, ≤ 42 files per folder), which files are chosen, script guards, and a REAL rclone 1.75.2 run against a crypt remote: 5 nightlies uploaded and nothing else, names and contents encrypted at rest, decrypted copies byte-identical, second run uploads nothing, existing copy never overwritten, retention deletes exactly the expected 2 and never touches manual files or unknown folders, unreachable destination → FAILED / exit 1. Also a real run on two freshly made local tenant backups: uploaded, downloaded back, MD5 identical. `test_tenant_backups_cli` 62 (third cron line; only the off-site job runs as root). Audit suites (`tenant_resource_audit`, `security_coverage`, `project_scope`) do not flag any new file.
+
+## 2026-10-31 — fix(backup): old backups are thinned by a schedule that never empties a folder; backups/ no longer world-readable
+
+**Plan:** `backup_plan.md` (Phase 4 of PR 1).
+**New:** `tests/test_backup_retention_cli.php`.
+**Changed:** `core/backup.php` (`bms_prune_backups()` removed; new `bms_backup_file_info()`, `bms_apply_retention()`), `core/tenant_backups.php` (retention after each successful backup; `tenant-audit: skip` with reason), `cron/auto_backup.php`, `app/constant/settings/backup_restore.php`, `lang/sw.php`, `.github/workflows/deploy.yml`, `tests/test_backup_zip_cli.php`, `tests/test_tenant_backups_cli.php`.
+
+- **Before:** every automatic backup older than 7 days was deleted, with no minimum — on production on 2026-10-31 a manual run deleted both older BJP backups and left one. Uploaded restore files were never deleted (≈325 MB in one company's folder). `deploy.yml` ran `chmod -R 777 backups/`, so every user and every other system on the shared server could read every company's database dump.
+- **Retention now:** snapshots kept 48 h; nightly 7 days; the first nightly of each week 4 weeks; the first of each month 12 months; `pre_restore_*` and `uploaded_*` 30 days; the 3 newest nightly and 3 newest snapshots are **always** kept, whatever their age, so a folder whose backups stopped is never emptied. Manual backups (`bms_backup_*`) and unrecognised files are never touched. The date is read from the file name (copying changes a file's time, not its name). Applied by the scheduled run only after a new backup succeeded (a failing company keeps its old files), by the Backup page's daily fallback and by `cron/auto_backup.php`. Each company's folder settles at about 28–29 files.
+- **Permissions now:** `backups/` is owned by the deploy user (git can still update its `.htaccess`), group `www-data` (PHP and the backup cron write), mode `2770` (setgid keeps new files in the group); existing files `0660`, folders `2770`; nobody else can list or read it. Guarded with `|| echo` — never stops a deploy.
+- **Page:** the Backup page's note describes the schedule and what is kept (English + Swahili).
+- **`cron/auto_backup.php`:** docblock now says it is a manual main-install-only tool and must not be scheduled alongside `backup_all_tenants.php`.
+- **Checked:** `test_backup_retention_cli` 32 checks (name parsing incl. real production names, a year of history in one run, stopped backups keep 3, the production 13/17 Oct case keeps everything, mtime ignored, a 400-night simulation peaks at 29 files and keeps one per month for 12 months, a failing target keeps its files, all callers wired, old function gone). `test_tenant_backups_cli` 60 (adds deploy permission checks). Other backup suites 35/73/31/62 all 0 failures. Real Backup page rendered as admin in English and Swahili: HTTP 200, snapshot row "DB only", full row "Full backup", new note, no PHP warnings. 30 other suites that read the changed files run against a clean `develop`: `test_tenant_resource_audit_cli` flagged `core/tenant_backups.php` (fleet-wide job, like the exempt migration runner) → marked `tenant-audit: skip` with the reason, now identical to `develop`; every other failure identical to `develop`.
+
+## 2026-10-31 — feat(backup): deploy installs the backup schedule — no manual step, never forgotten
+
+**Plan:** `backup_plan.md` (Phase 3 of PR 1).
+**New:** `scripts/install_backup_cron.php`.
+**Changed:** `.github/workflows/deploy.yml`, `core/tenant_backups.php` (`bmsBackupCronFile()`, `bmsBackupCronFileName()`), `cron/backup_all_tenants.php` (log location, fatal-error logging), `tests/test_tenant_backups_cli.php`.
+
+- **Before:** the only schedule was a comment in `cron/auto_backup.php` telling someone to add a crontab line. Nobody did: production had no backup schedule.
+- **Now:** every deploy runs `sudo php scripts/install_backup_cron.php --host=<host>` per host, which (re)writes `/etc/cron.d/bms-backup-<host>`: full backup 00:30, database snapshots 06:30 / 12:30 / 18:30 Africa/Dar_es_Salaam, run as `www-data` so the Backup page can list, download and delete the files. Times are converted to the server clock (production runs on UTC; Ubuntu cron ignores `CRON_TZ`). The second host (demo) is staggered 30 minutes later. Only its own file is written — other systems' cron entries on the server are never read or changed. Unchanged file → left alone. `--print` shows the schedule without installing.
+- **Safety:** guarded with `|| echo` in `deploy.yml` — a schedule problem warns in the deploy log and can never stop a deploy. The cron lines redirect only to `/dev/null`: if cron cannot open a redirect target it never starts the command, which would silently skip every backup. So the run writes its own log to `backups/_platform/backup.log` (www-data can write there, and no company's page lists that folder), including fatal PHP errors. File name has no dots (cron ignores `/etc/cron.d` names with dots). Works without the php-posix extension.
+- **Checked:** `test_tenant_backups_cli` now 55 checks (adds: UTC and Dar es Salaam server clocks, 30-minute stagger, www-data only, no file redirects, MAILTO off, dot-free name, `--print`, bad `--host` refused, deploy wiring inside the host loop after tenant migrations with its guard, `script_stop: true` intact). `deploy.yml` parses as YAML; the host loop simulated in bash with a failing installer: warning printed, second host and the rest of the deploy still run.
+
+## 2026-10-31 — feat(backup): scheduled backup of every company, not just the main install
+
+**Plan:** `backup_plan.md` (Phase 2 of PR 1).
+**New:** `core/tenant_backups.php`, `cron/backup_all_tenants.php`, `tests/test_tenant_backups_cli.php`.
+**Changed:** `core/backup.php` (`bms_write_zip_backup()` gains `$includeUploads`; manifest records it), `scripts/setup_control_db.php` (table `tenant_backup_log`), `app/constant/settings/backup_restore.php` (snapshots labelled "DB only").
+
+- **Before:** `cron/auto_backup.php` runs from the command line where no company is resolved, so it only ever backed up the main database. On production 23 of 25 live companies had never been backed up.
+- **Now:** `php cron/backup_all_tenants.php --kind=full|snapshot` backs up the main install, every company that is not deleted (suspended and archived included — their data is kept and can come back; rows that never finished provisioning are skipped) and the control database. Full = database + that company's own uploads → `auto_backup_<ts>.zip`; snapshot = database only → `auto_snapshot_<ts>.zip`. Each company's files go into its own `backups/t{id}/`, the folder its Backup & Restore page already lists, so its admin can download or restore them. The control database goes to `backups/_platform/`, which no company's page lists.
+- **Safety:** each dump runs inside `START TRANSACTION WITH CONSISTENT SNAPSHOT` (a coherent copy while shops keep selling); every file is re-opened and checked (ZIP consistency, manifest, dump ends with its closing line) before it counts as OK; one company failing — wrong password, missing encryption key — never stops the others and leaves no half-written file (found during testing: a missing key used to throw and would have stopped the whole run); one run at a time (lock file); every attempt recorded in `bms_control.tenant_backup_log`; `--tenant=ID` retries one company, `--list` shows what would be backed up. A scheduled full backup updates `.last_auto_backup` so the page's own once-a-day fallback does not run a duplicate.
+- **Checked:** `test_tenant_backups_cli` 38 checks (target list vs the registry, full/snapshot contents, the dump loads into an empty DB with generated column + view intact, truncated and cut-off files rejected, failure isolation, password never in errors, audit rows, CLI arguments, lock). Real local run: 38 of 38 databases backed up, 0 failed. A real cron backup of a full company database (349 tables and views) restored through `api/backup_actions.php` into a scratch DB: every table present, every row count equal (bar the one "Restored Backup" log row the restore itself writes). `test_backup_tenant_scope_cli` 35/0, `test_backup_zip_cli` 73/0, `test_backup_isolation_cli` 31/0, `test_backup_restore_csrf_cli` 62/0.
+
+## 2026-10-31 — fix(backup): a company's backup holds and restores only its own files
+
+**Plan:** `backup_plan.md` (Phase 1 of PR 1).
+**New:** `tests/test_backup_tenant_scope_cli.php`.
+**Changed:** `core/backup.php`, `api/backup_actions.php`, `app/constant/settings/backup_restore.php`, `cron/auto_backup.php`, `tests/test_backup_zip_cli.php`.
+
+- **Before:** every backup ZIP took the whole shared `uploads/` folder, so each company's download carried every other company's files (seen on production: BJP's backup held `t4/`, `t7/`, `t20/`, `t50/`). Restore copied the whole tree back into the shared root, so one company restoring a ZIP could overwrite another company's files.
+- **Now:** new `bms_upload_in_scope()` — a tenant owns only `uploads/t{id}/`; the original install (BJP) owns everything except the `t{id}/` folders (`tenders/`, `training_certs/`, `trips/` stay BJP's). `bms_write_zip_backup()` takes the owner's prefix as a required argument (a caller cannot forget it) and records it in `manifest.json`. New `bms_restore_uploads()` replaces `bms_copy_dir()` on both restore paths and writes only in-scope files — older ZIPs that hold every company's folders restore safely, the rest is skipped.
+- **Checked:** `test_backup_tenant_scope_cli` 35 checks (scope rules, tenant/BJP ZIP contents, hostile old ZIP restore, round trip, negative control proving the old call overwrote, call-site guards). `test_backup_zip_cli` 73/0, `test_backup_isolation_cli` 31/0. Real `cron/auto_backup.php` run: 0 tenant files in the ZIP. Real `api/backup_actions.php` as a simulated tenant on a scratch DB: create → only own file; restore → DB + file back; hostile ZIP → other company's and BJP's files untouched, own folder guard present.
+
+## 2026-10-31 — fix(products): creating a product failed on the legacy database — missing product_batches.manufacturing_date
+
+**New:** `migrations/2026_10_31_product_batches_manufacturing_date_legacy_db.php`.
+
+- **Bug:** Add Product with opening stock failed with `Unknown column 'manufacturing_date' in 'field list'`. The column was only added to tenant databases (`migrations/tenant/2026_09_15_...`); the legacy / non-tenant database never got its mirror.
+- **Fix:** idempotent migration adds the nullable `product_batches.manufacturing_date DATE` after `expiry_date`. No application code changed; Smart POS is untouched.
+
+## 2026-10-29 — feat: Import Products from CSV works again (Smart POS) — preview, then all-or-nothing import
+
+**New:** `core/product_import.php`, `tests/test_product_import_cli.php`, `tests/helpers/product_import_request.php`.
+**Changed:** `api/import_products.php` (rewritten), `app/bms/product/product_import.php` (rewritten), `app/bms/product/products.php` (Import button), `lang/sw.php`.
+
+- **Before:** the import page had no link anywhere, and its API wrote only `products.stock_quantity` — no shop stock, no batch, no ledger entry, no CSRF check, category ignored. An imported product showed 0 stock and the Balance Sheet missed its value.
+- **Now:** every row goes through the same steps as Add Product — a name that already exists (case/space-insensitive) is skipped, never duplicated; category matched by name or created once; SKU and barcode generated unique against the database and the rest of the file (the old `time()+rand(100,999)` collided when many were made in one second); opening stock received as a batch in the chosen shop and posted Dr Inventory / Cr Opening Balance; wholesale price written to the Wholesale price group.
+- **Check, then import:** "Check the file" shows what happens to every row (will be added / already exists / repeated in file / error) and which categories will be created, saving nothing. The import re-validates the uploaded file and saves all new rows in one transaction — one bad row and nothing is saved. Excel CSVs with a BOM, `;` separators and `2,600`-style numbers are read.
+- **Checked:** `test_product_import_cli` 30 checks (guards, preview writes nothing, all-or-nothing, categories, unique codes, shop stock + batch, ledger Dr = Cr, wholesale group, re-import creates nothing; all rows removed). `test_login_and_product_errors_cli` 19/0. `test_pos_detail_pages_cli` 6 and `test_activity_log_permission_and_sell_label_cli` 3 failures — identical on `develop`.
+
+## 2026-10-28 — feat: Customer Visits — follow up as many times as needed, View details, reminders (owner + admins)
+
+**Plan:** `customer_visit_followups_plan.md`.
+**New:** `core/field_visit_followups.php`, `api/field_reports/followup_save.php`, `api/field_reports/detail.php`, `app/bms/field_reports/field_visit_details.php` (route `field_reports/details`), `includes/field_reports/followup_kit.php`, `migrations/tenant/2026_10_28_customer_visit_follow_ups.php` + legacy mirror, `tests/test_customer_visit_followups_cli.php`.
+**Changed:** `core/field_reports_schema.php`, `core/field_reports.php`, `api/field_reports/_common.php`, `save.php`, `followup_done.php`, `delete.php`, `app/bms/field_reports/field_visits.php`, `core/notify.php`, `api/notifications/rules_api.php`, `app/constant/settings/notification_rules.php`, `cron/run_notification_checks.php`, `roots.php`, `lang/sw.php`, `tests/helpers/field_reports_request.php`, `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`.
+
+- **Before:** a visit held ONE follow-up date and a "done" flag — no history, no outcome, no next step; "Follow up on" in the form was that single date.
+- **Follow-ups:** new table `field_visit_follow_ups` — every follow-up is kept (due date, reason, open / done / cancelled, how it was done: visited / call / WhatsApp / SMS / other, what happened, who and when, the new visit it led to). One open follow-up per visit at a time; **Mark done** can set the next date in the same step, so the chain never ends. "Follow up on" in the form now adds / moves / cancels the open one. **New visit** from "To follow up" closes it automatically. Existing follow-up dates are copied once (done or not). The visit's own follow-up columns stay as a mirror of its current follow-up, so reports, print and Excel are unchanged.
+- **View details:** first item of the row menu and first button of the phone card — every field of the visit, record info, the next follow-up (Mark done / Change date / Cancel), the follow-up history of the whole customer (every visit to the same phone) and the customer's visits. Same access as the list: owner, or an admin once that day's report is submitted. Edit opens the visits page's form (`?edit=`).
+- **Reminders:** event `field_visit.follow_up_due` — 2 days before, the day before, on the day, and once the day after if missed; once per stage per follow-up (a moved date starts again); not for joined clients or deleted visits. In-app + email to the staff member who recorded the visit and all admins. **Notification Rules** gains two targets worked out when the alert fires — "The person who recorded it" and "All admins" — seeded as this event's default rules (editable; a removed rule is never put back). Private: a non-admin only ever gets their own visits' reminders whatever rules say; an admin only for a visit they may open.
+- **Checked:** `test_customer_visit_followups_cli` 98 checks (reminders run in a rolled-back transaction — no email queued); `test_field_reports_cli` 282/0; `test_customer_visit_link_cli` 40/0; `test_notification_engine_cli` 76 + 1 pre-existing failure (same on `develop`); `test_security_coverage_cli` identical to `develop`. Browser: mark done + next date, details page desktop + 390 px phone, no console errors. Tenant template rebuilt (also records three other 2026-10-28 tenant migrations).
+
+## 2026-10-28 — fix(pos): Products window — X instead of Cancel, no row arrows; Receive Stock opens straight to its form
+
+**New:** `app/bms/pos/receive_stock.php` (route `receive_stock`), `app/bms/pos/restock_modal.php`, `app/bms/pos/restock_modal_js.php`, `tests/test_receive_stock_page_cli.php`.
+**Changed:** `header.php`, `app/dashboard.php`, `app/bms/product/products.php`, `core/help_nav.php`, `core/permissions.php`, `roots.php`, `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`; tests `test_pos_restock_batch_dates_cli`, `test_pos_simple_ux_cli`, `test_supplier_access_simple_pos_cli`, `test_support_center_phase3_cli`, `test_text_display_case_refs_cli` (they read the form from its new file / expect the new page).
+
+- **Products window** (phone bottom bar "Products" and the dashboard Add Product tile, Smart POS): the large Cancel button at the bottom is replaced by an **X** at the top right, and the ">" arrow on each row (Receive Stock, New Product, View Products) is removed.
+- **Receive Stock opened the whole POS first** (confirmed): every Receive Stock link went to `pos?restock=1`, so the till, categories, product grid, cart and shift bar loaded before the form appeared, and the user was left on the POS afterwards. Now the links open a **Receive Stock page** that shows only the form, already open (about 0.6 s in the test browser). Saving keeps the form open and empty for the next product; X / Cancel returns to the screen the user came from (the dashboard if none). The Products list's per-product Receive Stock still pre-selects that product and loads its last prices.
+- **Links moved to the page:** the Products window, the Shop menu, the side menu, the dashboard tile, the Products list and the help article's "take me there" link (the help button recognises the new page as Receive Stock).
+- **One form, not two:** the form's markup and script moved out of the POS into `restock_modal.php` + `restock_modal_js.php`, used by both the POS button and the new page. Same fields, permission (`pos` + `pos_restock`), shops, price lookup, price warnings and save as before. Old `pos?restock=1` links still open the form on the POS.
+- **Checked:** browser at phone size — window has the X at the top right, no Cancel, no arrows, 3 rows; X closes it; Receive Stock opens its page with the form open and no POS loaded; a restock saved from the page (stock +3), form cleared for the next one; X goes back to the dashboard; `?product_id` pre-selects; POS button still opens and saves (window closes, product grid reloads); old POS link still works; no JS errors — 16 checks. New test 30 checks (24 of them fail on the old code). 32 related suites before / after: same failures.
+
+## 2026-10-28 — feat: Add Product opens a centred window (Smart POS), page inactive until a choice
+
+**Changed:** `header.php`, `app/dashboard.php`.
+
+- **Why:** the small menu opened at the edge of the screen (top right on desktop); the owner wants it in the centre with the rest of the page inactive until a choice is made (design 2 of a clickable trial, without its title, "Most used" badge or highlight).
+- **What:** one Bootstrap modal `#bmsAddProductModal` (centred, `data-bs-backdrop="static"` — a click outside does nothing; Cancel or Esc closes) in the Smart POS block of `header.php`: **Receive Stock** → `pos?restock=1`, **New Product** → `product_create`, and **View Products** → `products` only when opened from the phone's Products tab. Same icons, colours, wording and permissions as the menu it replaces; no heading.
+- **Opened by:** the dashboard's Add Product tile (Smart POS, both permissions) and the phone bottom bar's Products tab. The dropdown markup, its z-index workarounds and their scripts are removed.
+- **Smart BMS unchanged:** no modal; the dashboard keeps the original plain Add Product link.
+- **Checked:** the rendered modal, CSS and buttons placed into the live shop.demo dashboard in the browser — desktop: Add Product opens the window centred over a dimmed page, Receive Stock / New Product only, a click outside and on the cards behind does nothing, Cancel closes it cleanly (no backdrop left), Receive Stock opens `/pos?restock=1` with the Restock form open; phone width (400 px): Products opens it with View Products as well, bar and chat button dimmed behind it, outside tap ignored, View Products → `/products`. Local render: Smart POS EN + SW (Pokea Mzigo) has the modal; Smart BMS has no modal and the plain tile (setting restored).
+
+## 2026-10-28 — fix: Add Product / Products menus did nothing when clicked; Smart POS only
+
+**Changed:** `app/dashboard.php`, `header.php`.
+
+- **Bug (from #2610):** clicking Add Product (dashboard) or Products (phone bottom bar) did nothing. `header.php` closes every open dropdown on any click that is not on a `.dropdown-toggle`; the two new buttons lacked that class, so the click that opened the menu closed it at once. Both buttons now carry `dropdown-toggle` (Bootstrap's caret hidden).
+- **Menu covered:** on the dashboard the open menu sat behind the KPI cards (the Quick Links card is a stacking context) — the card is lifted (`.apm-open`, z 1060) while the menu is open. On the phone the Ask BMS button (z 1040) covered View Products — the bar is lifted to 1041 while the menu is open.
+- **Smart POS only:** the dashboard menu now appears only when `pos_simple_mode` is on. Smart BMS keeps the original plain Add Product link to `product_create` (the bottom bar already exists only in Smart POS).
+- **Checked:** on shop.demo.bjptechnologies.co.tz with the fix applied in the browser — desktop: Add Product opens the menu above the cards; phone width (400 px): Products opens Receive Stock / New Product / View Products above the chat button, the dashboard tile opens its menu; Receive Stock → `/pos?restock=1` opens the Restock form, New Product → `/product_create`, View Products → `/products`. Local render with `pos_simple_mode` 1 vs 0: menu + bottom bar vs the original plain tile and no bar (setting restored).
+
+## 2026-10-28 — fix: Expenses payee-columns repair now also runs on the root install (bms / demo)
+
+**New:** `migrations/2026_10_28_expenses_payee_columns_legacy_db.php`.
+**Changed:** `tests/test_expenses_payee_columns_migration_cli.php`.
+
+- **Why:** the payee-columns fix shipped only as a tenant migration. The root install (BJP's books on bms / demo) runs on the legacy DB and only runs `migrations/*.php`, so the repair never reached demo, the site where the Expenses "Ajax error" was reported. CI's PHP Lint Check also failed on every PR (`test_legacy_migration_mirrors_cli`: ❌ `2026_10_28_expenses_payee_columns`).
+- **Fix:** the legacy-DB mirror, same repair: adds whichever of `paid_to_type` / `paid_to_id` / `payee_manual_role` / `payee_manual_name` are missing, widens an old `paid_to_type` ENUM. Idempotent.
+- **Checked:** new section F of `test_expenses_payee_columns_migration_cli` runs the real mirror file against a scratch DB with the columns removed: it adds all four, the list's payee SELECT then works, a second run is a no-op (23 checks, scratch DB dropped). `test_legacy_migration_mirrors_cli` 24/24. Run on the local DB: all four already exist, nothing changed.
+
+## 2026-10-28 — feat(dashboard): Add Product opens a menu — Receive Stock / New Product (also on the phone Products tab)
+
+**Changed:** `app/dashboard.php`, `header.php`, `lang/sw.php`.
+
+- **Why:** receiving stock for an existing product is the most common job, but it was only reachable inside the POS. Option B ("menu at the button") chosen from a clickable trial of five popup styles.
+- **Dashboard → Quick Links → Add Product:** now opens a small menu at the tile: **Receive Stock** ("Add stock to a product you already have") → the POS Receive Stock form (`pos?restock=1`, the same link the header menu and Products list already use), and **New Product** ("Create a product you don't have yet") → `product_create`. Receive Stock is shown first and highlighted.
+- **Phone bottom bar → Products** (Simple POS): opens the same menu above the tab, plus **View Products** (the product list it used to open directly).
+- **Permissions:** Receive Stock needs `pos` + `pos_restock` (same gate as the Products page's Receive Stock); New Product needs create on `products`. With only one of them the tile stays a plain link to that one; the phone menu lists only what the user may open, View Products always. Users who saw no Add Product / Products before still see none.
+- **Names** follow Square / Lightspeed ("Receive Stock") and the POS's own labels; Swahili uses the existing **Pokea Mzigo** / **Bidhaa Mpya** plus three new lines (descriptions, **Angalia Bidhaa**).
+- **Checked:** dashboard rendered as admin (EN + SW): both menus, links `pos?restock=1` / `product_create` / `products`, Swahili text. Rendered as 5 non-admin users: two with create-products but no receive-stock get a plain Add Product link and a phone menu with New Product + View Products only; three without product access see neither, as before. Not yet clicked in a browser (extension not connected).
+
+## 2026-10-28 — fix: Expenses list "Ajax error" on databases missing the payee columns
+
+**New:** `migrations/tenant/2026_10_28_expenses_payee_columns.php`, `tests/test_expenses_payee_columns_migration_cli.php`.
+
+- **Cause:** `api/account/get_expenses.php` selects `expenses.paid_to_type`, `paid_to_id`, `payee_manual_role` and `payee_manual_name`. `paid_to_type` / `paid_to_id` were only ever added by a hand-run one-off (`scripts/legacy/migrate_expenses_paid_to.php`) — no migration created them — so a database that never ran it (demo.bjptechnologies.co.tz) fails the list query → HTTP 500 → "DataTables warning: table id=expensesTable - Ajax error". `2026_09_15_expenses_simple_pos.php` could not repair it: it skips a missing `paid_to_type` and adds `payee_manual_role` `AFTER paid_to_id`, which errors.
+- **Fix:** new tenant migration adds whichever of the four columns are missing (no `AFTER`, so no dependency on another optional column) and widens a legacy `paid_to_type ENUM('supplier','staff')` to include `sub_contractor` and `other`. Idempotent; existing data kept. No app code changed.
+- **Checked:** `test_expenses_payee_columns_migration_cli` 17 checks — a scratch DB without the columns reproduces the failing SELECT; the real migration (run through `tenant_migration_bootstrap.php` like the runner) adds them, a second run is a no-op, a legacy-enum table is widened with its rows intact, and the real `api/get_expenses.php` returns valid DataTables JSON.
+
+## 2026-10-28 — security: list APIs no longer put raw `start` / sort direction into SQL; list API tests work on Windows
+
+**New:** `tests/test_list_sql_input_cli.php`.
+**Changed:** `api/get_campaigns.php`, `api/get_compliance.php`, `api/get_templates.php`, `api/get_leads.php`, `api/document/get_documents.php`, `tests/test_dt_page_length_cli.php`, `tests/test_dt_header_sort_cli.php`.
+
+- **SQL injection closed:** Campaigns, Compliance and Templates put `start` into `LIMIT` as raw request text; Campaigns, Leads and the Document Library put the sort direction into `ORDER BY` as raw text. A request could rewrite the query (proved on the old code: `start=0,1 -- ` cut the list to 1 row; a subquery in the direction ran — `SLEEP(2)` delayed the reply 2 s). Now `start` is cast to a number (never below 0) and the direction is only `ASC` or `DESC`. One line per value; nothing else changed. Swept every API / ajax / app file for the same pattern — no others.
+- **Tests:** the list-API tests passed the request to a child PHP process as a URL-encoded argument; on Windows `escapeshellarg()` turns every `%` into a space, so `order[...]`, `search[...]` and `columns[...]` never arrived. Now passed as base64. `test_dt_header_sort_cli` goes from 65 failures to 3 — header sorting works; the 3 left are the test comparing differently from MySQL (status ENUMs sort in their defined order pending → reviewed → approved…, and MySQL's collation puts `__test` usernames after letters), not bugs.
+- **Checked:** `test_list_sql_input_cli` 25 checks on the fixed code; on the old code 12 fail (injections change the query). `test_dt_page_length_cli` 83 checks. `test_dt_header_sort_cli` 129 / 132 (3 above).
+
+## 2026-10-28 — fix: page size "All" no longer breaks server-side lists (DataTables "Ajax error")
+
+**New:** `dt_page_length()` in `helpers.php`, `tests/test_dt_page_length_cli.php`.
+**Changed:** `ajax/get_users.php`, `api/account/get_expenses.php`, `api/account/get_invoices.php`, `api/account/get_sales_orders.php`, `api/account/get_chart_of_accounts.php`, `api/document/get_compliance_documents.php`, `api/document/get_documents.php`, `api/get_campaigns.php`, `api/get_compliance.php`, `api/get_customers_paged.php`, `api/get_delivery_notes_list.php`, `api/get_documents.php`, `api/get_email_templates.php`, `api/get_employees.php`, `api/get_grns.php`, `api/get_leads.php`, `api/get_notifications.php`, `api/get_pending_signatures.php`, `api/get_purchase_returns.php`, `api/get_signature_history.php`, `api/get_templates.php`, `api/get_user_signatures.php`, `api/operations/get_assets.php`, `api/operations/get_maintenance_logs.php`, `api/operations/get_projects.php`.
+
+- **Cause:** choosing "All" in a list's page-size box sends `length=-1`; these 25 list APIs built `LIMIT 0, -1` (invalid SQL) → HTTP 500 → "DataTables warning: table id=expensesTable - Ajax error" (tn/7). Chart of Accounts caught the error and showed an empty table instead.
+- **Fix:** one helper, `dt_page_length($_GET['length'] ?? null, default)` — missing → the list's own default (10, or 25 for Delivery Notes), a normal size kept, below 1 (-1 = "All") → every row. Each API changes one line to use it; nothing else in the APIs changed.
+- **Already correct, not changed:** Bank Reconciliations, Journals, Audit Logs, Login History, Payroll, Activity Log.
+- **Not changed (reported):** `api/get_campaigns.php`, `api/get_compliance.php`, `api/get_templates.php` put `start` into the SQL without casting it to a number. `tests/test_dt_header_sort_cli.php` already fails 65 of 132 checks on `develop` before this change (identical before / after).
+- **Checked:** all 25 APIs as admin with "All" and with 25 — "All" returns every row (Expenses 47/47, Chart of Accounts 114/114, Notifications 1069/1069…), 25 still pages. `test_dt_page_length_cli` 83 checks.
+
+## 2026-10-28 — chore: remove `NUL` and debug log from the repo; GRN list stops writing a debug log
+
+**Removed:** `NUL`, `debug_grn_log.txt` (both added by mistake in `de20875e`).
+**Changed:** `api/get_grns.php`, `.gitignore`.
+
+- **`NUL`** (empty file) made `develop` / `main` impossible to check out or pull on Windows (`error: invalid path 'NUL'`) — removed.
+- **`debug_grn_log.txt`** (176 KB of GRN SQL + rows from a local run) removed from the repo; root `debug_grn_log.txt` added to `.gitignore` next to `api/debug_grn_log.txt`.
+- **`api/get_grns.php`:** leftover debug code wrote the full SQL, parameters and the first GRN row to `debug_grn_log.txt` on every GRN list load (on the server: `api/debug_grn_log.txt`, growing forever) — the three `file_put_contents` calls removed. No other change to the endpoint.
+- **After deploy:** delete `api/debug_grn_log.txt` on the live server(s).
+
+## 2026-10-28 — feat(customers): Customer Groups work end to end; CSV supplier import uses company codes
+
+**New:** `core/customer_groups.php`, `api/create_customer_group.php`, `api/update_customer_group.php`, `api/get_customer_group.php`, `api/delete_customer_group.php`, `api/add_group_members.php`, `api/remove_group_member.php`, `api/refresh_dynamic_group.php`, `api/export_group_members.php`, `migrations/tenant/2026_10_28_customer_groups_soft_delete.php` + `migrations/2026_10_28_customer_groups_soft_delete_legacy_db.php`, `tests/test_customer_groups_cli.php`.
+**Changed:** `app/bms/customer/customer_groups.php`, `app/bms/customer/customer_group_details.php`, `app/bms/customer/customer_group_members.php`, `api/import_suppliers.php`.
+
+- **Customer Groups:** the three pages called eight APIs that were never built — all added (§9 shape: login, `customer_groups` permission — create / edit / delete / view — POST + CSRF for writes, activity log). Create, edit, delete, add / remove members, refresh a dynamic group, export members to CSV now work.
+- **Dynamic groups** have one rule on the current customer fields (Customer Type, Category, Occupation / Business, City, Region, Country, Registration Date) with Equals / Contains / Starts With / Ends With. Members are filled on save and by Refresh; deleted customers drop out; a `%` or `_` in the value is matched literally. Fields are a whitelist — nothing from the request reaches SQL except bound values. A rule saved on a field the old customer layout had (education, marital status…) is reported ("edit the group") instead of run; the old `entity_type` maps to Customer Type. A dynamic group's members can't be edited by hand.
+- **Delete is a soft delete** (`status = 'deleted'`; migration adds the enum value; row and member list kept); deleted groups disappear from every page and their name can be reused.
+- **Pages fixed:** each loaded a second jQuery (and Details a second Bootstrap) after the header, wiping DataTables and the CSRF header; AJAX used relative `api/…` URLs that resolved under `/customers/` (404) — now `buildUrl()`; links to `customer_group_members.php` / `customer_details.php` went nowhere — now `getUrl()`. List page: `display_errors` switched on in production removed; Edit reused and renamed the Create form and never switched back — one form with a hidden `group_id`, closing it always returns to Create; Edit from Group Details opens it (`?edit=ID`); the rule's saved values load into Edit. Buttons follow create / edit / delete permission; permission is checked before the header; group ids are cast to int; rule values and names are escaped (they were echoed raw); sortable S/No on the groups and members tables; exports leave out the Actions column.
+- **CSV supplier import:** codes came from `rand()` (`SUP80432610`) — §18 forbids it. New suppliers now get `nextCode('SUP')` (`CMP-SUP-0034`) inside the insert's transaction (a failing row rolls back and burns no number) and their payables sub-account (`ensureActorLedgerAccount`, as Add Supplier does). An updated supplier's legacy code is upgraded with `codeForEdit()`, as editing a supplier does.
+- **Not changed (reported):** `api/mobile/suppliers/create.php` also skips the payables sub-account.
+- **Checked:** browser walk-through of Customer Groups — create, duplicate refused, add 2 / remove 1 member, CSV export, edit from Details, edit form resets, dynamic group filled (7) and refreshed (8), soft delete from Details and list, deleted group gone — 19 checks, no JS errors. `test_customer_groups_cli` 57 checks (APIs, gates, pages, import codes). Import against the running app: new row `CMP-SUP-0034` with ledger account, legacy `SUP80432610` → `CMP-SUP-0035`, failing row leaves the sequence at 35. Migration on a fresh tenant DB: adds `'deleted'`, second run does nothing, rows kept. 21 related CLI suites before / after: identical (one extra pass — the new migration's mirror).
+
+## 2026-10-28 — fix: header sorting on server-side lists, page errors, Supplier audit trail, regression tests
+
+**New:** `core/dt_order.php`, `tests/test_dt_header_sort_cli.php`, `tests/test_supplier_categories_audit_cli.php`, `tests/test_sno_and_page_fixes_cli.php`.
+**Changed:** `api/get_customers_paged.php`, `api/account/get_invoices.php`, `api/account/get_sales_orders.php`, `api/operations/get_assets.php`, `api/operations/get_maintenance_logs.php`, `api/operations/get_projects.php`, `ajax/get_users.php`, `api/account/get_journals.php`, `api/get_delivery_notes_list.php`, `api/get_grns.php`, `app/bms/customer/customers.php`, `app/bms/invoice/invoices.php`, `app/bms/sales/sales_orders.php`, `app/bms/operations/assets.php`, `assets/js/tables/bms-grn-table.js`, `assets/js/tables/bms-delivery-notes-table.js`, `app/bms/stock/stock_movements.php`, `roots.php`, `app/constant/accounts/revenue.php`, `app/constant/accounts/add_journal.php`, `app/constant/accounts/journals.php`, `app/constant/accounts/edit_expense.php`, `app/constant/accounts/expense_details.php`, `app/constant/accounts/budget_details.php`, `app/bms/invoice/payment_create.php`, `app/constant/document/preview_template.php`, `app/bms/customer/customer_group_details.php`, `app/bms/customer/customer_group_members.php`, `api/add_supplier.php`, `api/update_supplier.php`, `api/update_supplier_status.php`, `api/delete_supplier.php`, `api/import_suppliers.php`, `api/mobile/suppliers/create.php`, `api/mobile/suppliers/update.php`, `api/mobile/suppliers/delete.php`, `app/bms/Suppliers/supplier_details.php`.
+
+- **Header sorting really sorts now** on the ten server-side lists (Customers, Invoices, Sales Orders, Assets, Maintenance, Users, Projects, Journals, Delivery Notes, GRN — also the GRN / DN tabs on Supplier Details). Every header looked clickable but the APIs ignored the column, so only S/No changed anything. `dtOrderSql()` (`core/dt_order.php`) maps the clicked column's data name to a whitelisted SQL expression with a unique-id tie-breaker; S/No keeps its normal / reversed order; anything unknown falls back to the normal order, so nothing from the request reaches SQL. Mapping is by data name because the shared GRN / DN tables hide columns (indexes shift).
+- Customers: the Contact and Balance columns sort by contact person / amount due (`name:` on render-only columns). Assets: Book Accumulated Depreciation and NBV are worked out per page, so they are no longer offered as sortable.
+- **Default order unchanged:** Customers, Invoices, Sales Orders, GRN and DN started "sorted" on a column the API ignored; they now start on S/No, so the same rows show in the same order, and the header arrow matches.
+- **Security:** `api/operations/get_maintenance_logs.php` and `api/operations/get_projects.php` answered without login (maintenance returned its data to anyone) — now login + `canView('assets')` / `canView('projects')`, the keys their pages enforce. `api/get_delivery_notes_list.php` had login only — now `canView('dn') || canView('grn')`, the same gate as its pages. **Stock Movements:** `date_from` / `date_to` were echoed into the page unescaped (reflected XSS) — dates are validated as `YYYY-MM-DD` and escaped; `movement_type` must be one of the five listed types.
+- **Page errors fixed** (all reproduced first on a clean load):
+  - Cash Flow (`/cash_flow`, `/reports?report=cash_flow`) and Trial Balance (`/reports?report=trial_balance`) printed the whole header and footer twice ("APP_URL has already been declared"): the report partial and its wrapper both called `includeHeader()` / `includeFooter()`. Both now print once per request.
+  - Edit Expense crashed (`ORDER BY category_name` — the column is `name`). Customer Group Details / Members crashed on `c.entity_type` and other columns `customers` no longer has — mapped to `customer_type` / `customer_name` / `phone` / `email` / `address`; the add-member list also skips deleted customers.
+  - Revenue: the card view's permission flags lived inside the ready handler, so `renderCards()` threw "CAN_EDIT is not defined" whenever a pending row existed — moved to script level.
+  - Expense voucher: `expense_items` was printed raw into the script (bad data broke the page; `</script>` in it would run); description / notes used `addslashes()`, which lets a newline break the script — all JSON-encoded now (HTML escaping kept).
+  - Consolidated Expenses printed the header before its permission check, so a refusal (e.g. POS Simple Mode) stopped the page with no footer / Bootstrap — permission is checked first now.
+  - Budget Details (not found), Payment Create (redirects sent after the header — "headers already sent"), Template Preview: they stopped before the footer, so Bootstrap never loaded. `journal/add` opened directly rendered a bare modal fragment without jQuery — now redirects to Journals, where the modal lives.
+- **Supplier audit trail:** the System Info → Audit Trail tab read `audit_logs` for the supplier, but no write logged one. Web create / edit / status / delete, mobile create / update / delete and CSV import now call `logAudit()` with `entity_type 'supplier'` and the supplier id; an edit records only the fields that changed (old → new). Action labels show without underscores.
+- Customer Groups APIs and the CSV supplier import codes: done in the entry above.
+- **Supplier Categories migration** checked on a fresh tenant DB built from `schema/tenant_schema_template.sql`: the first run adds `'deleted'`, the second does nothing, rows untouched; the legacy mirror is idempotent too.
+- **Tests:** `test_dt_header_sort_cli` (helper rules, every list API uses it, and against the DB every whitelisted column of every API in both directions — 132 checks; a broken column mapping makes it fail). `test_supplier_categories_audit_cli` (category add / duplicate / rename / status / in-use delete refused / soft delete / re-add restores the row; supplier web + mobile writes audited — 24 checks). `test_sno_and_page_fixes_cli` (S/No column count per file, DataTable inits, each page fix above — 89 checks).
+- **Checked in a browser:** header sorting on 12 tables, every sortable column ascending and descending, rows in order, no server / JS errors — 402 checks. Each fixed page re-opened in the browser: no JS errors, header printed once. 517 related CLI suites run before and after the change, side by side on the same data: no new failures (the three that differed fail the same way on the old code when re-run — leftover shared test data). Whole-site page audit (309 pages): the ten page errors above are gone; nothing new.
+
+## 2026-10-28 — feat(ui): S/No is sortable on every DataTable (one shared definition)
+
+**New:** `assets/js/bms-serial.js` (loaded in `header.php` right after jQuery). **Pages / modules:** 84 DataTables across ~50 pages + the shared table modules in `assets/js/tables/`, `pos-credit-aging.js`, `warehouse-batches.js`, `includes/project_view/scripts/`. **APIs:** `api/get_customers_paged.php`, `api/account/get_invoices.php`, `api/account/get_sales_orders.php`, `api/account/get_expenses.php`, `api/account/get_journals.php`, `api/account/get_bank_reconciliations.php`, `api/operations/get_assets.php`, `api/operations/get_maintenance_logs.php`, `api/operations/get_projects.php`, `api/get_employees.php`, `api/get_login_history.php`, `api/get_delivery_notes_list.php`, `api/get_grns.php`, `api/get_purchase_returns.php`, `ajax/get_users.php`, `app/activity_log.php`.
+
+- **What S/No means now (everywhere):** a row's position in the list's normal order; the number stays with its row. Click S/No → ascending = normal order, descending = reversed; sorting any other column keeps each row's own number. `BMSSerial.column()` is the one definition.
+- **Bug fixed along the way:** client-side tables numbered rows with `meta.row + _iDisplayStart + 1`, which is wrong past page 1 (row 26 could show as 51). Page 2 now continues 26, 27…
+- **Server-side tables:** each API reverses its normal order when S/No is sorted descending (with a unique-id tie-breaker so pages are stable); the number counts down to match.
+- **Statements** (Bank / Customer / Vendor / Material List): only S/No sorts there — oldest/newest first; each row keeps its own running balance.
+- **Same look as before:** Purchase Orders, RFQ and Bank Reconciliation used to start sorted on S/No, so the same rows now show numbered 1..N.
+- **Left as is:** Product Categories (and Restaurant Menu Type, same page) — a parent/child tree; reversing it would put children above parents (`test_ui_constants_group_a_cli` pins `ordering: false`).
+- **Security fixes in APIs touched:** `get_bank_reconciliations.php` had no login/permission check and put the search text, sort column/direction and paging straight into SQL — now auth + `canView('bank_reconciliation')`, bound search, whitelisted sort, int paging (and it sorted on a column that does not exist). Sort direction was unchecked SQL in `get_employees.php`, `get_purchase_returns.php`, `account/get_expenses.php` — whitelisted.
+- **Wrong column sorting fixed:** `get_employees.php` and `get_purchase_returns.php` mapped page columns one place off (Employee # sorted by name, etc.; employees also missed the Project column) — now mapped by the real column.
+- **RFQ page:** a stray `}` killed its script block, so Filter / Clear / Export did nothing — removed.
+- **Tests:** Node harnesses of `test_expenses_table_sort_and_resize_cli`, `test_pos_credit_aging_table_cli`, `test_warehouse_batches_tab_cli` now load the real `bms-serial.js` (as the page header does); `test_journal_page_render_cli` checks for the shared serial column.
+- **Checked in a browser:** 84 tables — default view numbered 1..N, S/No asc/desc reverses rows and numbers, other-column sort keeps numbers, page 2 continues, server reverse is exact, no JS errors (548 checks). Whole-site re-audit: no new JS errors; four earlier ones gone. 171 related CLI suites: same failures as before the change (two differ only by shared-test-data drift).
+
+## 2026-10-28 — feat(ui): DataTables on the 11 main list pages that had none
+
+**Files:** `app/constant/accounts/customer_deposits.php`, `app/bms/pos/paye_register.php`, `app/bms/invoice/po_invoice_report.php`, `app/constant/reports/employee_statement.php`, `app/bms/restaurant/modifier_group.php`, `app/bms/restaurant/reservations.php`, `app/bms/restaurant/tables.php`, `app/bms/sales/sales_returns/sales_returns.php`, `app/constant/accounts/petty_cash.php`, `app/bms/stock/stock_movements.php`, `api/sales/get_returns_paged.php`, `api/petty_cash/get_transactions.php`, `api/stock/get_stock_movements.php` (new), `tests/test_ui_constants_group_a_cli.php`
+
+- **Client-side DataTables** (search, sort, paging; Actions not sortable; S/No sortable): Customer Deposits, PO vs Invoice Report, Restaurant Modifier Groups / Reservations / Tables. JS-filled tables now destroy + rebuild the DataTable on each reload; the colspan "no records" rows became the DataTable's own empty message. Amount cells carry `data-order` + `type: 'num'`, so `TZS 150,000` sorts after `TZS 70,000`.
+- **Registers / statements** (PAYE Register, Employee Statement): sort + search with every row on one page, so Print and the Totals footer still cover everything. Employee Statement sorts only by S/No (oldest/newest first; each row keeps its own running balance); the Opening row is now a full-width row that always stays at the oldest end.
+- **Server-side DataTables** for the three server-paged lists (a client DataTable would only have sorted one page): Sales Returns (`get_returns_paged.php` gains a `draw` mode — old callers unchanged), Petty Cash (`get_transactions.php` gains whitelisted `sort`/`dir`; signed amount; the page's own search box, Show picker, card view and "print every row" keep working), Stock Movements (new `api/stock/get_stock_movements.php` — same filters and project/warehouse scope as the page had, plus search). Sorting is a column-index whitelist; S/No = default order, descending = oldest first.
+- Sales Returns cells are now escaped (`safeOutput`) — the old renderer inserted names/numbers raw.
+- `test_ui_constants_group_a_cli.php`: the specs that pinned these pages to "no DataTable" now accept the server-side DataTable (dated note, same as tenders.php's).
+- **Checked in a browser** (57 + 16 checks): each table is a DataTable with no JS errors; S/No sorts both ways (data + header click); server sort/search reach the server; amounts sort numerically; Petty Cash print fetches all rows then restores; restaurant status dropdown / Edit buttons still work. 26 related CLI suites: failures identical before and after.
+
+## 2026-10-28 — fix: Supplier Categories page never worked; Receive Payment didn't load invoices
+
+**Files:** `app/bms/Suppliers/supplier_categories.php`, `api/add_supplier_category.php` (new), `api/update_supplier_category.php` (new), `api/update_supplier_category_status.php` (new), `api/delete_supplier_category.php` (new), `migrations/tenant/2026_10_28_supplier_categories_soft_delete.php` (new) + `migrations/2026_10_28_supplier_categories_soft_delete_legacy_db.php` (new), `app/constant/accounts/receive_payment.php`
+
+- **Supplier Categories** (broken since the first commit): `editCategory()` was cut off mid-function, CSS sat inside the `<script>` with no `</script>`, so the whole script failed (no DataTable, no buttons). None of the APIs it called existed. Now: script rewritten (`editCategory`, `updateCategoryStatus`, `confirmDeleteCategory`), four APIs added (§9 shape: auth, permission on `categories`, POST + CSRF, activity log), AJAX URLs via `buildUrl()`, buttons follow `canCreate/canEdit/canDelete('categories')`.
+- **Delete is a soft delete** (`status = 'deleted'`, migration adds the enum value) and is refused while suppliers use the category. Re-adding a deleted name restores that row instead of hitting the unique key.
+- **Receive Payment:** `$('#f-customer').on('change', loadOutstanding)` ran before `window.loadOutstanding` was assigned — a ReferenceError that stopped the rest of the setup, so picking a customer / Filter never loaded invoices. The handler now resolves the function when the change fires.
+- **Checked in a browser:** Supplier Categories add / edit / deactivate / activate / delete / re-add / duplicate refused / in-use delete refused / no-CSRF 419 — all pass, no JS errors; Receive Payment has no JS error and the customer change calls `loadOutstanding`.
+
+## 2026-10-27 — fix(permissions): Smart POS (Simple Mode) hides and refuses pages its UI never shows
+
+**Files:** `core/feature_registry.php`, `app/bms/invoice/reports.php`, `api/account/search_customers.php`, `app/bms/customer/customers.php`, `tests/test_simple_mode_hidden_pages_cli.php` (new)
+
+- **Problem:** the Roles & Permissions page hid a permission only when its module was off. Simple Mode only trims the menus, so Smart POS still listed checkboxes for pages it never shows (Balance Sheet, Trial Balance, Chart of Accounts…), and an old grant still opened them by URL.
+- **`simpleModeHiddenPageKeys()`** (one list): balance_sheet, cash_flow, income_statement, profit_loss_report, trial_balance, ledger_report, financial_reports, financial_statements, tax_report, chart_of_accounts, transactions, inventory_valuation, locations, customer_groups, customer_import, loans, loan_documents. `tenantModuleAllowsPage()` refuses them while `pos_simple_mode` is on (admin included), so they leave the matrix and their routes 404. Grants are kept — turning Simple Mode off restores everything. Smart BMS is unaffected.
+- **Deliberately kept** (Simple Mode uses them): `reports` (mobile Reports tab), `categories` (category create), `stock_adjustments` (Shops → Transfer Stock), Sales/Inventory/Expense reports.
+- **Reports hub** (`/reports`): the Financial Reports card and `?report=balance_sheet|cash_flow|trial_balance|general_ledger|journal_mappings` follow the same rule (they only checked `reports` before).
+- **Customer search API:** also allowed for `sales_report` / `service_sales_report`, so the Sales Report customer filter keeps working without `financial_reports`.
+- **Customers list:** "View Account" (customer statement) link shows only with `financial_reports`.
+- **Test:** 233 checks — list integrity, entitlement on/off (admin too), matrix hide + grant preserved on save, router, pages on/off. With the block switched off, 86 checks fail.
+
+## 2026-10-27 — fix(superadmin): tenant page crash "Undefined constant BMS_GRACE_PERIOD_DAYS" (Sentry 6ee17ca6)
+
+**Files:** `app/superadmin/tenant_view.php`, `core/tenant_admin.php`
+
+- **Crash:** opening a tenant from a grace-period notification or dashboard tile (`notif_type`/`from_cat` = `trial_grace_started`, `in_grace`, `subscription_grace_started`) hit a fatal error — the "Action Required" banner still used `BMS_GRACE_PERIOD_DAYS`, which was removed when the grace period moved to `core/tenant_lifecycle_policy.php`. The banner now uses `tenantGraceDaysFor($tenant)`, so it also shows this tenant's real grace period.
+- **Per-tenant override never shown:** `getTenant()` did not return `grace_days`, so the tenant page always showed the platform default and labelled it "(platform default)" even when an override was set. It is now read in a separate guarded query (same pattern as `vendor_customer_id`), so a control DB without the column still loads every tenant.
+
+## 2026-10-27 — feat(mobile): "Ask Smart POS" AI chat in the Flutter app (mobile API upgrade, Phase 9)
+
+**Files:** `api/mobile/ai_ask.php` (new), `api/mobile/me.php`, `tests/test_mobile_ai_cli.php` (new)
+
+- **`POST api/mobile/ai_ask.php`** (`question`) → `{answer, used}`: runs the web endpoint `api/ai/ask.php` itself — the AI Assistant module and permission, the company's or BJP's key, the monthly cap, the rate limit, answers only from what this user may open, in their language. Optional `client_uuid` for safe retries.
+- **`me.php` → `ai`:** `allowed`, `ready` (show the chat — the same rule as the web's floating chat), `limit_reached`, `name` ("Smart POS" / "BMS").
+- **Test:** 12 checks over HTTP — no key (not ready, 422), a key set (ready; empty question 422; the provider address refused by the AI service's SSRF guard → clean error, nothing leaves the machine), cap reached, module off (403), no token (401). AI suites pass; `test_ai_foundation_cli` fails 1 the same on develop.
+
+## 2026-10-27 — feat(mobile): Help & Support in the Flutter app (mobile API upgrade, Phase 8)
+
+**Files:** `api/mobile/support.php` (new), `tests/test_mobile_support_cli.php` (new), `tests/helpers/mobile_http.inc.php`, `tests/test_mobile_old_sale_cli.php`, `tests/test_mobile_subscription_cli.php`, `tests/test_mobile_language_mode_cli.php`, `tests/test_mobile_parity_cli.php`
+
+- **`api/mobile/support.php?action=…`:** help articles (`home`, `search`, `article`, `feedback`, `dismiss_notice`) and support requests (`create`, `list`, `reply`, `resolve`, `rate`, `forward`, files as multipart `attachments[]`) run the web endpoints themselves — same rules: the `help` permission, staff see their own requests and admins the company's, staff → admin → BJP forwarding, same notifications.
+- **`view`** (new for the app): one request with its conversation (author, mine, body, time, attachments with a download URL) and the same buttons the web Help page shows (`can_reply`, `can_resolve`, `can_forward`, `can_rate`). **`attachment`** downloads a file through the web's own access check.
+- **Test helper fix:** a failing test no longer leaves its throwaway company and server behind (`mhStopAll()` runs before `exit(1)`); `mhStart()` can capture mail in its server (`capture_mail`).
+- **Test:** 22 checks over HTTP — articles (home, search, open, unknown 404, GET 405), a request with a screenshot (list, view, download the PNG, reply, resolve, rate), too-short refused, mail captured not sent, staff cannot see or open the owner's request, no token 401. All support-center suites pass.
+
+## 2026-10-27 — feat(mobile): price warnings + product/stock/expense parity for the app (mobile API upgrade, Phase 7)
+
+**Files:** `core/price_check.php` (new), `api/mobile/products/create.php`, `api/mobile/products/update.php`, `api/pos/quick_restock.php`, `tests/test_mobile_parity_cli.php` (new)
+
+- **Selling below the buying price, for the app:** the web asks "Is this correct?" in the browser (`assets/js/bms-price-check.js`); the app had nothing. `products/create`, `products/update` (when a price is sent) and `pos/quick_restock` now return a non-blocking `warnings` list — `below_buying_retail`, `below_buying_wholesale`, `wholesale_above_retail`, each with the same translated sentence. The figures are saved as typed, exactly like the web's "Yes, keep it".
+- **Checked and documented (no code change needed):** `products/delete` is refused with **409** while any shop holds stock and keeps every past sale and movement; `expenses/create` takes an optional `warehouse_id` (the shop's profit), like the web form; the dashboard chart's `fill_gaps=1` returns every day; subscription services stay out of the POS (BJP install only).
+- **Test:** 21 checks — the rule itself, then over HTTP: create (saved + warned), update with and without prices, restock (saved + warned), delete refused with stock / allowed at zero with history kept, expense on its shop, chart with all 30 days. Related suites pass; `test_supplier_access_simple_pos_cli` (1) and `test_warehouse_batches_tab_cli` (4) fail the same on develop.
+
+## 2026-10-27 — fix(mobile): the app follows the company's language mode (mobile API upgrade, Phase 6)
+
+**Files:** `api/mobile/login.php`, `api/mobile/me.php`, `api/mobile/profile/language.php`, `lang/sw.php`, `tests/test_mobile_language_mode_cli.php` (new)
+
+- **The gap:** when an admin sets one language for everyone (Settings → General → Language Mode = organization), the web follows it but the app showed each user's own choice and let them save another.
+- **Now:** `login.php` and `me.php` return the **effective** language plus `language_mode` (`user` | `organization`) and `language_locked`; `profile/language` refuses with **409** "Language is set by your organization" (Swahili: "Lugha imewekwa na kampuni yako"), like the web switch. The user's own choice is kept and returns when the mode goes back to per-user.
+- **Test:** 14 checks over HTTP — per-user switch, organization English and Swahili (login, me, refusal, server messages), back to per-user. Related suites pass; three fail the same on develop (`test_activity_log_permission_and_sell_label_cli`, `test_dashboard_kpi_row_cli`, `test_my_settings_help_i18n_cli`).
+
+## 2026-10-27 — feat(mobile): Subscription in the Flutter app (mobile API upgrade, Phase 5)
+
+**Files:** `api/mobile/subscription.php` (new), `api/mobile/me.php`, `api/mobile/notifications/list.php`, `tests/test_mobile_subscription_cli.php` (new)
+
+- **`api/mobile/subscription.php?action=…`:** the web Subscription page for the app — `status`, `catalog`, `documents`, `badge`, `request`, `contracts`, `contract_sign`. It runs the web endpoint `api/my_subscription.php` itself (one copy of the logic): admins only, this company only, POSTs accepted with the Bearer token (JSON or form; optional `client_uuid` for safe retries).
+- **`me.php` → `subscription` (every user):** `plan_key`, `plan_name`, `status` (`trial` | `active` | `grace` | `no_end`), `ends_at`, `days_left`, `grace_until`, `grace_days_left`, `warning` (the web banner's rule: last 7 days, or in grace) and `can_manage` (admin).
+- **App notifications:** new first group **Subscription** — "Your free trial / subscription ends in N days" in the last 7 days, then "…has ended. Your grace period ends in N days", same wording as the web banner.
+- **Test:** 24 checks over HTTP — trial / paid / grace / no end date in `me.php` and notifications, status matches the web page, POST and JSON bodies pass the web rules (422) through CSRF, BJP-backed actions answer like the web page, unknown action 422, staff see the summary but get 403 on the page, no token 401. Related suites pass; `test_settings_admin_drawer_cli` fails 1 the same on develop.
+
+## 2026-10-27 — fix(mobile): app signup matches the web — plans, username, Smart BMS approval, plan limits (mobile API upgrade, Phase 4)
+
+**Files:** `api/mobile/register.php`, `api/mobile/register_status.php`, `api/mobile/me.php`, `cron/process_registration_jobs.php`, `scripts/setup_control_db.php`, `tests/test_mobile_signup_plans_cli.php` (new), `tests/helpers/mobile_http.inc.php`
+
+- **Bug fixed — Smart BMS approval was skipped from the app:** a Smart BMS plan chosen in the app went live straight away; the web locks it until a superadmin approves. The registration worker now holds it (`holdTenantForApproval`), issues no token, and `register.php` / `register_status` return `pending_approval: true` with a "waiting for approval" message.
+- **Superadmins are told about app signups** too (bell for Smart BMS requests + the "new company registered" email), as for web signups.
+- **Username:** optional `owner_username` (same rule as the web: starts with a letter, 3–50); empty keeps the phone as the username. New control column `registration_jobs.owner_username` (deploy adds it).
+- **Phone:** spaces, dashes, dots and brackets are ignored and 7–15 digits are required, as on the web (before: only spaces removed, no digit check).
+- **Plan:** `register_status` returns the chosen `plan` (key, term, name, product).
+- **`me.php` → `limits`:** `shops` and `users` as `{used, max}` (null max = unlimited), so the app can show "1 of 1 shops" before the server refuses with `shop_limit_reached`.
+- **Test:** 24 checks over HTTP — public offers, refusals (bad phone / username / plan), Smart POS signup with plan + username (token, plan, unformatted phone, sign-in by username), limits and the shop-limit refusal, Smart BMS signup locked with no token and the superadmin bell. Related suites re-run; `test_pos_phase8_registers_cli` (3) fails the same on develop; `test_service_plans_customer_link_cli` passes alone (it fails only after other suites leave queue rows behind — cleared).
+
+## 2026-10-27 — feat(mobile): Record Old Sale in the Flutter app (mobile API upgrade, Phase 3)
+
+**Files:** `api/mobile/me.php`, `api/pos/save_pos_setting.php`, `api/pos/get_z_report.php`, `tests/helpers/mobile_http.inc.php` (new), `tests/test_mobile_old_sale_cli.php` (new)
+
+- **The gap:** the server already took old sales from the app (`process_sale` `old_sale` + `sold_at`, `old_sale_context`, `void_sale`), but the app could not tell who may use it or how far back, could not change the limit, and its Z-report did not show old sales.
+- **`me.php`:** `permissions.pos_past_sales` (same gate as the web button) and `pos_settings.old_sale_max_days` (POS Settings, default 30).
+- **`save_pos_setting`:** accepts `pos_old_sale_max_days` (1–365), like the web POS Settings page.
+- **`get_z_report` (app Z-report):** adds `recorded_later` (old sales in the shift: when it happened + when typed in) and `is_backdated_shift`, matching the web Z-report.
+- **Test helper:** `tests/helpers/mobile_http.inc.php` — throwaway company + local server + Bearer calls, reused by the next phases.
+- **Test:** 21 checks over HTTP — owner vs staff permission, the setting (save / 0 / 400), shop + product from the app, an old sale yesterday (receipt numbered that day, stored that day, `is_past_entry`), Z-report, future / too-old refused, void, staff refused (403). `test_pos_old_sale_flow_cli` fails the same on develop (local product below its minimum price); `test_mobile_api_http_cli` needs API credentials in the environment.
+
+## 2026-10-27 — feat(superadmin): bell alerts for company activity (mobile API upgrade, Phase 2)
+
+**Files:** `core/tenant_activity_alerts.php` (new), `core/superadmin_notifications.php`, `core/superadmin_ui.php`, `core/mobile_auth.php`, `actions/login.php`, `actions/superadmin_activity_scan.php` (new), `api/cron/trial_enforcement.php`, `app/superadmin/tenant_view.php`, `scripts/setup_control_db.php`, `tests/test_superadmin_activity_alerts_cli.php` (new)
+
+- **New bell alerts, once per company:** **First sign-in** (web or app — instant, the app one says "on the mobile app"), **First product**, **First sale** (completed sales or issued invoices; a held cart does not count), and **No activity** for 7, then 14, then 30 days (new activity re-arms it). Bell only, no email.
+- **No flood on go-live:** "first" alerts only for companies created after the feature went live, "no activity" only for companies active after it (`activity_alerts_since`, set on first use).
+- **When it runs:** first sign-in at web/app sign-in (`taaMarkActive()`, which also stamps Last Active); the others in a scan run by the daily cron and, at most every 10 minutes, in the background when a superadmin page is open (`actions/superadmin_activity_scan.php`). Only new companies' own databases are opened.
+- **Schema (deploy runs it):** `superadmin_notifications.type` gains `first_login`, `first_product`, `first_sale`, `inactive`; new control table `tenant_activity_alerts` remembers what was sent.
+- **Bell + tenant page:** own icons and a short banner for each new alert.
+- **Test:** 31 checks — real web and app sign-ins over HTTP, products and sales in a test company's database, all inactive stages, re-arm, no-flood rules, scan endpoint 405/401. Related suites re-run; `test_login_finalize_dispatch_cli` (3) and `test_login_history_cli` (4) fail the same on develop without this change.
+
+## 2026-10-27 — feat(mobile): superadmin sees Flutter app activity (mobile API upgrade, Phase 1)
+
+**Files:** `core/mobile_auth.php`, `api/mobile/login.php`, `core/tenant_admin.php`, `app/superadmin/tenant_view.php`, `tests/test_mobile_last_active_cli.php` (new), `mobile_api_upgrade_plan.md` (new)
+
+- **The gap:** the superadmin "Last Active" (`tenants.last_active_at`) was set only by web login, so a company that used only the app showed "Never".
+- **Now:** app sign-in sets it, and app use sets it too — at most once per 15 minutes per device (the token's previous "last used" time is the throttle, so normal app calls add no query).
+- **Tenant page → Users:** each user's last sign-in is labelled **App** or **Web**, with the app's last use and the device name underneath; the "most recent activity" line counts app use too.
+- **Plan:** `mobile_api_upgrade_plan.md` — 10 phases to bring the Flutter API level with the web (this is Phase 1).
+- **Test:** 18 checks, real HTTP calls with a Bearer token on a throwaway company (login, first call, throttle, after 15 min idle, bad token, App vs Web in the user list).
+
+## 2026-10-27 — fix(pos): clearer phone POS for new cashiers (old-sale strip, balance label, choose-shop prompt)
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **Old-sale mode is visible on phones:** while recording an old sale, a blue strip under the Sell bar reads "Recording old sale: Saturday 24/10/2026, 15:30" with **Change** and **Stop**. Before, only the cart header changed colour, so a cashier could forget the mode and record today's sales as an old day. Desktop keeps its existing date chip.
+- **Balance is labelled:** the phone bar's amount now has "Cash in drawer" above it (the figure is starting cash + cash sales + cash in/out − refunds). The label stays when the amount refreshes after a sale.
+- **Choose your shop:** a cashier limited to some shops, with more than one and none picked, used to see a red "Error loading products — Status: 403". Now the product area says "Choose your shop — Pick a shop above to see its products and stock" and the shop picker gets a red outline until one is chosen. Admins / all-shop users and single-shop users are unchanged (single shop is already picked automatically).
+- **Test:** `test_pos_old_sale_ui_cli.php` 40 checks pass (3 new). Browser at 360 px: strip shows with the date and hides on Stop/desktop; label shown on phone, hidden on desktop, kept after the amount changes; shop-limited render (2 shops) shows the prompt and outline, and picking a shop clears it and loads products.
+
+## 2026-10-27 — fix(pos): phone Sell bar has rounded corners
+
+**Files:** `app/bms/pos/pos.php`
+
+- The blue Sell bar on phones now has 12px rounded corners, matching the rounded Actions button inside it. Set in the early (first-paint) phone CSS so it never flashes square. Desktop unchanged.
+- **Checked:** browser at 360 px shows 12px corners; at 1000 px the bar stays square.
+
+## 2026-10-27 — fix(pos): phone "Actions" button is a solid white button
+
+**Files:** `app/bms/pos/pos.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **The issue (seen live):** the phone Sell bar's "Actions 4" was a faint blue box on the blue bar, so cashiers could not tell it was tappable.
+- **Fix (style A, chosen from 8 mock-ups):** a solid white button with a grid icon, "Actions" and ⌄, and a shadow that presses in on tap. The count badge is removed. Tapping it opens the same Actions sheet as before. Desktop unchanged.
+- **Test:** `test_pos_old_sale_ui_cli.php` 37 checks pass (count check replaced by the button check). Browser at 320 / 360 / 412 px: white button inside the bar, no overlap with the balance, no sideways scroll, sheet opens; hidden on desktop.
+
+## 2026-10-27 — fix(pos): receipts show quantity as sold (1, 1.5), not 1.000
+
+**Files:** `helpers.php`, `api/pos/print_receipt.php`, `api/pos/email_receipt.php`, `core/escpos_printer.php`, `tests/test_pos_receipt_qty_format_cli.php` (new)
+
+- **The issue:** POS receipts printed every quantity with three decimals ("1.000", "1.500"), because the quantity column is stored as DECIMAL with 3 places and the receipt printed the raw value. The network thermal printer forced two ("1.00 x").
+- **Fix:** new `format_qty()` in `helpers.php` keeps real decimals and drops trailing zeros: 1 → "1", 1.5 → "1.5", 0.125 → "0.125". Used on the printed receipt (QTY column and the "@ price x qty" line), the emailed receipt and the network thermal printer. Money figures are unchanged.
+- **Test:** new suite, 18 checks: the formatter, all three receipts use it, the real printed receipt for a local sale with lines set to 1 and 1.5 inside a rolled-back transaction shows "1" and "1.5" with no "1.000", and the thermal text shows "1 x" / "1.5 x". Network printer suite (34) still passes.
+
+## 2026-10-27 — feat(pos): "Actions" sheet on phones, every header action explained
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **The issue:** on phones the folded Sell bar hid its four buttons (Overview, Old Sale, Open Drawer, End Shift) behind a bare ⌄; a new cashier could not tell they were there.
+- **Phones (desktop unchanged):** the bar is always one line: Sell, scanner dot, cash balance (or "No shift") and an **Actions** button with a count. It opens a sheet from the bottom: shift status, number, cashier, balance and starting cash on top, then one row per action with a line explaining it: Open Drawer, Record Old Sale, Sales Overview (Workspace), End Shift (red, last). With no shift open, Start Shift is the first row (yellow) and Open Drawer is greyed out ("Start a shift first"). While an old sale is being recorded, its row shows the date and time ("Old sale: Saturday 24/10/2026, 15:30") and a "Stop recording old sale" row appears.
+- Each row calls the same function as the desktop button, after the sheet has closed. The Record Old Sale pop-up still lives in the (now hidden) desktop button block and opens as the bottom sheet as before. The floating cart button is hidden while the sheet is open.
+- **Replaced:** the ⌄ fold/unfold header and its remembered choice (`togglePosHeader`, `posHeaderExpanded`) and the phone action tiles.
+- **Test:** `test_pos_old_sale_ui_cli.php` 37 checks pass (header checks rewritten for the sheet). Browser, rendered as admin with and without a rolled-back test shift at 320 / 360 / 412 px and 1100 px: one-line bar with no sideways scroll; sheet rows correct for shift open and no shift; Old Sale row opens the pop-up (visible and tappable); old-sale mode shows the date and Stop row, and stopping resets it; cart button hidden while the sheet is open; desktop shows the original buttons and no Actions button.
+## 2026-10-27 — fix(register): signup is faster and no longer says "failed" when the account was created
+
+**Files:** `register.php` (script only), `actions/register_tenant.php`, `actions/register_status.php` (new), `actions/register_after.php` (new), `core/tenant_registration.php`, `scripts/build_tenant_template.php` (new), `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql` (regenerated), `tests/test_register_fast_no_false_fail_cli.php` (new)
+
+- **The bug (seen live):** after "Create my account" the page often waited a long time on the last step and then said "Registration failed. Please try again.", yet the company existed in superadmin and the owner could sign in. The page gives up after 120 s; the server carries on (`ignore_user_abort`) and finishes the account.
+- **Why it was slow:** every signup re-ran all 91 tenant migrations, one PHP process each (~25–30 s locally), because the new-company template was an old snapshot; and the welcome + superadmin emails were sent over SMTP while the visitor waited (up to 20 s each).
+- **Faster:** new `scripts/build_tenant_template.php` builds the template from the old one plus every tenant migration (in a scratch database, nothing from any real company) and records them in `schema_migrations`, so signup has nothing to re-run. A company built the old way and one built the new way were compared table by table: same tables, columns, indexes, foreign keys and data (seed timestamps included). Local signup: 40–64 s → 19–27 s. The regenerated seed keeps the old file's shape (one row per INSERT). Rebuild the template after adding tenant migrations (they still run at signup until then).
+- **Emails after the answer:** the web form now creates the account, answers, and the ready screen beacons `actions/register_after.php`, which sends the welcome and the superadmin notice (the panel bell still rings immediately). The welcome now goes to the owner's email address — before, it was addressed to their username, so it never arrived.
+- **No false "failed":** each signup carries a random id. If the page loses the answer (timeout, dropped connection), it asks `actions/register_status.php` (this visitor's own session only) and shows the normal ready screen once the account is done; a real refusal still shows its own message. No visible change to the page; no field removed.
+- **Tests:** new suite 19 checks (mail captured, never sent). Browser on a local copy: normal signup → ready screen; signup with the answer cut after 3 s → still the ready screen, no error; taken subdomain → its own message. Related suites re-run; the only failures (`test_service_plans_e2e_cli`, `test_supplier_access_simple_pos_cli`, `test_tenant_registration_cli`, `test_tenant_module_smoke_cli`'s Mobile Money tables) fail the same on develop without this change.
+
+## 2026-10-27 — fix(dashboard): nothing shown on chart tap on phones
+
+**Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
+
+- **Change requested after seeing it live:** the figures line under the chart (added in the entry below) is removed. On phones, tapping either dashboard chart (Simple POS "Sales, Expenses & Profit" and the normal "Performance Overview") now shows nothing: no tooltip box and no line. Desktop/tablet keep the tooltip box on hover, unchanged.
+- The now-unused "Tap the chart to see one period" Swahili string is removed.
+- **Test:** chart test 23 checks pass (section E updated). Browser at 360px: both charts, no box and no line after a tap; desktop: box still enabled.
+
+## 2026-10-27 — fix(dashboard): no tooltip box over the chart on phones; tapped period shown under it
+
+**Files:** `app/dashboard.php`, `lang/sw.php`, `tests/test_dashboard_performance_chart_cli.php`
+
+- **The issue (seen live on a phone):** tapping the Sales, Expenses & Profit chart opened the dark tooltip box on top of the bars, hiding most of the chart.
+- **Phones (below 768px):** the box is turned off. Tapping a period shows its figures in one line under the chart instead, e.g. "Wk 43, 2026 · Sales TSh 165,500 · Expenses TSh 0 · Cost of goods sold TSh 115,500 · Net Profit TSh 50,000" (Net loss in red). Before a tap it reads "Tap the chart to see one period". Works for both the Simple POS chart and the normal Performance Overview chart.
+- **Desktop/tablet:** unchanged; the tooltip box shows on hover as before. Turning or resizing the screen switches between the two.
+- **Test:** chart test 23 checks pass (4 new). Browser: rendered dashboard at 360px and desktop. Phone tap shows the line and no box; desktop hover shows the box and hides the line.
+
+## 2026-10-27 — feat(pos): one "When" field for Record Old Sale; folding Sell bar on phones
+
+**Files:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `lang/sw.php`, `tests/test_pos_old_sale_ui_cli.php`
+
+- **Record Old Sale, "When was this sale made?":** the quick buttons (Yesterday / 2 / 3 days ago) plus a separate date and time field asked for the day twice. They are replaced by one "When" field ("Yesterday, Monday 26/10 · 12:00"). Tapping it opens two lists: days (Today, Yesterday, 2 days ago … up to the POS Settings limit, each with its weekday and date) and times every 30 minutes. Picking a time closes the lists. Same hidden `oldSaleDate`/`oldSaleTime` values, so the preview, start and save logic are unchanged. The "Allowed: the last N days" line is dropped; the list itself enforces it.
+- **Sell bar on phones (desktop unchanged):** with a shift open, the bar folds to one line: title, scanner dot, cash balance and a ⌄ button. Tapping it shows the shift info, balance and the actions as four equal icon tiles (Overview, Old Sale, Open Drawer, End Shift). The tiles share the width and drop style.css's 85px button min-width, which was cutting End Shift off on narrow phones. The open/folded choice is remembered on the device. With no shift the bar stays open so Start Shift is always visible. While recording an old sale, its date chip gets its own row.
+- **"SCANNER READY" on phones:** now a small green dot next to the title; the text stays as its tooltip and screen-reader label. A long title shortens with "…" so the dot and balance always show.
+- **Test:** `test_pos_old_sale_ui_cli.php` updated for the new picker and header (32 checks pass). Browser: rendered as admin with a rolled-back test shift at 320 / 360 / 412 px and desktop. No sideways scroll, all four tiles inside the bar; day list = 31 entries (today to 30 days ago), 48 time slots, list scrolls to the chosen time, picking a day/time updates the field.
+
+## 2026-10-27 — fix(customers): deleted customers no longer counted on the dashboard and Customer Groups
+
+**Files:** `app/dashboard.php`, `app/bms/customer/customer_groups.php`, `app/bms/customer/customer_group_details.php`, `app/bms/customer/customer_group_members.php`, `core/tenant_admin.php`, `tests/test_customer_count_excludes_deleted_cli.php` (new)
+
+- **The bug (seen live):** after creating and then deleting a customer, the Customers page was empty but the dashboard "Customer Overview" card still showed 1. Deleting a customer only sets `status = 'deleted'` (kept for invoice/payment history); the Customers page hides those rows, but the dashboard stats query counted every row.
+- **Fix:** the dashboard customer stats (total and new this period) now skip deleted customers. The same gap was found and fixed on Customer Groups (Total Customers and each group's member count — a deleted customer stays in its groups) and in the superadmin tenant snapshot's customer count.
+- **Checked and already correct:** the Customers list and its API, mobile customer list, customer print, the over-credit-limit alerts (active only) and every customer dropdown (active only or not deleted).
+- **Test:** 24 checks: lint + the filters are in place, then renders the real dashboard and Customer Groups pages as an admin: create a customer in a temp group → counts go up by one; soft-delete it like `api/delete_customer.php` → counts return to the baseline. Fixture rows are removed. Against the old dashboard code the test fails exactly as reported (count stays one too high).
+
+## 2026-10-27 — feat(prices, dashboard): warn when selling below the buying price; smooth Net profit line
+
+**Files:** `assets/js/bms-price-check.js`, `header.php`, `lang/sw.php`, `app/dashboard.php`, `tests/test_pos_profit_void_shop_and_product_delete_cli.php`
+
+- **Selling below the buying price — warning, never a block:** on every form that takes prices (POS restock `buying_price`, product create/edit/quick add `cost_price`, batch correction `unit_cost`), entering a retail or wholesale price lower than the buying price (or a buying price above them) asks "Retail price (100,000) is lower than the buying price (1,000,000) — you would sell at a loss. Is this correct?". Yes keeps the figures; No returns to the field just changed. Seen live on shop.bms: a RICE batch saved at 1,000,000 per unit against a 100,000 selling price (an extra zero) turned weeks 39–41 into big losses. The existing wholesale-above-retail check is unchanged; several problems at once are listed in one dialog. Read-only (calculated) cost fields are ignored. English and Swahili.
+- **Smart POS chart:** the Net profit line is a smooth curve that never overshoots (Chart.js `cubicInterpolationMode: 'monotone'`) — between two periods it stays within their real values, so it can't show a profit or loss that never happened.
+- Tests: suite 124 checks pass. Browser: restock, product, batch and read-only forms (typo warns, fixed price silent, equal/normal silent, two problems listed together); curve control points stay within each segment's real values.
+
+## 2026-10-27 — fix(stock): voided POS sales no longer show as stock out on Warehouses and Recent Activity
+
+**Files:** `core/stock_ledger.php`, `app/bms/stock/warehouses.php`, `app/bms/stock/warehouse_view.php`, `app/bms/product/product_view.php`, `api/pos/void_sale.php`, `tests/test_stock_activity_voided_sales_cli.php` (new)
+
+- **The bug (seen live):** after selling from a shop and voiding every sale, stock went back to normal and the sales disappeared, but the Warehouses list still showed units dispatched in the last 30 days, and the shop page's Recent Activity still listed the sales as stock out (followed by "Returned by Customer"). Both read the stock movement log, where a void adds a stock-back row instead of removing the sale's stock-out.
+- **Fix:** new `stockMovementNotVoidedSaleSql()` in `core/stock_ledger.php` leaves out a voided POS sale's stock-out and the void's stock-back (including older combo reversals stored as `'return'` and older voids stored without a type). Used by the Warehouses 30-day in/out units and values, the shop page's Recent Activity, and the product page's recent movements. Matching is by the voided sale's id plus each row's own type and note, never a text comparison across tables.
+- **Kept on purpose:** the full Stock Movements ledger still shows every row, for the audit trail. Stock quantities were already correct and are unchanged.
+- **Also:** voiding a combo now tags its component reversals `'pos_void'` like every other void.
+- **Test:** 17 checks, rolled back on the real local DB: hidden vs kept rows (completed sale, genuine return and adjustment are kept), the 30-day "out" figure, and both pages render with no errors.
+
+## 2026-10-27 — feat(pos): Record Old Sale (Rekodi Mauzo ya Zamani)
+
+**Files:** `core/pos_old_sales.php` (new), `api/pos/old_sale_context.php` (new), `api/pos/process_sale.php`, `api/pos/void_sale.php`, `api/pos/get_sales.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `app/bms/pos/zreport.php`, `app/bms/pos/shift_history.php`, `app/bms/pos/pos_dashboard.php`, `app/constant/settings/pos_config_settings.php`, `core/feature_registry.php`, `lang/sw.php`, `migrations/tenant/2026_10_27_pos_record_old_sale.php` (new), `migrations/2026_10_27_pos_record_old_sale_legacy_db.php` (new), `tests/test_pos_old_sale_cli.php`, `tests/test_pos_old_sale_flow_cli.php`, `tests/test_pos_old_sale_ui_cli.php` (new), `tests/test_service_plans_pos_cli.php`
+
+- **What it does:** a sale made on an earlier day can be typed in from the POS. A "Record Old Sale" header button (permission `pos_past_sales`: admins by default, other roles via Roles & Permissions) opens a small pop-up (a bottom sheet on phones) with quick days, date and time, and a live preview of the shift the sale will land in. While on, the header shows a chip with that time, the cart is labelled as an old sale, and Pay asks for confirmation (warning about a likely double entry). Hold is blocked in this mode; no open shift is needed.
+- **Rules (`core/pos_old_sales.php`):** within the last N days (POS Settings, default 30, 1–365), never in the future. The sale goes into the cashier's own shift that covered that time; with none, a closed back-dated shift is created for that user and day and reused by later entries. A closed shift that receives (or loses, on void) an old sale has its saved Z-report figures recomputed. Not allowed inside a finalized bank reconciliation of the payment's account.
+- **Dating:** the receipt is numbered on the sale's day; stock movements, the journal entry, the bank register, the payment row and the drawer row are dated that day. Offline sales synced late (`sold_at`) now date their stock, journal and bank entries by `sold_at` too.
+- **Reports:** Z-report badges old sales, lists them under "Recorded later" with sale and entry times, and notes a back-dated shift; shift history marks back-dated shifts; POS dashboard sales lists badge old sales.
+- **Schema:** `pos_sales.is_past_entry`, `cash_register_shifts.is_past_entry` and the `pos_past_sales` permission row (tenant + legacy-DB migrations, idempotent).
+- **Tests:** 33 (rules) + 46 (real sale/void/preview endpoints, rolled back) + 26 (screen and reports). `test_service_plans_pos_cli.php` match loosened: the receipt number is now allocated after the old-sale date is known; platform subscriptions are still refused before it.
+
+## 2026-10-26 — fix(pos, ledger): shop Profit Report — voided sales, shop expenses, Monthly Trend; product delete keeps history; wholesale-above-retail check
+
+**Files:** `core/expense_posting.php`, `core/money_in_posting.php`, `core/payment_source.php`, `core/purchase_posting.php`, `api/account/reverse_journal.php`, `core/ledger_post.php`, `api/helpers/transaction_helper.php`, `api/account/add_expense.php`, `api/account/update_expense_status.php`, `api/account/update_expense.php`, `api/mobile/expenses/create.php`, `api/account/get_profit_report.php`, `migrations/tenant/2026_10_26_ledger_warehouse_backfill.php` (new), `migrations/2026_10_26_ledger_warehouse_backfill_legacy_db.php` (new), `core/product_delete.php` (new), `api/delete_product.php`, `api/mobile/products/delete.php`, `app/constant/reports/pos_profit_report.php`, `assets/js/bms-price-check.js` (new), `header.php`, `app/dashboard.php`, `lang/sw.php`, `tests/test_pos_profit_void_shop_and_product_delete_cli.php` (new)
+
+- **Voided sale still counted for its shop (fixed):** a void posts a reversal, but the reversal was saved without the shop. All Shops netted to 0 while the shop's own Profit Report still showed the sale (seen live: Shop 19 showed 8,000 sales for a voided sale). Every reversal now carries the original's shop: POS sale and cost of goods, bills, purchase returns, invoice/credit-note cost of goods, expenses, vouchers, trips, maintenance, asset deletion, customer advances, tender fees, payment voids, books-transaction reversals and manual journal reversals.
+- **Shop expenses did not reduce the shop's net profit (fixed):** a Simple POS expense saved its shop, but its ledger entries did not, so a shop's Profit Report showed Total Expenses 0 and Net Profit = Gross Profit. The approval entry and the payment entry now carry the expense's shop (web add/approve/pay, mobile create; editing a legacy posted expense keeps it). Company-wide expenses (no shop) still count under All Shops only.
+- **One-time, idempotent migration** (`ledger_warehouse_backfill`): gives existing expense entries their expense's shop, then gives existing reversals their original's shop.
+- **Monthly Trend:** bars per month labelled "Oct 2026" — the curved line rose from September's point, so an October sale looked like September. A range longer than 24 months now keeps the latest 24 (it used to drop the most recent months), and the first month starts at the From date so the trend adds up to the cards.
+- **Product delete keeps history:** refused while any shop holds stock (the message names each shop and quantity; negative stock blocks too) — bring the stock to zero first, then delete. The delete removes the product only; past POS sales, stock movements, batches and ledger entries stay. Web and mobile share the rule. Web delete also no longer leaves its transaction open on a refused delete.
+- **Profit Report:** changing a date now reloads the figures; the printout's period follows the dates on screen; a slower earlier request can no longer overwrite newer figures.
+- **Wholesale above retail:** on every form with both prices (POS restock, product create/edit, quick add, batch correction), entering a wholesale price higher than retail asks "Is this correct?". Yes keeps it, No returns to the field; never blocks. Empty wholesale still means retail. English and Swahili.
+- **Smart POS dashboard chart — "Sales, Expenses & Profit" (chart card only; chosen from four samples)** (`app/dashboard.php`, `api/pos/get_simple_dashboard_chart.php`): Sales and Expenses bars per period with a Net profit line on top (Sales − cost of goods sold − Expenses; cost of goods sold = each item's own batch buying price), replacing three curved lines. Shows the last 7 periods of the chosen filter (7 days, 7 weeks … 7 years); every period has its own slot (the API's new opt-in `fill_gaps=1` fills empty periods with zeros — totals unchanged; other callers get exactly the old rows). Under the chart, "Last 7 days/weeks/… — how your profit is worked out": Sales − Cost of goods sold − Expenses = Net profit (or Net loss), in full figures — one line on wide screens, a receipt on phones. Tooltip lists Sales, Expenses, Cost of goods sold and Net profit in full; only the Y-axis stays short (50K). The old "Latest Period" boxes and their change chips are replaced by that row. Rest of the dashboard unchanged. English and Swahili. `tests/test_simple_pos_expenses_chart_cli.php` updated to the new datasets.
+- Tests: new suite 118 checks pass (incl. real approve→pay of a shop expense, the real profit-report endpoint and the real chart API with and without fill_gaps). 25 related suites pass (expenses, accruals, vouchers, WHT, journal mirror, voids, restock, profit reports). Failing the same on develop without this change: `test_warehouse_scope_cli` (1), `test_expenses_simple_pos_cli` (2), `test_junk_voucher_reversal_cli` (1), `test_dashboard_performance_chart_cli` (1, normal-mode chart vs local data). `test_simple_pos_expense_bugs_cli` needs the main checkout (it calls dev.bms.local).
+
+## 2026-10-26 — fix(pos): voiding a credit sale with a deposit left the deposit in the cash drawer
+
+**Files:** `api/pos/void_sale.php`, `core/pos_shift_reporting.php`, `migrations/tenant/2026_10_26_pos_void_drawer_cash_fix.php` (new), `migrations/2026_10_26_pos_void_drawer_cash_fix_legacy_db.php` (new), `tests/test_pos_void_drawer_cash_cli.php` (new)
+
+- **The bug (seen live on the POS header):** "Cash Balance" showed TZS 1,000 with starting cash 0, while the Z-report said expected cash 0. Cause: a credit sale that took a 1,000 deposit records that cash in the drawer ledger (`cash_register_transactions`), but `void_sale.php` only took cash back when `pos_sales.payment_method` was `cash`. Voiding the credit sale left the deposit in the drawer. A split sale's cash leg and a settled credit sale had the same problem.
+- **Fix in `void_sale.php`:** it now asks the drawer ledger how much cash the sale still holds (new `posSaleDrawerCashOwed()` in `core/pos_shift_reporting.php`) and takes exactly that back, against the operator's active shift. A split sale's row has no `sale_id`, so it is matched by receipt number. An older cash sale with no drawer row still refunds its total, as before.
+- **Existing wrong balances:** the two new migrations call `posFixVoidedSaleDrawerCash()`, which adds the missing "Void:" refund for already-voided sales into OPEN shifts only; closed shifts were reconciled at close and are not touched. Safe to run twice (it counts refunds already there). It matches sales to drawer rows in PHP, not SQL, because the two tables do not share a collation on every database.
+- **Test:** `tests/test_pos_void_drawer_cash_cli.php` runs the real `void_sale.php` on a credit deposit, a cash sale, an older cash sale, a split sale and a credit sale with no deposit, then checks the repair function (open shift fixed once, closed shift left alone, already-refunded sale untouched). 20 assertions.
+## 2026-10-26 — fix(i18n): Swahili "Muuzo" becomes "Uzo"; shop wording in stock messages
+
+**Files:** `lang/sw.php`, `api/stock/get_warehouse_batches.php`, `api/stock/update_warehouse_batch.php`, `api/stock/generate_shop_catalog_link.php`, `api/stock/revoke_shop_catalog_link.php`, `app/bms/stock/adjustment_print.php`, `tests/test_activity_log_permission_and_sell_label_cli.php`
+
+- **"Muuzo" is now "Uzo" (36 lines in `lang/sw.php`):** every Swahili string for one sale (Current Sale, Hold Sale, Void Sale, Sale Completed!, the held-sale, credit-limit and scope messages) now reads "Uzo". The existing u-class wording ("umekamilika", "huu", "wa Sasa") already agreed with it, so only the noun changed. The test that checks `t('Sale')` now expects "Uzo".
+- **Shop Mode no longer says "ghala" for a shop:** the shop-catalog and batch endpoints (`api/stock/*`) and the print header of a stock adjustment used plain warehouse text, so a Shop Mode tenant read "ghala". They now use `wLabel()`: "duka" in Shop Mode, "ghala" otherwise. New Swahili keys added for the shop versions of: a valid shop is required, a valid batch and shop are required, batch not found in this shop, shop not found.
+- **Fixed wrong keys:** `'A valid warehouse is required.'` and `'Warehouse not found.'` translated to "Duka"; they now translate to "Ghala", with separate "shop" keys for Shop Mode.
+- **Inventory Report menu label:** "Ripoti ya Ghala" is now "Ripoti ya Stoku" (`lang/sw.php`, key `Inventory Report`), so the Reports menu no longer reads like a report of the shop itself.
+- **Left as is on purpose:** "Ghala" where it means stock or inventory elsewhere (Stock, Add Stock and similar).
+
+## 2026-10-25 — hotfix(login, products): login crash after the Language mode release; clear photo-size and lost-connection messages on Add/Edit Product
+
+**Files:** `actions/login.php`, `api/create_product.php`, `api/update_product.php`, `app/bms/product/product_create_footer.php`, `lang/sw.php`, `tests/test_login_and_product_errors_cli.php` (new), `tests/test_org_language_mode_cli.php`
+
+- **Login was broken for everyone (fixed):** since the Language mode release (12:56 UTC), every correct-password login failed with error 500 ("Unable to connect to the server"). Sentry: "Call to undefined function orgLanguage()" at `actions/login.php` line 92. That file loads only `includes/config.php`, not the translation engine. The three added lines are removed; `header.php` already applies the organization language on the first page after login, so the setting still works. The earlier test only read the file's text and used no successful login, so it missed this; the new test performs a real successful login and proves the old file crashes on it.
+- **Photo too large, said exactly:** the Add/Edit Product page names the photo's size ("This photo is 5.3 MB. Maximum file size is 2MB."). A photo over the server's 2 MB upload limit used to be dropped silently and the product saved without it; a request over 8 MB failed with a confusing error. Both now answer "The photo is too large (… MB). The maximum is 2 MB." and nothing is saved. A web-server refusal (413) shows the same photo message.
+- **Lost reply no longer says "System Error":** when the reply never arrives (for example during a code update's Apache reload — the 12:33 failure on pigakazishop), the page checks whether the product was in fact saved. Saved → "The connection was briefly lost, but the product was saved." Not saved → "…the product was not saved. Please try again." So nobody adds the same product twice.
+- English and Swahili. Tests: new suite 19 checks; Language mode suite 18; Simple POS product create suite 58 — all pass.
+
+## 2026-10-25 — feat(settings): Language mode — per user (default) or per organization
+
+**Files:** `app/constant/settings/system_settings.php`, `core/i18n.php`, `header.php`, `api/set_language.php`, `app/constant/settings/my_settings.php`, `actions/login.php`, `core/mobile_auth.php`, `lang/sw.php`, `tests/test_org_language_mode_cli.php` (new)
+
+- System Settings > General has a new **Language** card: *Language mode* = **Per user** (default, nothing changes) or **Per organization**. In organization mode an *Organization language* select (English / Kiswahili) appears.
+- In organization mode everyone sees the chosen language (web, login and mobile login), the EN/SW globe in the top header is hidden, the Language field in My Settings is hidden, and `api/set_language.php` and the My Settings save refuse personal overrides.
+- New helper `orgLanguage()` in `core/i18n.php` is the single place that decides it. Swahili strings added.
+
+## 2026-10-25 — fix(migrations): legacy-DB mirror for the Help & Support permission migration
+
+**Files:** `migrations/2026_10_24_help_self_service_legacy_db.php` (new)
+
+- `migrations/tenant/2026_10_24_help_self_service.php` had no twin for the root install, which runs only `migrations/*.php`. BJP's own Roles & Permissions page therefore still showed a "Help" switch that does nothing, and the PR lint check (`test_legacy_migration_mirrors_cli`) failed on every pull request. The mirror applies the same idempotent update.
+
+## 2026-10-25 — fix(register): say exactly which field is wrong, accept normal phone formats, eye on password boxes
+
+**Files:** `register.php`, `core/tenant_registration.php`, `tests/test_register_field_errors_cli.php` (new)
+
+- **Exact errors:** the public registration form no longer shows only "Please complete every field marked *, meet all password rules and accept the Terms." Each wrong field turns red with its own message underneath, for example "A username cannot contain spaces. Use a dot instead, e.g. jane.mwangi" or "Phone: needs 7 to 15 digits. The number you typed has 6." A short summary sits at the top, and the page scrolls to the first problem. The message clears as soon as you start fixing that field. English and Swahili.
+- **Server refusals land on their field too:** for example "this phone number already has an account" (on Phone), "this email already has an account" (on Email) and "that web address is taken" (on Web address, back on the company step), in the page language.
+- **Normal phone formats accepted:** `0712-345-678`, `(+255) 712 345 678` and `0712.345.678` were refused before. Dashes, dots, brackets and spaces are now removed before the digits check, on both the page and the server, and the number is stored as digits only.
+- **Eye button** on Password and Confirm password, to show or hide what you typed.
+- **Bug fixed:** the password checklist labels ("8+ characters", "A number"…) disappeared as soon as you typed; now only the ✓/○ mark changes.
+
 ## 2026-10-25 — fix(login): remove the separate "Need help signing in?" link
 
 **Files:** `login.php`, `app/superadmin/support.php`, `tests/test_support_center_phase7_cli.php`

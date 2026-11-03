@@ -11,6 +11,17 @@ require_once ROOT_DIR . '/core/financial_reports.php';   // glProfitLoss() — l
 require_once ROOT_DIR . '/core/pos_nav.php';              // posSimpleModeEnabled()
 require_once ROOT_DIR . '/header.php';
 
+// restaurant_plan.md Phase 6 — a restaurant-only company (every active shop is a
+// Restaurant, Restaurant POS + Smart POS on) gets the restaurant dashboard instead.
+// Everyone else continues to the shop dashboard below, unchanged.
+require_once ROOT_DIR . '/core/restaurant_scope.php';
+if (restaurantOnlyCompany($pdo)) {
+    require ROOT_DIR . '/includes/restaurant/dashboard.php';
+    include("footer.php");
+    ob_end_flush();
+    return;
+}
+
 // Simple Mode (POS Settings) — swaps the Performance Overview chart below for
 // a plain Bought-vs-Sold view sourced from pos_sales, not the ledger. See
 // core/pos_nav.php::posSimpleModeEnabled() and .claude/reporting-source.md.
@@ -500,7 +511,7 @@ function get_business_stats($pdo, $start_date, $end_date, $user_id, $permissions
                    COUNT(CASE WHEN c.status = 'active' THEN 1 END) as active_customers,
                    COUNT(CASE WHEN c.created_at BETWEEN :start_date AND :end_date THEN 1 END) as new_customers
             FROM customers c
-            WHERE 1=1
+            WHERE c.status != 'deleted'
               {$custScope}
         ");
         $stmt->execute(['start_date' => $start_date, 'end_date' => $end_date]);
@@ -608,7 +619,7 @@ function get_pending_approvals($pdo, $permissions = []) {
                 'expense' as type,
                 expense_id as id,
                 reference_number as reference,
-                CONCAT('Expense claim - TSh ', FORMAT(amount, 2)) as description,
+                CONCAT('Expense claim - " . bmsCurrencySymbol() . "', FORMAT(amount, 2)) as description,
                 created_at as timestamp,
                 e.description as details
             FROM expenses e
@@ -630,7 +641,7 @@ function get_pending_approvals($pdo, $permissions = []) {
                 'purchase' as type,
                 purchase_order_id as id,
                 order_number as reference,
-                CONCAT('Purchase order - TSh ', FORMAT(grand_total, 2)) as description,
+                CONCAT('Purchase order - " . bmsCurrencySymbol() . "', FORMAT(grand_total, 2)) as description,
                 po.created_at as timestamp,
                 s.supplier_name
             FROM purchase_orders po
@@ -1523,11 +1534,24 @@ function get_progress_color($percentage) {
     </style>
     <?php endif; ?>
 
+    <?php
+    // restaurant_plan.md Phase 6 — shops + restaurant company: one "Restaurant today" row
+    // (renders nothing unless the restaurant module is on and a restaurant shop exists).
+    require ROOT_DIR . '/includes/restaurant/today_strip.php';
+    ?>
+
     <!-- Quick Links Section -->
     <?php
+    // Smart POS only: Add Product opens the centred Add Product window
+    // (#bmsAddProductModal in header.php) — Receive Stock (POS form, same gate
+    // as the Products page's own Receive Stock action) + New Product.
+    // With only one of the two permissions it stays a plain link to that one.
+    // Smart BMS keeps the plain Add Product link ($ql_receive_stock is false).
+    $ql_new_product   = canCreate('products');
+    $ql_receive_stock = $pos_simple_mode && canView('pos') && canView('pos_restock');
     $ql_has_links = canView('pos') || canCreate('invoices') || canCreate('customers')
                  || ($pos_simple_mode && canCreate('warehouses'))
-                 || canCreate('suppliers') || canCreate('products')
+                 || canCreate('suppliers') || $ql_new_product || $ql_receive_stock
                  || (projectsModuleActive() && canView('projects'));
     ?>
     <div class="row mt-4">
@@ -1586,11 +1610,19 @@ function get_progress_color($percentage) {
                         </div>
                         <?php endif; ?>
 
-                        <?php if (canCreate('products')): ?>
+                        <?php if ($ql_new_product && $ql_receive_stock): ?>
                         <div class="flex-fill" style="min-width: 130px;">
-                            <a href="<?= getUrl('product_create') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                            <!-- Opens the centred Add Product window (header.php, Smart POS block) -->
+                            <button type="button" class="btn btn-outline-warning w-100 h-100 py-3" data-bs-toggle="modal" data-bs-target="#bmsAddProductModal">
                                 <i class="bi bi-plus-circle display-6"></i>
                                 <div class="mt-2"><?= t('Add Product') ?></div>
+                            </button>
+                        </div>
+                        <?php elseif ($ql_new_product || $ql_receive_stock): ?>
+                        <div class="flex-fill" style="min-width: 130px;">
+                            <a href="<?= $ql_new_product ? getUrl('product_create') : getUrl('receive_stock') ?>" class="btn btn-outline-warning w-100 h-100 py-3">
+                                <i class="bi <?= $ql_new_product ? 'bi-plus-circle' : 'bi-box-arrow-in-down' ?> display-6"></i>
+                                <div class="mt-2"><?= $ql_new_product ? t('Add Product') : t('Receive Stock') ?></div>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -1860,7 +1892,7 @@ function get_progress_color($percentage) {
             <?php if (hasReportsAccess()): ?>
             <div class="card mb-4 shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Bought vs Sold') : t('Performance Overview') ?></h6>
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-bar-chart-line text-primary me-2"></i> <?= $pos_simple_mode ? t('Sales, Expenses & Profit') : t('Performance Overview') ?></h6>
                     <div class="d-flex gap-2">
                         <?php
                         // Simple Mode defaults this chart to Daily — a small
@@ -2154,7 +2186,8 @@ function loadPerformanceChart(period = 'monthly') {
     $.ajax({
         url: apiUrl,
         type: 'GET',
-        data: { period: period },
+        // Simple POS bar chart: one slot per period, empty days included.
+        data: POS_SIMPLE_MODE ? { period: period, fill_gaps: 1 } : { period: period },
         dataType: 'json',
         success: function(response) {
             $('#chartLoader').hide();
@@ -2195,25 +2228,29 @@ function fmtAbbrev(n) {
     const v = Number(n) || 0;
     const sign = v < 0 ? '-' : '';
     const av = Math.abs(v);
-    if (av >= 1000000) return sign + 'TSh ' + (av / 1000000).toFixed(2) + 'M';
-    if (av >= 1000) return sign + 'TSh ' + (av / 1000).toFixed(1) + 'K';
-    return sign + 'TSh ' + av.toLocaleString();
+    if (av >= 1000000) return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (av / 1000000).toFixed(2) + 'M';
+    if (av >= 1000) return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (av / 1000).toFixed(1) + 'K';
+    return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + av.toLocaleString();
 }
 
-// % change vs the previous data point — null when there's nothing to compare
-// against (first period, or previous value was exactly zero: a % off zero is
-// undefined, not "infinite", so the caller shows no chip rather than lying).
-function pctDelta(curr, prev) {
-    if (prev === undefined || prev === null || prev === 0) return null;
-    return ((curr - prev) / Math.abs(prev)) * 100;
+// Full figure — TSh 165,500 — for every number a person reads (summary boxes,
+// tooltips). Only the chart's Y-axis keeps fmtAbbrev(), where space is tight.
+function fmtFull(n) {
+    const v = Math.round((Number(n) || 0) * 100) / 100;
+    const sign = v < 0 ? '-' : '';
+    const dp = Number.isInteger(v) ? 0 : 2;   // 165,500 — or 12,345,678.50, never ".5"
+    return sign + '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
-function deltaChipHtml(pct) {
-    if (pct === null) return '';
-    const up = pct >= 0;
-    const cls = up ? 'text-success' : 'text-danger';
-    const arrow = up ? '▲' : '▼';
-    return `<span class="${cls} small fw-bold ms-1">${arrow}${Math.abs(pct).toFixed(0)}%</span>`;
+// Phones: no tooltip box over the chart (it covers the bars) and nothing
+// shown on tap. Desktop keeps the tooltip exactly as it was.
+const chartPhoneQuery = window.matchMedia('(max-width: 767.98px)');
+if (chartPhoneQuery.addEventListener) {
+    chartPhoneQuery.addEventListener('change', function () {
+        if (!dashboardChart) return;
+        dashboardChart.options.plugins.tooltip.enabled = !chartPhoneQuery.matches;
+        dashboardChart.update('none');
+    });
 }
 
 function renderChart(data) {
@@ -2307,6 +2344,7 @@ function renderNormalChart(data) {
                     }
                 },
                 tooltip: {
+                    enabled: !chartPhoneQuery.matches,
                     padding: 14,
                     backgroundColor: 'rgba(17,24,39,0.9)',
                     titleFont: { size: 13, weight: 'bold' },
@@ -2319,9 +2357,9 @@ function renderNormalChart(data) {
                             let label = context.dataset.label || '';
                             if (label) label += ': ';
                             const val = context.parsed.y;
-                            if (val >= 1000000) label += 'TSh ' + (val/1000000).toFixed(2) + 'M';
-                            else if (val >= 1000) label += 'TSh ' + (val/1000).toFixed(1) + 'K';
-                            else label += 'TSh ' + val.toLocaleString();
+                            if (val >= 1000000) label += '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (val/1000000).toFixed(2) + 'M';
+                            else if (val >= 1000) label += '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (val/1000).toFixed(1) + 'K';
+                            else label += '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + val.toLocaleString();
                             return label;
                         },
                         afterBody: function(items) {
@@ -2335,7 +2373,7 @@ function renderNormalChart(data) {
                                     : Math.abs(profit) >= 1000
                                         ? (profit/1000).toFixed(1) + 'K'
                                         : profit.toLocaleString();
-                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + `: ${sign}TSh ` + formatted];
+                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + `: ${sign}<?= htmlspecialchars(bmsCurrencySymbol()) ?>` + formatted];
                             }
                             return [];
                         }
@@ -2350,9 +2388,9 @@ function renderNormalChart(data) {
                         color: '#6b7280',
                         font: { size: 11 },
                         callback: function(value) {
-                            if (value >= 1000000) return 'TSh ' + (value/1000000).toFixed(1) + 'M';
-                            if (value >= 1000) return 'TSh ' + (value/1000).toFixed(0) + 'K';
-                            return 'TSh ' + value;
+                            if (value >= 1000000) return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (value/1000000).toFixed(1) + 'M';
+                            if (value >= 1000) return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (value/1000).toFixed(0) + 'K';
+                            return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + value;
                         },
                         maxTicksLimit: 7
                     },
@@ -2400,21 +2438,21 @@ function renderNormalChart(data) {
                     <div class="col-md-4 border-end">
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
                         <div class="d-flex align-items-center flex-wrap gap-2 mt-1">
-                            <span class="badge bg-primary"><?= t('Sales') ?>: TSh ${last.revenue.toLocaleString()}</span>
-                            <span class="badge bg-success"><?= t('Cash In') ?>: TSh ${(last.collected || 0).toLocaleString()}</span>
+                            <span class="badge bg-primary"><?= t('Sales') ?>: <?= htmlspecialchars(bmsCurrencySymbol()) ?>${last.revenue.toLocaleString()}</span>
+                            <span class="badge bg-success"><?= t('Cash In') ?>: <?= htmlspecialchars(bmsCurrencySymbol()) ?>${(last.collected || 0).toLocaleString()}</span>
                         </div>
                     </div>
                     <div class="col-md-4 border-end text-center py-2 py-md-0">
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Cash Flow') ?></span>
                         <strong class="h5 mb-0 text-${netCash >= 0 ? 'success' : 'danger'}">
-                            <?= t('Net Cash') ?>: ${netCash >= 0 ? '+' : ''}TSh ${netCash.toLocaleString()}
+                            <?= t('Net Cash') ?>: ${netCash >= 0 ? '+' : ''}<?= htmlspecialchars(bmsCurrencySymbol()) ?>${netCash.toLocaleString()}
                         </strong>
                         <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('(Cash In − Cash Out)') ?></small>
                     </div>
                     <div class="col-md-4 text-end">
                         <span class="text-muted small d-block uppercase fw-bold" style="font-size: 0.7rem;"><?= t('Net Profit') ?></span>
                         <strong class="h6 mb-0 text-${netProfit >= 0 ? 'primary' : 'danger'}">
-                            TSh ${netProfit.toLocaleString()}
+                            <?= htmlspecialchars(bmsCurrencySymbol()) ?>${netProfit.toLocaleString()}
                         </strong>
                         <small class="d-block text-muted" style="font-size: 0.75rem;"><?= t('(Revenue − Expenses)') ?></small>
                     </div>
@@ -2440,45 +2478,33 @@ function renderSimpleChart(data) {
 
     $('#performanceSummary').empty();
 
+    // The last 7 periods of whatever the filter is (7 days, 7 weeks … 7 years).
+    // The API fills empty periods with zeros, so these are 7 consecutive
+    // periods and a sale always sits on its own day.
+    data = data.slice(-7);
+
+    // Bars: Sales and Expenses (what happened). Line: Net profit — Sales minus
+    // the buying price of the goods sold (each at its own batch's cost) minus
+    // Expenses — so a tall Sales bar is never mistaken for profit.
     const labels       = data.length > 0 ? data.map(row => row.period) : [];
     const salesData     = data.length > 0 ? data.map(row => parseFloat(row.revenue) || 0) : [];
     const cogsData      = data.length > 0 ? data.map(row => parseFloat(row.expense) || 0) : [];
     const opExpenseData = data.length > 0 ? data.map(row => parseFloat(row.operating_expenses) || 0) : [];
-
-    function lineDataset(label, data, color, dash) {
-        return {
-            label: label,
-            data: data,
-            borderColor: color,
-            backgroundColor: function(context) {
-                const chart = context.chart;
-                const { chartArea } = chart;
-                if (!chartArea) return color + '14';
-                const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                gradient.addColorStop(0, color + '2E');
-                gradient.addColorStop(1, color + '03');
-                return gradient;
-            },
-            fill: true,
-            tension: 0.4,
-            borderWidth: dash ? 2 : 2.5,
-            borderDash: dash || [],
-            pointRadius: 4,
-            pointHoverRadius: 7,
-            pointBackgroundColor: '#fff',
-            pointBorderColor: color,
-            pointBorderWidth: 2,
-        };
-    }
+    const profitData    = data.length > 0 ? data.map((row, i) => (row.net_profit != null) ? (parseFloat(row.net_profit) || 0) : (salesData[i] - cogsData[i] - opExpenseData[i])) : [];
 
     dashboardChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [
-                lineDataset(<?= json_encode(t('Sales')) ?>, salesData, '#0d6efd', null),
-                lineDataset(<?= json_encode(t('Cost of Goods')) ?>, cogsData, '#dc3545', [6, 3]),
-                lineDataset(<?= json_encode(t('Expenses')) ?>, opExpenseData, '#fd7e14', [2, 2]),
+                { label: <?= json_encode(t('Sales')) ?>, data: salesData, backgroundColor: '#0d6efd', borderRadius: 3, maxBarThickness: 34, order: 2, pointStyle: 'rect' },
+                { label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData, backgroundColor: '#fd7e14', borderRadius: 3, maxBarThickness: 34, order: 2, pointStyle: 'rect' },
+                // Lower order draws on top of the bars. A smooth curve that
+                // never overshoots ('monotone'): between two periods it stays
+                // within their real values, so it can't show a profit or loss
+                // that never happened.
+                { type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData, borderColor: '#198754', backgroundColor: '#198754',
+                  borderWidth: 2.5, cubicInterpolationMode: 'monotone', pointRadius: 4, pointHoverRadius: 6, order: 1, pointStyle: 'circle' },
             ]
         },
         options: {
@@ -2488,9 +2514,12 @@ function renderSimpleChart(data) {
             plugins: {
                 legend: {
                     display: true, position: 'top', align: 'end',
-                    labels: { usePointStyle: true, pointStyleWidth: 12, boxHeight: 8, font: { size: 12 }, padding: 20 }
+                    // Sales, Expenses, Net Profit — in that order (draw order would put the line first).
+                    labels: { usePointStyle: true, pointStyleWidth: 18, boxHeight: 10, font: { size: 12 }, padding: 20,
+                              sort: (a, b) => a.datasetIndex - b.datasetIndex }
                 },
                 tooltip: {
+                    enabled: !chartPhoneQuery.matches,
                     padding: 14,
                     backgroundColor: 'rgba(17,24,39,0.9)',
                     titleFont: { size: 13, weight: 'bold' },
@@ -2499,20 +2528,20 @@ function renderSimpleChart(data) {
                     borderWidth: 1,
                     cornerRadius: 8,
                     callbacks: {
+                        // One block per period: the whole story, full figures.
                         label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            return label + fmtAbbrev(context.parsed.y);
+                            if (context.datasetIndex !== 0) return null;
+                            const i = context.dataIndex;
+                            return [
+                                <?= json_encode(t('Sales')) ?> + ': ' + fmtFull(salesData[i]),
+                                <?= json_encode(t('Expenses')) ?> + ': ' + fmtFull(opExpenseData[i]),
+                                <?= json_encode(t('Cost of goods sold')) ?> + ': ' + fmtFull(cogsData[i]),
+                            ];
                         },
                         afterBody: function(items) {
-                            const sales = items.find(i => i.datasetIndex === 0);
-                            const cogs  = items.find(i => i.datasetIndex === 1);
-                            const opex  = items.find(i => i.datasetIndex === 2);
-                            if (sales && cogs && opex) {
-                                const netProfit = sales.parsed.y - cogs.parsed.y - opex.parsed.y;
-                                return ['─────────────────', <?= json_encode(t('Net Profit')) ?> + ': ' + fmtAbbrev(netProfit)];
-                            }
-                            return [];
+                            if (!items.length) return [];
+                            const p = profitData[items[0].dataIndex];
+                            return ['─────────────────', (p < 0 ? <?= json_encode(t('Net loss')) ?> : <?= json_encode(t('Net Profit')) ?>) + ': ' + fmtFull(p)];
                         }
                     }
                 }
@@ -2533,45 +2562,49 @@ function renderSimpleChart(data) {
         }
     });
 
-    if (data.length === 0) return;
-
-    const last = data[data.length - 1];
-    const prev = data.length > 1 ? data[data.length - 2] : null;
-
-    const sales    = parseFloat(last.revenue) || 0;
-    const cogs     = parseFloat(last.expense) || 0;
-    const opex     = parseFloat(last.operating_expenses) || 0;
-    const netProfit = (last.net_profit != null) ? parseFloat(last.net_profit) : (sales - cogs - opex);
-    const margin   = sales > 0 ? (netProfit / sales) * 100 : null;
-
-    const salesDelta = prev ? deltaChipHtml(pctDelta(sales, parseFloat(prev.revenue) || 0)) : '';
-    const cogsDelta  = prev ? deltaChipHtml(pctDelta(cogs, parseFloat(prev.expense) || 0)) : '';
-    const opexDelta  = prev ? deltaChipHtml(pctDelta(opex, parseFloat(prev.operating_expenses) || 0)) : '';
-    const profitPrev = prev ? ((prev.net_profit != null) ? parseFloat(prev.net_profit) : ((parseFloat(prev.revenue) || 0) - (parseFloat(prev.expense) || 0) - (parseFloat(prev.operating_expenses) || 0))) : null;
-    const profitDelta = prev ? deltaChipHtml(pctDelta(netProfit, profitPrev)) : '';
+    // "How your profit is worked out" for the same 7 periods the chart shows:
+    // Sales − Cost of goods sold − Expenses = Net profit.
+    const sum = arr => arr.reduce((a, b) => a + b, 0);
+    const tSales  = sum(salesData);
+    const tCogs   = sum(cogsData);
+    const tOpex   = sum(opExpenseData);
+    const tProfit = sum(profitData);
+    const unit    = ($('#chartPeriod').val() || 'daily');
+    const heading = ({
+        daily:     <?= json_encode(t('Last 7 days — how your profit is worked out')) ?>,
+        weekly:    <?= json_encode(t('Last 7 weeks — how your profit is worked out')) ?>,
+        monthly:   <?= json_encode(t('Last 7 months — how your profit is worked out')) ?>,
+        quarterly: <?= json_encode(t('Last 7 quarters — how your profit is worked out')) ?>,
+        yearly:    <?= json_encode(t('Last 7 years — how your profit is worked out')) ?>,
+    })[unit] || <?= json_encode(t('Last 7 days — how your profit is worked out')) ?>;
+    const loss = tProfit < 0;
+    const box  = (label, value, color, final) => `
+        <div class="flex-fill text-center rounded border px-2 py-2 ${final ? (loss ? 'bg-danger-subtle border-danger-subtle' : 'bg-success-subtle border-success-subtle') : 'bg-white'}" style="min-width:0;">
+            <div class="text-muted ${final ? 'fw-bold' : ''}" style="font-size:0.72rem;">${label}</div>
+            <div class="fw-bold text-nowrap" style="color:${color}; font-size: clamp(0.85rem, 3.2vw, 1rem);">${fmtFull(value)}</div>
+        </div>`;
+    const op = s => `<span class="align-self-center text-muted fs-5 px-1">${s}</span>`;
+    const finalLabel = loss ? <?= json_encode(t('Net loss')) ?> : <?= json_encode(t('Net Profit')) ?>;
+    const finalColor = loss ? '#b02a37' : '#146c43';
 
     $('#performanceSummary').append(`
-        <div class="mt-4 p-3 bg-light rounded shadow-sm border">
-            <span class="text-muted small d-block uppercase fw-bold mb-2" style="font-size: 0.7rem;"><?= t('Latest Period') ?> (${last.period})</span>
-            <div class="row g-3 text-center">
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Sales') ?></div>
-                    <div class="h6 mb-0 text-primary">${fmtAbbrev(sales)}${salesDelta}</div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Cost of Goods') ?></div>
-                    <div class="h6 mb-0 text-danger">${fmtAbbrev(cogs)}${cogsDelta}</div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Expenses') ?></div>
-                    <div class="h6 mb-0" style="color:#fd7e14;">${fmtAbbrev(opex)}${opexDelta}</div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="small text-muted uppercase fw-bold" style="font-size: 0.68rem;"><?= t('Net Profit') ?></div>
-                    <div class="h6 mb-0 text-${netProfit >= 0 ? 'success' : 'danger'}">${fmtAbbrev(netProfit)}${profitDelta}</div>
-                    ${margin !== null ? `<small class="d-block text-muted" style="font-size: 0.7rem;">${margin.toFixed(0)}% <?= t('margin') ?></small>` : ''}
-                </div>
+        <div class="mt-3 p-3 bg-light rounded border">
+            <div class="text-muted fw-bold text-uppercase mb-2" style="font-size:0.7rem;">${safeOutput(heading)}</div>
+            <!-- Wide screens: one line, Sales − Cost of goods sold − Expenses = Net profit -->
+            <div class="d-none d-md-flex align-items-stretch gap-1">
+                ${box(<?= json_encode(t('Sales')) ?>, tSales, '#0d6efd', false)}${op('−')}
+                ${box(<?= json_encode(t('Cost of goods sold')) ?>, tCogs, '#b02a37', false)}${op('−')}
+                ${box(<?= json_encode(t('Expenses')) ?>, tOpex, '#b35c00', false)}${op('=')}
+                ${box(finalLabel, tProfit, finalColor, true)}
             </div>
+            <!-- Phones: the same sum, read top to bottom like a receipt -->
+            <div class="d-md-none small">
+                <div class="d-flex justify-content-between py-1"><span><?= t('Sales') ?></span><strong class="text-nowrap" style="color:#0d6efd;">${fmtFull(tSales)}</strong></div>
+                <div class="d-flex justify-content-between py-1"><span>− <?= t('Cost of goods sold') ?></span><strong class="text-nowrap" style="color:#b02a37;">${fmtFull(tCogs)}</strong></div>
+                <div class="d-flex justify-content-between py-1 border-bottom"><span>− <?= t('Expenses') ?></span><strong class="text-nowrap" style="color:#b35c00;">${fmtFull(tOpex)}</strong></div>
+                <div class="d-flex justify-content-between pt-2 fw-bold" style="color:${finalColor};"><span>= ${safeOutput(finalLabel)}</span><span class="text-nowrap">${fmtFull(tProfit)}</span></div>
+            </div>
+            <div class="text-muted mt-2" style="font-size:0.75rem;"><?= t("Cost of goods sold = what you paid for the items you sold, each at its own batch's buying price.") ?></div>
         </div>
     `);
 }
@@ -2587,7 +2620,7 @@ function updateDashboardMetrics(data) {
         // Update revenue
         const todayRevenue = $('#todayRevenue');
         const currentRevenue = parseFloat(todayRevenue.text().replace(/[^0-9.]/g, '')) || 0;
-        todayRevenue.text('TSh ' + (currentRevenue + data.amount).toLocaleString());
+        todayRevenue.text('<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (currentRevenue + data.amount).toLocaleString());
     }
 }
 

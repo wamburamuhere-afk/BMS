@@ -304,7 +304,7 @@ function openScPaymentModal() {
     $('#scPaymentMsg').empty();
     $('#scPayDate').val(new Date().toISOString().split('T')[0]);
     $('#scPayAmount').val('');
-    $('#scPayCurrency').val('TZS');
+    $('#scPayCurrency').val('<?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     $('#scPayMethod').val('');
     $('#scPayAccount').val('');
     $('#scPayRef').val('');
@@ -580,7 +580,7 @@ function openSuppPaymentModal() {
     $('#suppPaymentMsg').empty();
     $('#suppPayDate').val(new Date().toISOString().split('T')[0]);
     $('#suppPayAmount').val('');
-    $('#suppPayCurrency').val('TZS');
+    $('#suppPayCurrency').val('<?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     $('#suppPayMethod').val('');
     $('#suppPayRef').val('');
     $('#suppPayNotes').val('');
@@ -598,7 +598,7 @@ function openSuppPaymentModal() {
             let opts = '<option value="">Select PO...</option>';
             pos.forEach(function(po) {
                 const bal = parseFloat(po.grand_total || 0) - parseFloat(po.paid_amount || 0);
-                opts += `<option value="${po.purchase_order_id}" data-balance="${bal}" data-currency="${po.currency || 'TZS'}">${safeOutput(po.order_number)} — Balance: ${po.currency || 'TZS'} ${bal.toLocaleString('en-US',{minimumFractionDigits:2})}</option>`;
+                opts += `<option value="${po.purchase_order_id}" data-balance="${bal}" data-currency="${po.currency || '<?= htmlspecialchars(bmsCompanyCurrency()) ?>'}">${safeOutput(po.order_number)} — Balance: ${po.currency || '<?= htmlspecialchars(bmsCompanyCurrency()) ?>'} ${bal.toLocaleString('en-US',{minimumFractionDigits:2})}</option>`;
             });
             $('#suppPayPO').html(opts);
         }
@@ -614,7 +614,7 @@ function openSuppPaymentModal() {
 $(document).on('change', '#suppPayPO', function() {
     const opt = $(this).find(':selected');
     const bal = parseFloat(opt.data('balance') || 0);
-    const cur = opt.data('currency') || 'TZS';
+    const cur = opt.data('currency') || '<?= htmlspecialchars(bmsCompanyCurrency()) ?>';
     if ($(this).val()) {
         $('#suppPayPOBalance').html('<span class="text-success fw-bold">Outstanding balance: ' + cur + ' ' + bal.toLocaleString('en-US',{minimumFractionDigits:2}) + '</span>');
         $('#suppPayCurrency').val(cur);
@@ -870,7 +870,7 @@ function ipcLoadTable() {
                 + '<div class="small text-muted mb-1"><i class="bi bi-person me-1"></i>' + ipcEscHtml(r.customer_name || '-') + '</div>'
                 + '<div class="small text-muted mb-2"><i class="bi bi-cart me-1"></i>' + ipcEscHtml(r.order_number || '-') + '</div>'
                 + '<div class="d-flex justify-content-between align-items-center">'
-                + '<span class="fw-bold text-primary">TZS ' + fmt(r.net_payable) + '</span>' + actions + '</div>'
+                + '<span class="fw-bold text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + fmt(r.net_payable) + '</span>' + actions + '</div>'
                 + '</div></div></div>';
         });
         if (data.length) { $('#proj-ipc-cards').html(cards); }

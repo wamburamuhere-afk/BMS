@@ -601,12 +601,7 @@ $(document).ready(function () {
             }
         },
         columns: [
-            {   // # — row counter
-                data: null, orderable: false, className: 'ps-3 text-muted small',
-                render: function (data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                }
-            },
+            BMSSerial.column({ className: 'ps-3 text-muted small' }),   // # — row counter
             {   // User
                 data: null, orderable: true,
                 render: function (data, type, row) {

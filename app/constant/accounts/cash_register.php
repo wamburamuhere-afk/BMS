@@ -390,9 +390,9 @@ if (!$is_admin && isset($_GET['debug'])) {
                     <p class="text-muted mb-4 px-3">Enter the starting balance to open your cash register session.</p>
                     
                     <div class="text-start mb-4">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Opening Cash (TSh)</label>
+                        <label class="form-label fw-bold small text-muted text-uppercase">Opening Cash (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</label>
                         <div class="input-group input-group-lg">
-                            <span class="input-group-text bg-light border-end-0 text-muted">TSh</span>
+                            <span class="input-group-text bg-light border-end-0 text-muted"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                             <input type="number" class="form-control border-start-0 ps-0 fw-bold" name="opening_balance" step="1" required value="0">
                         </div>
                     </div>
@@ -427,9 +427,9 @@ if (!$is_admin && isset($_GET['debug'])) {
                     </div>
 
                     <div class="text-start mb-4">
-                        <label class="form-label fw-bold small text-muted text-uppercase">Actual Cash Counted (TSh)</label>
+                        <label class="form-label fw-bold small text-muted text-uppercase">Actual Cash Counted (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)</label>
                         <div class="input-group input-group-lg">
-                            <span class="input-group-text bg-light border-end-0 text-muted">TSh</span>
+                            <span class="input-group-text bg-light border-end-0 text-muted"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                             <input type="number" class="form-control border-start-0 ps-0 fw-bold" name="closing_balance" step="1" required placeholder="0">
                         </div>
                     </div>

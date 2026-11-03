@@ -144,7 +144,7 @@ function annDelete(id) { Swal.fire({title:'Delete announcement?',icon:'warning',
 
 $(function () {
     annTable = $('#annTable').DataTable({ responsive:false, scrollX:true, pageLength:25, order:[[3,'desc']], dom:'rtip',
-        columnDefs:[{targets:0,orderable:false,searchable:false,className:'text-center',render:(d,t,row,meta)=>meta.row+1+meta.settings._iDisplayStart}],
+        columnDefs:[$.extend({targets:0,className:'text-center'}, BMSSerial.column())],
         language:{emptyTable:'No announcements yet.'}, drawCallback:function(){ annCards(this.api().rows({page:'current'})[0].map(i=>ANN[i]).filter(Boolean)); } });
     $('#af_status').on('change', loadAnn);
     function av(){ if (window.innerWidth<768){$('#annTableView').addClass('d-none');$('#annCardView').removeClass('d-none');}else{$('#annTableView').removeClass('d-none');$('#annCardView').addClass('d-none');} }

@@ -5,6 +5,23 @@ require_once __DIR__ . '/../../../roots.php';
 // Enforce permission BEFORE any output
 autoEnforcePermission('reports');
 
+// The ledger reports this hub embeds keep their own page_key's entitlement, so
+// a page refused on its own route (e.g. POS Simple Mode — see
+// simpleModeHiddenPageKeys()) is not reachable as ?report= here either.
+$__hub_report_keys = [
+    'balance_sheet'    => 'balance_sheet',
+    'cash_flow'        => 'cash_flow',
+    'trial_balance'    => 'trial_balance',
+    'general_ledger'   => 'ledger_report',
+    'journal_mappings' => 'chart_of_accounts',
+];
+$__hub_allows = static fn(string $key): bool => !function_exists('tenantModuleAllowsPage') || tenantModuleAllowsPage($key);
+$__hub_report = $_GET['report'] ?? '';
+if (isset($__hub_report_keys[$__hub_report]) && !$__hub_allows($__hub_report_keys[$__hub_report])) {
+    bmsFeatureHalt($__hub_report_keys[$__hub_report]);
+}
+$__hub_show_financial = $__hub_allows('balance_sheet');
+
 includeHeader();
 ?>
 
@@ -72,6 +89,7 @@ includeHeader();
         </div>
 
         <!-- Financial Reports -->
+        <?php if ($__hub_show_financial): ?>
         <div class="col-md-4">
             <div class="card h-100 shadow-sm border-0 custom-stat-card-green">
                 <div class="card-body d-flex flex-column">
@@ -107,6 +125,7 @@ includeHeader();
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Inventory Reports -->
         <div class="col-md-4">

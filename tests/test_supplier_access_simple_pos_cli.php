@@ -201,6 +201,7 @@ $files = [
     'core/stock_intake.php',
     'api/pos/quick_restock.php',
     'app/bms/pos/pos_modals_new.php',
+    'app/bms/pos/restock_modal.php',
     'migrations/tenant/2026_09_17_product_batches_supplier_id.php',
     'migrations/2026_09_17_product_batches_supplier_id_legacy_db.php',
 ];
@@ -254,7 +255,7 @@ $qrSrc = src($root, 'api/pos/quick_restock.php');
 has($qrSrc, "\$supplier_id            = (int)(\$_POST['supplier_id'] ?? 0);", 'quick_restock.php reads supplier_id from POST (optional)');
 has($qrSrc, "'supplier_id'      => \$supplier_id > 0 ? \$supplier_id : null,", 'quick_restock.php passes supplier_id into receiveProductBatch()');
 
-$modalSrc = src($root, 'app/bms/pos/pos_modals_new.php');
+$modalSrc = src($root, 'app/bms/pos/restock_modal.php');   // the Receive Stock window (shared by the POS and receive_stock.php)
 has($modalSrc, 'id="restock_supplier_id" name="supplier_id"', 'Restock modal declares the optional Supplier field');
 has($modalSrc, "canView('suppliers')", 'Restock modal gates the Supplier field on canView(\'suppliers\')');
 ok('Restock modal never marks the Supplier field required',

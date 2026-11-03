@@ -49,11 +49,12 @@ try {
     // ── Self-growing dropdowns: resolve "Other" → typed value, then persist. ──
     $customer_type = trim($_POST['customer_type'] ?? 'individual');
     $payment_terms = trim($_POST['payment_terms'] ?? '');
-    $currency      = trim($_POST['currency'] ?? 'TZS');
+    $currency      = trim($_POST['currency'] ?? bmsCompanyCurrency());
     $year          = trim($_POST['year'] ?? date('Y'));
     if ($customer_type === 'other') $customer_type = trim($_POST['customer_type_other'] ?? '');
     if ($payment_terms === 'other') $payment_terms = trim($_POST['payment_terms_other'] ?? '');
-    if ($currency === 'other')      $currency      = trim($_POST['currency_other'] ?? 'TZS');
+    if ($currency === 'other')      $currency      = trim($_POST['currency_other'] ?? bmsCompanyCurrency());
+    $currency = bmsEnforceDocCurrency($currency);   // non-TZS company: always its own currency (core/currency.php)
     if ($year === 'other')          $year          = trim($_POST['year_other'] ?? date('Y'));
 
     $category_id = !empty($_POST['category_id']) ? $_POST['category_id'] : null;
@@ -127,7 +128,7 @@ try {
         
         'tax_id' => $_POST['tax_id'] ?? null,
         'payment_terms' => $_POST['payment_terms'] ?? null,
-        'currency' => $_POST['currency'] ?? 'TZS',
+        'currency' => $_POST['currency'] ?? bmsCompanyCurrency(),
         'bank_name' => $_POST['bank_name'] ?? null,
         'bank_account' => $_POST['bank_account'] ?? null,
         'bank_address' => $_POST['bank_address'] ?? null,

@@ -225,14 +225,7 @@ $(document).ready(function() {
             }
         },
         columns: [
-            { 
-                data: null,
-                render: function (data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                },
-                orderable: false,
-                searchable: false
-            },
+            BMSSerial.column(),
             { data: 'user_id' },
             { data: 'username' },
             { data: 'full_name' },

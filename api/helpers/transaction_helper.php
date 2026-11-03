@@ -91,7 +91,7 @@ function recordGlobalTransaction($data, $pdo) {
         //    here now makes it real: no mirror, no "posted".
         if (empty($data['skip_journal_mirror'])) {
             try {
-                $mirrorEntryId = mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null);
+                $mirrorEntryId = mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null, null, $data['warehouse_id'] ?? null);
             } catch (Throwable $e) {
                 error_log("recordGlobalTransaction: journal mirror failed for txn $transaction_id: " . $e->getMessage());
                 return [
@@ -169,8 +169,18 @@ function updateGlobalTransaction($transaction_id, $data, $pdo) {
         // Keep the canonical journal mirror in sync with the rewritten legs.
         if (empty($data['skip_journal_mirror'])) {
             try {
+                // The shop stays as it was unless the caller passes one (a caller
+                // that never knew about warehouses must not wipe the tag).
+                if (array_key_exists('warehouse_id', $data)) {
+                    $whId = $data['warehouse_id'];
+                } else {
+                    $w = $pdo->prepare("SELECT warehouse_id FROM journal_entries WHERE entity_type = 'books_transaction' AND entity_id = ? LIMIT 1");
+                    $w->execute([(int)$transaction_id]);
+                    $whId = $w->fetchColumn();
+                    $whId = ($whId !== false && $whId !== null) ? (int)$whId : null;
+                }
                 unmirrorTransactionFromJournal($pdo, (int)$transaction_id);
-                mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null);
+                mirrorTransactionToJournal($pdo, (int)$transaction_id, $description, $transaction_date, $data['project_id'] ?? null, null, $whId);
             } catch (Throwable $e) {
                 error_log("updateGlobalTransaction: journal re-mirror failed for txn $transaction_id: " . $e->getMessage());
             }
@@ -221,7 +231,7 @@ function deleteGlobalTransaction($transaction_id, $pdo) {
  * @return int|null new (or existing) journal entry_id.
  */
 if (!function_exists('mirrorTransactionToJournal')) {
-    function mirrorTransactionToJournal(PDO $pdo, int $transaction_id, ?string $description, ?string $transaction_date, $project_id = null, ?int $user_id = null): ?int
+    function mirrorTransactionToJournal(PDO $pdo, int $transaction_id, ?string $description, ?string $transaction_date, $project_id = null, ?int $user_id = null, $warehouse_id = null): ?int
     {
         require_once __DIR__ . '/../../core/ledger_post.php';
         if ($transaction_id <= 0) return null;
@@ -256,8 +266,9 @@ if (!function_exists('mirrorTransactionToJournal')) {
         $desc = (trim((string)$description) !== '') ? (string)$description : 'Transaction';
         $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$transaction_date) ? (string)$transaction_date : date('Y-m-d');
         $pid  = ($project_id !== null && $project_id !== '') ? (int)$project_id : null;
+        $whId = ($warehouse_id !== null && $warehouse_id !== '' && (int)$warehouse_id > 0) ? (int)$warehouse_id : null;
 
-        return postLedgerEntry($pdo, $desc, $lines, $pid, $transaction_id, 'books_transaction', $date, $uid);
+        return postLedgerEntry($pdo, $desc, $lines, $pid, $transaction_id, 'books_transaction', $date, $uid, $whId);
     }
 }
 

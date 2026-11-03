@@ -73,9 +73,9 @@ try {
 
         $s = $tpdo->prepare("
             SELECT setting_key, setting_value FROM system_settings
-            WHERE setting_key IN (?,?,?,?,?)
+            WHERE setting_key IN (?,?,?,?,?,?)
         ");
-        $s->execute(['company_name', 'company_logo', 'company_currency', 'company_address', 'company_phone']);
+        $s->execute(['company_name', 'company_logo', 'company_currency', 'company_address', 'company_phone', 'currency']);
         while ($row = $s->fetch(PDO::FETCH_ASSOC)) {
             switch ($row['setting_key']) {
                 case 'company_name':
@@ -85,8 +85,11 @@ try {
                     $raw = trim($row['setting_value']);
                     if ($raw !== '') $logoUrl = $tenantUrl . '/' . ltrim($raw, '/');
                     break;
-                case 'company_currency':
-                    if ($row['setting_value'] !== '') $currency = $row['setting_value'];
+                case 'currency':
+                    // Same rule as core/currency.php bmsCompanyCurrency(): the web's `currency`
+                    // key decides; not a 3-letter code → keep the default.
+                    $__c = strtoupper(trim((string)$row['setting_value']));
+                    if (preg_match('/^[A-Z]{3}$/', $__c)) $currency = $__c;
                     break;
                 case 'company_address': $address = $row['setting_value']; break;
                 case 'company_phone':   $phone   = $row['setting_value']; break;

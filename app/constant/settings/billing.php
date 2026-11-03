@@ -218,8 +218,8 @@ $(function () {
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2"><li><a class="dropdown-item py-2 rounded" href="${esc(url)}" target="_blank" rel="noopener"><i class="bi bi-eye text-primary me-2"></i>${L.view}</a></li></ul></div>` : '';
     // An empty list shows one short line instead of an empty table with paging.
     const dt = (id, cols, right) => $(id).DataTable({ responsive: false, scrollX: false, autoWidth: false, pageLength: 25, order: [], dom: 'rtip',
-        columnDefs: [{ targets: cols, orderable: false }, { targets: right, className: 'text-end' }] });
-    const tInv = dt('#tblInvoices', [0, 8], [5, 6, 8]), tQt = dt('#tblQuotes', [0, 7], [5, 7]), tPay = dt('#tblPayments', [0], [2]), tCon = dt('#tblContracts', [0, 7], [7]);
+        columnDefs: [$.extend({ targets: 0 }, BMSSerial.column()), { targets: cols, orderable: false }, { targets: right, className: 'text-end' }] });
+    const tInv = dt('#tblInvoices', [8], [5, 6, 8]), tQt = dt('#tblQuotes', [7], [5, 7]), tPay = dt('#tblPayments', [], [2]), tCon = dt('#tblContracts', [7], [7]);
     const fill = (key, table, rows, emptyTxt) => {
         const wrap = $(`.sb-wrap[data-for="${key}"]`);
         wrap.find('.sb-empty').remove();

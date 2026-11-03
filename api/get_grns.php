@@ -7,6 +7,24 @@ require_once __DIR__ . '/../core/warehouse_scope.php';
 // Ensure no output before JSON
 if (ob_get_length()) ob_clean(); 
 header('Content-Type: application/json');
+
+require_once __DIR__ . '/../core/dt_order.php';
+
+// Header sorting by data name (columns can be hidden, so indexes shift);
+// S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'receipt_number'   => 'pr.receipt_number',
+    'receipt_date'     => 'pr.receipt_date',
+    'supplier_name'    => 'supplier_name',
+    'order_number'     => 'order_number',
+    'project_name'     => 'project_name',
+    'warehouse_name'   => 'warehouse_name',
+    'total_items'      => 'total_items',
+    'total_value'      => 'total_value',
+    'received_by_name' => 'received_by_name',
+    'status'           => 'pr.status',
+], 'pr.receipt_date DESC, pr.created_at DESC, pr.receipt_id DESC',
+   'pr.receipt_date ASC, pr.created_at ASC, pr.receipt_id ASC', 'pr.receipt_id');
 error_reporting(E_ALL);
 ini_set('display_errors', 0); 
 ini_set('log_errors', 1);
@@ -49,7 +67,7 @@ try {
     // Get DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
     $start = isset($_GET['start']) ? intval($_GET['start']) : 0;
-    $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search_value = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
 
     // Base query conditions
@@ -160,7 +178,7 @@ try {
         LEFT JOIN users u2 ON pr.created_by = u2.user_id
         WHERE $where_sql
         GROUP BY pr.receipt_id 
-        ORDER BY pr.receipt_date DESC, pr.created_at DESC
+        ORDER BY $order_sql
         LIMIT ? OFFSET ?
     ";
 
@@ -177,17 +195,8 @@ try {
     $stmt->bindValue($param_index++, (int)$length, PDO::PARAM_INT);
     $stmt->bindValue($param_index++, (int)$start, PDO::PARAM_INT);
     
-    // Debug SQL and Params
-    file_put_contents('debug_grn_log.txt', date('Y-m-d H:i:s') . " - SQL: " . $query . "\nParams: " . json_encode($params) . "\n", FILE_APPEND);
-
     $stmt->execute();
     $grns = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Debug Results
-    file_put_contents('debug_grn_log.txt', date('Y-m-d H:i:s') . " - Count: " . count($grns) . "\n", FILE_APPEND);
-    if (count($grns) > 0) {
-        file_put_contents('debug_grn_log.txt', "First Row: " . json_encode($grns[0]) . "\n", FILE_APPEND);
-    }
 
     echo json_encode([
         'success' => true,

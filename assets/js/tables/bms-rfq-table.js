@@ -32,11 +32,7 @@
     function columns(cfg) {
         var esc = window.BMSTbl.esc;
         var all = [
-            { key: 'sno', col: {
-                data: null, orderable: false, searchable: false,
-                className: 'ps-3 text-center text-muted small fw-bold', responsivePriority: 1,
-                render: function (d, t, r, m) { return m.row + m.settings._iDisplayStart + 1; }
-            }},
+            { key: 'sno', col: BMSSerial.column({ className: 'ps-3 text-center text-muted small fw-bold', responsivePriority: 1 })},
             { key: 'rfq_number', col: {
                 data: 'rfq_number', responsivePriority: 1,
                 render: function (d) { return '<span class="rfq-code">' + (esc(d) || '—') + '</span>'; }
@@ -131,7 +127,9 @@
             responsive: true,
             scrollX: false,
             pageLength: cfg.pageLength || 10,
-            order: cfg.order || [[0, 'desc']],
+            // Same rows as before (the API's newest-first list, reversed = oldest
+            // first), now numbered 1..N by RFQ number instead of counting down on S/No.
+            order: cfg.order || [[1, 'asc']],
             ajax: {
                 url: cfg.apiUrl,
                 data: function (d) {

@@ -110,13 +110,8 @@ $payment_terms = [
     'cash'    => 'Immediate Payment',
 ];
 
-$currencies = [
-    'TZS' => 'Tanzanian Shilling',
-    'USD' => 'US Dollar',
-    'EUR' => 'Euro',
-    'GBP' => 'British Pound',
-    'KES' => 'Kenyan Shilling',
-];
+// TZS company: the same 5 currencies as before. Other company: only its own (core/currency.php).
+$currencies = bmsDocumentCurrencies();
 
 if (!function_exists('generate_quotation_number')) {
     function generate_quotation_number() {
@@ -295,7 +290,7 @@ includeHeader();
                             <?php foreach ($currencies as $code => $name): ?>
                                 <option value="<?= $code ?>"
                                     <?= ($customer && isset($customer['currency']) && $customer['currency'] == $code) ? 'selected' : '' ?>
-                                    <?= (!$customer && $code == 'TZS') ? 'selected' : '' ?>>
+                                    <?= (!$customer && $code == bmsCompanyCurrency()) ? 'selected' : '' ?>>
                                     <?= $code ?> - <?= $name ?>
                                 </option>
                             <?php endforeach; ?>
@@ -429,22 +424,22 @@ includeHeader();
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>Subtotal:</span>
                                     <span id="subtotal">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>VAT (18%):</span>
                                     <span id="tax-total">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>Discount <small>(<span id="discount-percent">0</span>%)</small>:</span>
                                     <span id="discount-total">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
                                     <span>Shipping:</span>
                                     <div class="input-group input-group-sm" style="width: 150px;">
-                                        <span class="input-group-text currency-symbol">TZS</span>
+                                        <span class="input-group-text currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                         <input type="number" class="form-control" id="shipping_cost" name="shipping_cost"
                                                min="0" step="0.01" value="<?= $quotation ? $quotation['shipping_cost'] : '0' ?>" onchange="calculateTotals()">
                                     </div>
@@ -453,7 +448,7 @@ includeHeader();
                                 <div class="d-flex justify-content-between fw-bold fs-5">
                                     <span>Grand Total:</span>
                                     <span id="grand-total">0.00</span>
-                                    <span class="currency-symbol">TZS</span>
+                                    <span class="currency-symbol"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 </div>
                                 <div class="mt-3">
                                     <div class="form-check">

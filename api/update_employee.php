@@ -225,6 +225,9 @@ try {
         }
     }
 
+    // Non-TZS company: salary currency is always the company's own (core/currency.php).
+    if (isset($_POST['currency'])) $_POST['currency'] = bmsEnforceDocCurrency($_POST['currency']);
+
     // Dynamic update query
     $fields = [
         'employee_code', 'first_name', 'last_name', 'middle_name', 'gender', 'date_of_birth',

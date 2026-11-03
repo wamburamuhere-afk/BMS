@@ -23,7 +23,10 @@ if (!isAuthenticated()) {
     echo json_encode(['results' => []]);
     exit;
 }
-if (!canView('financial_reports')) {
+// The customer picker also backs the Sales / Service Sales report filters —
+// those reports' own permission is enough to search by customer (Simple Mode
+// turns financial_reports off, but its Sales Report still needs this).
+if (!canView('financial_reports') && !canView('sales_report') && !canView('service_sales_report')) {
     http_response_code(403);
     echo json_encode(['results' => []]);
     exit;

@@ -285,12 +285,9 @@ function pctFor(row) {
 }
 
 function renderTable(rows) {
+    // Rebuilt on every filter change: drop the DataTable, refill, start it again.
+    if ($.fn.DataTable.isDataTable('#reportTable')) $('#reportTable').DataTable().destroy();
     const $tb = $('#reportTable tbody').empty();
-    if (!rows.length) {
-        const f = getFilterSummary();
-        $tb.append('<tr><td colspan="10" class="text-center text-muted py-4"><i class="bi bi-inbox d-block mb-2 fs-2 opacity-25"></i><div class="fw-bold mb-1">' + PT.noPurchaseOrdersFound + '</div><small>' + f + '</small></td></tr>');
-        return;
-    }
     rows.forEach((r, i) => {
         const s   = statusFor(r);
         const pct = pctFor(r);
@@ -300,10 +297,10 @@ function renderTable(rows) {
                 <td><a href="<?= getUrl('purchase_order_view') ?>?id=${r.purchase_order_id}" class="fw-bold text-decoration-none">${safeOutput(r.order_number)}</a></td>
                 <td>${safeOutput(r.supplier_name)}</td>
                 <td>${safeOutput(r.order_date)}</td>
-                <td class="text-end fw-bold">${fmtTZS(r.grand_total)}</td>
-                <td class="text-end">${fmtTZS(r.invoiced_total)}</td>
-                <td class="text-end ${parseFloat(r.remaining) < 0 ? 'text-danger fw-bold' : ''}">${fmtTZS(r.remaining)}</td>
-                <td>
+                <td class="text-end fw-bold" data-order="${parseFloat(r.grand_total) || 0}">${fmtTZS(r.grand_total)}</td>
+                <td class="text-end" data-order="${parseFloat(r.invoiced_total) || 0}">${fmtTZS(r.invoiced_total)}</td>
+                <td class="text-end ${parseFloat(r.remaining) < 0 ? 'text-danger fw-bold' : ''}" data-order="${parseFloat(r.remaining) || 0}">${fmtTZS(r.remaining)}</td>
+                <td data-order="${pct}">
                     <div class="progress ${s.pcls}"><div class="progress-bar" style="width:${Math.min(100, pct)}%"></div></div>
                     <small class="text-muted">${pct.toFixed(0)}%</small>
                 </td>
@@ -311,6 +308,12 @@ function renderTable(rows) {
                 <td class="text-center"><span class="badge bg-secondary">${r.invoice_count}</span></td>
             </tr>
         `);
+    });
+    $('#reportTable').DataTable({
+        responsive: false, autoWidth: false, pageLength: 25, order: [],
+        columnDefs: [{ type: 'num', targets: [0, 4, 5, 6, 7] }, { type: 'html-num', targets: 9 }],
+        dom: '<"px-3 pt-3"f>rt<"d-flex justify-content-between align-items-center px-3 pb-3"ip>',
+        language: { emptyTable: '<i class="bi bi-inbox d-block mb-2 fs-2 opacity-25"></i><div class="fw-bold mb-1">' + PT.noPurchaseOrdersFound + '</div><small>' + getFilterSummary() + '</small>' }
     });
 }
 

@@ -41,11 +41,7 @@
     function columns(cfg) {
         var esc = window.BMSTbl.esc, date = window.BMSTbl.date, money = window.BMSTbl.money;
         var all = [
-            { key: 'sno', col: {
-                data: null, orderable: false, searchable: false, width: '50px',
-                className: 'ps-4 text-center text-muted small fw-bold',
-                render: function (d, t, r, meta) { return meta.row + meta.settings._iDisplayStart + 1; }
-            }},
+            { key: 'sno', col: BMSSerial.column({ width: '50px', className: 'ps-4 text-center text-muted small fw-bold' })},
             { key: 'receipt_number', col: {
                 data: 'receipt_number',
                 render: function (data, type, row) {
@@ -229,7 +225,7 @@
             responsive: false,
             autoWidth: false,
             pageLength: cfg.pageLength || 10,
-            order: cfg.order || [[2, 'desc']],
+            order: cfg.order || [[0, 'asc']],   // S/No = the normal newest-first order
             columnDefs: [{ className: 'text-center', targets: '_all' }],
             drawCallback: function () {
                 renderCards(cfg, this.api().rows({ page: 'current' }).data());

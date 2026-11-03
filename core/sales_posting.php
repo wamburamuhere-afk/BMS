@@ -124,7 +124,18 @@ if (!function_exists('posSaleCogs')) {
                   OR NOT (p.cost_price > p.selling_price AND p.selling_price > 0)
               )
         ")->fetchColumn();
-        return round((float)$v, 2);
+        // restaurant_plan.md Phase 7 — a dish with a recipe (no-stock item + recipe) uses up
+        // its ingredients' stock, so its cost is Σ(ingredient qty × ingredient cost). Only that
+        // new item kind is added here; every other line is costed exactly as above.
+        $recipe = $pdo->query("
+            SELECT COALESCE(SUM(si.quantity * ac.qty_per_unit * COALESCE(cp.cost_price, 0)), 0)
+              FROM pos_sale_items si
+              JOIN products p  ON p.product_id = si.product_id AND p.is_service = 1 AND p.is_combo = 1
+              JOIN product_assembly_components ac ON ac.parent_product_id = p.product_id
+              JOIN products cp ON cp.product_id = ac.component_product_id
+             WHERE si.sale_id = " . (int)$saleId . "
+        ")->fetchColumn();
+        return round((float)$v + (float)$recipe, 2);
     }
 }
 

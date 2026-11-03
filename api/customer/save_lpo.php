@@ -56,7 +56,7 @@ try {
     $warehouse_id = !empty($_POST['warehouse_id']) ? intval($_POST['warehouse_id']) : null;
     $issue_date  = trim($_POST['issue_date'] ?? '');
     $expiry_date = trim($_POST['expiry_date'] ?? '') ?: null;
-    $currency    = trim($_POST['currency'] ?? 'TZS');
+    $currency    = bmsEnforceDocCurrency(trim($_POST['currency'] ?? bmsCompanyCurrency()));   // core/currency.php: TZS company unchanged; other → own currency
     $description = trim($_POST['description'] ?? '') ?: null;
     $notes       = trim($_POST['notes'] ?? '') ?: null;
     $items_json  = $_POST['items'] ?? '[]';

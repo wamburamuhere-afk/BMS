@@ -121,7 +121,7 @@ $total_categories = count(array_unique($categories_list));
                 <th>Asset Code</th>
                 <th>Category</th>
                 <th>Purchase Date</th>
-                <th class="text-end">Cost (TZS)</th>
+                <th class="text-end">Cost (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                 <th class="text-center">Status</th>
                 <th>Location</th>
             </tr>

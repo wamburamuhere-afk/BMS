@@ -1,7 +1,13 @@
 <?php
-// This file is designed to be included as a modal in journals.php
-// but can also function standalone if needed.
+// This file is the Add Journal modal included by journals.php. Opened
+// directly (journal/add route) it would render a bare fragment with no
+// header or scripts, so send the user to the Journals page instead.
 global $pdo, $pdo_accounts;
+
+if (empty($journal_modal_partial)) {
+    header('Location: ' . getUrl('journals'));
+    exit;
+}
 
 require_once ROOT_DIR . '/core/permissions.php';
 

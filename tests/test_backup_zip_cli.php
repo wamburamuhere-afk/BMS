@@ -69,18 +69,20 @@ foreach ([
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-section('3. core/backup.php — bms_prune_backups handles .zip patterns');
+section('3. core/backup.php — retention covers .zip and .sql (full policy: test_backup_retention_cli)');
 // ─────────────────────────────────────────────────────────────────────────────
 
+require_once $coreFile;
 check(
-    str_contains($core, 'auto_backup_*.zip'),
-    'bms_prune_backups() prunes auto_backup_*.zip files',
-    'bms_prune_backups() does not prune auto_backup_*.zip — old ZIP auto-backups will accumulate'
+    function_exists('bms_backup_file_info') && (bms_backup_file_info('auto_backup_2026-01-01_00-30-00.zip')['kind'] ?? '') === 'auto_backup',
+    'retention recognises auto_backup_*.zip files',
+    'retention does not recognise auto_backup_*.zip — old ZIP auto-backups will accumulate'
 );
 check(
-    str_contains($core, 'pre_restore_*.zip'),
-    'bms_prune_backups() prunes pre_restore_*.zip files',
-    'bms_prune_backups() does not prune pre_restore_*.zip — old ZIPs will accumulate'
+    (bms_backup_file_info('pre_restore_2026-01-01_00-30-00.zip')['kind'] ?? '') === 'pre_restore'
+        && (bms_backup_file_info('auto_backup_2026-01-01_00-30-00.sql')['kind'] ?? '') === 'auto_backup',
+    'retention recognises pre_restore_*.zip and legacy .sql files',
+    'retention misses pre_restore_*.zip or .sql files — old files will accumulate'
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -190,9 +192,9 @@ check(
     'restore_backup does not call bms_extract_zip_backup() — .zip restores will fail'
 );
 check(
-    str_contains($api, "bms_copy_dir("),
-    'restore_backup calls bms_copy_dir() to restore uploaded files',
-    'restore_backup does not call bms_copy_dir() — files will not be restored from ZIP'
+    str_contains($api, "bms_restore_uploads("),
+    'restore_backup calls bms_restore_uploads() to restore uploaded files (tenant-scoped)',
+    'restore_backup does not call bms_restore_uploads() — files will not be restored from ZIP, or not scoped to the tenant'
 );
 check(
     str_contains($api, "bms_delete_dir("),

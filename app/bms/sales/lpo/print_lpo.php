@@ -46,7 +46,7 @@ $stmtItems = $pdo->prepare("SELECT * FROM customer_lpo_items WHERE lpo_id = ? OR
 $stmtItems->execute([$lpo_id]);
 $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
-$currency = $lpo['currency'] ?? 'TZS';
+$currency = $lpo['currency'] ?? bmsCompanyCurrency();
 $subtotal = 0; $taxTotal = 0;
 foreach ($items as $item) {
     $lineSub = (float)$item['quantity'] * (float)$item['unit_price'];

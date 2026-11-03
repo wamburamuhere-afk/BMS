@@ -76,6 +76,24 @@ if (empty($_POST['accept_terms'])) {
 
 $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
 
+// Progress record for actions/register_status.php: if the browser loses this
+// request (timeout, dropped connection) while provisioning carries on, the page
+// asks there instead of reporting a failure that did not happen. The session is
+// released during provisioning so those status checks are not blocked by it.
+$regToken = (string)($_POST['reg_token'] ?? '');
+if (!preg_match('/^[A-Za-z0-9]{16,64}$/', $regToken)) $regToken = '';
+$saveRegState = function (array $state) use ($regToken) {
+    if ($regToken === '') return;
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    foreach ($_SESSION['bms_reg'] ?? [] as $k => $v) {
+        if (($v['t'] ?? 0) < time() - 3600) unset($_SESSION['bms_reg'][$k]);
+    }
+    $_SESSION['bms_reg'][$regToken] = $state + ['t' => time()];
+    session_write_close();
+};
+$saveRegState(['state' => 'running']);
+if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
 $result = registerTenant([
     'company_name'             => $_POST['company_name'] ?? '',
     'subdomain'                => $_POST['subdomain'] ?? '',
@@ -98,19 +116,28 @@ $result = registerTenant([
     'plan_key'                 => $_POST['plan_key']  ?? '',   // re-checked on the server
     'plan_term'                => $_POST['plan_term'] ?? '',
     'website'                  => $_POST['website'] ?? '',   // honeypot
+    'defer_emails'             => true,   // sent by actions/register_after.php
 ], $ip);
 
 if (!$result['ok']) {
+    $saveRegState(['state' => 'failed', 'message' => $result['error']]);
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => $result['error']]);
     exit;
 }
 
-echo json_encode([
+$response = [
     'success'   => true,
     'message'   => 'Your account is ready.',
     'subdomain' => $result['subdomain'],
     'login_url' => $result['login_url'],
     'username'  => $result['username'] ?? '',
     'pending_approval' => !empty($result['pending_approval']),
-]);
+];
+// The emails wait in this visitor's session for actions/register_after.php.
+if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+if (!empty($result['deferred_emails'])) $_SESSION['bms_reg_mail'][] = $result['deferred_emails'];
+session_write_close();
+$saveRegState(['state' => 'done', 'response' => $response]);
+
+echo json_encode($response);

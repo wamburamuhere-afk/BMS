@@ -114,7 +114,7 @@ foreach($logs as $l) {
                 <th>Date</th>
                 <th>Type</th>
                 <th>Performed By</th>
-                <th class="text-end">Cost (TZS)</th>
+                <th class="text-end">Cost (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                 <th class="text-center">Status</th>
             </tr>
         </thead>

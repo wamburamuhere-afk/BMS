@@ -79,6 +79,11 @@ try {
     // Log Activity
     require_once __DIR__ . '/../helpers.php';
     logActivity($pdo, $_SESSION['user_id'], ucfirst($status) . " supplier: " . $supplier['supplier_name']);
+    logAudit($pdo, $_SESSION['user_id'], 'update_supplier_status', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$supplier_id,
+        'description'   => "Status changed from {$supplier['status']} to $status",
+        'old_values'    => ['status' => $supplier['status']], 'new_values' => ['status' => $status],
+    ]);
     
     header('Content-Type: application/json');
     echo json_encode([

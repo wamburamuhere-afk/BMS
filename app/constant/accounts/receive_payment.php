@@ -199,7 +199,7 @@ $(function () {
     $('.select2-static').each(function () { $(this).select2({ theme: 'bootstrap-5', width: '100%' }); });
 
     // Auto-load when customer changes
-    $('#f-customer').on('change', loadOutstanding);
+    $('#f-customer').on('change', () => window.loadOutstanding());   // defined below — resolve at change time
 
     window.clearReceipt = function () {
         $('#receiptForm')[0].reset();

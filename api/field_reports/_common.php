@@ -3,6 +3,7 @@
 // Row-level ownership (owner or admin) is enforced per endpoint via core/field_reports.php.
 require_once __DIR__ . '/../../roots.php';
 require_once ROOT_DIR . '/core/field_reports.php';
+require_once ROOT_DIR . '/core/field_visit_followups.php';
 header('Content-Type: application/json');
 
 function frJson(array $body, int $code = 200): void

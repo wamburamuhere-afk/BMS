@@ -66,6 +66,11 @@ try {
     $delete_stmt->execute([$_SESSION['user_id'], $supplier_id]);
 
     logActivity($pdo, $_SESSION['user_id'], "Delete supplier", "deleted supplier \"" . $supplier['supplier_name'] . "\" with id $supplier_id");
+    logAudit($pdo, $_SESSION['user_id'], 'delete_supplier', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => (int)$supplier_id,
+        'description'   => 'Deleted supplier ' . $supplier['supplier_name'],
+        'old_values'    => ['status' => $supplier['status']], 'new_values' => ['status' => 'deleted'],
+    ]);
 
     header('Content-Type: application/json');
     echo json_encode([

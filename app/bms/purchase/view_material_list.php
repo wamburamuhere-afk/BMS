@@ -393,7 +393,9 @@ $(function(){
             paging: true,
             pageLength: 10,
             searching: false,
-            ordering: false,
+            // Only S/No sorts (list order / reversed); the other columns keep the list's order.
+            order: [],
+            columnDefs: [$.extend({ targets: 0 }, BMSSerial.column()), { targets: '_all', orderable: false }],
             info: false,
             dom: 'rtp'
         });

@@ -209,13 +209,13 @@ if ($hasContext ?? false):
             $bannerIcon  = 'bi-hourglass-split';
             $bannerClass = 'alert-warning';
             $bannerTitle = 'Trial grace period active';
-            $bannerBody  = 'This tenant\'s free trial has ended. A ' . BMS_GRACE_PERIOD_DAYS . '-day grace period is in progress. Review the Billing tab to record a payment or take action.';
+            $bannerBody  = 'This tenant\'s free trial has ended. A ' . tenantGraceDaysFor($tenant) . '-day grace period is in progress. Review the Billing tab to record a payment or take action.';
             break;
         case 'subscription_grace_started':
             $bannerIcon  = 'bi-hourglass';
             $bannerClass = 'alert-warning';
             $bannerTitle = 'Subscription grace period active';
-            $bannerBody  = 'This tenant\'s subscription has expired. A ' . BMS_GRACE_PERIOD_DAYS . '-day grace period is in progress. Review the Billing tab to record a payment or contact the tenant.';
+            $bannerBody  = 'This tenant\'s subscription has expired. A ' . tenantGraceDaysFor($tenant) . '-day grace period is in progress. Review the Billing tab to record a payment or contact the tenant.';
             break;
         case 'trial_expired':
             $bannerIcon  = 'bi-hourglass-bottom';
@@ -228,6 +228,20 @@ if ($hasContext ?? false):
             $bannerClass = 'alert-danger';
             $bannerTitle = 'Subscription expired — tenant suspended';
             $bannerBody  = 'This tenant\'s subscription expired and was automatically suspended after the grace period. Record a payment to reactivate.';
+            break;
+        case 'first_login':
+        case 'first_product':
+        case 'first_sale':
+            $bannerIcon  = 'bi-stars';
+            $bannerClass = 'alert-success';
+            $bannerTitle = ['first_login' => 'First sign-in', 'first_product' => 'First product added', 'first_sale' => 'First sale made'][$notifType];
+            $bannerBody  = 'This company is getting started. The Users and Activity tabs show who is using it.';
+            break;
+        case 'inactive':
+            $bannerIcon  = 'bi-moon';
+            $bannerClass = 'alert-secondary';
+            $bannerTitle = 'No recent activity';
+            $bannerBody  = 'Nobody from this company has used the web or the app for a while. Consider reaching out.';
             break;
         case 'billing_overdue':
         case 'billing_due_soon':
@@ -1906,6 +1920,21 @@ function applyPlan() {
     });
 }
 
+// Last sign-in with where it happened (Web / App), plus the app's last use and device.
+function lastLoginCell(u) {
+    let html = u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>';
+    if (u.last_login_via) {
+        html += u.last_login_via === 'app'
+            ? ' <span class="badge" style="background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7">App</span>'
+            : ' <span class="badge" style="background:#eef2f7;color:#334155;border:1px solid #cbd5e1">Web</span>';
+    }
+    if (u.app_last_used) {
+        html += '<div class="text-muted" style="font-size:.75rem"><i class="bi bi-phone me-1"></i>App used '
+            + safeOutput(u.app_last_used) + (u.app_device ? ' · ' + safeOutput(u.app_device) : '') + '</div>';
+    }
+    return html;
+}
+
 function loadUsers() {
     // On demand, deliberately — same discipline as checkUsage(): this is the
     // one other thing on this page that briefly opens the tenant's own
@@ -1936,13 +1965,14 @@ function loadUsers() {
                 const role = (u.role && u.role.trim()) ? u.role.trim() : 'No role set';
                 roleCounts[role] = (roleCounts[role] || 0) + 1;
                 if (u.last_login && (!lastActivity || u.last_login > lastActivity)) lastActivity = u.last_login;
+                if (u.app_last_used && (!lastActivity || u.app_last_used > lastActivity)) lastActivity = u.app_last_used;
             });
             const roleBadges = Object.keys(roleCounts).sort().map(function (role) {
                 return '<span class="badge" style="background:#e7f0ff;color:#084298;border:1px solid #b6ccfe;font-weight:600">'
                     + safeOutput(role) + ': ' + roleCounts[role] + '</span>';
             }).join('');
             $('#usersRoleBadges').html(roleBadges);
-            $('#usersLastActivity').html('<i class="bi bi-clock me-1"></i>Most recent sign-in across the company: '
+            $('#usersLastActivity').html('<i class="bi bi-clock me-1"></i>Most recent activity across the company (web sign-in or app use): '
                 + (lastActivity ? '<strong>' + safeOutput(lastActivity) + '</strong>' : '<span class="text-muted">no one has signed in yet</span>'));
             $('#usersSummary').removeClass('d-none');
 
@@ -1991,7 +2021,7 @@ function loadUsers() {
                     + '<td>' + (u.phone ? safeOutput(u.phone) : '<span class="text-muted">—</span>') + '</td>'
                     + '<td>' + safeOutput(u.role) + '</td>'
                     + '<td>' + statusBadge + '</td>'
-                    + '<td>' + (u.last_login ? safeOutput(u.last_login) : '<span class="text-muted">never</span>') + '</td>'
+                    + '<td>' + lastLoginCell(u) + '</td>'
                     + '<td class="text-end">' + userActions(u) + '</td>'
                     + '</tr>';
             });
@@ -2313,6 +2343,8 @@ function openPosMoreModal() {
             }
         }).then(function (result) {
             if (!result.isConfirmed) return;
+            // Switching Restaurant POS on: show shops already set to Restaurant/Hybrid first.
+            confirmRestaurantShops(result.value.restaurantPos && !RESTAURANT_POS.enabled, function () {
             $.when(
                 $.ajax({
                     url: '/actions/superadmin_tenant_features.php',
@@ -2401,11 +2433,43 @@ function openPosMoreModal() {
             }).fail(function () {
                 Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save.' });
             });
+            });
         });
     }).fail(function (xhr) {
         let msg = 'Could not read Simple Mode status for this tenant.';
         try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
         Swal.fire({ icon: 'error', title: 'Error', text: msg });
+    });
+}
+
+// restaurant_plan.md Phase 0.1 — when Restaurant POS is being switched ON, list
+// the tenant's shops whose stored POS Mode is already Restaurant/Hybrid (they
+// change behaviour the moment the module is on) and ask before saving.
+// Read-only lookup; no shop is changed. Any other save goes straight through.
+function confirmRestaurantShops(turningOn, proceed) {
+    if (!turningOn) { proceed(); return; }
+    $.ajax({
+        url: '/actions/superadmin_tenant_restaurant_shops.php',
+        method: 'POST', dataType: 'json',
+        data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID }
+    }).done(function (res) {
+        const shops = (res && res.success && res.shops) ? res.shops : [];
+        if (!shops.length) { proceed(); return; }
+        const list = shops.map(function (s) {
+            return $('<div>').text(s.warehouse_name).html() + ' — <strong>' + (s.pos_mode === 'hybrid' ? 'Hybrid' : 'Restaurant') + '</strong>';
+        }).join('<br>');
+        Swal.fire({
+            icon: 'warning',
+            title: 'These shops are already set to Restaurant/Hybrid',
+            html: '<div class="text-start">Once Restaurant POS is on, they will show restaurant features straight away:<br><br>'
+                + list + '<br><br>Other shops stay Retail. You can change a shop\'s POS Mode later on its Shops page.</div>',
+            showCancelButton: true,
+            confirmButtonColor: '#0d6efd',
+            confirmButtonText: 'Continue and save'
+        }).then(function (r) { if (r.isConfirmed) proceed(); });
+    }).fail(function () {
+        // Lookup failed — never block the save over a warning.
+        proceed();
     });
 }
 

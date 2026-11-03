@@ -289,8 +289,7 @@ window.editParticipant = function (pid) {
 $(function () {
     trTable = $('#trainingsTable').DataTable({
         responsive:false, scrollX:true, pageLength:25, order:[[3,'desc']], dom:'rtip',
-        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
-            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
+        columnDefs: [$.extend({ targets: 0, className: 'text-center' }, BMSSerial.column())],
         language:{ emptyTable:'No trainings yet.', zeroRecords:'No matching records.' },
         drawCallback: function () { trCards(this.api().rows({page:'current'})[0].map(i=>TR_ROWS[i]).filter(Boolean)); }
     });

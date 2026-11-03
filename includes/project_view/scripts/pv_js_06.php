@@ -374,7 +374,7 @@ function viewProcNipDetails(productId) {
                     <div class="text-muted small">Warehouse</div><div class="fw-bold">${p.warehouse_name || '—'}</div>
                 </div>
                 <div class="col-md-3 text-center border rounded p-3">
-                    <div class="text-muted small">Selling Price</div><div class="fw-bold text-primary">TZS ${parseFloat(p.selling_price||0).toLocaleString()}</div>
+                    <div class="text-muted small">Selling Price</div><div class="fw-bold text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${parseFloat(p.selling_price||0).toLocaleString()}</div>
                 </div>
                 <div class="col-md-3 text-center border rounded p-3">
                     <div class="text-muted small">Tax</div><div class="fw-bold">${p.tax_name ? p.tax_name + ' (' + p.tax_rate + '%)' : 'No Tax'}</div>
@@ -562,7 +562,7 @@ function editProcNipSearch(input, idx) {
                         <div class="d-flex justify-content-between align-items-start">
                             <div><div class="fw-bold small">${p.product_name}</div>
                             <div class="text-muted" style="font-size:11px;">${p.sku||''}</div></div>
-                            <span class="fw-bold text-primary small">TZS ${cost.toLocaleString()}</span>
+                            <span class="fw-bold text-primary small"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${cost.toLocaleString()}</span>
                         </div></button>`;
                 }).join('');
                 $res.html(`<div class="list-group list-group-flush">${rows}</div>`).removeClass('d-none');
@@ -854,7 +854,7 @@ function viewVoucherDetails(encodedData) {
     $('#pv_detail_method_badge').html(`<span class="badge bg-light text-dark border text-uppercase px-3">${safeOutput((v.payment_method || '').replace(/_/g, ' '))}</span>`);
     $('#pv_detail_payee').text(v.payee_name || 'N/A');
     $('#pv_detail_category').text(v.expense_account_name || v.category_name || 'Uncategorized');
-    $('#pv_detail_amount').text(formatMoney(v.amount) + ' TZS');
+    $('#pv_detail_amount').text(formatMoney(v.amount) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
     $('#pv_detail_words').text(v.amount_in_words ? 'In Words: ' + v.amount_in_words : '');
     $('#pv_detail_reference').text(v.reference_number || 'None');
     $('#pv_detail_description').text(v.description || 'No description provided');
@@ -873,11 +873,11 @@ function viewVoucherDetails(encodedData) {
                             <div class="text-muted" style="font-size:.75rem;">${safeOutput((p.payment_method || '').replace(/_/g, ' '))} ${p.reference_number ? '· ' + safeOutput(p.reference_number) : ''}</div>
                             <div class="text-muted" style="font-size:.75rem;">${safeOutput(p.bank_code ? p.bank_code + ' — ' : '')}${safeOutput(p.bank_name || '—')}</div>
                         </div>
-                        <strong class="text-primary">${formatMoney(p.amount)} TZS</strong>
+                        <strong class="text-primary">${formatMoney(p.amount)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>
                     </div>`).join('');
                 rows += `<div class="d-flex justify-content-between border-top pt-2 mt-1">
                             <strong class="small text-muted">Total Paid</strong>
-                            <strong class="text-success">${formatMoney(res.total_paid)} TZS</strong>
+                            <strong class="text-success">${formatMoney(res.total_paid)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>
                          </div>`;
                 $('#pv_detail_payments_list').html(rows);
                 $('#pv_detail_payments_section').show();

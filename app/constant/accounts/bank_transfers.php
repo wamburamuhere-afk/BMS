@@ -264,7 +264,7 @@ $(function () {
         $('#transfersTable').DataTable({
             responsive: false, scrollX: true, pageLength: 25, order: [[1, 'desc']],
             dom: 'rtip',
-            columnDefs: [{ targets: [5, 6], className: 'text-end' }, { targets: [0, 7, 8], orderable: false }],
+            columnDefs: [{ targets: [5, 6], className: 'text-end' }, { targets: [7, 8], orderable: false }, $.extend({ targets: 0 }, BMSSerial.column())],
             drawCallback: function () { renderCards(this.api().rows({ page: 'current' }).data().toArray()); },
             language: { emptyTable: 'No transfers yet.', zeroRecords: 'No matching transfers.' }
         });

@@ -608,3 +608,28 @@ table thead th {
     html body::after { height: 0 !important; }
 
 } /* end @media print */
+
+/* ── Summary cards: white with a coloured edge bar (shared look) ───────────────
+   Add `stat-edge` (+ one colour) to a `.custom-stat-card`:
+     blue (default)  totals / general      green  good: active, paid
+     amber           caution: pending, overdue, suspended
+     slate           blocked / blacklisted   gray  inactive / neutral
+   Same palette on every page; red is kept for errors and destructive actions only. */
+.custom-stat-card.stat-edge {
+    --edge: #0d6efd;
+    background-color: #fff !important;
+    border: 1px solid #e6e9ef !important;
+    border-left: 4px solid var(--edge) !important;
+    border-radius: 10px;
+}
+.custom-stat-card.stat-edge-green { --edge: #198754; }
+.custom-stat-card.stat-edge-amber { --edge: #d97706; }
+.custom-stat-card.stat-edge-slate { --edge: #475569; }
+.custom-stat-card.stat-edge-gray  { --edge: #94a3b8; }
+.custom-stat-card.stat-edge h3,
+.custom-stat-card.stat-edge h4 { color: #12326b !important; }
+.custom-stat-card.stat-edge p,
+.custom-stat-card.stat-edge small,
+.custom-stat-card.stat-edge .small { color: #6c7a89 !important; font-weight: 600; }
+.custom-stat-card.stat-edge i { color: var(--edge) !important; }
+.custom-stat-card.stat-edge .stat-icon-circle { background: #f1f5f9 !important; }

@@ -312,14 +312,14 @@ if ($bank_account_id) {
                         <div class="col-md-6">
                             <label for="modal_statement_balance" class="form-label small fw-bold text-muted text-uppercase">Statement Balance <span class="text-danger">*</span></label>
                             <div class="input-group shadow-sm">
-                                <span class="input-group-text bg-light fw-bold border-end-0">TSh</span>
+                                <span class="input-group-text bg-light fw-bold border-end-0"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                                 <input type="number" class="form-control border-start-0" id="modal_statement_balance" name="statement_balance" step="0.01" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <label for="modal_book_balance" class="form-label small fw-bold text-muted text-uppercase">Book Balance <span class="text-danger">*</span></label>
                             <div class="input-group shadow-sm">
-                                <span class="input-group-text bg-light fw-bold border-end-0">TSh</span>
+                                <span class="input-group-text bg-light fw-bold border-end-0"><?= htmlspecialchars(trim(bmsCurrencySymbol())) ?></span>
                                 <input type="number" class="form-control border-start-0" id="modal_book_balance" name="book_balance" step="0.01" required>
                             </div>
                         </div>
@@ -495,16 +495,7 @@ $(document).ready(function() {
             type: 'POST'
         },
         columns: [
-            {
-                data: null,
-                orderable: false,
-                searchable: false,
-                width: '50px',
-                className: 'text-center text-muted small fw-bold ps-4',
-                render: function(data, type, row, meta) {
-                    return meta.row + meta.settings._iDisplayStart + 1;
-                }
-            },
+            BMSSerial.column({ width: '50px', className: 'text-center text-muted small fw-bold ps-4' }),
             { data: 'reconciliation_id' },
             { data: 'account_name' },
             { 
@@ -585,7 +576,7 @@ $(document).ready(function() {
         responsive: true,
         dom: 'rtip',
         pageLength: 25,
-        order: [[0, 'desc']]
+        order: [[0, 'asc']]   // S/No ascending = newest first (api/account/get_bank_reconciliations.php)
     });
 
     // Reconciliation form submission (New & Edit)

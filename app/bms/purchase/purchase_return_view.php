@@ -342,8 +342,8 @@ function renderReturn(data) {
                         <div class="fw-bold">${item.product_name || PRV_I18N.product}</div>
                     </td>
                     <td class="text-center py-3">${parseFloat(item.quantity).toLocaleString()}</td>
-                    <td class="text-end py-3">TZS ${parseFloat(item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td class="text-end py-3 fw-bold">TZS ${lineTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="text-end py-3"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${parseFloat(item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="text-end py-3 fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${lineTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="py-3 small text-muted">${item.reason || '-'}</td>
                 </tr>
             `);
@@ -352,7 +352,7 @@ function renderReturn(data) {
         tbody.append(`<tr><td colspan="5" class="text-center py-4 text-muted">${PRV_I18N.noItemsFound}</td></tr>`);
     }
 
-    const fmt = v => 'TZS ' + v.toLocaleString(undefined, {minimumFractionDigits: 2});
+    const fmt = v => '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + v.toLocaleString(undefined, {minimumFractionDigits: 2});
     $('#subtotalDisplay').text(fmt(subtotal));
     $('#vatDisplay').text(fmt(vatTotal));
     $('#grandTotal').text(fmt(subtotal + vatTotal));

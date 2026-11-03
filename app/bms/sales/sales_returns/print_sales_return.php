@@ -113,7 +113,7 @@ try {
 $doc_title   = 'SALES RETURN';
 $doc_label   = 'Return #:';
 $date_label  = 'Return Date:';
-$currency    = $return['currency'] ?? 'TZS';
+$currency    = $return['currency'] ?? bmsCompanyCurrency();
 
 // Company Settings
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];

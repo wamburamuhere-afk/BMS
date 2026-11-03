@@ -308,8 +308,7 @@ function empSelect2(el, dropdownParent) {
 $(document).ready(function () {
     table = $('#contractsTable').DataTable({
         responsive: false, scrollX: true, pageLength: 25, order: [[3, 'desc']], dom: 'rtipB',
-        columnDefs: [{ targets: 0, orderable: false, searchable: false, className: 'text-center',
-            render: (d, t, row, meta) => meta.row + 1 + meta.settings._iDisplayStart }],
+        columnDefs: [$.extend({ targets: 0, className: 'text-center' }, BMSSerial.column())],
         buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:first-child):not(:last-child)' } }],
         language: { emptyTable: 'No contracts recorded yet.', zeroRecords: 'No matching records.' },
         drawCallback: function () {

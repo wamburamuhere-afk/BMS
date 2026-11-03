@@ -288,6 +288,17 @@ if (!function_exists('seedTenantCompanyProfile')) {
             }
         }
 
+        // Operating currency from the registration country (core/currency.php):
+        // Kenya → KES, Burundi → BIF, Rwanda → RWF, South Sudan → SSP. Tanzania, an
+        // empty or any other country writes NOTHING, so the tenant stays on the TZS
+        // default exactly as every tenant did before. Both keys, so web and mobile agree.
+        require_once __DIR__ . '/currency.php';
+        $seedCurrency = bmsCurrencyForCountry($extra['country'] ?? '');
+        if ($seedCurrency !== 'TZS') {
+            $values['currency']         = $seedCurrency;
+            $values['company_currency'] = $seedCurrency;
+        }
+
         $tmpPath = $extra['logo_tmp_path'] ?? null;
         $ext     = $extra['logo_extension'] ?? null;
         if ($tmpPath && $ext && is_uploaded_file($tmpPath)) {
@@ -655,6 +666,7 @@ if (!function_exists('provisionTenant')) {
                     'email'            => $opts['email'] ?? '',
                     'address'          => $opts['physical_address'] ?? '',
                     'company_type'     => $opts['company_type'] ?? '',
+                    'country'          => $country ?? '',
                     'logo_tmp_path'    => $opts['logo_tmp_path'] ?? null,
                     'logo_extension'   => $opts['logo_extension'] ?? null,
                 ]);

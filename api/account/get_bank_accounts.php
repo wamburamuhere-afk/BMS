@@ -24,7 +24,7 @@ try {
                 a.account_code as account_number,
                 a.account_name as bank_name,
                 a.current_balance as balance,
-                COALESCE(a.currency, 'TZS') as currency,
+                COALESCE(a.currency, " . $pdo->quote(bmsCompanyCurrency()) . ") as currency,
                 a.status
             FROM accounts a
             WHERE a.status = 'active'

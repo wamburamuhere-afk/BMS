@@ -6,7 +6,7 @@ try {
     // Basic pagination for DataTables
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
     $start = isset($_GET['start']) ? intval($_GET['start']) : 0;
-    $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
 
     $params = [];

@@ -10,7 +10,8 @@ if (!isAuthenticated()) {
 
 try {
     $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+    $limit = isset($_GET['limit']) ? max(1, min(100000, intval($_GET['limit']))) : 10;
+    $page = max(1, $page);
     $search = isset($_GET['search']) ? trim($_GET['search']) : '';
     $from_date = isset($_GET['from_date']) ? trim($_GET['from_date']) : '';
     $to_date = isset($_GET['to_date']) ? trim($_GET['to_date']) : '';
@@ -25,6 +26,21 @@ try {
     $defaultFund = (int)(pettyCashAccountId($pdo) ?: 0);
 
     $offset = ($page - 1) * $limit;
+
+    // Optional sort (petty_cash.php's DataTable): whitelisted by column index.
+    // Column 0 (S/No) is the default newest-first order; descending = oldest first.
+    $sortCols = [1 => 'pt.transaction_date', 2 => 'pt.type', 3 => 'pt.description', 5 => 'pt.reference_number',
+                 6 => 'pt.received_by', 7 => 'u.username',
+                 8 => "(CASE WHEN pt.type = 'deposit' THEN pt.amount ELSE -pt.amount END)"];   // as shown: +in / -out
+    $sortCol = isset($_GET['sort']) ? (int)$_GET['sort'] : 0;
+    $sortDir = strtolower((string)($_GET['dir'] ?? '')) === 'desc' ? 'DESC' : 'ASC';
+    if (isset($sortCols[$sortCol])) {
+        $orderSql = $sortCols[$sortCol] . " $sortDir, pt.id $sortDir";
+    } elseif ($sortCol === 0 && $sortDir === 'DESC' && isset($_GET['sort'])) {
+        $orderSql = "pt.transaction_date ASC, pt.created_at ASC";
+    } else {
+        $orderSql = "pt.transaction_date DESC, pt.created_at DESC";
+    }
 
     // Build query conditions
     $whereClause = "WHERE 1=1";
@@ -84,7 +100,7 @@ try {
         LEFT JOIN accounts ea ON pt.expense_account_id = ea.account_id
         LEFT JOIN accounts sa ON pt.source_account_id = sa.account_id
         $whereClause
-        ORDER BY pt.transaction_date DESC, pt.created_at DESC
+        ORDER BY $orderSql
         LIMIT $limit OFFSET $offset
     ";
     

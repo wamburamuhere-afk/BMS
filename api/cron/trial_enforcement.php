@@ -335,8 +335,18 @@ try {
         }
     }
 
+    // ── Company activity alerts: first product / first sale / inactive ─────
+    $activity = ['scanned' => 0, 'sent' => []];
+    try {
+        require_once __DIR__ . '/../../core/tenant_activity_alerts.php';
+        $activity = runTenantActivityAlerts();
+    } catch (Throwable $e) {
+        error_log('trial_enforcement activity alerts: ' . $e->getMessage());
+    }
+
     echo json_encode([
         'ok'                      => true,
+        'activity_alerts'         => count($activity['sent']),
         'trial_grace_started'     => $trialGraceStarted,
         'trial_suspended'         => $trialSuspended,
         'sub_grace_started'       => $subGraceStarted,

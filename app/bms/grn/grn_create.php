@@ -497,7 +497,7 @@ function generate_grn_number() {
                                                 <div class="text-end">
                                                     <strong><?= t('Total Items:') ?> <span id="totalItems">0</span></strong><br>
                                                     <?php if (!$is_dn): ?>
-                                                    <strong><?= t('Total Value:') ?> <span id="totalValue">0.00</span> TZS</strong>
+                                                    <strong><?= t('Total Value:') ?> <span id="totalValue">0.00</span> <?= htmlspecialchars(bmsCompanyCurrency()) ?></strong>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
@@ -947,7 +947,7 @@ function addItemRow(product = null) {
             </td>
             <td class="<?= $is_dn ? 'd-none' : '' ?>">
                 <div class="input-group">
-                    <span class="input-group-text">TZS</span>
+                    <span class="input-group-text"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                     <input type="number" class="form-control item-price"
                            name="items[${index}][unit_price]"
                            min="0" step="0.01" value="${product ? product.unit_price || 0 : 0}"
@@ -979,7 +979,7 @@ function addItemRow(product = null) {
             </td>
             <td class="<?= $is_dn ? 'd-none' : '' ?>">
                 <span class="item-total">0.00</span>
-                <span class="ms-1">TZS</span>
+                <span class="ms-1"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
             </td>
             <td>
                 <button type="button" class="btn btn-sm btn-danger" onclick="removeItemRow(${index})">

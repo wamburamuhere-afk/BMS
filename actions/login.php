@@ -55,11 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($__tenantId !== null) {
                 $_SESSION['tenant_id'] = $__tenantId;
                 // Update last_active_at in the control DB for the tenant dashboard
+                // (+ the superadmin's "first sign-in" alert, core/tenant_activity_alerts.php)
                 try {
                     if (function_exists('getControlPdo')) {
-                        getControlPdo()->prepare(
-                            "UPDATE tenants SET last_active_at = NOW() WHERE id = ?"
-                        )->execute([$__tenantId]);
+                        require_once __DIR__ . '/../core/tenant_activity_alerts.php';
+                        taaMarkActive($__tenantId, 'web');
                     }
                 } catch (Throwable $__e) {
                     // Non-fatal: never block a login because of a control-DB hiccup
@@ -89,6 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_COOKIE['bms_lang']) && in_array($_COOKIE['bms_lang'], ['en', 'sw'], true)) {
             $_SESSION['user_lang'] = $_COOKIE['bms_lang'];
         }
+        // Organization-wide language (if set) is applied by header.php on the first
+        // page load. Not here: this file loads only includes/config.php, not core/i18n.php.
 
         $response['success'] = true;
     } else {

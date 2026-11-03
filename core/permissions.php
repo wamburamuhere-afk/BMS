@@ -503,6 +503,7 @@ function getPagePermissionMapping()
         // Sales
         'sales_orders.php' => 'sales_orders',
         'pos.php' => 'pos',
+        'receive_stock.php' => 'pos_restock',
         'quotations.php' => 'quotations',
         'sales_returns.php' => 'sales_returns',
         'lpos.php' => 'lpo',

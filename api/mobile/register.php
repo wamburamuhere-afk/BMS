@@ -18,7 +18,8 @@
  *
  * Fields:
  *   company_name            required
- *   owner_phone             required  — becomes the BMS login username
+ *   owner_phone             required  — digits (spaces, dashes, dots, brackets ignored), 7–15
+ *   owner_username          optional  — login name, as on the web signup; empty = the phone
  *   owner_password          required  — min 8 chars, letter + digit
  *   owner_password_confirm  required
  *   owner_first_name        optional
@@ -69,7 +70,10 @@ if ($contentType === 'application/json') {
 }
 
 $company    = trim((string)($body['company_name']  ?? ''));
-$phone      = preg_replace('/\s+/', '', (string)($body['owner_phone'] ?? ''));
+// Spaces, dashes, dots and brackets are formatting — same rule as the web signup (registerTenant()).
+$phone      = preg_replace('/[\s().\-]+/', '', (string)($body['owner_phone'] ?? ''));
+// Optional login name, as on the web signup; empty = the phone number (older app builds).
+$username   = trim((string)($body['owner_username'] ?? ''));
 $pw         = (string)($body['owner_password']         ?? '');
 $pwConf     = (string)($body['owner_password_confirm'] ?? '');
 $firstName  = trim((string)($body['owner_first_name']  ?? ''));
@@ -92,6 +96,17 @@ if ($phone === '') {
     echo json_encode(['success' => false, 'message' => 'Phone number is required.']);
     exit;
 }
+if (!preg_match('/^\+?[0-9]{7,15}$/', $phone)) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Please enter a valid phone number (digits only, 7–15 characters).']);
+    exit;
+}
+if ($username !== '' && !preg_match('/^[A-Za-z][A-Za-z0-9._-]{2,49}$/', $username)) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Username must start with a letter and use only letters, numbers, dots, hyphens or underscores (3–50 characters).']);
+    exit;
+}
+$loginName = $username !== '' ? $username : $phone;
 if (mb_strlen($pw) < 8 || !preg_match('/[a-zA-Z]/', $pw) || !preg_match('/[0-9]/', $pw)) {
     logRegistrationAttempt($ip, $phone, null, 'rejected', 'weak password');
     http_response_code(422);
@@ -183,7 +198,7 @@ if ($row = $existingJob->fetch(PDO::FETCH_ASSOC)) {
         'status'       => 'provisioning',
         'job_id'       => $row['job_id'],
         'message'      => 'Your account is already being set up. Please wait about 1 minute then log in.',
-        'username'     => $phone,
+        'username'     => $loginName,
         'subdomain'    => $row['subdomain'],
         'tenant_url'   => $tenantUrl,
         'poll_url'     => 'GET api/mobile/register_status.php?job_id=' . $row['job_id'],
@@ -229,6 +244,12 @@ if ($planChoice['plan'] && controlColumnExists('registration_jobs', 'plan_key'))
     array_push($jobCols, 'plan_key', 'plan_term');
     array_push($jobVals, $planChoice['plan']['plan_key'], $planChoice['term_key']);
 }
+if ($username !== '' && controlColumnExists('registration_jobs', 'owner_username')) {
+    $jobCols[] = 'owner_username';
+    $jobVals[] = $username;
+}
+// Smart BMS is not self-service: built now, locked until a superadmin approves (same as the web).
+$pendingApproval = (string)($planChoice['plan']['product_key'] ?? '') === 'bms_full';
 $cpdo->prepare("INSERT INTO registration_jobs (" . implode(', ', $jobCols) . ")
                 VALUES (" . implode(',', array_fill(0, count($jobCols), '?')) . ")")->execute($jobVals);
 
@@ -244,10 +265,11 @@ echo json_encode([
     'status'       => 'provisioning',
     'job_id'       => $jobId,
     'message'      => 'Account created! Your BMS system is being set up — this usually takes about 1 minute.',
-    'username'     => $phone,
+    'username'     => $loginName,
     'subdomain'    => $subdomain,
     'tenant_url'   => $tenantUrl,
-    'note'         => 'Use your phone number as your username when you log in.',
+    'note'         => $username !== '' ? 'Use your username to log in.' : 'Use your phone number as your username when you log in.',
+    'pending_approval' => $pendingApproval,
     'poll_url'     => 'GET api/mobile/register_status.php?job_id=' . $jobId,
     'poll_seconds' => 5,
 ]);

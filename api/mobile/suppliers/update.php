@@ -49,6 +49,10 @@ try {
         ->execute($params);
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: updated supplier #$supplier_id ($supplier_name)");
+    logAudit($pdo, $_SESSION['user_id'], 'update_supplier', [
+        'activity_type' => 'supplier', 'entity_type' => 'supplier', 'entity_id' => $supplier_id,
+        'description'   => 'Edited from mobile',
+    ]);
     echo json_encode(['success'=>true,'message'=>'Supplier updated successfully']);
 } catch (Throwable $e) {
     error_log('mobile/suppliers/update.php: ' . $e->getMessage());

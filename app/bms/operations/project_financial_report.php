@@ -208,19 +208,19 @@ try {
         <div class="col-3">
             <div class="stat-card">
                 <div class="stat-label">Total Revenue</div>
-                <div class="stat-value"><?= format_currency($total_revenue) ?> TZS</div>
+                <div class="stat-value"><?= format_currency($total_revenue) ?> <?= htmlspecialchars(bmsCompanyCurrency()) ?></div>
             </div>
         </div>
         <div class="col-3">
             <div class="stat-card">
                 <div class="stat-label">Total Expenses</div>
-                <div class="stat-value"><?= format_currency($total_expense) ?> TZS</div>
+                <div class="stat-value"><?= format_currency($total_expense) ?> <?= htmlspecialchars(bmsCompanyCurrency()) ?></div>
             </div>
         </div>
         <div class="col-3">
             <div class="stat-card">
                 <div class="stat-label">Net Profit</div>
-                <div class="stat-value"><?= format_currency($profit) ?> TZS</div>
+                <div class="stat-value"><?= format_currency($profit) ?> <?= htmlspecialchars(bmsCompanyCurrency()) ?></div>
             </div>
         </div>
         <div class="col-3">

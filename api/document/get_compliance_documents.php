@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $draw = $_GET['draw'] ?? 1;
 $start = $_GET['start'] ?? 0;
-$length = $_GET['length'] ?? 10;
+$length = dt_page_length($_GET['length'] ?? null, 10);
 $type = $_GET['type'] ?? '';
 $status = $_GET['status'] ?? '';
 

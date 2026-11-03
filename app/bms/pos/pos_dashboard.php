@@ -40,7 +40,9 @@ $company_logo = getSetting('company_logo', '');
             <button id="btnToggleDash" class="btn btn-primary btn-sm pos-workspace-action">
                 <i class="bi bi-speedometer2 me-1"></i> <?= t('Sales Dashboard') ?>
             </button>
-            <a id="posWorkspaceShiftHistory" href="<?= getUrl('pos/shifts') ?>" class="btn btn-primary btn-sm pos-workspace-action">
+            <!-- Phones/tablets (<lg): Shift History lives in the ☰ side menu (My Business) so this
+                 row stays just Sales Dashboard + Start Selling. Still in the DOM, shown from lg up. -->
+            <a id="posWorkspaceShiftHistory" href="<?= getUrl('pos/shifts') ?>" class="btn btn-primary btn-sm pos-workspace-action d-none d-lg-inline-block">
                 <i class="bi bi-clock-history me-1"></i> <?= t('Shift History') ?>
             </a>
             <a id="posWorkspaceOpenPos" href="<?= getUrl('pos') ?>" class="btn btn-primary btn-sm pos-workspace-action">
@@ -60,7 +62,9 @@ $company_logo = getSetting('company_logo', '');
         'settings'          => 'bi-gear',
     ];
     ?>
-    <div class="row g-3 mb-4">
+    <!-- Hub cards: shown from lg up. On phones/tablets (<lg) the same destinations
+         (Who Owes Me, Catalog Setup, Restaurant, Settings) are in the ☰ side menu instead. -->
+    <div class="row g-3 mb-4 d-none d-lg-flex">
         <?php foreach ($pos_nav_groups as $navCard): ?>
         <div class="col-6 col-md-4 col-lg">
             <?php
@@ -712,6 +716,14 @@ $company_logo = getSetting('company_logo', '');
 <script>
 const DASH_URL    = '<?= buildUrl('api/pos/get_dashboard.php') ?>';
 const GET_SALES   = '<?= buildUrl('api/pos/get_sales.php') ?>';
+// Record Old Sale — a sale typed in later for an earlier day gets a small badge;
+// hovering it shows when it was entered.
+const T_OLD_SALE  = <?= json_encode(t('Old sale')) ?>;
+const T_ENTERED   = <?= json_encode(t('Entered %s')) ?>;
+function oldSaleBadge(r) {
+    if (!r || !Number(r.is_past_entry)) return '';
+    return ' <span class="badge bg-primary" title="' + safeOutput(T_ENTERED.replace('%s', r.created_at || '')) + '">' + safeOutput(T_OLD_SALE) + '</span>';
+}
 const GET_ITEMS   = '<?= buildUrl('api/pos/get_sale_items.php') ?>';
 const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';
 const RETURN_URL  = '<?= buildUrl('api/pos/create_return.php') ?>';
@@ -746,6 +758,7 @@ const T = {
     noSalesThisMonth: <?= json_encode(t('No sales this month')) ?>,
     netSalesLabel: <?= json_encode(t('Net Sales')) ?>,
     salesHistoryPrintTitle: <?= json_encode(wLabel('POS Sales History', 'Sales History')) ?>,
+    actions: <?= json_encode(t('Actions')) ?>,
     viewReceipt: <?= json_encode(t('View Receipt')) ?>,
     receivePayment: <?= json_encode(t('Receive Payment')) ?>,
     returnRefund: <?= json_encode(t('Return / Refund')) ?>,
@@ -908,7 +921,7 @@ function initDashboardTables() {
     dtLowStock = $('#lowStockTable').DataTable({
         responsive: false, pageLength: 10, dom: 'tip', order: [[2,'asc']],
         columns: [
-            { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
+            BMSSerial.column({ className: 'text-center text-muted' }),
             { data: 'name', render: d => caseFormatJs(d) },
             { data: 'current', className: 'text-end fw-bold',
               render: (d,t,r) => `<span class="${d<=0?'text-danger':'text-primary'}">${(+d).toLocaleString()}</span>` },
@@ -920,8 +933,8 @@ function initDashboardTables() {
     dtRecent = $('#recentSalesTable').DataTable({
         responsive: false, pageLength: 8, dom: 'tip', order: [],
         columns: [
-            { data: null, orderable: false, className: 'text-center text-muted', render: (d,t,r,m) => m.row+1 },
-            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
+            BMSSerial.column({ className: 'text-center text-muted' }),
+            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
             { data: 'party', render: d => caseFormatJs(d) },
             { data: 'grand_total', className: 'text-end fw-bold', render: d => money(d) },
             { data: 'sale_status', render: d => statusBadge(d) }
@@ -941,14 +954,23 @@ function payBadge(row) {
     return html;
 }
 
-function actionMenu(row) {
+// One source for the row's named actions — used by the desktop table AND the phone cards,
+// so both show the same real names (View Receipt / Receive Payment / Return-Refund / Void Sale).
+function actionItems(row) {
     let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> ${T.viewReceipt}</a></li>`;
     if (CAN_EDIT   && row.can_receive) items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> ${T.receivePayment}</button></li>`;
     if (CAN_CREATE && row.can_return)  items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> ${T.returnRefund}</button></li>`;
     if (CAN_DELETE && row.can_void)    items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')"><i class="bi bi-x-octagon text-danger me-2"></i> ${T.voidSaleLabel}</button></li>`;
-    return `<div class="dropdown d-flex justify-content-end">
-        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-gear-fill me-1"></i></button>
-        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${items}</ul>
+    return items;
+}
+
+// The toggle carries the word "Actions" (not just a gear) so it is clear what it is.
+// block=true → full-width button for the phone cards. strategy:fixed keeps the menu
+// from being clipped by the card / bottom bar.
+function actionMenu(row, block) {
+    return `<div class="dropdown ${block ? 'w-100' : 'd-flex justify-content-end'}">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2${block ? ' w-100' : ''}" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear-fill me-1"></i> ${T.actions}</button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${actionItems(row)}</ul>
     </div>`;
 }
 
@@ -994,8 +1016,8 @@ function initHistoryTable() {
             }
         ],
         columns: [
-            { data: null,             orderable: false, className: 'text-muted', render: (d,t,r,m) => m.row+1 },
-            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) },
+            BMSSerial.column({ className: 'text-muted' }),
+            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
             { data: 'sale_date',      render: d => fmt(d) },
             { data: 'party',          render: d => caseFormatJs(d) },
             { data: 'grand_total',    className: 'text-end fw-bold', render: d => money(d) },
@@ -1237,23 +1259,20 @@ function renderCards(rows) {
     if (!rows.length) { $('#cardView').html('<div class="col-12 text-center py-5 text-muted">' + T.noRecordsFound + '</div>'); return; }
     let html = '';
     rows.forEach((row, i) => {
-        let actions = `<a class="btn btn-sm btn-outline-primary" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-receipt"></i></a>`;
-        if (CAN_EDIT   && row.can_receive) actions += `<button class="btn btn-sm btn-outline-primary" onclick="openReceive(${row.sale_id})" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-cash-coin"></i></button>`;
-        if (CAN_CREATE && row.can_return)  actions += `<button class="btn btn-sm btn-outline-primary" onclick="openReturn(${row.sale_id})" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-arrow-return-left"></i></button>`;
-        if (CAN_DELETE && row.can_void)    actions += `<button class="btn btn-sm btn-outline-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')" style="flex:1;padding:3px 4px;font-size:.72rem"><i class="bi bi-x-octagon"></i></button>`;
+        const actions = actionMenu(row, true);
         html += `
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between">
-                        <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number)}</div>
+                        <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number) + oldSaleBadge(row)}</div>
                         <div>${statusBadge(row.sale_status)}</div>
                     </div>
                     <small class="text-muted">${caseFormatJs(row.party)} &middot; ${fmt(row.sale_date)}</small>
                     <div class="fw-bold text-primary mt-1">${CURRENCY} ${money(row.grand_total)}</div>
                 </div>
                 <div class="card-footer bg-white border-top p-0">
-                    <div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${actions}</div>
+                    <div style="padding:8px;">${actions}</div>
                 </div>
             </div>
         </div>`;

@@ -109,7 +109,7 @@ const LEAD_VIEW    = '<?= getUrl('crm/lead_view') ?>';
 const CAN_EDIT     = <?= json_encode($can_edit) ?>;
 const CAN_CONVERT  = <?= json_encode($can_convert) ?>;
 const CSRF         = '<?= csrf_token() ?>';
-const fmt = n => 'TZS ' + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmt = n => '<?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0});
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 let _pendingMove = null; // {leadId, newStageId, fromStageId, cardEl, fromEl}
@@ -247,7 +247,7 @@ function openQuickView(id) {
                 <span class="badge" style="background:${scoreCol}22;color:${scoreCol};border:1px solid ${scoreCol}">Score: ${d.lead_score||0}</span>
             </div>
             <table class="table table-sm table-borderless mb-3" style="font-size:.84rem">
-                <tr><td class="text-muted">Value</td><td class="fw-bold text-primary">TZS ${fmt(d.lead_value)}</td></tr>
+                <tr><td class="text-muted">Value</td><td class="fw-bold text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${fmt(d.lead_value)}</td></tr>
                 <tr><td class="text-muted">Probability</td><td>${d.probability}%</td></tr>
                 <tr><td class="text-muted">Source</td><td>${esc(d.lead_source||'—')}</td></tr>
                 ${d.assigned_name ? `<tr><td class="text-muted">Assigned</td><td>${esc(d.assigned_name)}</td></tr>` : ''}

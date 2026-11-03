@@ -291,3 +291,44 @@ if (!function_exists('assertJournalNotPosted')) {
         // status === 'draft' → safe to edit; return without throwing.
     }
 }
+
+if (!function_exists('backfillReversalWarehouses')) {
+    /**
+     * One-time repair: reversal entries posted before reversals inherited the
+     * original's warehouse_id were saved with warehouse_id NULL, so a per-shop
+     * report kept the original (e.g. a voided POS sale) and lost its reversal.
+     * Copies the original entry's warehouse_id onto each such reversal, linked by:
+     *   - '<base>_void' entity_type → '<base>' entry with the same entity_id
+     *     (reverseAccrualEntry, payment_void, books_transaction_void, …)
+     *   - reverses_entry_id → the entry it reverses (manual journal reversal)
+     * (bill_vat_remediation only ever applied to bills older than warehouse
+     * tagging, so it has nothing to inherit.) Only fills NULLs, so it is idempotent and never re-tags an entry.
+     *
+     * @return int rows updated
+     */
+    function backfillReversalWarehouses(PDO $pdo): int
+    {
+        $n = 0;
+        // MIN() keeps the pick deterministic should an entity have two originals.
+        $n += $pdo->exec("
+            UPDATE journal_entries r
+              JOIN (SELECT entity_type, entity_id, MIN(warehouse_id) AS wid
+                      FROM journal_entries
+                     WHERE warehouse_id IS NOT NULL AND entity_id IS NOT NULL
+                     GROUP BY entity_type, entity_id) o
+                ON CONCAT(o.entity_type, '_void') = r.entity_type
+               AND o.entity_id = r.entity_id
+               SET r.warehouse_id = o.wid
+             WHERE r.warehouse_id IS NULL
+               AND r.entity_type LIKE '%\\_void'
+        ");
+        $n += $pdo->exec("
+            UPDATE journal_entries r
+              JOIN journal_entries o ON o.entry_id = r.reverses_entry_id
+               SET r.warehouse_id = o.warehouse_id
+             WHERE r.warehouse_id IS NULL
+               AND o.warehouse_id IS NOT NULL
+        ");
+        return (int)$n;
+    }
+}

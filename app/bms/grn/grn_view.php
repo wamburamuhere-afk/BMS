@@ -362,8 +362,8 @@ logAudit($pdo, $_SESSION['user_id'], "view", [
                                     <th><?= t('Product / Item') ?></th>
                                     <th class="text-center" style="width: 150px;"><?= t('Quantity') ?></th>
                                     <?php if (!$is_dn): ?>
-                                    <th class="text-end" style="width: 150px;"><?= t('Unit Price (TZS)') ?></th>
-                                    <th class="text-end pe-4" style="width: 150px;"><?= t('Total (TZS)') ?></th>
+                                    <th class="text-end" style="width: 150px;"><?= str_replace('TZS', bmsCompanyCurrency(), t('Unit Price (TZS)')) ?></th>
+                                    <th class="text-end pe-4" style="width: 150px;"><?= str_replace('TZS', bmsCompanyCurrency(), t('Total (TZS)')) ?></th>
                                     <?php endif; ?>
                                 </tr>
                             </thead>

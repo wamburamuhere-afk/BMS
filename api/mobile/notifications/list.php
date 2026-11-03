@@ -22,6 +22,9 @@ $user_id = (int)$_SESSION['user_id'];
 
 // Initialise all groups in the same order the web dashboard shows them.
 $groups = [
+    // The web's header banner (core/tenant_bootstrap.php): last 7 days before the
+    // trial / subscription ends, then the grace period. Shown to every user.
+    'subscription' => ['key' => 'subscription', 'title' => 'Subscription',             'color' => 'danger',  'items' => []],
     'invoices'    => ['key' => 'invoices',    'title' => 'Invoices & Payments',        'color' => 'warning', 'items' => []],
     'products'    => ['key' => 'products',    'title' => 'Inventory & Products',        'color' => 'danger',  'items' => []],
     'approvals'   => ['key' => 'approvals',   'title' => 'Pending Approvals',           'color' => 'primary', 'items' => []],
@@ -592,6 +595,34 @@ try {
         $engine_notifications['items'][] = $row;
     }
 } catch (PDOException $e) {}
+
+// ── Subscription ending / grace (same wording as the web banner) ─────────────
+if (function_exists('bmsCurrentTenant') && ($__t = bmsCurrentTenant())) {
+    require_once __DIR__ . '/../../../core/tenant_lifecycle_policy.php';
+    $__ends = tenantAccessEndsAt($__t);
+    $__days = tenantDaysRemaining($__t);
+    $__trial = (string)($__t['status'] ?? '') === 'trial';
+    $__when = fn(int $d) => $d === 0 ? 'today' : ($d === 1 ? 'tomorrow' : "in $d days");
+    if ($__ends !== null && $__days !== null && $__days >= 0 && $__days <= 7) {
+        $groups['subscription']['items'][] = [
+            'type'      => $__trial ? 'trial_ending' : 'subscription_ending',
+            'id'        => 0,
+            'reference' => substr($__ends, 0, 10),
+            'days_left' => $__days,
+            'message'   => ($__trial ? 'Your free trial ends ' : 'Your subscription ends ') . $__when($__days) . '.',
+        ];
+    } elseif ($__ends !== null && $__days !== null && $__days < 0 && !empty($__t['grace_until'])) {
+        $__g = max(0, (int)floor((strtotime(substr((string)$__t['grace_until'], 0, 10)) - strtotime('today')) / 86400));
+        $groups['subscription']['items'][] = [
+            'type'      => 'subscription_grace',
+            'id'        => 0,
+            'reference' => substr((string)$__t['grace_until'], 0, 10),
+            'days_left' => $__g,
+            'message'   => ($__trial ? 'Your free trial has ended. ' : 'Your subscription has ended. ')
+                         . ($__g === 0 ? 'Your grace period expires today.' : "Your grace period ends in $__g day" . ($__g === 1 ? '' : 's') . '.'),
+        ];
+    }
+}
 
 // ── Build output: only non-empty groups, preserving dashboard order ───────────
 $output_groups = [];

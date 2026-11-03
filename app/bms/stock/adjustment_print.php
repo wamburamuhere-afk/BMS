@@ -124,7 +124,7 @@ try {
                 <td><?= htmlspecialchars($adjustment['barcode']) ?></td>
             </tr>
             <tr>
-                <th><?= t('Warehouse') ?></th>
+                <th><?= wLabel('Warehouse', 'Shop') ?></th>
                 <td><?= htmlspecialchars($adjustment['warehouse_name']) ?></td>
             </tr>
             <?php if ($adjustment['location_name']): ?>

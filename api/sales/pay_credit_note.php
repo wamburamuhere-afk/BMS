@@ -117,7 +117,7 @@ try {
     require_once __DIR__ . '/../../helpers.php';
     $user_name = $_SESSION['username'] ?? 'User';
     logActivity($pdo, $_SESSION['user_id'], 'Refund Credit Note',
-        "$user_name refunded Credit Note #{$cn['credit_note_number']} (TZS " . number_format($amount, 2) . ")");
+        "$user_name refunded Credit Note #{$cn['credit_note_number']} (" . bmsCompanyCurrency() . " " . number_format($amount, 2) . ")");
     if (function_exists('logAudit')) {
         logAudit($pdo, $_SESSION['user_id'], 'credit_note_paid', [
             'entity_type' => 'credit_note', 'entity_id' => $id,

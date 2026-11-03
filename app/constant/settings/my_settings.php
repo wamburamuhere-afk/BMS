@@ -118,7 +118,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // NEXT page load reads $_SESSION['user_lang'] directly, so it
             // must be updated here too or it would show the stale language
             // for one more request.
-            $_SESSION['user_lang'] = $prefs['user_language'];
+            // (Organization-wide mode ignores the personal choice entirely.)
+            if (orgLanguage() === null) {
+                $_SESSION['user_lang'] = $prefs['user_language'];
+            }
 
             $success_msg = t("Preferences saved successfully!");
         } catch (Exception $e) {
@@ -374,13 +377,15 @@ $prefs = [
                                         </select>
                                     </div>
 
+                                    <?php if (orgLanguage() === null): ?>
                                     <div class="col-md-6">
-                                        <label for="user_language" class="form-label"><?= t('Language') ?></label>
+                                        <label for="user_language"class="form-label"><?= t('Language') ?></label>
                                         <select class="form-select" id="user_language" name="user_language">
                                             <option value="en" <?= $prefs['user_language'] == 'en' ? 'selected' : '' ?>><?= t('English') ?></option>
                                             <option value="sw" <?= $prefs['user_language'] == 'sw' ? 'selected' : '' ?>><?= t('Kiswahili') ?></option>
                                         </select>
                                     </div>
+                                    <?php endif; ?>
 
                                     <div class="col-md-6">
                                         <label for="user_timezone" class="form-label"><?= t('Timezone') ?></label>

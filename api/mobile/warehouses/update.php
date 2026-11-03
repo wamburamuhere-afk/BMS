@@ -38,7 +38,10 @@ try {
     if (isset($body['email']))   { $sets[] = 'email = ?';   $params[] = trim($body['email'])   ?: null; }
     if (isset($body['contact_person'])) { $sets[] = 'contact_person = ?'; $params[] = trim($body['contact_person']) ?: null; }
     if (isset($body['notes']))   { $sets[] = 'notes = ?';   $params[] = trim($body['notes'])   ?: null; }
-    if (in_array($body['pos_mode'] ?? '', ['retail','restaurant','hybrid'], true)) {
+    // Restaurant POS off, or not Smart POS → pos_mode is ignored, stored value kept.
+    require_once __DIR__ . '/../../../core/pos_nav.php';
+    if (in_array($body['pos_mode'] ?? '', ['retail','restaurant','hybrid'], true)
+        && posModeSelectable()) {
         $sets[] = 'pos_mode = ?'; $params[] = $body['pos_mode'];
     }
     if (in_array($body['status'] ?? '', ['active','inactive'], true)) {

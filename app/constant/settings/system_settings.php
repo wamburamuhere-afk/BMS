@@ -31,11 +31,25 @@ if ($_POST) {
                 'company_email' => $_POST['company_email'] ?? '',
                 'company_website' => $_POST['company_website'] ?? '',
                 'company_type' => $_POST['company_type'] ?? '',
-                'currency' => $_POST['currency'] ?? '',
+                // One of the supported operating currencies (core/currency.php), or the value
+                // already stored (a legacy code such as EUR re-saves unchanged). Anything else,
+                // or an empty post, keeps the current currency instead of blanking it.
+                'currency' => (function () {
+                    $posted  = strtoupper(trim((string)($_POST['currency'] ?? '')));
+                    $current = (string)get_setting('currency', 'TZS');
+                    $allowed = array_keys(bmsSupportedCurrencies());
+                    if ($posted !== '' && (in_array($posted, $allowed, true) || $posted === strtoupper(trim($current)))) {
+                        return $posted;
+                    }
+                    return $current;
+                })(),
                 'timezone' => $_POST['timezone'] ?? '',
                 'date_format' => $_POST['date_format'] ?? '',
                 'items_per_page' => $_POST['items_per_page'] ?? '',
                 'enable_projects' => $_POST['enable_projects'] ?? 0,
+                // Language mode: each user picks their own (default), or one language for the whole organization.
+                'language_mode' => ($_POST['language_mode'] ?? '') === 'organization' ? 'organization' : 'user',
+                'org_language'  => in_array($_POST['org_language'] ?? '', ['en', 'sw'], true) ? $_POST['org_language'] : 'en',
                 // Global "Text Display Case" (2026-09-18) — whitelisted, never
                 // trust the posted value verbatim (see core/text_display_case.php
                 // for what each mode does; textDisplayCaseMode() also re-validates
@@ -96,6 +110,8 @@ if ($_POST) {
                 }
             }
 
+            // Keep Company Profile / the mobile app's key in step with the web's.
+            $settings['company_currency'] = $settings['currency'];
             foreach ($settings as $key => $value) {
                 save_setting($key, $value);
             }
@@ -317,11 +333,20 @@ if ($_POST) {
                                                 <div class="mb-3">
                                                     <label for="currency" class="form-label"><?= t('Currency') ?> *</label>
                                                     <select class="form-control" id="currency" name="currency" required>
-                                                        <option value="USD" <?= get_setting('currency') == 'USD' ? 'selected' : '' ?>><?= t('US Dollar ($)') ?></option>
-                                                        <option value="TZS" <?= get_setting('currency') == 'TZS' ? 'selected' : '' ?>><?= t('Tanzanian Shilling (TSh)') ?></option>
-                                                        <option value="KES" <?= get_setting('currency') == 'KES' ? 'selected' : '' ?>><?= t('Kenyan Shilling (KSh)') ?></option>
-                                                        <option value="EUR" <?= get_setting('currency') == 'EUR' ? 'selected' : '' ?>><?= t('Euro (€)') ?></option>
+                                                        <?php
+                                                        // Supported operating currencies (core/currency.php). A company still on a
+                                                        // legacy code (e.g. EUR) keeps it listed and selected, so saving this form
+                                                        // never changes its currency by accident.
+                                                        $__cur_now = strtoupper(trim((string)get_setting('currency', 'TZS'))) ?: 'TZS';
+                                                        $__cur_list = bmsSupportedCurrencies();
+                                                        if (!isset($__cur_list[$__cur_now])) { ?>
+                                                        <option value="<?= htmlspecialchars($__cur_now) ?>" selected><?= htmlspecialchars($__cur_now) ?></option>
+                                                        <?php }
+                                                        foreach ($__cur_list as $__code => $__meta): ?>
+                                                        <option value="<?= $__code ?>" <?= $__cur_now === $__code ? 'selected' : '' ?>><?= t($__meta['name']) ?> (<?= htmlspecialchars(trim($__meta['symbol'])) ?>)</option>
+                                                        <?php endforeach; ?>
                                                     </select>
+                                                    <div class="form-text"><?= t('Every price, receipt and report uses this currency. A company that is not on TZS issues all its documents in this one currency.') ?></div>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
@@ -388,6 +413,40 @@ if ($_POST) {
                                                 <div class="p-2 px-3 bg-light rounded border fw-bold" id="text_case_preview_box">John Doe Supplies</div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Language mode: per user (default) or one language for the whole organization. -->
+                        <div class="row g-4 mt-1">
+                            <div class="col-12">
+                                <div class="card info-card">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-2 text-dark text-uppercase small letter-spacing-1"><?= t('Language') ?></h6>
+                                        <p class="text-muted small mb-3"><?= t('Choose whether each user picks their own language, or the whole organization uses one language. In organization mode users no longer see a language option in their profile or the top header.') ?></p>
+                                        <?php $lang_mode = get_setting('language_mode', 'user') === 'organization' ? 'organization' : 'user'; $org_lang = get_setting('org_language', 'en') === 'sw' ? 'sw' : 'en'; ?>
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-md-5">
+                                                <label for="language_mode" class="form-label small fw-bold"><?= t('Language mode') ?></label>
+                                                <select class="form-select" id="language_mode" name="language_mode">
+                                                    <option value="user" <?= $lang_mode === 'user' ? 'selected' : '' ?>><?= t('Per user') ?></option>
+                                                    <option value="organization" <?= $lang_mode === 'organization' ? 'selected' : '' ?>><?= t('Per organization') ?></option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5" id="org_language_wrap" style="<?= $lang_mode === 'organization' ? '' : 'display:none' ?>">
+                                                <label for="org_language" class="form-label small fw-bold"><?= t('Organization language') ?></label>
+                                                <select class="form-select" id="org_language" name="org_language">
+                                                    <option value="en" <?= $org_lang === 'en' ? 'selected' : '' ?>><?= t('English') ?></option>
+                                                    <option value="sw" <?= $org_lang === 'sw' ? 'selected' : '' ?>><?= t('Kiswahili') ?></option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <script>
+                                        document.getElementById('language_mode').addEventListener('change', function () {
+                                            document.getElementById('org_language_wrap').style.display = this.value === 'organization' ? '' : 'none';
+                                        });
+                                        </script>
                                     </div>
                                 </div>
                             </div>

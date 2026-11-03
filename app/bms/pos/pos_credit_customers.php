@@ -62,21 +62,21 @@ $can_delete = canDelete('pos');
             color: #0f5132 !important;
         }
     </style>
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-4">
-            <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
+    <div class="row g-3 mb-4" id="creditStatRow">
+        <div class="col-12 col-md-4">
+            <div class="card custom-stat-card shadow-sm border-0 text-center p-3 stat-total">
                 <h4 class="mb-0 fw-bold" id="stat-total-owed">—</h4>
                 <p class="small mb-0"><?= t('Total Owed') ?></p>
             </div>
         </div>
         <div class="col-6 col-md-4">
-            <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
+            <div class="card custom-stat-card shadow-sm border-0 text-center p-3 stat-overdue">
                 <h4 class="mb-0 fw-bold" id="stat-overdue-count">—</h4>
                 <p class="small mb-0"><?= t('Sales Overdue') ?></p>
             </div>
         </div>
         <div class="col-6 col-md-4">
-            <div class="card custom-stat-card shadow-sm border-0 text-center p-3">
+            <div class="card custom-stat-card shadow-sm border-0 text-center p-3 stat-open">
                 <h4 class="mb-0 fw-bold" id="stat-open-count">—</h4>
                 <p class="small mb-0"><?= t('Open Credit Sales') ?></p>
             </div>
@@ -272,6 +272,7 @@ $(function () {
             cancel: <?= json_encode(t('Cancel')) ?>,
             success: <?= json_encode(t('Success!')) ?>,
             error: <?= json_encode(t('Error')) ?>,
+            actions: <?= json_encode(t('Actions')) ?>,
             view: <?= json_encode(t('View')) ?>,
             repay: <?= json_encode(t('Repay')) ?>,
             edit: <?= json_encode(t('Edit')) ?>,
@@ -352,6 +353,33 @@ $(function () {
         margin-top: 10px;
     }
     .credit-aging-mobile-card .cag-actions .btn { flex: 1; }
+    .credit-aging-mobile-card .cag-actions { justify-content: flex-end; }
+    .credit-aging-mobile-card .cag-actions .dropdown { width: auto; }
+    .credit-aging-mobile-card .cag-actions .dropdown-item { font-size: 0.95rem; }
+}
+
+/* ── Phone summary cards (<768px only; desktop keeps the green cards) — white with a coloured
+   edge bar like the Expenses page; the first card spans the row so nothing hangs half-empty. ── */
+@media (max-width: 767.98px) {
+    #creditStatRow { --bs-gutter-x: .6rem; --bs-gutter-y: .6rem; margin-bottom: .75rem !important; }
+    #creditStatRow .custom-stat-card {
+        background-color: #fff !important;
+        border: 1px solid #e6e9ef !important;
+        border-left: 4px solid #0d6efd !important;
+        border-radius: 10px;
+        text-align: left !important;
+        padding: .6rem .85rem !important;
+        height: 100%;
+    }
+    #creditStatRow .custom-stat-card.stat-overdue { border-left-color: #d97706 !important; }
+    #creditStatRow .custom-stat-card.stat-open    { border-left-color: #0f766e !important; }
+    #creditStatRow .custom-stat-card h4 { color: #12326b !important; font-size: 1.15rem; order: 2; }
+    #creditStatRow .custom-stat-card.stat-total h4 { font-size: 1.4rem; }
+    #creditStatRow .custom-stat-card p {
+        color: #6c7a89 !important; font-size: .68rem; font-weight: 600;
+        letter-spacing: .03em; margin-bottom: .1rem !important; order: 1;
+    }
+    #creditStatRow .custom-stat-card { display: flex; flex-direction: column; }
 }
 </style>
 

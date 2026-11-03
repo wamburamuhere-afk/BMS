@@ -233,7 +233,7 @@ require_once 'header.php';
     $fin_paid        = (float)($order['total_paid']         ?? 0);
     $fin_grand       = (float)($order['grand_total']        ?? 0);
     $fin_outstanding = max(0, $fin_grand - $fin_paid);
-    $fin_currency    = $order['currency'] ?? 'TZS';
+    $fin_currency    = $order['currency'] ?? bmsCompanyCurrency();
     $fin_inv_count   = (int)($order['invoice_count']        ?? 0);
     if ($fin_grand > 0 && $fin_paid >= $fin_grand * 0.999) {
         $billing_label = 'Fully Paid';   $billing_color = 'success';
@@ -280,9 +280,9 @@ require_once 'header.php';
                         <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-box me-1"></i><?= count($orderItems) ?> item<?= count($orderItems) !== 1 ? 's' : '' ?></span>
                         <span class="badge bg-light text-dark border px-2 py-1"><i class="bi bi-layers me-1"></i><?= number_format(array_sum(array_column($orderItems, 'quantity')), 0) ?> units</span>
                         <?php if ((float)($order['tax_amount'] ?? 0) > 0): ?>
-                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= caseFormat($order['currency'] ?? 'TZS') ?> <?= number_format($order['tax_amount'], 2) ?></span>
+                        <span class="badge bg-warning bg-opacity-10 text-warning border px-2 py-1"><i class="bi bi-percent me-1"></i>Tax <?= caseFormat($order['currency'] ?? bmsCompanyCurrency()) ?> <?= number_format($order['tax_amount'], 2) ?></span>
                         <?php endif; ?>
-                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= caseFormat($order['currency'] ?? 'TZS') ?> <?= number_format($order['grand_total'], 2) ?></span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border px-2 py-1 fw-semibold"><i class="bi bi-cash me-1"></i><?= caseFormat($order['currency'] ?? bmsCompanyCurrency()) ?> <?= number_format($order['grand_total'], 2) ?></span>
                     </div>
                 </div>
                 <div class="card-body p-0">

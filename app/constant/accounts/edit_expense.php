@@ -27,7 +27,7 @@ if (!$expense) {
 }
 
 // Fetch Categories
-$categories = $pdo->query("SELECT * FROM expense_categories WHERE status = 'active' ORDER BY category_name")->fetchAll();
+$categories = $pdo->query("SELECT id AS category_id, name AS category_name FROM expense_categories WHERE status = 'active' ORDER BY name")->fetchAll();
 
 // Payment Method Labels
 $method_labels = [

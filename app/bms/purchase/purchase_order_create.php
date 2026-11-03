@@ -48,13 +48,8 @@ $tax_rates = $pdo->query("SELECT * FROM tax_rates WHERE status = 'active' AND ra
 // Get shipping methods
 $shipping_methods = $pdo->query("SELECT * FROM shipping_methods WHERE status = 'active' ORDER BY method_name")->fetchAll(PDO::FETCH_ASSOC);
 
-$currencies = [
-    'TZS' => 'Tanzanian Shilling',
-    'USD' => 'US Dollar',
-    'EUR' => 'Euro',
-    'GBP' => 'British Pound',
-    'KES' => 'Kenyan Shilling'
-];
+// TZS company: the same 5 currencies as before. Other company: only its own (core/currency.php).
+$currencies = bmsDocumentCurrencies();
 
 // Get projects if enabled. $enable_projects now reflects BOTH the
 // superadmin's platform grant AND the tenant's own "Enable Projects Module"
@@ -368,7 +363,7 @@ if ($is_edit) {
                                                 </td>
                                                 <td>
                                                     <div class="input-group">
-                                                        <span class="input-group-text bg-light cur-symbol">TSh </span>
+                                                        <span class="input-group-text bg-light cur-symbol"><?= htmlspecialchars(bmsCurrencySymbol()) ?></span>
                                                         <input type="number" class="form-control price-input" name="price" value="<?= $item['unit_price'] ?>" min="0" step="0.01" oninput="calculateRowTotal('<?= $rowId ?>')" required>
                                                     </div>
                                                 </td>
@@ -397,7 +392,7 @@ if ($is_edit) {
                                 <tfoot>
                                     <tr class="bg-light">
                                         <td colspan="5" class="text-end fw-bold"><?= t('Subtotal:') ?></td>
-                                        <td class="text-end fw-bold pt-3" id="subtotal_display">TSh 0.00</td>
+                                        <td class="text-end fw-bold pt-3" id="subtotal_display"><?= htmlspecialchars(bmsCurrencySymbol()) ?>0.00</td>
                                         <td></td>
                                     </tr>
                                 </tfoot>
@@ -507,7 +502,7 @@ if ($is_edit) {
                                 <hr class="my-3">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h4 class="mb-0 fw-bold text-dark"><?= t('Total Value') ?></h4>
-                                    <h4 class="mb-0 fw-bold text-primary" id="summary-grand-total">TSh 0.00</h4>
+                                    <h4 class="mb-0 fw-bold text-primary" id="summary-grand-total"><?= htmlspecialchars(bmsCurrencySymbol()) ?>0.00</h4>
                                 </div>
                             </div>
                         </div>
@@ -696,7 +691,7 @@ $(document).ready(function() {
     $('#supplier_id').on('change', function() {
         const option = $(this).find('option:selected');
         if (option.val()) {
-            $('#currency').val(option.data('currency') || 'TZS');
+            $('#currency').val(option.data('currency') || <?= json_encode(bmsCompanyCurrency()) ?>);
 
             // Set payment terms from supplier
             const terms = option.data('terms');
@@ -861,7 +856,7 @@ $(document).on('change', '#rfq_reference', function() {
                     </td>
                     <td>
                         <div class="input-group">
-                            <span class="input-group-text bg-light cur-symbol">TSh </span>
+                            <span class="input-group-text bg-light cur-symbol"><?= htmlspecialchars(bmsCurrencySymbol()) ?></span>
                             <input type="number" class="form-control price-input" name="price" value="${price}" min="0" step="0.01" oninput="calculateRowTotal('${rowId}')" required>
                         </div>
                     </td>
@@ -1041,7 +1036,7 @@ function addItemRow() {
             </td>
             <td>
                 <div class="input-group">
-                    <span class="input-group-text bg-light cur-symbol">TSh </span>
+                    <span class="input-group-text bg-light cur-symbol"><?= htmlspecialchars(bmsCurrencySymbol()) ?></span>
                     <input type="number" class="form-control price-input" name="price" value="0.00" min="0" step="0.01" oninput="calculateRowTotal('${rowId}')" required>
                 </div>
             </td>
@@ -1095,7 +1090,7 @@ function addEditItemRow(item) {
             </td>
             <td>
                 <div class="input-group">
-                    <span class="input-group-text bg-light cur-symbol">TSh </span>
+                    <span class="input-group-text bg-light cur-symbol"><?= htmlspecialchars(bmsCurrencySymbol()) ?></span>
                     <input type="number" class="form-control price-input" name="price" value="${item.unit_price}" min="0" step="0.01" oninput="calculateRowTotal('${rowId}')" required>
                 </div>
             </td>

@@ -167,7 +167,13 @@ try {
     ];
     $orderCol = intval($_GET['order'][0]['column'] ?? 6);
     $orderDir = (($_GET['order'][0]['dir'] ?? 'desc') === 'asc') ? 'ASC' : 'DESC';
-    $orderSQL = 'ORDER BY ' . ($colMap[$orderCol] ?? 'us.login_at') . ' ' . $orderDir;
+    if (isset($colMap[$orderCol])) {
+        $orderSQL = 'ORDER BY ' . $colMap[$orderCol] . ' ' . $orderDir . ', us.id ' . $orderDir;
+    } else {
+        // S/No (column 0) = the normal newest-first order, reversed when descending.
+        $d = ($orderCol === 0 && $orderDir === 'DESC') ? 'ASC' : 'DESC';
+        $orderSQL = "ORDER BY us.login_at $d, us.id $d";
+    }
 
     // Data rows
     $limitSQL = $length > 0 ? "LIMIT " . intval($start) . ", " . intval($length) : "";

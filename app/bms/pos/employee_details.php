@@ -1944,7 +1944,7 @@ $(document).ready(function() {
                     dom: 'frtip',
                     pageLength: 10,
                     order: [],
-                    columnDefs: [{ orderable: false, targets: 'no-sort' }],
+                    columnDefs: [$.extend({ targets: 0 }, BMSSerial.column()), { orderable: false, targets: 'no-sort' }],
                     language: {
                         search: "_INPUT_",
                         searchPlaceholder: "Search...",

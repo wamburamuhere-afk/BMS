@@ -120,3 +120,94 @@ if (!function_exists('posShiftReportExtras')) {
         ];
     }
 }
+
+if (!function_exists('posSaleDrawerCashOwed')) {
+    /**
+     * How much cash a sale still has sitting in the cash drawer ledger.
+     *
+     * Reads cash_register_transactions, not pos_sales: the drawer ledger is what
+     * the POS header's "Cash Balance" sums, so reversing a sale against it keeps
+     * that figure honest whatever the sale's payment method was. A credit sale
+     * that took a deposit, a split sale and a settled credit sale all leave cash
+     * in the drawer even though pos_sales.payment_method is not 'cash'.
+     *
+     * received = cash the drawer took in for this sale (the sale row + any later
+     *            'cash_in' settlements). Rows are matched by sale_id; a split
+     *            sale's row has no sale_id, so it is matched by receipt number.
+     * refunded = what earlier voids already took back out (reason 'Void: …').
+     *
+     * @return array{received: float, refunded: float, owed: float}
+     */
+    function posSaleDrawerCashOwed(PDO $pdo, int $saleId, string $receiptNumber): array
+    {
+        $byReceipt = $receiptNumber !== '' ? ' OR (sale_id IS NULL AND reference_number = ?)' : '';
+        $stmt = $pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN transaction_type IN ('sale', 'cash_in') AND payment_method = 'cash' THEN amount ELSE 0 END), 0) AS received,
+                COALESCE(SUM(CASE WHEN transaction_type = 'refund' AND reason LIKE 'Void:%' THEN amount ELSE 0 END), 0) AS refunded
+              FROM cash_register_transactions
+             WHERE sale_id = ?{$byReceipt}
+        ");
+        $stmt->execute($receiptNumber !== '' ? [$saleId, $receiptNumber] : [$saleId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $received = round((float)($row['received'] ?? 0), 2);
+        $refunded = round((float)($row['refunded'] ?? 0), 2);
+        return ['received' => $received, 'refunded' => $refunded, 'owed' => max(0.0, round($received - $refunded, 2))];
+    }
+}
+
+if (!function_exists('posFixVoidedSaleDrawerCash')) {
+    /**
+     * One-off repair for sales voided before void_sale.php took back every cash
+     * leg: adds the missing 'Void:' refund to each OPEN shift's drawer ledger.
+     * Closed shifts are left alone — they were reconciled at close.
+     *
+     * Idempotent: the amount comes from posSaleDrawerCashOwed(), which counts the
+     * refunds already there, so a second run finds nothing owed.
+     *
+     * @return int number of corrective refund rows added
+     */
+    function posFixVoidedSaleDrawerCash(PDO $pdo): int
+    {
+        // Cash the drawer took in during OPEN shifts — a small set. Sales are looked
+        // up per row (by id, or by receipt for a split sale's row that has no
+        // sale_id) rather than joined in SQL, because pos_sales and the drawer
+        // table do not share a collation on every database.
+        $rows = $pdo->query("
+            SELECT c.shift_id, c.sale_id, c.reference_number, sh.user_id AS shift_user
+              FROM cash_register_transactions c
+              JOIN cash_register_shifts sh ON sh.shift_id = c.shift_id AND sh.status = 'active'
+             WHERE c.transaction_type IN ('sale', 'cash_in') AND c.payment_method = 'cash'
+          ORDER BY c.transaction_id
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $byId      = $pdo->prepare("SELECT sale_id, receipt_number, sale_status, is_return_sale, voided_by FROM pos_sales WHERE sale_id = ?");
+        $byReceipt = $pdo->prepare("SELECT sale_id, receipt_number, sale_status, is_return_sale, voided_by FROM pos_sales WHERE receipt_number = ?");
+        $insert    = $pdo->prepare("
+            INSERT INTO cash_register_transactions
+                   (shift_id, transaction_type, amount, payment_method, reference_number, sale_id, reason, created_by, created_at)
+            VALUES (?, 'refund', ?, 'cash', ?, ?, 'Void: cash taken at the till returned (auto-correction)', ?, NOW())
+        ");
+        $added = 0;
+        foreach ($rows as $r) {
+            if ($r['sale_id'] !== null) {
+                $byId->execute([(int)$r['sale_id']]);
+                $sale = $byId->fetch(PDO::FETCH_ASSOC);
+            } elseif ((string)$r['reference_number'] !== '') {
+                $byReceipt->execute([(string)$r['reference_number']]);
+                $sale = $byReceipt->fetch(PDO::FETCH_ASSOC);
+            } else {
+                continue;
+            }
+            if (!$sale || $sale['sale_status'] !== 'voided' || (int)$sale['is_return_sale'] === 1) continue;
+
+            $owed = posSaleDrawerCashOwed($pdo, (int)$sale['sale_id'], (string)$sale['receipt_number'])['owed'];
+            if ($owed <= 0) continue;
+            $actor = (int)($sale['voided_by'] ?: $r['shift_user']);
+            $insert->execute([(int)$r['shift_id'], $owed, $sale['receipt_number'], (int)$sale['sale_id'], $actor]);
+            $added++;
+        }
+        return $added;
+    }
+}

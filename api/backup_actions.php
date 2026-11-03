@@ -38,6 +38,11 @@ csrf_check();
 require_once __DIR__ . '/../core/tenant_bootstrap.php';
 $backupsDir = bmsBackupDir();
 
+// The uploads this request owns: '' (legacy install) or 't{id}/'. Every ZIP
+// written here holds only these files, and every restore writes only these —
+// never another company's folder under the shared uploads/ root.
+$uploadPrefix = bmsTenantPathPrefix();
+
 $action = $_POST['action'] ?? '';
 
 // Dump logic now lives in core/backup.php (bms_write_dump) — shared by the
@@ -181,7 +186,7 @@ switch ($action) {
             $filename   = 'bms_backup_' . date('Y-m-d_H-i-s') . '.zip';
             $filepath   = $backupsDir . $filename;
             $uploadsDir = ROOT_DIR . '/uploads';
-            $stats      = bms_write_zip_backup($pdo, $filepath, $uploadsDir);
+            $stats      = bms_write_zip_backup($pdo, $filepath, $uploadsDir, $uploadPrefix);
 
             $bytes      = filesize($filepath);
             $sizeLabel  = $bytes >= 1048576
@@ -240,7 +245,8 @@ switch ($action) {
                 try {
                     $errors = restoreFromFile($extracted['sql_path']);
                     if (empty($errors) && $extracted['uploads_path'] !== null) {
-                        $filesCopied = bms_copy_dir($extracted['uploads_path'], ROOT_DIR . '/uploads');
+                        bmsUploadsDir(); // ensure this request's folder + its guard exist
+                        $filesCopied = bms_restore_uploads($extracted['uploads_path'], ROOT_DIR . '/uploads', $uploadPrefix);
                     }
                 } finally {
                     bms_delete_dir($extracted['temp_dir']);
@@ -385,7 +391,8 @@ switch ($action) {
                 try {
                     $errors = restoreFromFile($extracted['sql_path']);
                     if (empty($errors) && $extracted['uploads_path'] !== null) {
-                        $filesCopied = bms_copy_dir($extracted['uploads_path'], ROOT_DIR . '/uploads');
+                        bmsUploadsDir(); // ensure this request's folder + its guard exist
+                        $filesCopied = bms_restore_uploads($extracted['uploads_path'], ROOT_DIR . '/uploads', $uploadPrefix);
                     }
                 } finally {
                     bms_delete_dir($extracted['temp_dir']);

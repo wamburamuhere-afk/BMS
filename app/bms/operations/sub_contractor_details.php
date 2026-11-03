@@ -328,7 +328,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     <table class="table table-sm border-0">
                         <tr><td class="text-muted border-0">Bank Name:</td><td class="border-0"><?= !empty($sc['bank_name']) ? caseFormat($sc['bank_name']) : 'N/A' ?></td></tr>
                         <tr><td class="text-muted border-0">Account:</td><td class="border-0"><code><?= htmlspecialchars($sc['bank_account'] ?: 'N/A') ?></code></td></tr>
-                        <tr><td class="text-muted border-0">Currency:</td><td class="border-0"><?= htmlspecialchars($sc['currency'] ?: 'TZS') ?></td></tr>
+                        <tr><td class="text-muted border-0">Currency:</td><td class="border-0"><?= htmlspecialchars($sc['currency'] ?: bmsCompanyCurrency()) ?></td></tr>
                         <tr><td class="text-muted border-0">Payment Terms:</td><td class="border-0"><?= htmlspecialchars($sc['payment_terms'] ?: 'N/A') ?></td></tr>
                     </table>
                     <?php if($sc['bank_address']): ?>
@@ -587,7 +587,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                             <td><span class="fw-bold"><?= htmlspecialchars($pay['reference_number'] ?? '—') ?></span></td>
                                             <td><?= $pay['payment_date'] ? date('d M Y', strtotime($pay['payment_date'])) : '—' ?></td>
                                             <td><?= format_currency($pay['amount'] ?? 0) ?></td>
-                                            <td><?= htmlspecialchars($pay['currency'] ?? 'TZS') ?></td>
+                                            <td><?= htmlspecialchars($pay['currency'] ?? bmsCompanyCurrency()) ?></td>
                                             <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $pay['payment_method'] ?? '—'))) ?></td>
                                             <td class="text-end">
                                                 <div class="dropdown">
@@ -734,7 +734,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold small"><?= t('Currency') ?></label>
-                        <input type="text" class="form-control" id="scRpCurrency" value="<?= htmlspecialchars($sc['currency'] ?: 'TZS') ?>">
+                        <input type="text" class="form-control" id="scRpCurrency" value="<?= htmlspecialchars($sc['currency'] ?: bmsCompanyCurrency()) ?>">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold small">Payment Method <span class="text-danger">*</span></label>
@@ -939,6 +939,7 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                 <div class="col-6 mb-3">
                                     <label class="form-label"><?= t('Currency') ?></label>
                                     <select class="form-select" id="edit_currency" name="currency">
+                                        <?php if (bmsIsDefaultCurrency()): /* TZS company: the list as before */ ?>
                                         <option value="">Select...</option>
                                         <option value="TZS">TZS</option>
                                         <option value="USD">USD</option>
@@ -946,6 +947,9 @@ $contract_value = array_sum(array_column($sc_projects, 'contract_sum'));
                                         <option value="EUR">EUR</option>
                                         <option value="GBP">GBP</option>
                                         <option value="other">Other...</option>
+                                        <?php else: /* other currency: only the company's own (core/currency.php) */ ?>
+                                        <?= bmsCompanyCurrencyOptionHtml() ?>
+                                        <?php endif; ?>
                                     </select>
                                     <div id="edit_currency_other_wrap" class="mt-2" style="display:none;"><input type="text" class="form-control" id="edit_currency_other" name="currency_other" placeholder="<?= t('Enter currency') ?>"></div>
                                 </div>
@@ -1111,7 +1115,7 @@ $(document).ready(function () {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'Not assigned to any project yet.', zeroRecords: 'No matching projects found.' },
         drawCallback: function () {
             renderProjectCards(this.api().rows({ page: 'current' }).data().toArray());
@@ -1121,7 +1125,7 @@ $(document).ready(function () {
         pageLength: 10,
         responsive: false,
         order: [[0, 'asc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No recent payment history found.', zeroRecords: 'No matching payments found.' },
         drawCallback: function () {
             renderPaymentCards(this.api().rows({ page: 'current' }).data().toArray());
@@ -1228,7 +1232,7 @@ function initRiScTable() {
         responsive: false,
         pageLength: 10,
         order: [[3, 'desc']],
-        columnDefs: [{ orderable: false, targets: [0, -1] }],
+        columnDefs: [{ orderable: false, targets: -1 }, $.extend({ targets: 0 }, BMSSerial.column())],
         language: { emptyTable: 'No received invoices recorded yet.', zeroRecords: 'No matching invoices.' },
         drawCallback: function () {
             renderRiScCards(this.api().rows({ page: 'current' }).data().toArray());

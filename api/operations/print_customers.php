@@ -189,8 +189,8 @@ foreach($customers as $c) {
                 <th>Customer Name & Category</th>
                 <th>Contact Details</th>
                 <th class="text-center">Activity</th>
-                <th class="text-end">Paid (TZS)</th>
-                <th class="text-end">Unpaid (TZS)</th>
+                <th class="text-end">Paid (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
+                <th class="text-end">Unpaid (<?= htmlspecialchars(bmsCompanyCurrency()) ?>)</th>
                 <th class="text-center">Status</th>
             </tr>
         </thead>

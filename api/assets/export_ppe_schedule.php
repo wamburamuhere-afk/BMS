@@ -43,11 +43,11 @@ $asAt       = strtoupper(date('j F Y', strtotime($pe)));
 
 // Statutory layout: asset classes ACROSS the columns, movement lines DOWN the
 // rows. Disposals shown as negatives so each section reads as a running total.
-fputcsv($out, ['SCHEDULE OF PROPERTY, PLANT AND EQUIPMENT AS AT ' . $asAt . ' (' . ucfirst($area) . ' area, TZS)']);
+fputcsv($out, ['SCHEDULE OF PROPERTY, PLANT AND EQUIPMENT AS AT ' . $asAt . ' (' . ucfirst($area) . ' area, ' . bmsCompanyCurrency() . ')']);
 fputcsv($out, []);
 
 // Header: TZS | each Category | TOTAL.
-$header = ['TZS'];
+$header = [bmsCompanyCurrency()];
 foreach ($rows as $r) $header[] = $r['category'] . ($r['is_depreciable'] ? '' : ' (Land)');
 $header[] = 'TOTAL';
 fputcsv($out, $header);

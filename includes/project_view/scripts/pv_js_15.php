@@ -86,7 +86,7 @@ function ipcView(id) {
             + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Subtotal</span><span>' + fmt(subtotal) + '</span></div>'
             + '<div class="d-flex justify-content-between mb-1 small"><span class="text-muted">Tax</span><span>' + fmt(tax_sum) + '</span></div>'
             + '<hr class="my-1">'
-            + '<div class="d-flex justify-content-between fw-bold"><span>Net Payable</span><span class="text-primary">TZS ' + fmt(r.net_payable) + '</span></div>'
+            + '<div class="d-flex justify-content-between fw-bold"><span>Net Payable</span><span class="text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ' + fmt(r.net_payable) + '</span></div>'
             + '</div></div>'
             + '<div class="row g-2">'
             + '<div class="col-md-3"><small class="text-muted d-block">Status</small><strong>' + ipcEscHtml(r.status) + '</strong></div>'

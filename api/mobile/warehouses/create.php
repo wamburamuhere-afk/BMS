@@ -52,6 +52,11 @@ $contact_person = trim($body['contact_person'] ?? '');
 $notes          = trim($body['notes']    ?? '');
 $_pm            = $body['pos_mode'] ?? 'retail';
 $pos_mode       = in_array($_pm, ['retail','restaurant','hybrid'], true) ? $_pm : 'retail';
+// Restaurant POS off, or not Smart POS → a new shop is always retail.
+require_once __DIR__ . '/../../../core/pos_nav.php';
+if (!posModeSelectable()) {
+    $pos_mode = 'retail';
+}
 $_st            = $body['status'] ?? 'active';
 $status         = in_array($_st, ['active','inactive','maintenance'], true) ? $_st : 'active';
 

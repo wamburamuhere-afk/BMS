@@ -51,22 +51,22 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     <div class="card border-0 shadow-sm mb-3">
         <div class="card-body py-3">
             <div class="row g-2 align-items-end">
-                <div class="col-auto">
+                <div class="col-6 col-md-auto">
                     <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
-                    <select id="whSelect" class="form-select form-select-sm select2-static" style="min-width:220px;">
+                    <select id="whSelect" class="form-select form-select-sm select2-static restaurant-filter-select">
                         <?php foreach ($warehouses as $w): ?>
                         <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-auto">
+                <div class="col-6 col-md-auto">
                     <label class="form-label small mb-1"><?= t('Floor') ?></label>
-                    <select id="floorFilter" class="form-select form-select-sm select2-static" style="min-width:180px;">
+                    <select id="floorFilter" class="form-select form-select-sm select2-static restaurant-filter-select">
                         <option value=""><?= t('All Floors') ?></option>
                     </select>
                 </div>
                 <?php if ($can_edit): ?>
-                <div class="col-auto">
+                <div class="col-12 col-md-auto">
                     <button class="btn btn-primary btn-sm" onclick="openTableModal()">
                         <i class="bi bi-plus-circle me-1"></i> <?= t('Add Table') ?>
                     </button>
@@ -140,8 +140,8 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <div id="table-message" class="mb-2"></div>
                     <div class="mb-3">
-                        <label class="form-label"><?= t('Floor') ?> <span class="text-danger">*</span></label>
-                        <select class="form-select" name="floor_id" id="f-table-floor" required></select>
+                        <label class="form-label"><?= t('Floor') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
+                        <select class="form-select" name="floor_id" id="f-table-floor"></select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><?= t('Table Number') ?> <span class="text-danger">*</span></label>
@@ -161,12 +161,18 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     </div>
 </div>
 
+<style>
+/* Filters: half-width each on phones (no sideways scroll), a comfortable fixed width on desktop. */
+@media (min-width: 768px) { .restaurant-filter-select + .select2-container { min-width: 200px; } }
+</style>
+
 <script>
 const CAN_EDIT = <?= json_encode($can_edit) ?>;
 const CSRF_FIELD = <?= json_encode(csrf_token()) ?>;
 const STRINGS = {
     noTables: <?= json_encode(t('No tables found.')) ?>,
-    statusAvailable: <?= json_encode(t('Available')) ?>,
+    mainArea: <?= json_encode(t('Main Area')) ?>,
+    statusAvailable: <?= json_encode(t('Free table')) ?>,
     statusOccupied: <?= json_encode(t('Occupied')) ?>,
     statusReserved: <?= json_encode(t('Reserved')) ?>,
     statusCleaning: <?= json_encode(t('Cleaning')) ?>,
@@ -196,10 +202,12 @@ function loadFloorsThenTables() {
     $.getJSON('<?= buildUrl('api/restaurant/get_floors.php') ?>', { warehouse_id: wid }, function (res) {
         FLOORS_CACHE = res.success ? res.data : [];
         let opts = '<option value="">' + <?= json_encode(t('All Floors')) ?> + '</option>';
-        let formOpts = '';
+        // No floors yet → offer the default area, created on save (Phase 0.2).
+        let formOpts = FLOORS_CACHE.length ? '' : '<option value="">' + <?= json_encode(t('Main Area')) ?> + '</option>';
         FLOORS_CACHE.forEach(f => {
-            opts += `<option value="${f.floor_id}">${safeOutput(f.name)}</option>`;
-            formOpts += `<option value="${f.floor_id}">${safeOutput(f.name)}</option>`;
+            const name = f.name === 'Main Area' ? <?= json_encode(t('Main Area')) ?> : f.name;
+            opts += `<option value="${f.floor_id}">${safeOutput(name)}</option>`;
+            formOpts += `<option value="${f.floor_id}">${safeOutput(name)}</option>`;
         });
         $('#floorFilter').html(opts).trigger('change.select2');
         $('#f-table-floor').html(formOpts);
@@ -210,6 +218,7 @@ function loadFloorsThenTables() {
 function loadTables() {
     const wid = currentWarehouseId();
     if (!wid) return;
+    if ($.fn.DataTable.isDataTable('#tablesTable')) $('#tablesTable').DataTable().destroy();
     $('#tablesTbody').html('<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>');
     $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid }, function (res) {
         TABLES_CACHE = res.success ? res.data : [];
@@ -226,10 +235,9 @@ function renderTables() {
     $('#stat-occupied').text(TABLES_CACHE.filter(t => t.status === 'occupied').length);
     $('#stat-reserved').text(TABLES_CACHE.filter(t => t.status === 'reserved').length);
 
+    if ($.fn.DataTable.isDataTable('#tablesTable')) $('#tablesTable').DataTable().destroy();
     if (!rows.length) {
-        $('#tablesTbody').html(`<tr><td colspan="5" class="text-center text-muted py-4">${STRINGS.noTables}</td></tr>`);
         $('#tablesCards').html(`<div class="text-center text-muted py-4">${STRINGS.noTables}</div>`);
-        return;
     }
 
     let tbody = '', cards = '';
@@ -246,9 +254,9 @@ function renderTables() {
 
         tbody += `<tr>
             <td class="fw-bold">${safeOutput(t.table_number)}</td>
-            <td>${safeOutput(t.floor_name)}</td>
+            <td>${safeOutput(t.floor_name === 'Main Area' ? STRINGS.mainArea : t.floor_name)}</td>
             <td>${t.seats}</td>
-            <td>${statusSelect}</td>
+            <td data-order="${safeOutput(label)}" data-search="${safeOutput(label)}">${statusSelect}</td>
             <td class="text-end">
                 ${CAN_EDIT ? `<button class="btn btn-sm btn-outline-primary" onclick="editTable(${t.table_id}, ${t.floor_id}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')}, ${t.seats})"><i class="bi bi-pencil"></i></button>` : ''}
             </td>
@@ -256,12 +264,18 @@ function renderTables() {
 
         cards += `<div class="card border-0 shadow-sm mb-2"><div class="card-body p-3" style="border-left:4px solid ${color};">
             <div class="d-flex justify-content-between"><div class="fw-bold">${safeOutput(t.table_number)}</div><span class="badge" style="background:${color};color:#fff;">${safeOutput(label)}</span></div>
-            <div class="small text-muted">${safeOutput(t.floor_name)} &middot; ${t.seats} <?= t('seats') ?></div>
+            <div class="small text-muted">${safeOutput(t.floor_name === 'Main Area' ? STRINGS.mainArea : t.floor_name)} &middot; ${t.seats} <?= t('seats') ?></div>
             ${CAN_EDIT ? `<button class="btn btn-sm btn-outline-primary mt-2" onclick="editTable(${t.table_id}, ${t.floor_id}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')}, ${t.seats})"><i class="bi bi-pencil"></i> ${<?= json_encode(t('Edit')) ?>}</button>` : ''}
         </div></div>`;
     });
     $('#tablesTbody').html(tbody);
-    $('#tablesCards').html(cards);
+    if (rows.length) $('#tablesCards').html(cards);
+    $('#tablesTable').DataTable({
+        responsive: false, autoWidth: false, pageLength: 25, order: [],
+        dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
+        columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+        language: { emptyTable: STRINGS.noTables }
+    });
 }
 
 function openTableModal() {

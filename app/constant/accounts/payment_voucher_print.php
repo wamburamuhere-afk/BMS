@@ -328,7 +328,7 @@ $hasPayment = paymentAccountsHasAny($pa);
         </div>
         <div class="amount-value-box">
             <strong>Total Amount:</strong>
-            <div class="val">TSh <?= number_format($v['amount'], 2) ?></div>
+            <div class="val"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($v['amount'], 2) ?></div>
         </div>
     </div>
 

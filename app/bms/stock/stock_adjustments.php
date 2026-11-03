@@ -595,7 +595,7 @@ function get_pagination_url($page) {
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-semibold"><?= t('Unit Cost') ?></label>
                             <div class="input-group">
-                                <span class="input-group-text">TZS</span>
+                                <span class="input-group-text"><?= htmlspecialchars(bmsCompanyCurrency()) ?></span>
                                 <input type="number" class="form-control" id="unit_cost" name="unit_cost" min="0" step="0.01" value="0.00">
                             </div>
                             <small class="text-muted"><?= t("Leave as 0 to use product's cost price") ?></small>

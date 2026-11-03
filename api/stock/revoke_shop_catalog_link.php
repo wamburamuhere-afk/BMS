@@ -29,12 +29,12 @@ csrf_check();
 $warehouseId = (int)($_POST['warehouse_id'] ?? 0);
 if ($warehouseId <= 0) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => t('A valid warehouse is required.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('A valid warehouse is required.', 'A valid shop is required.')]);
     exit;
 }
 if (!userCan('warehouse', $warehouseId)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => t('Access denied: this warehouse is not in your assigned scope.')]);
+    echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
 

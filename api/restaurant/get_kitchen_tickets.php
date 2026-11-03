@@ -30,7 +30,9 @@ $statusList = array_filter(array_map('trim', explode(',', $_GET['status'] ?? 'qu
 $statusList = array_values(array_intersect($statusList, ['queued', 'preparing', 'ready', 'served']));
 if (empty($statusList)) $statusList = ['queued', 'preparing'];
 
-$sql = "SELECT kt.ticket_id, kt.hold_id, kt.warehouse_id, kt.station_id, kt.table_id, kt.status, kt.created_at, kt.updated_at,
+// restaurant_plan.md Phase 3 — order_label ("Table T3", "Take away · RCP-…") when the column exists.
+$labelSel = restaurantMenuSchemaReady($pdo) ? 'kt.order_label' : 'NULL AS order_label';
+$sql = "SELECT kt.ticket_id, kt.hold_id, kt.warehouse_id, kt.station_id, kt.table_id, kt.status, kt.created_at, kt.updated_at, $labelSel,
                ks.name AS station_name, rt.table_number
         FROM kitchen_tickets kt
         JOIN kitchen_stations ks ON ks.station_id = kt.station_id

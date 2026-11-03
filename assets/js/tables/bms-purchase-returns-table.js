@@ -28,11 +28,7 @@
 
     function columns(cfg) {
         var all = [
-            { key: 'sno', col: {
-                data: null, orderable: false, searchable: false, width: '50px',
-                className: 'text-muted small fw-bold',
-                render: function (d, t, r, meta) { return meta.row + meta.settings._iDisplayStart + 1; }
-            }},
+            { key: 'sno', col: BMSSerial.column({ width: '50px', className: 'text-muted small fw-bold' })},
             { key: 'return_number',  col: { data: 'return_number' } },
             { key: 'return_date',    col: { data: 'return_date' } },
             { key: 'supplier',       col: { data: 'supplier_name', render: function (d) { return d ? window.caseFormatJs(d) : ''; } } },

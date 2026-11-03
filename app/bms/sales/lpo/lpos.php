@@ -84,7 +84,7 @@ if (isAdmin()) {
                 <div class="card-body p-0 d-flex align-items-center">
                     <div class="stats-icon flex-shrink-0 d-none d-sm-flex"><i class="bi bi-cash-stack"></i></div>
                     <div class="flex-grow-1 overflow-hidden text-center text-sm-start">
-                        <h4 class="mb-0 fw-bold" id="stat-total-amount" style="font-size: 1.1rem; word-break: break-word;">TSh 0.00</h4>
+                        <h4 class="mb-0 fw-bold" id="stat-total-amount" style="font-size: 1.1rem; word-break: break-word;"><?= htmlspecialchars(bmsCurrencySymbol()) ?>0.00</h4>
                         <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;">Total Value</small>
                     </div>
                 </div>
@@ -106,7 +106,7 @@ if (isAdmin()) {
                 <div class="card-body p-0 d-flex align-items-center">
                     <div class="stats-icon flex-shrink-0 d-none d-sm-flex"><i class="bi bi-check-circle"></i></div>
                     <div class="flex-grow-1 overflow-hidden text-center text-sm-start">
-                        <h4 class="mb-0 fw-bold" id="stat-approved-amount" style="font-size: 1.1rem; word-break: break-word;">TSh 0.00</h4>
+                        <h4 class="mb-0 fw-bold" id="stat-approved-amount" style="font-size: 1.1rem; word-break: break-word;"><?= htmlspecialchars(bmsCurrencySymbol()) ?>0.00</h4>
                         <small class="text-uppercase small fw-bold text-muted d-block text-truncate" style="font-size: 0.65rem;">Approved</small>
                     </div>
                 </div>
@@ -284,11 +284,7 @@ $(document).ready(function() {
             }
         },
         columns: [
-            {
-                data: null, orderable: false, searchable: false, width: '50px',
-                className: 'ps-4 text-center text-muted small fw-bold',
-                render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
-            },
+            BMSSerial.column({ width: '50px', className: 'ps-4 text-center text-muted small fw-bold' }),
             {
                 data: 'lpo_number', className: 'ps-4',
                 render: (data) => `<span class="fw-bold text-dark custom-code">${data}</span>`

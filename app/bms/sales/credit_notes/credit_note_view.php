@@ -231,7 +231,7 @@ $badge = [
 
             <?php if ($status === 'paid'): ?>
             <div class="alert" style="background:#052c65;color:#fff;border:0;">
-                <i class="bi bi-check-circle me-1"></i> Refund of <strong>TZS <?= number_format($cn['grand_total'], 2) ?></strong> paid from <strong><?= caseFormat($cn['paid_from_name'] ?: 'account') ?></strong>.
+                <i class="bi bi-check-circle me-1"></i> Refund of <strong><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($cn['grand_total'], 2) ?></strong> paid from <strong><?= caseFormat($cn['paid_from_name'] ?: 'account') ?></strong>.
                 <?php if (!empty($cn['payment_reference'])): ?><div class="small mt-1">Ref: <?= caseFormat($cn['payment_reference']) ?></div><?php endif; ?>
             </div>
             <?php endif; ?>
@@ -252,7 +252,7 @@ $badge = [
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
                     <input type="hidden" name="credit_note_id" value="<?= $id ?>">
-                    <p class="mb-3">Refund <strong class="text-primary">TZS <?= number_format($cn['grand_total'], 2) ?></strong> to <strong><?= caseFormat($cn['customer_name']) ?></strong>.</p>
+                    <p class="mb-3">Refund <strong class="text-primary"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($cn['grand_total'], 2) ?></strong> to <strong><?= caseFormat($cn['customer_name']) ?></strong>.</p>
                     <div class="mb-3">
                         <label class="form-label">Paid From <span class="text-danger">*</span></label>
                         <select class="form-select" name="paid_from_account_id" id="pay_account" required style="width:100%">

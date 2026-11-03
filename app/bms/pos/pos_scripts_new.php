@@ -13,6 +13,8 @@ let allProducts = [];  // full catalog, never filtered — scanner always search
 let currentDiscountPercentage = 0;
 let currentShiftId = '<?= $shift_id ?>';
 let currentShiftActive = <?= $shift_active ? 'true' : 'false' ?>;
+// Record Old Sale mode: { at: 'YYYY-MM-DD HH:MM', label: '<which shift>' } while on, else null.
+let oldSale = null;
 let isSplitPayment = false;
 let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
@@ -31,8 +33,22 @@ let currentTableId = null;
 let currentTableLabel = '';
 let currentHoldId = null;         // the pos_held_sales row backing the open table order, once one exists
 let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetched once and reused
+// restaurant_plan.md Phase 2 — dine_in / take_away / delivery; '' = not chosen (sent as nothing,
+// exactly like before). Only a restaurant/hybrid shop ever sets it.
+let currentOrderType = '';
+// restaurant_plan.md Phase 4 — split bill in progress: { original: [...], remainder: [...] }.
+let rsSplit = null;
+// Restaurant simplicity pass — the waiter's till shows the Menu by default (not every retail product).
+// Only a restaurant/hybrid shop ever uses these; a retail shop never turns Menu mode on.
+let posMenuOnly = true;
+let posMenuCategoryIds = null;    // category ids that hold Menu items, from the last full Menu load
+function posMenuModeOn() { return posRestaurantActive() && (posMenuOnly || posRestaurantOnlyShop()); }
+// A plain Restaurant shop (not Hybrid, not Retail): Menu only, and none of the retail-only controls.
+function posRestaurantOnlyShop() { return !!POS_REST_ONLY[parseInt($('#posWarehouseId').val() || 0, 10)]; }
 
 // ══════════════════════ TRANSLATED STRINGS (t()) ══════════════════════
+// True for admins / users granted every shop: they may load products with no shop chosen.
+const POS_ALL_SHOPS = <?= json_encode(function_exists('hasAllWarehouseAccess') ? hasAllWarehouseAccess() : true) ?>;
 const PT = {
     service: <?= json_encode(t('Service')) ?>,
     lowStock: <?= json_encode(t('LOW STOCK')) ?>,
@@ -41,12 +57,18 @@ const PT = {
     noProductsFound: <?= json_encode(t('No products found')) ?>,
     tryDifferentSearch: <?= json_encode(t('Try a different search or category')) ?>,
     errorLoadingProducts: <?= json_encode(t('Error loading products')) ?>,
+    chooseShopTitle: <?= json_encode(wLabel('Choose your warehouse', 'Choose your shop', true)) ?>,
+    chooseShopHelp: <?= json_encode(wLabel('Pick a warehouse above to see its products and stock.', 'Pick a shop above to see its products and stock.', true)) ?>,
     statusLabel: <?= json_encode(t('Status:')) ?>,
     retry: <?= json_encode(t('Retry')) ?>,
     noSku: <?= json_encode(t('No SKU')) ?>,
     stockLabel: <?= json_encode(t('Stock:')) ?>,
     quantityLabel: <?= json_encode(t('Quantity')) ?>,
     addToCart: <?= json_encode(t('Add to Cart')) ?>,
+    allShort: <?= json_encode(t('All')) ?>,
+    searchMenu: <?= json_encode(t('Search the menu...')) ?>,
+    menuEmpty: <?= json_encode(t('Your menu is empty. Add dishes and drinks in Menu.')) ?>,
+    openMenu: <?= json_encode(t('Open Menu')) ?>,
     cancel: <?= json_encode(t('Cancel')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     serverError: <?= json_encode(t('Server error.')) ?>,
@@ -179,6 +201,21 @@ const PT = {
     sendToKitchenFailed: <?= json_encode(t('Could not send this order to the kitchen.')) ?>,
     addItemsBeforeKitchen: <?= json_encode(t('Add items to the order before sending to the kitchen.')) ?>,
     selectTableFirst: <?= json_encode(t('Select a table first.')) ?>,
+    // restaurant_plan.md Phase 2
+    chooseTable: <?= json_encode(t('Choose table')) ?>,
+    openOrder: <?= json_encode(t('open order')) ?>,
+    savedToTable: <?= json_encode(t('Saved to table %s.')) ?>,
+    addNote: <?= json_encode(t('Add note')) ?>,
+    madeToOrder: <?= json_encode(t('made to order')) ?>,
+    kitchenSlipReady: <?= json_encode(t('Kitchen slip ready')) ?>,
+    splitPickOne: <?= json_encode(t('Choose at least one item to pay now.')) ?>,
+    splitNote: <?= json_encode(t('Paying part of the bill — %d item(s) stay on the table.')) ?>,
+    splitKept: <?= json_encode(t('The rest of the bill stays on table %s.')) ?>,
+    printKitchenSlip: <?= json_encode(t('Print kitchen slip')) ?>,
+    itemNoteTitle: <?= json_encode(t('Note for the kitchen')) ?>,
+    itemNotePlaceholder: <?= json_encode(t('e.g. less salt, no chilli')) ?>,
+    save: <?= json_encode(t('Save')) ?>,
+    tableNotInShop: <?= json_encode(t('This table belongs to a different shop than the one you are selling in.')) ?>,
     modifiersLabel: <?= json_encode(t('Options')) ?>,
     modifierRequired: <?= json_encode(t('"%s" is required.')) ?>,
     modifierMinMax: <?= json_encode(t('Choose between %min% and %max% option(s) for "%group%".')) ?>,
@@ -194,12 +231,7 @@ const PT = {
     nextPage: <?= json_encode(t('Next')) ?>,
     productPages: <?= json_encode(t('Product pages')) ?>,
     pageOfTotal: <?= json_encode(t('%from%–%to% of %total% products')) ?>,
-    addedToCart: <?= json_encode(t('Added to cart')) ?>,
-    // "Add Product" shortcut — Restock Product modal.
-    restockSaving: <?= json_encode(t('Saving...')) ?>,
-    restockSaved: <?= json_encode(t('Product restocked successfully!')) ?>,
-    restockFailed: <?= json_encode(t('Restock Failed')) ?>,
-    restockSelectProductFirst: <?= json_encode(t('Select a product first.')) ?>
+    addedToCart: <?= json_encode(t('Added to cart')) ?>
 };
 
 // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
@@ -232,16 +264,8 @@ function openNewProductPage() {
     window.location.href = <?= json_encode(getUrl('product_create')) ?> + '?return=' + encodeURIComponent(returnUrl);
 }
 
-// "Add Product" shortcut — Restock Product modal. Pre-selects the modal's own
-// shop field (when shown, i.e. the cashier is scoped to more than one shop)
-// to whatever is currently active at the till, so the common single-shop case
-// needs no extra click at all.
-function openRestockProductModal() {
-    if ($('#restock_warehouse_id').length) {
-        $('#restock_warehouse_id').val($('#posWarehouseId').val());
-    }
-    new bootstrap.Modal(document.getElementById('restockProductModal')).show();
-}
+// "Add Product" shortcut — the Receive Stock window (shared with the Receive Stock page).
+<?php include __DIR__ . '/restock_modal_js.php'; ?>
 
 // Phase 10 (pos_upgrade_plan.md §7) — Select2 AJAX customer search. $parent is
 // set only while the field sits inside the phone cart sheet: the sheet's focus
@@ -266,81 +290,13 @@ $(document).ready(function() {
     // the old plain <select> hard-limited to 50 rows with no search at all.
     initCustomerSelect();
 
-    // "Add Product" shortcut — Restock Product modal (only rendered when the
-    // cashier has adjust_stock permission; pos_modals_new.php's own PHP gate).
-    if ($('#restockProductModal').length) {
-        $('#restock_product_id').select2({
-            theme: 'bootstrap-5', width: '100%', dropdownParent: $('#restockProductModal'),
-            placeholder: <?= json_encode(t('Search product by name or SKU')) ?>,
-            ajax: {
-                url: '<?= buildUrl('/api/pos/search_products_for_restock.php') ?>',
-                dataType: 'json', delay: 300, cache: true,
-                data: p => ({ q: p.term })
-            }
-        });
-
-        // Prefill buying/wholesale/retail price from the product's most recent
-        // batch in the currently-relevant shop (falls back to the product's
-        // own purchase/selling price when it has never been batch-tracked here).
-        $('#restock_product_id').on('select2:select', function () {
-            const pid = $(this).val();
-            const wid = $('#restock_warehouse_id').length ? $('#restock_warehouse_id').val() : $('#posWarehouseId').val();
-            if (!pid || !wid) return;
-            $.getJSON('<?= buildUrl('/api/pos/get_restock_defaults.php') ?>', { product_id: pid, warehouse_id: wid }, function (res) {
-                if (res.success) {
-                    $('#restock_buying_price').val(res.data.buying_price || '');
-                    $('#restock_wholesale_price').val(res.data.wholesale_price || '');
-                    $('#restock_selling_price').val(res.data.selling_price || '');
-                }
-            });
-        });
-
-        $('#restockProductModal').on('hidden.bs.modal', function () {
-            $('#restockProductForm')[0].reset();
-            $('#restock_product_id').val(null).trigger('change');
-            $('#restock_date').val(<?= json_encode(date('Y-m-d')) ?>);
-            $('#restock-message').html('');
-        });
-
-        $('#restockProductForm').on('submit', function (e) {
-            e.preventDefault();
-            if (!$('#restock_product_id').val()) {
-                Swal.fire({ icon: 'warning', title: PT.restockSelectProductFirst });
-                return;
-            }
-            const btn = $(this).find('[type="submit"]');
-            const orig = btn.html();
-            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.restockSaving);
-            $.ajax({
-                url: '<?= buildUrl('/api/pos/quick_restock.php') ?>',
-                type: 'POST',
-                data: $(this).serialize(),
-                dataType: 'json',
-                success: function (res) {
-                    if (res.success) {
-                        Swal.fire({ icon: 'success', title: PT.restockSaved, timer: 1800, showConfirmButton: false })
-                            .then(() => {
-                                $('#restockProductModal').modal('hide');
-                                if (typeof loadProducts === 'function') loadProducts();
-                            });
-                    } else {
-                        $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(res.message) + '</div>');
-                    }
-                },
-                error: function (xhr) {
-                    // A caught server-side exception still replies with real
-                    // JSON (success:false, message:<reason>) but a non-2xx
-                    // status code — jQuery routes that to error(), not
-                    // success(), so the actual reason was silently discarded
-                    // and only the generic "Restock Failed" ever showed.
-                    let msg = PT.restockFailed;
-                    try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
-                    $('#restock-message').html('<div class="alert alert-danger py-2 mb-0">' + safeOutput(msg) + '</div>');
-                },
-                complete: function () { btn.prop('disabled', false).html(orig); }
-            });
-        });
-    }
+    // "Add Product" shortcut — the Receive Stock window (only rendered when the
+    // cashier holds pos_restock; restock_modal.php's own PHP gate). After a save
+    // it closes and the product grid reloads with the new stock.
+    initRestockModal(function () {
+        $('#restockProductModal').modal('hide');
+        if (typeof loadProducts === 'function') loadProducts();
+    });
 
     // Phase 11 (pos_upgrade_plan.md §7) — show the selected customer's loyalty
     // balance and cap how many points they can redeem. Walk-in (no selection)
@@ -508,32 +464,10 @@ $(document).ready(function() {
         $(window).on('resize', syncPosTop);
     }
 
-    // "Receive Stock" menu link lands here as ?restock=1.
-    // The modal is only rendered for users holding pos_restock (pos_modals_new.php).
-    // &product_id=N (Products list "Receive Stock", pos_detail_pages_plan.md A3)
-    // pre-selects that product — looked up below with the same filter and label
-    // as api/pos/search_products_for_restock.php; an unknown id / service just
-    // opens the modal empty, as before.
+    // Older links (?restock=1) still open the Receive Stock window here;
+    // the menus now go to the Receive Stock page instead.
     if (new URLSearchParams(location.search).get('restock') === '1' && document.getElementById('restockProductModal')) {
         openRestockProductModal();
-        <?php
-        $__restockPre = null;
-        if (!empty($_GET['restock']) && ctype_digit((string)($_GET['product_id'] ?? ''))) {
-            try {
-                $__rp = $pdo->prepare("SELECT product_id, product_name, sku FROM products WHERE product_id = ? AND status != 'deleted' AND is_service != 1");
-                $__rp->execute([(int)$_GET['product_id']]);
-                if ($__r = $__rp->fetch(PDO::FETCH_ASSOC)) {
-                    $__n = applyCaseMode($__r['product_name']);
-                    $__restockPre = ['id' => (int)$__r['product_id'], 'text' => $__r['sku'] ? ($__r['sku'] . ' — ' . $__n) : $__n];
-                }
-            } catch (Throwable $e) { $__restockPre = null; }
-        }
-        ?>
-        const restockPre = <?= json_encode($__restockPre) ?>;
-        if (restockPre) {
-            $('#restock_product_id').append(new Option(restockPre.text, restockPre.id, true, true)).trigger('change')
-                .trigger({ type: 'select2:select', params: { data: restockPre } });   // loads its last prices
-        }
     }
 
     // Load initial data
@@ -700,7 +634,23 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
 
     $('#loadingProducts').show();
     $('#productGrid').empty();
-    
+
+    // No shop chosen yet, by someone who may only see their own shops: the
+    // product API would refuse (403) and show a red error. Ask for the shop instead.
+    const $shopSel = $('#posWarehouseId');
+    if (!$shopSel.val() && !POS_ALL_SHOPS && $shopSel.find('option').filter(function () { return this.value !== ''; }).length > 1) {
+        $('#loadingProducts').hide();
+        $shopSel.addClass('pos-shop-needed').one('change', function () { $(this).removeClass('pos-shop-needed'); });
+        $('#productGrid').html(`
+            <div class="col-12 text-center py-5">
+                <i class="bi bi-shop" style="font-size: 3rem; color: #0d6efd;"></i>
+                <h5 class="mt-3">${PT.chooseShopTitle}</h5>
+                <p class="text-muted">${PT.chooseShopHelp}</p>
+            </div>
+        `);
+        return;
+    }
+
     console.log('=== LOADING PRODUCTS ===');
     console.log('Category:', categoryId);
     console.log('Search:', searchTerm);
@@ -718,10 +668,26 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
             search: searchTerm,
             warehouse_id: warehouseId,
             project_id: projectId,
-            price_group_id: posSelectedPriceGroupId || ''
+            price_group_id: posSelectedPriceGroupId || '',
+            menu_only: posMenuModeOn() ? 1 : ''   // restaurant shops only; '' (ignored) everywhere else
         },
         dataType: 'json',
         success: function(response) {
+            // Menu view with nothing on the Menu yet: show the products instead of an empty till.
+            if (posRestaurantOnlyShop() && !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined)
+                && response.success && !(response.data && response.data.length > 0)) {
+                // A Restaurant shop with nothing on its Menu yet: say so (never fall back to retail products).
+                $('#loadingProducts').hide();
+                $('#productGrid').html('<div class="col-12 text-center py-5"><i class="bi bi-journal-richtext" style="font-size:3rem;color:#0d6efd"></i><h5 class="mt-3">' + PT.menuEmpty + '</h5><a class="btn btn-primary mt-2" href="<?= getUrl('restaurant/menu') ?>">' + PT.openMenu + '</a></div>');
+                return;
+            }
+            if (posMenuModeOn() && !posRestaurantOnlyShop() && !searchTerm && (categoryId === 'all' || categoryId === '' || categoryId === undefined)
+                && !(response.success && response.data && response.data.length > 0)) {
+                posMenuOnly = false;
+                $('#posViewAll').prop('checked', true);
+                loadProducts();
+                return;
+            }
             console.log('=== API RESPONSE ===');
             console.log('Success:', response.success);
             console.log('Data:', response.data);
@@ -734,7 +700,15 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
                 // Keep a full-catalog copy for the barcode scanner so it can find
                 // any product even when the grid is filtered to one category.
                 if (categoryId === 'all' || categoryId === '' || categoryId === undefined) {
-                    allProducts = response.data;
+                    if (posMenuModeOn()) {
+                        // Menu view: build the Menu's own category chips; leave the scanner's catalog alone.
+                        if (!searchTerm) {
+                            posMenuCategoryIds = [...new Set(response.data.map(p => parseInt(p.category_id, 10)))];
+                            posRenderMenuChips('all');
+                        }
+                    } else {
+                        allProducts = response.data;
+                    }
                 }
                 const grid = $('#productGrid');
                 grid.empty();
@@ -816,6 +790,8 @@ function loadProducts(categoryId = 'all', searchTerm = '') {
 // One product tile (shared by the full grid and the phone pager).
 function posProductTileHtml(product) {
     const isService = product.is_service == 1 || product.is_service == '1';
+    // restaurant_plan.md Phase 2 — on a restaurant shop a no-stock item is a dish.
+    const isDish = isService && posRestaurantActive();
     const projectStock = parseFloat(product.project_stock) || 0;
     
     // Determine image content
@@ -827,7 +803,7 @@ function posProductTileHtml(product) {
         }
         imageContent = `<img src="${imgPath}" alt="${caseFormatJs(product.product_name)}" style="height: 100%; max-width: 100%; object-fit: contain;">`;
     } else {
-        imageContent = `<i class="bi ${isService ? 'bi-briefcase' : 'bi-box-seam'}" style="font-size: 3rem; color: #0d6efd;"></i>`;
+        imageContent = `<i class="bi ${isDish ? 'bi-egg-fried' : (isService ? 'bi-briefcase' : 'bi-box-seam')}" style="font-size: 3rem; color: #0d6efd;"></i>`;
     }
 
     // Phase 31 (pos_upgrade_plan.md §8) — a variant parent (variant_count > 0)
@@ -850,13 +826,13 @@ function posProductTileHtml(product) {
                         ${projectStock > 0 ? '<span class="badge bg-info position-absolute top-0 start-0" style="font-size: 8px;"><i class="bi bi-star-fill"></i> ' + PT.projectStock + '</span>' : ''}
                         ${variantCount > 0 ? '<span class="badge bg-primary position-absolute bottom-0 end-0" style="font-size: 8px;"><i class="bi bi-diagram-2"></i> ' + variantCount + ' ' + PT.variantsLabel + '</span>' : ''}
                     </div>
-                    ${isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : ''}
+                    ${isDish ? '' : (isService ? '<span class="badge bg-info text-white mb-1">' + PT.service + '</span>' : '')}
                     <h6 class="card-title mb-1 small text-truncate fw-bold" title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}</h6>
                     ${POS_SIMPLE_MODE ? '' : `<p class="card-text text-muted small mb-1">${product.sku || ''}</p>`}
                     <p class="card-text fw-bold text-primary mb-1">${POS_CURRENCY} ${parseFloat(product.effective_price ?? product.selling_price).toLocaleString()}</p>
                     ${!isService ? `<p class="card-text small ${product.stock_quantity <= 10 ? 'text-danger fw-bold' : 'text-muted'}">
                         ${PT.qtyLabel} ${product.stock_quantity}
-                    </p>` : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>'}
+                    </p>` : (isDish ? '<p class="card-text small text-muted">' + PT.madeToOrder + '</p>' : '<p class="card-text small text-muted"><i class="bi bi-infinity"></i> ' + PT.service + '</p>')}
                 </div>
             </div>
         </div>
@@ -938,6 +914,38 @@ function loadProductsByCategory(categoryId) {
     loadProducts(categoryId, '');
 }
 
+// Restaurant simplicity pass — the Menu view's own group chips: only groups that hold Menu items
+// (not the shop's 30 retail categories). Never used on a retail shop.
+function posRenderMenuChips(activeId) {
+    const strip = $('#menuCategoryButtons');
+    if (!strip.length) return;
+    const ids = posMenuCategoryIds || [];
+    const allLabel = PT.allShort;
+    let html = `<button type="button" class="btn btn-sm ${activeId === 'all' ? 'btn-primary active' : 'btn-outline-secondary'}" onclick="loadMenuCategory('all')">${safeOutput(allLabel)}</button>`;
+    ids.forEach(function (id) {
+        const cat = categories.find(c => parseInt(c.category_id, 10) === id);
+        if (!cat) return;
+        html += `<button type="button" class="btn btn-sm ${activeId === id ? 'btn-primary active' : 'btn-outline-secondary'}" onclick="loadMenuCategory(${id})">${caseFormatJs(cat.category_name)}</button>`;
+    });
+    strip.html(html);
+}
+function loadMenuCategory(categoryId) {
+    $('#productSearch').val('');
+    if (categoryId !== 'all') posRenderMenuChips(categoryId);
+    loadProducts(categoryId, '');
+}
+// Menu | All products switch (restaurant/hybrid shops only — the row stays hidden on a retail shop).
+$(document).on('change', 'input[name="posView"]', function () {
+    posMenuOnly = (this.value === 'menu');
+    posShowAllProducts = false;
+    $('#productSearch').val('');
+    if (!posMenuOnly) {
+        $('#categoryButtons button').removeClass('active btn-primary').addClass('btn-outline-secondary');
+        $('#categoryButtons button:first').removeClass('btn-outline-secondary').addClass('active btn-primary');
+    }
+    loadProducts('all', '');
+});
+
 function searchProducts() {
     const searchTerm = $('#productSearch').val().trim();
     console.log('Manual search:', searchTerm);
@@ -945,7 +953,8 @@ function searchProducts() {
     // Reset category to "All" when searching
     $('#categoryButtons button').removeClass('active btn-primary').addClass('btn-outline-secondary');
     $('#categoryButtons button:first').removeClass('btn-outline-secondary').addClass('active btn-primary');
-    
+    if (posMenuModeOn()) posRenderMenuChips('all');
+
     loadProducts('all', searchTerm);
 }
 
@@ -964,7 +973,11 @@ function posTapProduct(productId) {
     const restaurantShop = POS_RESTAURANT_ENABLED
         && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail';
     const unitCount = (product.unit_count === null || product.unit_count === undefined) ? -1 : parseInt(product.unit_count, 10);
-    const needsPopup = product.track_serials == 1 || restaurantShop || unitCount !== 0;
+    // Restaurant shop: the popup is only for items that have add-on groups (or whose count is unknown) —
+    // every other dish/drink is one tap. A retail shop never reaches the add-on check.
+    const modCount = (product.modifier_group_count === null || product.modifier_group_count === undefined) ? -1 : parseInt(product.modifier_group_count, 10);
+    const restaurantNeedsPopup = restaurantShop && modCount !== 0;
+    const needsPopup = product.track_serials == 1 || restaurantNeedsPopup || unitCount !== 0;
     if (needsPopup) {
         showProductQuickView(productId);
         return;
@@ -1017,7 +1030,9 @@ function showProductQuickView(productId) {
     // Phase 30 (pos_upgrade_plan.md §9) — only a restaurant/hybrid warehouse
     // with the entitlement ever fetches/shows modifier groups; a plain retail
     // sale never triggers the extra lookups below.
-    const showModifiers = POS_RESTAURANT_ENABLED && (POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail') !== 'retail' && currentProduct.is_service != 1;
+    // restaurant_plan.md Phase 2 — dishes are no-stock items, so on a restaurant shop
+    // they get add-ons too (before, is_service excluded every dish).
+    const showModifiers = posRestaurantActive();
 
     const html = `
         <h6>${caseFormatJs(currentProduct.product_name)}</h6>
@@ -1408,6 +1423,7 @@ function updateCartDisplay() {
                         <strong class="small">${caseFormatJs(item.product_name)}</strong>
                         ${item.unit_label ? `<br><span class="badge bg-light text-dark border">${safeOutput(item.unit_label)}</span>` : ''}
                         ${item.modifiers && item.modifiers.length ? `<br><span class="small text-muted">${item.modifiers.map(m => safeOutput(m.option_name)).join(', ')}</span>` : ''}
+                        ${posRestaurantActive() ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none rs-note" onclick="editItemNote(${index})"><i class="bi bi-chat-left-text me-1"></i>${item.note ? safeOutput(item.note) : PT.addNote}</button>` : ''}
                         ${discountBadge}
                     </td>
                     <td class="text-end">
@@ -1606,18 +1622,22 @@ function processPayment() {
     }
 
     <?php if (!$shift_active): ?>
-    Swal.fire({
-        icon: 'warning',
-        title: PT.noActiveShiftTitle,
-        text: PT.noActiveShiftText,
-        showConfirmButton: true,
-        confirmButtonText: PT.startShift
-    }).then((result) => {
-        if (result.isConfirmed) {
-            startShift();
-        }
-    });
-    return;
+    // An old sale goes into the shift that covered its own time, so it does
+    // not need a shift open today.
+    if (!oldSale) {
+        Swal.fire({
+            icon: 'warning',
+            title: PT.noActiveShiftTitle,
+            text: PT.noActiveShiftText,
+            showConfirmButton: true,
+            confirmButtonText: PT.startShift
+        }).then((result) => {
+            if (result.isConfirmed) {
+                startShift();
+            }
+        });
+        return;
+    }
     <?php endif; ?>
 
     // Warehouse is compulsory — a sale must come out of a specific warehouse's stock.
@@ -1750,12 +1770,31 @@ function processPayment() {
         // every plain retail sale, which process_sale.php treats identically
         // to how it behaved before this phase.
         table_id: currentTableId || undefined,
-        sale_type: currentTableId ? 'dine_in' : undefined,
+        // restaurant_plan.md Phase 2 — take_away / delivery from the order bar (restaurant shops only).
+        sale_type: currentTableId ? 'dine_in' : ((posRestaurantActive() && currentOrderType) ? currentOrderType : undefined),
+        // restaurant_plan.md Phase 4 — paying part of a table's bill keeps the table open.
+        keep_table: (currentTableId && rsSplit && rsSplit.remainder.length) ? 1 : undefined,
         // pos_credit_receivables_plan.md Phase 1 — Simple POS credit sales
         // only; undefined/null for every other sale, which process_sale.php
         // treats identically to how it behaved before this phase.
         due_date: dueDate || null
     };
+
+    // Record Old Sale: the server numbers the receipt on the sale's own day and
+    // picks the shift that covered that time; the cashier confirms first.
+    if (oldSale) {
+        delete paymentData.receipt_number;
+        delete paymentData.table_id;
+        delete paymentData.sale_type;
+        paymentData.old_sale = 1;
+        paymentData.sold_at = oldSale.at;
+        paymentData.client_uuid = oldSaleUuid();
+        confirmOldSale(paymentData, function () {
+            $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
+            submitPayment(paymentData);
+        });
+        return;
+    }
 
     $('#processPaymentBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + PT.processing);
 
@@ -1775,6 +1814,11 @@ function submitPayment(paymentData) {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
+                // The sale is saved on the server, so forget the browser's saved copy of this cart NOW, not when the
+                // "Sale Completed" popup closes. Otherwise a refresh / closed tab / lost power while the popup is showing
+                // brings the PAID order back into the cart on the next open, ready to be charged again (2026-11-02).
+                // The in-memory cart stays until the popup closes: the WhatsApp receipt below is built from it.
+                clearCartStorage();
                 // Phase 10 (pos_upgrade_plan.md §7) — "Automatically print the
                 // receipt" POS setting: skip waiting for the button click.
                 if (POS_AUTO_PRINT_RECEIPT) { printReceipt(response.sale_id); }
@@ -1786,12 +1830,25 @@ function submitPayment(paymentData) {
                 // Phase 22 (pos_upgrade_plan.md §8) — build the WhatsApp share
                 // text from the cart BEFORE it's cleared below (no gateway —
                 // a plain wa.me deep-link the cashier's own device opens).
-                const whatsappReceiptText = buildWhatsAppReceiptText(currentReceiptNumber);
+                // The server's number is the real one (an old sale is numbered on its own day).
+                const savedReceipt = response.receipt_number || currentReceiptNumber;
+                // restaurant_plan.md Phase 4 — split bill: the unpaid items go straight back on the table.
+                if (paymentData.keep_table && rsSplit && rsSplit.remainder.length) {
+                    saveRemainderToTable(rsSplit.remainder, paymentData.table_id, currentTableLabel, parseInt(paymentData.warehouse_id, 10));
+                }
+                rsSplit = null;
+                // restaurant_plan.md Phase 3 — a paid take-away / delivery order goes to the kitchen.
+                if (posRestaurantActive() && POS_KITCHEN_MODE !== 'none' && response.sale_id
+                    && (paymentData.sale_type === 'take_away' || paymentData.sale_type === 'delivery')) {
+                    sendSaleToKitchen(response.sale_id, parseInt(paymentData.warehouse_id, 10));
+                }
+                const whatsappReceiptText = buildWhatsAppReceiptText(savedReceipt);
+                const oldSaleMsg = response.is_old_sale ? ' ' + OLD_SALE_T.recordedFor.replace('%s', oldSaleLongDate(response.sale_date)) : '';
 
                 Swal.fire({
                     icon: 'success',
-                    title: PT.saleCompleted,
-                    text: PT.receiptHash + currentReceiptNumber + loyaltyMsg,
+                    title: response.is_old_sale ? OLD_SALE_T.saved : PT.saleCompleted,
+                    text: PT.receiptHash + savedReceipt + oldSaleMsg + loyaltyMsg,
                     showCancelButton: true,
                     showDenyButton: true,
                     confirmButtonText: POS_AUTO_PRINT_RECEIPT ? PT.printAgain : PT.printReceipt,
@@ -1817,6 +1874,8 @@ function submitPayment(paymentData) {
                     // terminal starts as an ordinary walk-in, not still
                     // pinned to the table that was just paid out.
                     clearTableSelection();
+                    // restaurant_plan.md Phase 2 — next order starts on the shop's default type.
+                    if (posRestaurantActive()) { setOrderType(''); applyPosModeUi(); }
 
                     // 2. Clear Payment Inputs
                     $('#amountTendered').val('0');
@@ -1858,7 +1917,7 @@ function submitPayment(paymentData) {
                         paymentData.override_credit_limit = 1;
                         submitPayment(paymentData);
                     } else {
-                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                        $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
                     }
                 });
                 return;
@@ -1869,7 +1928,7 @@ function submitPayment(paymentData) {
                     text: response.message
                 });
             }
-            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+            $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
         },
         error: function(xhr) {
             let msg = PT.genericErrorRetry;
@@ -1893,7 +1952,7 @@ function submitPayment(paymentData) {
                         paymentData.override_credit_limit = 1;
                         submitPayment(paymentData);
                     } else {
-                        $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+                        $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
                     }
                 });
                 return;
@@ -1903,7 +1962,7 @@ function submitPayment(paymentData) {
                 title: PT.error,
                 text: msg
             });
-            $('#processPaymentBtn').prop('disabled', false).html('<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn);
+            $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
         }
     });
 }
@@ -1988,18 +2047,50 @@ function printReceipt(saleId) {
 // separate "Choose POS Mode" step for hybrid warehouses: the same end state
 // (both modes available) with materially less new UI-state-machine surface.
 
+function posShopMode() {
+    return POS_WAREHOUSE_MODES[parseInt($('#posWarehouseId').val() || 0, 10)] || 'retail';
+}
+// True only on a Restaurant/Hybrid shop of a Restaurant POS tenant — every
+// restaurant_plan.md Phase 2 addition below is behind this.
+function posRestaurantActive() {
+    return POS_RESTAURANT_ENABLED && posShopMode() !== 'retail';
+}
+
 function applyPosModeUi() {
-    const wid = parseInt($('#posWarehouseId').val() || 0, 10);
-    const mode = POS_WAREHOUSE_MODES[wid] || 'retail';
-    const show = POS_RESTAURANT_ENABLED && mode !== 'retail';
-    $('#restaurantTableBtn').toggleClass('d-none', !show);
+    const mode = posShopMode();
+    const show = posRestaurantActive();
+    // Menu | All products switch, and the Menu's own group chips in place of the retail categories.
+    $('#posMenuSwitchRow').toggleClass('d-none', !show);
+    $('#menuCategoryButtons').toggleClass('d-none', !posMenuModeOn());
+    $('#categoryButtons').toggleClass('d-none', posMenuModeOn());
+    // Restaurant-only shop: no Menu | All products choice, and none of the retail-only controls.
+    const restOnly = posRestaurantOnlyShop();
+    $('#posMenuSwitchGroup').toggleClass('pos-rest-hide', restOnly);
+    $('.pos-restock-btn, #addProductDropdown, #scannerReadyBadge, button[onclick="holdSale()"], button[onclick="showHeldSales()"], #loyaltyPointsSection').toggleClass('pos-rest-hide', restOnly);
+    $('#posPriceGroupId').closest('.mb-2').toggleClass('pos-rest-hide', restOnly);
+    const $srch = $('#productSearch');
+    if ($srch.length) {
+        if ($srch.data('origPlaceholder') === undefined) $srch.data('origPlaceholder', $srch.attr('placeholder'));
+        $srch.attr('placeholder', restOnly ? PT.searchMenu : $srch.data('origPlaceholder'));
+    }
+    // The order bar (Dine in / Take away / Delivery + table) replaces the small table icon.
+    const hasBar = $('#restaurantOrderBar').length > 0;
+    $('#restaurantTableBtn').toggleClass('d-none', !show || hasBar);
+    $('#restaurantOrderBar').toggleClass('d-none', !show);
+    if (show && !currentOrderType && mode === 'restaurant') setOrderType('dine_in');
     if (!show) {
+        setOrderType('');
         // Warehouse changed away from a restaurant/hybrid one — drop any
         // selected table so a stale table_id from a different warehouse can
         // never ride along on the next sale.
         clearTableSelection();
     } else {
-        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId);
+        $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId || POS_KITCHEN_MODE === 'none');
+        // Order types switched off in Selling Settings are not offered.
+        ['take_away', 'delivery'].forEach(function (t) {
+            const on = POS_ORDER_TYPES.indexOf(t) > -1;
+            $(`input[name="rsOrderType"][value="${t}"]`).toggleClass('d-none', !on).next('label').toggleClass('d-none', !on);
+        });
     }
 }
 
@@ -2009,6 +2100,189 @@ function clearTableSelection() {
     currentHoldId = null;
     $('#restaurantTableIndicator').addClass('d-none');
     $('#sendToKitchenBtn').addClass('d-none');
+    $('#rsTableLabel').text(PT.chooseTable);
+    $('#rsTableBtn').removeClass('btn-primary text-white').addClass('btn-outline-primary');
+    $('#rsSaveTableBtn').addClass('d-none');
+    $('#rsSplitRow').addClass('d-none');
+    rsSplit = null;
+    $('#rsSplitNote').addClass('d-none');
+    $('#rsSplitBtn').removeClass('d-none');
+}
+
+// restaurant_plan.md Phase 2 — Dine in / Take away / Delivery.
+function setOrderType(type) {
+    currentOrderType = type || '';
+    $('input[name="rsOrderType"]').prop('checked', false);
+    if (currentOrderType) $(`input[name="rsOrderType"][value="${currentOrderType}"]`).prop('checked', true);
+    // A table only belongs to a dine-in order.
+    $('#rsTableRow').toggleClass('d-none', !!currentOrderType && currentOrderType !== 'dine_in');
+    if (currentOrderType && currentOrderType !== 'dine_in' && currentTableId) clearTableSelection();
+}
+$(document).on('change', 'input[name="rsOrderType"]', function () { setOrderType(this.value); });
+
+// restaurant_plan.md Phase 2 — arriving from the Tables screen (?table=ID): open that
+// table's order once the till knows its shop. Never crosses shops.
+$(function () {
+    // ?ot=take_away|delivery from the Tables screen's Take away button.
+    if (POS_OPEN_ORDER_TYPE) {
+        const applyOt = function (n) {
+            if (!parseInt($('#posWarehouseId').val() || 0, 10) && n < 20) { setTimeout(function () { applyOt(n + 1); }, 250); return; }
+            if (posRestaurantActive()) setOrderType(POS_OPEN_ORDER_TYPE);
+        };
+        setTimeout(function () { applyOt(0); }, 400);
+    }
+    if (!POS_OPEN_TABLE || !POS_OPEN_TABLE.id) return;
+    const tryOpen = function (attempt) {
+        const wid = parseInt($('#posWarehouseId').val() || 0, 10);
+        if (!wid && attempt < 20) { setTimeout(function () { tryOpen(attempt + 1); }, 250); return; }
+        if (!wid) return;
+        if (POS_OPEN_TABLE.wid && wid !== POS_OPEN_TABLE.wid) { Swal.fire({ icon: 'warning', title: PT.tableNotInShop }); return; }
+        if (!posRestaurantActive()) return;
+        selectTable(POS_OPEN_TABLE.id, wid, POS_OPEN_TABLE.label || ('#' + POS_OPEN_TABLE.id));
+    };
+    setTimeout(function () { tryOpen(0); }, 300);
+});
+
+// restaurant_plan.md Phase 4 — split bill by items.
+function openSplitBill() {
+    if (!currentTableId || !cart.length) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
+    if (rsSplit) return;
+    let html = '';
+    cart.forEach((it, i) => {
+        html += `<div class="d-flex align-items-center gap-2 py-2 border-bottom">
+            <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${caseFormatJs(it.product_name)}</div>
+                <div class="small text-muted">${it.quantity} × ${Number(it.discounted_price).toLocaleString()}</div></div>
+            <div class="input-group input-group-sm flex-shrink-0" style="width:120px;">
+                <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, -1)">−</button>
+                <input type="number" class="form-control text-center rs-split-qty" data-i="${i}" min="0" max="${it.quantity}" value="0" oninput="rsSplitTotal()">
+                <button class="btn btn-outline-secondary" type="button" onclick="rsSplitStep(${i}, 1)">+</button>
+            </div></div>`;
+    });
+    $('#rsSplitLines').html(html);
+    rsSplitTotal();
+    new bootstrap.Modal(document.getElementById('rsSplitModal')).show();
+}
+function rsSplitStep(i, d) {
+    const el = $(`.rs-split-qty[data-i="${i}"]`);
+    el.val(Math.max(0, Math.min(cart[i].quantity, (parseFloat(el.val()) || 0) + d)));
+    rsSplitTotal();
+}
+function rsSplitTotal() {
+    let t = 0;
+    $('.rs-split-qty').each(function () {
+        const it = cart[$(this).data('i')];
+        const q = Math.max(0, Math.min(it.quantity, parseFloat($(this).val()) || 0));
+        t += q * it.discounted_price;
+    });
+    $('#rsSplitTotal').text(POS_CURRENCY + ' ' + t.toLocaleString());
+}
+function applySplitBill() {
+    const original = JSON.parse(JSON.stringify(cart));
+    const payNow = [], remainder = [];
+    $('.rs-split-qty').each(function () {
+        const it = original[$(this).data('i')];
+        const q = Math.max(0, Math.min(it.quantity, parseFloat($(this).val()) || 0));
+        if (q > 0) payNow.push(Object.assign({}, it, { quantity: q }));
+        if (it.quantity - q > 0) remainder.push(Object.assign({}, it, { quantity: it.quantity - q }));
+    });
+    if (!payNow.length) { Swal.fire({ icon: 'info', title: PT.splitPickOne }); return; }
+    bootstrap.Modal.getInstance(document.getElementById('rsSplitModal'))?.hide();
+    if (!remainder.length) return; // everything chosen = a normal full payment
+    rsSplit = { original: original, remainder: remainder };
+    cart = payNow;
+    updateCartDisplay();
+    saveCartToStorage();
+    $('#rsSplitNoteText').text(PT.splitNote.replace('%d', remainder.reduce((n, i) => n + i.quantity, 0)));
+    $('#rsSplitNote').removeClass('d-none');
+    $('#rsSplitBtn, #rsSaveTableBtn').addClass('d-none');
+}
+function cancelSplitBill() {
+    if (!rsSplit) return;
+    cart = rsSplit.original;
+    rsSplit = null;
+    updateCartDisplay();
+    saveCartToStorage();
+    $('#rsSplitNote').addClass('d-none');
+    $('#rsSplitBtn, #rsSaveTableBtn').removeClass('d-none');
+}
+function saveRemainderToTable(items, tableId, label, warehouseId) {
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/hold_sale.php') ?>', type: 'POST', contentType: 'application/json', dataType: 'json',
+        data: JSON.stringify({
+            reference: PT.tableLabel + ' ' + label, customer_id: null, items: items,
+            subtotal: items.reduce((s, i) => s + (i.price * i.quantity), 0),
+            tax: items.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
+            warehouse_id: warehouseId, table_id: tableId
+        }),
+        success: function (res) {
+            if (res.success) Swal.fire({ toast: true, position: 'top', icon: 'info', title: PT.splitKept.replace('%s', label), timer: 2600, showConfirmButton: false });
+            else Swal.fire({ icon: 'error', title: PT.error, text: res.message });
+        },
+        error: () => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError })
+    });
+}
+
+// restaurant_plan.md Phase 3 — kitchen slip (printer mode). Uses an already-open window when
+// given (opened inside a click); otherwise opens one and offers a link if the browser blocks it.
+function openKitchenSlip(params, win) {
+    const url = '<?= buildUrl('api/restaurant/kitchen_slip.php') ?>?' + $.param(params);
+    if (win && !win.closed) { win.location.href = url; return; }
+    const w = window.open(url, '_blank', 'width=420,height=640');
+    if (!w) Swal.fire({ icon: 'info', title: PT.kitchenSlipReady, html: `<a href="${url}" target="_blank" class="btn btn-primary"><i class="bi bi-printer me-1"></i>${PT.printKitchenSlip}</a>` });
+}
+function sendSaleToKitchen(saleId, warehouseId) {
+    $.post('<?= buildUrl('api/restaurant/send_to_kitchen.php') ?>', { sale_id: saleId, warehouse_id: warehouseId, _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+        if (res.success && POS_KITCHEN_MODE === 'printer') openKitchenSlip({ sale_id: saleId, warehouse_id: warehouseId });
+    }, 'json');
+}
+
+// Kitchen note per item ("less salt, extra chilli") — restaurant shops only.
+function editItemNote(index) {
+    const item = cart[index];
+    if (!item) return;
+    Swal.fire({
+        title: PT.itemNoteTitle, input: 'text', inputValue: item.note || '',
+        inputPlaceholder: PT.itemNotePlaceholder, inputAttributes: { maxlength: 200 },
+        showCancelButton: true, confirmButtonText: PT.save, cancelButtonText: PT.cancel, confirmButtonColor: '#0d6efd'
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        item.note = (r.value || '').trim();
+        updateCartDisplay();
+        saveCartToStorage();
+    });
+}
+
+// Keep the order open on its table (pay later). One open order per table:
+// hold_sale.php replaces the table's previous held order.
+function saveOrderToTable() {
+    if (!currentTableId) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
+    if (cart.length === 0) { Swal.fire({ icon: 'warning', title: PT.emptyCartTitle, text: PT.addItemsBeforeHold }); return; }
+    const btn = $('#rsSaveTableBtn'); const orig = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    const label = currentTableLabel;
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/hold_sale.php') ?>', type: 'POST', contentType: 'application/json', dataType: 'json',
+        data: JSON.stringify({
+            reference: PT.tableLabel + ' ' + label,
+            customer_id: $('#customerSelect').val() || null,
+            items: cart,
+            subtotal: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+            tax: cart.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
+            warehouse_id: parseInt($('#posWarehouseId').val(), 10),
+            table_id: currentTableId
+        }),
+        success: function (res) {
+            if (!res.success) { Swal.fire({ icon: 'error', title: PT.error, text: res.message }); return; }
+            cart = [];
+            updateCartDisplay();
+            clearCartStorage();
+            clearTableSelection();
+            setCustomerSelection('', '');
+            Swal.fire({ icon: 'success', title: PT.savedToTable.replace('%s', label), timer: 1600, showConfirmButton: false });
+        },
+        error: () => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError }),
+        complete: () => btn.prop('disabled', false).html(orig)
+    });
 }
 
 function openTablePicker() {
@@ -2047,11 +2321,16 @@ function renderTablePickerFloor(floor, tables, warehouseId) {
     const colors = { available: '#198754', occupied: '#dc3545', reserved: '#fd7e14', cleaning: '#6c757d' };
     let cards = '';
     tables.forEach(t => {
+        // Same rule as the Tables board: busy only while the table holds an open order
+        // (a table someone merely opened, or one left "occupied" by mistake, is free).
+        if (t.has_open_order !== undefined) {
+            t.status = (t.has_open_order == 1) ? 'occupied' : (t.status === 'occupied' ? 'available' : t.status);
+        }
         const color = colors[t.status] || '#6c757d';
         cards += `
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-2" style="cursor:pointer;border-top:4px solid ${color} !important;"
-                 onclick="selectTable(${t.table_id}, ${warehouseId}, ${JSON.stringify(t.table_number)})">
+                 onclick="selectTable(${t.table_id}, ${warehouseId}, ${JSON.stringify(t.table_number).replace(/"/g, '&quot;')})">
                 <div class="fw-bold">${safeOutput(t.table_number)}</div>
                 <div class="small text-muted">${t.seats} <?= t('seats') ?></div>
                 <span class="badge mt-1" style="background:${color};color:#fff;">${safeOutput(t.status)}</span>
@@ -2079,19 +2358,24 @@ function selectTable(tableId, warehouseId, tableNumber) {
                 console.error('Error restoring table order', e);
                 cart = [];
             }
-        } else {
-            cart = [];
         }
+        // A table with no open order is a NEW order: keep whatever the waiter already added
+        // (before, choosing the table silently emptied the cart). A table WITH an open order
+        // still loads that order, exactly as before.
 
         updateCartDisplay();
         saveCartToStorage();
         $('#restaurantTableIndicatorText').text(PT.dineInTable.replace('%s', tableNumber));
         $('#restaurantTableIndicator').removeClass('d-none');
-        $('#sendToKitchenBtn').removeClass('d-none');
-
-        $.post('<?= buildUrl('api/restaurant/update_table_status.php') ?>', {
-            table_id: tableId, status: 'occupied', _csrf: <?= json_encode(csrf_token()) ?>
-        });
+        $('#sendToKitchenBtn').toggleClass('d-none', POS_KITCHEN_MODE === 'none');
+        // restaurant_plan.md Phase 2 — the order bar shows the table and offers "Save to table".
+        if (currentOrderType !== 'dine_in') setOrderType('dine_in');
+        $('#rsTableLabel').text(PT.tableLabel + ' ' + tableNumber + (existing ? ' · ' + PT.openOrder : ''));
+        $('#rsTableBtn').removeClass('btn-outline-primary').addClass('btn-primary text-white');
+        $('#rsSaveTableBtn').removeClass('d-none');
+        $('#rsSplitRow').removeClass('d-none');
+        // A table becomes occupied when its order is saved (hold_sale.php) — not merely by being
+        // opened, which left tables stuck "occupied" with no order and disagreeing with the board.
     }).fail(function () {
         Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError });
     });
@@ -2110,6 +2394,8 @@ function sendCurrentOrderToKitchen() {
     const wid = parseInt($('#posWarehouseId').val() || 0, 10);
     const btn = $('#sendToKitchenBtn');
     const origHtml = btn.html();
+    // restaurant_plan.md Phase 3 — printer mode: open the slip window now, inside the click.
+    const slipWin = (POS_KITCHEN_MODE === 'printer') ? window.open('', '_blank', 'width=420,height=640') : null;
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
     // Every "Send to Kitchen" press re-persists the table's current cart as a
@@ -2148,8 +2434,10 @@ function sendCurrentOrderToKitchen() {
                 hold_id: currentHoldId, warehouse_id: wid, _csrf: <?= json_encode(csrf_token()) ?>
             }, function (res) {
                 if (res.success) {
+                    if (POS_KITCHEN_MODE === 'printer') openKitchenSlip({ hold_id: currentHoldId, warehouse_id: wid }, slipWin);
                     Swal.fire({ icon: 'success', title: PT.sentToKitchen, timer: 1500, showConfirmButton: false });
                 } else {
+                    if (slipWin) slipWin.close();
                     Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: res.message });
                 }
             }, 'json').fail(function () {
@@ -2224,6 +2512,10 @@ function openVariantPicker(parentId) {
 }
 
 function holdSale() {
+    if (oldSale) {
+        Swal.fire({ icon: 'info', text: OLD_SALE_T.noHold });
+        return;
+    }
     if (cart.length === 0) {
         Swal.fire({
             icon: 'warning',
@@ -2946,12 +3238,12 @@ function generateNewReceipt() {
     $.get('<?= buildUrl('/api/pos/generate_receipt_number.php') ?>', function(res) {
         if (res.success) {
             currentReceiptNumber = res.receipt_number;
-            $('#receiptNumber').text(currentReceiptNumber);
         } else {
             // Fallback
             currentReceiptNumber = 'POS-' + Date.now().toString().slice(-10);
-            $('#receiptNumber').text(currentReceiptNumber);
         }
+        // In old-sale mode the number is given by the server on save, dated on the sale's day.
+        $('#receiptNumber').text(oldSale ? OLD_SALE_T.receiptLater.replace('%s', oldSaleShortDate(oldSale.at)) : currentReceiptNumber);
     });
 }
 
@@ -3086,6 +3378,7 @@ function updateCashBalanceUI() {
     // ── Core barcode lookup ──────────────────────────────────────────────────
     function handleBarcodeScanned(code) {
         if (!code || code.length < 3) return;
+        if (posRestaurantOnlyShop()) return;   // a Restaurant shop sells from its Menu — no barcode scanning
 
         // Search allProducts first (full catalog, unaffected by category filter).
         // Fall back to products[] if allProducts hasn't been populated yet.
@@ -3102,12 +3395,7 @@ function updateCashBalanceUI() {
                    (p.sku     && p.sku.toLowerCase()     === needle);
         });
 
-        if (found) {
-            scanSuccess();
-            flashHeader('#198754', 400);
-            scanAddToCart(found);
-            console.info('[Scanner] Found:', found.product_name, '— code:', code);
-        } else {
+        const scanNotFound = function () {
             scanError();
             flashHeader('#dc3545', 600);
             scanToast(
@@ -3116,6 +3404,25 @@ function updateCashBalanceUI() {
                 true
             );
             console.warn('[Scanner] Not found:', code);
+        };
+
+        if (found) {
+            scanSuccess();
+            flashHeader('#198754', 400);
+            scanAddToCart(found);
+            console.info('[Scanner] Found:', found.product_name, '— code:', code);
+        } else if (posMenuModeOn()) {
+            // Restaurant shop in Menu view: the code may belong to a shop product that is not on the
+            // Menu — look past the Menu view before saying "not found". (Never runs on a retail shop.)
+            $.getJSON('<?= buildUrl('/api/pos/simple_products.php') ?>', { search: code, warehouse_id: $('#posWarehouseId').val() }, function (r) {
+                const hit = (r && r.success && r.data || []).find(function (p) {
+                    return (p.barcode && p.barcode.toLowerCase() === needle) || (p.sku && p.sku.toLowerCase() === needle);
+                });
+                if (hit) { scanSuccess(); flashHeader('#198754', 400); scanAddToCart(hit); }
+                else scanNotFound();
+            }).fail(scanNotFound);
+        } else {
+            scanNotFound();
         }
     }
 
@@ -3369,5 +3676,302 @@ $(function () {
         posSheet.pending = btn;
         bootstrap.Offcanvas.getOrCreateInstance(sheet).hide();
     }, true);
+});
+
+// ── Record Old Sale (Rekodi Mauzo ya Zamani) ─────────────────────────────────
+// A small header button opens a pop-up (a bottom sheet on phones) to pick when
+// the sale happened. While the mode is on the header shows a chip with that
+// time, the cart is labelled as an old sale, and Pay saves it for that day after
+// a confirmation. Server side: core/pos_old_sales.php and process_sale.php
+// (old_sale + sold_at); the preview comes from api/pos/old_sale_context.php.
+const OLD_SALE_T = {
+    recordedFor: <?= json_encode(t('Recorded for %s.')) ?>,
+    saved: <?= json_encode(t('Old sale saved')) ?>,
+    noHold: <?= json_encode(t('Hold is not available while recording an old sale.')) ?>,
+    receiptLater: <?= json_encode(t('Given on save, dated %s')) ?>,
+    title: <?= json_encode(t('Old Sale Entry')) ?>,
+    current: <?= json_encode(t('Current Sale')) ?>,
+    note: <?= json_encode(t('Recording an old sale for %s.')) ?>,
+    payBtn: <?= json_encode(t('SAVE OLD SALE')) ?>,
+    checking: <?= json_encode(t('Checking…')) ?>,
+    confirmTitle: <?= json_encode(t('Confirm old sale')) ?>,
+    when: <?= json_encode(t('Sale date and time')) ?>,
+    shift: <?= json_encode(t('Shift')) ?>,
+    total: <?= json_encode(t('Total')) ?>,
+    payment: <?= json_encode(t('Payment')) ?>,
+    dated: <?= json_encode(t('Stock, books and bank are dated %s.')) ?>,
+    similar: <?= json_encode(t('A sale with the same total is already recorded that day:')) ?>,
+    similarHint: <?= json_encode(t('Continue only if this is a different sale.')) ?>,
+    confirmBtn: <?= json_encode(t('Confirm and save')) ?>,
+    back: <?= json_encode(t('Back')) ?>,
+    exited: <?= json_encode(t("Back to today's sales")) ?>,
+    offline: <?= json_encode(t('Recording an old sale needs an internet connection.')) ?>,
+    weekdays: <?= json_encode([t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')]) ?>,
+    sheetOff: <?= json_encode(t('Record Old Sale')) ?>,
+    sheetOffHelp: <?= json_encode(t('A sale from an earlier day you forgot to enter')) ?>,
+    sheetOn: <?= json_encode(t('Old sale: %s')) ?>,
+    sheetOnHelp: <?= json_encode(t('Tap to change the date or time')) ?>,
+    stripOn: <?= json_encode(t('Recording old sale: %s')) ?>,
+    today: <?= json_encode(t('Today')) ?>,
+    yesterday: <?= json_encode(t('Yesterday')) ?>,
+    daysAgo: <?= json_encode(t('%d days ago')) ?>,
+    maxDays: <?= (int)($old_sale_max_days ?? 30) ?>,
+    methods: <?= json_encode($payment_methods + ['split' => t('Split Payment')]) ?>
+};
+const OLD_SALE_CONTEXT_URL = '<?= buildUrl('/api/pos/old_sale_context.php') ?>';
+let oldSalePreviewTimer = null;
+let oldSalePreviewSeq = 0;
+
+function oldSalePad(n) { return (n < 10 ? '0' : '') + n; }
+function oldSaleYmd(d) { return d.getFullYear() + '-' + oldSalePad(d.getMonth() + 1) + '-' + oldSalePad(d.getDate()); }
+function oldSaleShortDate(at) {
+    const p = String(at).split(/[ T]/), d = p[0].split('-');
+    return d[2] + '/' + d[1] + ' · ' + (p[1] || '').slice(0, 5);
+}
+function oldSaleLongDate(at) {
+    const p = String(at).split(/[ T]/), d = p[0].split('-').map(Number);
+    const wd = OLD_SALE_T.weekdays[new Date(d[0], d[1] - 1, d[2]).getDay()];
+    return wd + ' ' + oldSalePad(d[2]) + '/' + oldSalePad(d[1]) + '/' + d[0] + ', ' + (p[1] || '').slice(0, 5);
+}
+function oldSaleEsc(s) { return $('<div>').text(String(s)).html(); }
+function oldSaleUuid() {
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+function payButtonHtml() {
+    return oldSale
+        ? '<i class="bi bi-clock-history"></i> ' + oldSaleEsc(OLD_SALE_T.payBtn)
+        : '<i class="bi bi-check-circle"></i> ' + PT.processPaymentBtn;
+}
+
+function toggleOldSalePopover() {
+    const $pop = $('#oldSalePopover');
+    if (!$pop.length) return;
+    if (!$pop.hasClass('d-none')) { closeOldSalePopover(); return; }
+
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    $('#oldSaleDate').val(oldSale ? oldSale.at.slice(0, 10) : oldSaleYmd(yesterday));
+    $('#oldSaleTime').val(oldSale ? oldSale.at.slice(11, 16) : '12:00');
+    oldSaleRenderPicker();
+    oldSaleShowPicker(false);
+    $pop.removeClass('d-none');
+    $('#oldSaleBtn, #oldSaleChip .pos-old-sale-chip-open').attr('aria-expanded', 'true');
+    if (window.innerWidth < 768 && !$('.pos-old-sale-backdrop').length) {
+        $('<div class="pos-old-sale-backdrop"></div>').appendTo('body').on('click', closeOldSalePopover);
+    }
+    refreshOldSalePreview();
+    $('#oldSaleWhenBtn').trigger('focus');
+}
+
+function closeOldSalePopover() {
+    $('#oldSalePopover').addClass('d-none');
+    $('.pos-old-sale-backdrop').remove();
+    $('#oldSaleBtn, #oldSaleChip .pos-old-sale-chip-open').attr('aria-expanded', 'false');
+}
+
+// Days back from today for a Y-m-d date (0 = today, 1 = yesterday).
+function oldSaleDaysBack(ymd) {
+    const p = String(ymd).split('-').map(Number), today = new Date();
+    const a = new Date(p[0], p[1] - 1, p[2]), b = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return Math.round((b - a) / 86400000);
+}
+function oldSaleDayName(n) { return n === 0 ? OLD_SALE_T.today : n === 1 ? OLD_SALE_T.yesterday : OLD_SALE_T.daysAgo.replace('%d', n); }
+function oldSaleDayDate(d) { return OLD_SALE_T.weekdays[d.getDay()] + ' ' + oldSalePad(d.getDate()) + '/' + oldSalePad(d.getMonth() + 1); }
+
+// The "When" field text plus the day list (today back to maxDays days ago,
+// as the server allows) and the time list (every 30 minutes; a saved
+// off-grid time is added to the list).
+function oldSaleRenderPicker() {
+    const date = $('#oldSaleDate').val(), time = $('#oldSaleTime').val();
+    let days = '';
+    for (let n = 0; n <= OLD_SALE_T.maxDays; n++) {
+        const d = new Date(); d.setDate(d.getDate() - n);
+        const ymd = oldSaleYmd(d);
+        days += '<li><button type="button" data-date="' + ymd + '" class="' + (ymd === date ? 'active' : '') + '">' +
+            oldSaleEsc(oldSaleDayName(n)) + '<small>' + oldSaleEsc(oldSaleDayDate(d)) + '</small></button></li>';
+    }
+    const slots = [];
+    for (let h = 0; h < 24; h++) { slots.push(oldSalePad(h) + ':00', oldSalePad(h) + ':30'); }
+    if (time && slots.indexOf(time) < 0) { slots.push(time); slots.sort(); }
+    const times = slots.map(function (t) {
+        return '<li><button type="button" data-time="' + t + '" class="' + (t === time ? 'active' : '') + '">' + t + '</button></li>';
+    }).join('');
+    $('#oldSaleDayList').html(days);
+    $('#oldSaleTimeList').html(times);
+
+    const n = date ? oldSaleDaysBack(date) : 0;
+    const p = String(date).split('-').map(Number);
+    $('#oldSaleWhenText').text(date && time
+        ? oldSaleDayName(n) + ', ' + oldSaleDayDate(new Date(p[0], p[1] - 1, p[2])) + ' · ' + time : '');
+}
+
+function oldSaleShowPicker(show) {
+    $('#oldSalePicker').toggleClass('d-none', !show);
+    $('#oldSaleWhenBtn').attr('aria-expanded', show ? 'true' : 'false');
+    if (!show) return;
+    // Bring the chosen day and time into view.
+    $('#oldSalePicker ul').each(function () {
+        const on = $(this).find('button.active').get(0);
+        if (on) this.scrollTop = on.parentNode.offsetTop - this.clientHeight / 2 + on.offsetHeight / 2;
+    });
+}
+
+function toggleOldSalePicker() { oldSaleShowPicker($('#oldSalePicker').hasClass('d-none')); }
+
+function refreshOldSalePreview() {
+    clearTimeout(oldSalePreviewTimer);
+    const date = $('#oldSaleDate').val(), time = $('#oldSaleTime').val();
+    const $out = $('#oldSalePreview'), $go = $('#oldSaleStartBtn');
+    $go.prop('disabled', true);
+    if (!date || !time) { $out.text(''); return; }
+    $out.removeClass('text-danger text-primary').addClass('text-muted').text(OLD_SALE_T.checking);
+    const seq = ++oldSalePreviewSeq;
+    oldSalePreviewTimer = setTimeout(function () {
+        $.getJSON(OLD_SALE_CONTEXT_URL, { sold_at: date + ' ' + time, warehouse_id: $('#posWarehouseId').val() || '' })
+            .done(function (res) {
+                if (seq !== oldSalePreviewSeq) return;   // a newer choice is already being checked
+                if (!res.success || res.error) {
+                    $out.removeClass('text-muted text-primary').addClass('text-danger').text(res.error || res.message || PT.serverError);
+                    return;
+                }
+                $out.removeClass('text-muted text-danger').addClass('text-primary').text(res.shift.label);
+                $go.data('label', res.shift.label).prop('disabled', false);
+            })
+            .fail(function (xhr) {
+                if (seq !== oldSalePreviewSeq) return;
+                let msg = PT.serverError;
+                try { msg = JSON.parse(xhr.responseText).message || msg; } catch (e) {}
+                $out.removeClass('text-muted text-primary').addClass('text-danger').text(msg);
+            });
+    }, 250);
+}
+
+function startOldSaleMode() {
+    const date = $('#oldSaleDate').val(), time = $('#oldSaleTime').val();
+    if (!date || !time) return;
+    oldSale = { at: date + ' ' + time, label: $('#oldSaleStartBtn').data('label') || '' };
+    closeOldSalePopover();
+    applyOldSaleUi();
+    Swal.fire({ toast: true, position: 'top-end', icon: 'info', timer: 2600, showConfirmButton: false,
+                title: OLD_SALE_T.note.replace('%s', oldSaleLongDate(oldSale.at)) });
+}
+
+function exitOldSaleMode() {
+    oldSale = null;
+    closeOldSalePopover();
+    applyOldSaleUi();
+    Swal.fire({ toast: true, position: 'top-end', icon: 'success', timer: 2000, showConfirmButton: false, title: OLD_SALE_T.exited });
+}
+
+function applyOldSaleUi() {
+    const on = !!oldSale;
+    $('#oldSaleBtn').toggleClass('d-none', on);
+    $('#oldSaleChip').toggleClass('d-none', !on);
+    // Phones' Actions sheet: the old-sale row shows the chosen time, plus a way out.
+    $('#posActOldSale').toggleClass('pos-act-on', on);
+    $('#posActOldSaleTitle').text(on ? OLD_SALE_T.sheetOn.replace('%s', oldSaleLongDate(oldSale.at)) : OLD_SALE_T.sheetOff);
+    $('#posActOldSaleHelp').text(on ? OLD_SALE_T.sheetOnHelp : OLD_SALE_T.sheetOffHelp);
+    $('#posActOldSaleExit').toggleClass('d-none', !on);
+    $('#posOldSaleStrip').toggleClass('d-none', !on);
+    $('#posOldSaleStripText').text(on ? OLD_SALE_T.stripOn.replace('%s', oldSaleLongDate(oldSale.at)) : '');
+    $('#oldSaleChipText').text(on ? oldSaleShortDate(oldSale.at) : '');
+    $('#cartHeaderTop').parent().toggleClass('pos-old-sale-head', on);
+    $('#cartTitleText, #mobileCartTitleText').text(on ? OLD_SALE_T.title : OLD_SALE_T.current);
+    $('#cartTitleIcon').attr('class', on ? 'bi bi-clock-history' : 'bi bi-cart3');
+    $('#oldSaleCartNote').toggleClass('d-none', !on)
+        .text(on ? OLD_SALE_T.note.replace('%s', oldSaleLongDate(oldSale.at)) + (oldSale.label ? ' ' + oldSale.label : '') : '');
+    $('#receiptNumber').text(on ? OLD_SALE_T.receiptLater.replace('%s', oldSaleShortDate(oldSale.at)) : currentReceiptNumber);
+    const $pay = $('#processPaymentBtn');
+    if (!$pay.prop('disabled')) $pay.html(payButtonHtml());
+    $('#mobilePayBtn').html(on
+        ? '<i class="bi bi-clock-history me-1"></i>' + oldSaleEsc(OLD_SALE_T.payBtn)
+        : '<i class="bi bi-check-circle me-1"></i>' + PT.processPaymentBtn);
+}
+
+// Shows what will be saved, and warns about a likely double entry, before the
+// sale is sent. proceed() is only called when the cashier confirms.
+function confirmOldSale(paymentData, proceed) {
+    if (navigator.onLine === false) {
+        Swal.fire({ icon: 'error', title: PT.error, text: OLD_SALE_T.offline });
+        return;
+    }
+    $.getJSON(OLD_SALE_CONTEXT_URL, { sold_at: oldSale.at, warehouse_id: paymentData.warehouse_id || '', total: paymentData.total })
+        .done(function (res) {
+            if (!res.success || res.error) {
+                Swal.fire({ icon: 'error', title: PT.error, text: res.error || res.message || PT.serverError });
+                return;
+            }
+            const money = POS_CURRENCY + ' ' + Number(paymentData.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const method = OLD_SALE_T.methods[paymentData.payment_method] || paymentData.payment_method;
+            const row = function (k, v) {
+                return '<tr><th class="text-muted fw-normal pe-3 py-1 align-top">' + oldSaleEsc(k) + '</th><td class="py-1">' + v + '</td></tr>';
+            };
+            let html = '<table class="table table-sm mb-2 text-start small"><tbody>' +
+                row(OLD_SALE_T.when, oldSaleEsc(oldSaleLongDate(oldSale.at))) +
+                row(OLD_SALE_T.shift, oldSaleEsc(res.shift.label)) +
+                row(OLD_SALE_T.total, '<strong>' + oldSaleEsc(money) + '</strong>') +
+                row(OLD_SALE_T.payment, oldSaleEsc(method)) +
+                '</tbody></table>' +
+                '<div class="small text-muted text-start">' + oldSaleEsc(OLD_SALE_T.dated.replace('%s', oldSale.at.slice(8, 10) + '/' + oldSale.at.slice(5, 7) + '/' + oldSale.at.slice(0, 4))) + '</div>';
+            if (res.similar && res.similar.length) {
+                html += '<div class="alert alert-warning small text-start mt-2 mb-0">' + oldSaleEsc(OLD_SALE_T.similar) + '<ul class="mb-1 mt-1">' +
+                    res.similar.map(function (s) { return '<li>' + oldSaleEsc(s.receipt_number + ' · ' + s.time) + '</li>'; }).join('') +
+                    '</ul>' + oldSaleEsc(OLD_SALE_T.similarHint) + '</div>';
+            }
+            Swal.fire({
+                icon: 'question', title: OLD_SALE_T.confirmTitle, html: html,
+                showCancelButton: true, confirmButtonText: OLD_SALE_T.confirmBtn, cancelButtonText: OLD_SALE_T.back,
+                confirmButtonColor: '#0d6efd', focusCancel: !!(res.similar && res.similar.length)
+            }).then(function (r) { if (r.isConfirmed) proceed(); });
+        })
+        .fail(function (xhr) {
+            let msg = PT.serverError;
+            try { msg = JSON.parse(xhr.responseText).message || msg; } catch (e) {}
+            Swal.fire({ icon: 'error', title: PT.error, text: msg });
+        });
+}
+
+// Phones: a row in the Actions sheet runs the same function as the desktop
+// button, once the sheet has finished closing (so its backdrop and focus
+// handling never clash with the next pop-up or dialog).
+function posAction(fn) {
+    const el = document.getElementById('posActionsSheet');
+    const sheet = el && window.bootstrap ? bootstrap.Offcanvas.getInstance(el) : null;
+    if (!sheet || !el.classList.contains('show')) { fn(); return; }
+    el.addEventListener('hidden.bs.offcanvas', function () { fn(); }, { once: true });
+    sheet.hide();
+}
+// The floating cart button sits above Bootstrap panels; hide it while the sheet is open.
+$(function () {
+    $('#posActionsSheet')
+        .on('show.bs.offcanvas', function () { document.body.classList.add('pos-actions-open'); })
+        .on('hidden.bs.offcanvas', function () { document.body.classList.remove('pos-actions-open'); });
+});
+
+$(function () {
+    if (!$('#oldSaleWrap').length) return;
+    $('#oldSaleDayList').on('click', 'button', function () {
+        $('#oldSaleDate').val($(this).data('date'));
+        oldSaleRenderPicker();
+        refreshOldSalePreview();
+    });
+    $('#oldSaleTimeList').on('click', 'button', function () {
+        $('#oldSaleTime').val($(this).data('time'));
+        oldSaleRenderPicker();
+        oldSaleShowPicker(false);
+        refreshOldSalePreview();
+    });
+    // Close the pop-up on a click outside it, or with Escape.
+    $(document).on('mousedown', function (e) {
+        if (!$('#oldSalePopover').hasClass('d-none') && !$(e.target).closest('#oldSaleWrap').length && !$(e.target).hasClass('pos-old-sale-backdrop')) {
+            closeOldSalePopover();
+        }
+    });
+    $(document).on('keydown', function (e) {
+        if (e.key === 'Escape' && !$('#oldSalePopover').hasClass('d-none')) closeOldSalePopover();
+    });
 });
 </script>

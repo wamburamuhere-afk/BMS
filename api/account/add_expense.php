@@ -75,6 +75,12 @@ try {
     // instead of asking; the normal form still requires an explicit choice.
     if (!$bank_account_id && $simplePos) {
         $bank_account_id = defaultCashAccountId($pdo);
+        // Restaurant focus (2026-11-02): a restaurant-only company pays from the same cash account its sales and purchases use.
+        require_once __DIR__ . '/../../core/restaurant_scope.php';
+        if (restaurantOnlyCompany($pdo)) {
+            require_once __DIR__ . '/../../core/sales_posting.php';
+            $bank_account_id = posReceiptAccountId($pdo, 'cash') ?: $bank_account_id;
+        }
     }
     if (!$bank_account_id) {
         http_response_code(400);
@@ -180,8 +186,10 @@ try {
             $ref  = 'EXP-' . $expense_id;
             $desc = 'Expense #' . $expense_id . ': ' . substr($description, 0, 100);
 
+            // The expense's shop goes onto both entries so the per-shop Profit
+            // Report sees it (NULL = company-wide).
             $accr = postExpenseAccrual($pdo, (int)$expense_id, $expense_account_id, $amount,
-                $expense_date, $project_id, (int)$created_by, $ref, $description);
+                $expense_date, $project_id, (int)$created_by, $ref, $description, $warehouse_id);
 
             $settle_debit = $expense_account_id;
             if (!empty($accr['posted'])) {
@@ -200,7 +208,8 @@ try {
                 $desc,
                 $project_id,
                 0,    // no WHT on Quick Expense
-                null
+                null,
+                $warehouse_id
             );
 
             if (!$txnId) {

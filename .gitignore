@@ -43,6 +43,7 @@ backups/*
 # -----------------------------------------------
 *.log
 api/debug_grn_log.txt
+debug_grn_log.txt
 
 # -----------------------------------------------
 # GENERATED DAILY REPORTS (local-only, never deploy)

@@ -1,6 +1,9 @@
 <?php
 // helpers.php
 
+// Company operating currency (TZS default; KES/BIF/RWF/SSP/USD) — used by format_currency() below.
+require_once __DIR__ . '/core/currency.php';
+
 function calculateTotalInterest($amount, $rate, $term, $formula) {
     switch ($formula) {
         case 'Flat Rate':
@@ -525,16 +528,11 @@ function get_variance_color($variance) {
     return 'info'; // On budget
 }
 
-function format_currency($amount, $currency = 'TZS') {
-    $symbols = [
-        'TZS' => 'TSh ',
-        'USD' => '$',
-        'EUR' => '€',
-        'GBP' => '£',
-        'KES' => 'KSh '
-    ];
-    $symbol = $symbols[$currency] ?? 'TSh ';
-    return $symbol . number_format((float)$amount, 2);
+// $currency omitted (245 of 248 call sites) → the company's operating currency, so a
+// TZS company still gets exactly "TSh 1,234.00". An explicit code keeps working as before.
+function format_currency($amount, $currency = null) {
+    return bmsCurrencySymbol($currency === null || $currency === '' ? null : (string)$currency)
+        . number_format((float)$amount, 2);
 }
 
 function safe_output($value, $default = 'N/A') {
@@ -555,6 +553,14 @@ if (!function_exists('generate_receipt_number')) {
 if (!function_exists('format_number')) {
     function format_number($number, $decimals = 2) {
         return number_format((float)$number, $decimals);
+    }
+}
+
+if (!function_exists('format_qty')) {
+    /** A quantity as it was entered: 1 → "1", 1.5 → "1.5", 0.125 → "0.125" (never "1.000"). */
+    function format_qty($qty) {
+        $s = number_format((float)$qty, 3);
+        return strpos($s, '.') === false ? $s : rtrim(rtrim($s, '0'), '.');
     }
 }
 
@@ -731,6 +737,20 @@ if (!function_exists('format_bytes')) {
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
         return round($bytes, $precision) . ' ' . $units[$pow];
+    }
+}
+
+/**
+ * DataTables page size for a server-side list. "All" sends -1, which would
+ * build LIMIT x, -1 (invalid SQL) — any value below 1 means every row.
+ */
+if (!function_exists('dt_page_length')) {
+    function dt_page_length($length, $default = 10) {
+        if ($length === null || $length === '') {
+            return (int)$default;
+        }
+        $n = (int)$length;
+        return $n < 1 ? 1000000000 : $n;
     }
 }
 

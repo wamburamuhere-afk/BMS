@@ -96,7 +96,7 @@ try {
     die("Error: " . $e->getMessage());
 }
 
-$currency = $return['currency'] ?? 'TZS';
+$currency = $return['currency'] ?? bmsCompanyCurrency();
 
 $comp = ['name'=>'Business Management System','email'=>'','phone'=>'','address'=>'','postal_address'=>'','website'=>'','tin'=>'','vrn'=>'','logo'=>''];
 try {

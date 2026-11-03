@@ -209,7 +209,7 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
             </div>
             <div class="text-end">
                 <div class="riv-label">Amount</div>
-                <div class="riv-amount">TZS <?= number_format($inv_total, 2) ?></div>
+                <div class="riv-amount"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($inv_total, 2) ?></div>
                 <?php if (in_array($inv['status'], ['partial', 'paid'])): ?>
                 <div class="mt-2" style="min-width:160px">
                     <div class="progress" style="height:6px;border-radius:4px;">
@@ -217,9 +217,9 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                              style="width:<?= $paid_pct ?>%"></div>
                     </div>
                     <div class="small mt-1 text-muted">
-                        Paid: <strong>TZS <?= number_format($amount_paid, 2) ?></strong>
+                        Paid: <strong><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($amount_paid, 2) ?></strong>
                         <?php if ($amount_due > 0): ?>
-                        &nbsp;&bull;&nbsp; Due: <strong class="text-danger">TZS <?= number_format($amount_due, 2) ?></strong>
+                        &nbsp;&bull;&nbsp; Due: <strong class="text-danger"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($amount_due, 2) ?></strong>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -371,7 +371,7 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                             <tr>
                                 <td class="text-muted small"><?= $i + 1 ?></td>
                                 <td><?= caseFormat($pmt['payment_date']) ?></td>
-                                <td class="text-end fw-semibold">TZS <?= number_format((float)$pmt['amount'], 2) ?></td>
+                                <td class="text-end fw-semibold"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format((float)$pmt['amount'], 2) ?></td>
                                 <td><?= caseFormat($pmt['payment_method']) ?></td>
                                 <td class="small"><?= caseFormat($pmt['account_name'] ?? '—') ?></td>
                                 <td class="small text-muted"><?= caseFormat($pmt['reference'] ?? '—') ?></td>
@@ -382,13 +382,13 @@ $paid_pct     = $inv_total > 0 ? min(100, round($amount_paid / $inv_total * 100)
                         <tfoot>
                             <tr class="table-primary fw-bold">
                                 <td colspan="2" class="text-end">Total Paid</td>
-                                <td class="text-end">TZS <?= number_format($amount_paid, 2) ?></td>
+                                <td class="text-end"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($amount_paid, 2) ?></td>
                                 <td colspan="4"></td>
                             </tr>
                             <?php if ($amount_due > 0): ?>
                             <tr class="table-warning">
                                 <td colspan="2" class="text-end">Remaining</td>
-                                <td class="text-end text-danger fw-bold">TZS <?= number_format($amount_due, 2) ?></td>
+                                <td class="text-end text-danger fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format($amount_due, 2) ?></td>
                                 <td colspan="4"></td>
                             </tr>
                             <?php endif; ?>

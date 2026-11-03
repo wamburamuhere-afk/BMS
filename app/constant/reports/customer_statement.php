@@ -206,7 +206,7 @@ $(function () {
             { extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }
         ],
         columns: [
-            { data: null,          orderable: false, className: 'ps-3',       render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
+            BMSSerial.column({ className: 'ps-3' }),
             { data: 'date',                                                    render: d => dt(d) },
             { data: 'type',                                                    render: d => typeBadge(d) },
             { data: 'ref',                                                     render: d => esc(d) },

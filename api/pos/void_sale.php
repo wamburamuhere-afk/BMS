@@ -3,8 +3,9 @@
 /**
  * API: Void a POS sale
  * ----------------------------------------------------------------------------
- * Reverses a completed POS sale in full: restores stock, refunds the cash drawer
- * (for cash sales, against the operator's active shift), and marks the sale
+ * Reverses a completed POS sale in full: restores stock, takes back the cash the
+ * drawer holds for it (any sale that put cash in — against the operator's active
+ * shift), and marks the sale
  * `voided`. A voided sale is treated as if it never happened — it is excluded
  * from the Income Statement automatically (the P&L only recognises non-voided
  * sales). Use this to reverse a mistaken or test sale.
@@ -29,6 +30,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_combo_products.php';
+require_once __DIR__ . '/../../core/pos_shift_reporting.php';   // posSaleDrawerCashOwed()
 
 header('Content-Type: application/json');
 
@@ -78,7 +80,10 @@ try {
                                  WHERE product_id = ? AND warehouse_id = ?");
 
     foreach ($lines as $ln) {
-        if ((int)($ln['is_service'] ?? 0) === 1) continue;   // services hold no stock
+        // services hold no stock — except a dish with a recipe (no-stock item + recipe,
+        // restaurant_plan.md Phase 7): its ingredients were used up, so a void puts them back,
+        // matching the reversed cost entry below.
+        if ((int)($ln['is_service'] ?? 0) === 1 && empty($ln['is_combo'])) continue;
         $pid = (int)$ln['product_id'];
         $qty = (float)$ln['quantity'];
         if ($pid <= 0 || $qty <= 0) continue;
@@ -87,7 +92,7 @@ try {
         // COMPONENTS, not itself (it never had its own stock decremented).
         if (!empty($ln['is_combo'])) {
             if ($warehouse_id !== null) {
-                reverseComboComponents($pdo, $pid, $qty, $warehouse_id, $project_id, $sale_id, $sale['receipt_number'], $_SESSION['user_id']);
+                reverseComboComponents($pdo, $pid, $qty, $warehouse_id, $project_id, $sale_id, $sale['receipt_number'], $_SESSION['user_id'], 'pos_void');
             }
             continue;
         }
@@ -119,16 +124,33 @@ try {
         reverseSerialsForSaleItem($pdo, (int)$ln['sale_item_id']);
     }
 
-    // Refund the cash drawer for cash sales, against the operator's active shift.
-    if ($sale['payment_method'] === 'cash') {
-        $shiftStmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
-        $shiftStmt->execute([$_SESSION['user_id']]);
-        $active_shift = $shiftStmt->fetchColumn();
+    // Take back whatever cash the drawer ledger holds for this sale, against the
+    // operator's active shift. Reads the drawer ledger rather than assuming a cash
+    // sale: a credit sale's deposit, a split sale's cash leg and a settled credit
+    // sale all put cash in the drawer too, and a refund for the sale total alone
+    // would leave that cash on the POS "Cash Balance" after the void.
+    $drawer = posSaleDrawerCashOwed($pdo, $sale_id, (string)$sale['receipt_number']);
+    if ($drawer['received'] > 0) {
+        $drawer_refund = $drawer['owed'];
+    } else {
+        // No drawer rows for this sale (an older cash sale) — refund the total, as before.
+        $drawer_refund = $sale['payment_method'] === 'cash' ? (float)$sale['grand_total'] : 0.0;
+    }
+    if ($drawer_refund > 0) {
+        if (!empty($sale['is_past_entry'])) {
+            // An old sale (typed in later) was never in today's drawer:
+            // reverse it inside its own shift, like it never happened there.
+            $active_shift = (int)$sale['shift_id'];
+        } else {
+            $shiftStmt = $pdo->prepare("SELECT shift_id FROM cash_register_shifts WHERE user_id = ? AND status = 'active' LIMIT 1");
+            $shiftStmt->execute([$_SESSION['user_id']]);
+            $active_shift = $shiftStmt->fetchColumn();
+        }
         if ($active_shift) {
             $pdo->prepare("INSERT INTO cash_register_transactions
                               (shift_id, transaction_type, amount, payment_method, reference_number, sale_id, reason, created_by, created_at)
                            VALUES (?, 'refund', ?, 'cash', ?, ?, ?, ?, NOW())")
-                ->execute([$active_shift, (float)$sale['grand_total'], $sale['receipt_number'], $sale_id, 'Void: ' . $reason, $_SESSION['user_id']]);
+                ->execute([$active_shift, $drawer_refund, $sale['receipt_number'], $sale_id, 'Void: ' . $reason, $_SESSION['user_id']]);
         }
     }
 
@@ -160,6 +182,16 @@ try {
     reverseLoyaltyForSale($pdo, $sale_id, (int)$_SESSION['user_id']);
 
     $pdo->commit();
+
+    // An old sale sits in a closed shift: refresh that shift's saved Z-report figures.
+    if (!empty($sale['is_past_entry'])) {
+        try {
+            require_once __DIR__ . '/../../core/pos_old_sales.php';
+            posOldSaleRecomputeShift($pdo, (int)$sale['shift_id']);
+        } catch (Throwable $e) {
+            error_log('void_sale old-sale shift recompute: ' . $e->getMessage());
+        }
+    }
 
     logActivity($pdo, $_SESSION['user_id'], "Voided POS Sale #{$sale['receipt_number']} (" . number_format((float)$sale['grand_total'], 2) . ")");
     logAudit($pdo, $_SESSION['user_id'], 'pos_void', [

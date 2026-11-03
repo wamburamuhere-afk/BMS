@@ -199,15 +199,15 @@ loadLanguage($__cd_lang);
         <div class="summary" id="summarySection" style="display: none;">
             <div class="summary-row">
                 <span class="summary-label"><?= t('Subtotal:') ?></span>
-                <span class="summary-value" id="displaySubtotal">TZS 0.00</span>
+                <span class="summary-value" id="displaySubtotal"><?= htmlspecialchars(bmsCompanyCurrency()) ?> 0.00</span>
             </div>
             <div class="summary-row">
                 <span class="summary-label"><?= t('Tax:') ?></span>
-                <span class="summary-value" id="displayTax">TZS 0.00</span>
+                <span class="summary-value" id="displayTax"><?= htmlspecialchars(bmsCompanyCurrency()) ?> 0.00</span>
             </div>
             <div class="summary-row summary-total">
                 <span><?= t('TOTAL:') ?></span>
-                <span id="displayTotal">TZS 0.00</span>
+                <span id="displayTotal"><?= htmlspecialchars(bmsCompanyCurrency()) ?> 0.00</span>
             </div>
         </div>
     </div>
@@ -240,7 +240,7 @@ loadLanguage($__cd_lang);
         }
 
         let lastTimestamp = 0;
-        let displayCurrency = 'TZS'; // Phase 11 (pos_upgrade_plan.md §7) — updated from the server's real setting below
+        let displayCurrency = '<?= htmlspecialchars(bmsCompanyCurrency()) ?>'; // Phase 11 (pos_upgrade_plan.md §7) — updated from the server's real setting below
 
         function updateDisplay() {
             $.ajax({

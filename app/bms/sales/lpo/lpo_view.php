@@ -296,7 +296,7 @@ function loadLpoDetails() {
 
 function renderLpo(o) {
     const items = o.items || [];
-    const currency = o.currency || 'TZS';
+    const currency = o.currency || <?= json_encode(bmsCompanyCurrency()) ?>;
 
     $('#lpoNumber').text(o.lpo_number);
 

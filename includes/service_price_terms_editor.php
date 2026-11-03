@@ -32,7 +32,7 @@ $p = $sptPrefix;
                     <th style="width:50px;"><?= t('S/NO') ?></th>
                     <th style="min-width:150px;"><?= t('Term name') ?></th>
                     <th style="min-width:170px;"><?= t('Length') ?></th>
-                    <th style="min-width:130px;"><?= t('Price (TZS)') ?></th>
+                    <th style="min-width:130px;"><?= str_replace('TZS', bmsCompanyCurrency(), t('Price (TZS)')) ?></th>
                     <th style="min-width:180px;"><?= t('Description') ?></th>
                     <th class="text-center" style="width:70px;"><?= t('Default') ?></th>
                     <th style="width:50px;"></th>

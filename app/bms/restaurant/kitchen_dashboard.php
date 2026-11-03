@@ -26,7 +26,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
 
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="mb-0"><i class="bi bi-egg-fried text-primary me-2"></i><?= t('Kitchen Display') ?></h4>
+        <h4 class="mb-0"><i class="ri ri-chef-hat text-primary me-2"></i><?= t('Kitchen Display') ?></h4>
         <a href="<?= getUrl('restaurant') ?>" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i> <?= t('Restaurant Hub') ?>
         </a>
@@ -76,6 +76,24 @@ $warehouses = restaurantWarehousesForSelect($pdo);
         </div>
     </div>
 
+    <?php if (restaurantKitchenMode() === 'none'): ?>
+    <!-- Restaurant simplicity pass — "by mouth" is the default, so this screen stays empty. Say so, and offer the switch. -->
+    <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2" id="kitchenOffNotice">
+        <div>
+            <i class="bi bi-info-circle me-1"></i>
+            <strong><?= t('Orders are not sent to this screen.') ?></strong>
+            <?= t('Your kitchen works "by mouth" — the waiter tells the cook. Turn the kitchen screen on to see new orders here.') ?>
+        </div>
+        <?php if (canEdit('pos_config_settings')): ?>
+        <button type="button" class="btn btn-sm btn-primary fw-bold text-nowrap" id="kitchenOnBtn">
+            <i class="bi bi-display me-1"></i><?= t('Turn on kitchen screen') ?>
+        </button>
+        <?php else: ?>
+        <span class="small text-muted"><?= t('Ask an admin to turn it on in Selling Settings.') ?></span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <div id="ticketsContainer" class="row g-3"></div>
 
     <?php endif; ?>
@@ -106,6 +124,14 @@ $(document).ready(function () {
     loadStations();
     loadTickets();
     restartPolling();
+});
+
+$(document).on('click', '#kitchenOnBtn', function () {
+    const btn = $(this).prop('disabled', true);
+    $.post('<?= buildUrl('api/restaurant/set_kitchen_mode.php') ?>', { _csrf: <?= json_encode(csrf_token()) ?> }, function (res) {
+        if (res.success) { location.reload(); }
+        else { btn.prop('disabled', false); Swal.fire({ icon: 'error', title: STRINGS.error, text: res.message }); }
+    }, 'json').fail(function () { btn.prop('disabled', false); Swal.fire({ icon: 'error', title: STRINGS.error }); });
 });
 
 function currentWarehouseId() { return parseInt($('#whSelect').val() || 0, 10); }
@@ -140,7 +166,7 @@ function loadTickets() {
             const nextStage = nextIdx < STAGES.length ? STAGES[nextIdx] : null;
             let items = '';
             (t.items || []).forEach(it => {
-                items += `<div class="d-flex justify-content-between"><span>${it.quantity}${STRINGS.qty} ${safeOutput(it.product_name)}</span></div>`;
+                items += `<div class="d-flex justify-content-between"><span>${parseFloat(it.quantity)}${STRINGS.qty} ${safeOutput(it.product_name)}</span></div>`;
                 if (it.modifiers_summary) items += `<div class="small text-muted ps-2">${safeOutput(it.modifiers_summary)}</div>`;
             });
             html += `
@@ -151,7 +177,7 @@ function loadTickets() {
                             <span class="fw-bold small">${safeOutput(t.station_name)}</span>
                             <span class="badge" style="background:${color};color:#fff;">${STAGE_LABELS[t.status]}</span>
                         </div>
-                        ${t.table_number ? `<div class="small text-muted mb-1">${STRINGS.table}: ${safeOutput(t.table_number)}</div>` : ''}
+                        ${t.order_label ? `<div class="fw-bold mb-1">${safeOutput(t.order_label)}</div>` : (t.table_number ? `<div class="small text-muted mb-1">${STRINGS.table}: ${safeOutput(t.table_number)}</div>` : '')}
                         <div class="small">${items}</div>
                         ${nextStage ? `<button class="btn btn-sm btn-primary w-100 mt-2" onclick="advance(${t.ticket_id}, '${nextStage}')">${STRINGS.advance} → ${STAGE_LABELS[nextStage]}</button>` : ''}
                     </div>

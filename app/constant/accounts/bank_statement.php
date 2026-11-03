@@ -155,12 +155,14 @@ const table = $('#stmtTable').DataTable({
     responsive: false,
     scrollX: false,
     pageLength: 25,
-    ordering: false,
+    // Only S/No sorts (oldest/newest first); each row keeps its own running balance.
+    order: [],
+    columnDefs: [{ targets: '_all', orderable: false }],
     dom: 'rtipB',
     buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
     language: { emptyTable: 'Select an account to view its statement.', zeroRecords: 'No movements found.' },
     columns: [
-        { data: null,              className: 'ps-3',            render: (d, t, r, meta) => meta.row + 1 },
+        BMSSerial.column({ className: 'ps-3' }),
         { data: 'transaction_date' },
         { data: 'description',     render: d => esc(d) },
         { data: 'reference_number',render: d => `<small class="text-muted">${esc(d || '—')}</small>` },

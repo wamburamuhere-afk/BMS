@@ -31,15 +31,19 @@ if (function_exists('assertScopeForRecord')) {
     assertScopeForRecord('products', 'product_id', $product_id);
 }
 
+require_once __DIR__ . '/../core/product_delete.php';
+
 try {
     $pdo->beginTransaction();
 
-    // Get product name before deleting
-    $stmt = $pdo->prepare("SELECT product_name, sku, warehouse_id FROM products WHERE product_id = ?");
+    // Get product name before deleting (row-locked so a sale/restock can't
+    // land between the stock check below and the delete)
+    $stmt = $pdo->prepare("SELECT product_name, sku, warehouse_id FROM products WHERE product_id = ? FOR UPDATE");
     $stmt->execute([$product_id]);
     $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$product) {
+        $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'Product not found']);
         exit();
     }
@@ -57,6 +61,7 @@ try {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM sales_order_items WHERE product_id = ?");
     $stmt->execute([$product_id]);
     if ($stmt->fetchColumn() > 0) {
+        $pdo->rollBack();
         echo json_encode([
             'success'  => false,
             'message'  => 'Cannot delete: this product has existing sales orders. Consider deactivating it instead.'
@@ -68,6 +73,7 @@ try {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM purchase_order_items WHERE product_id = ?");
     $stmt->execute([$product_id]);
     if ($stmt->fetchColumn() > 0) {
+        $pdo->rollBack();
         echo json_encode([
             'success'  => false,
             'message'  => 'Cannot delete: this product has existing purchase orders. Consider deactivating it instead.'
@@ -100,14 +106,18 @@ try {
         }
     }
 
-    // Delete related stock movements
-    $pdo->prepare("DELETE FROM stock_movements WHERE product_id = ?")->execute([$product_id]);
+    // A product still holding stock in any shop/warehouse can't be deleted —
+    // its quantity is brought to zero first. Past POS sales, stock movements,
+    // batches and ledger entries are kept (core/product_delete.php).
+    $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? FOR UPDATE")->execute([$product_id]);
+    $blocker = productStockBlocker($pdo, $product_id, (string)$product['product_name']);
+    if ($blocker !== null) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => $blocker]);
+        exit();
+    }
 
-    // Delete related product stocks
-    $pdo->prepare("DELETE FROM product_stocks WHERE product_id = ?")->execute([$product_id]);
-
-    // Delete the product
-    $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$product_id]);
+    deleteProductKeepHistory($pdo, $product_id);
 
     $pdo->commit();
 

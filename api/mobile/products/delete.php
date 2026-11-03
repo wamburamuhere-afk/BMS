@@ -15,29 +15,29 @@ if (empty($body)) { $raw = file_get_contents('php://input'); if ($raw) { $body =
 $product_id = (int)($body['product_id'] ?? 0);
 if ($product_id <= 0) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Invalid product ID']); exit; }
 
+require_once __DIR__ . '/../../../core/product_delete.php';
+
 try {
-    $check = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ?");
+    // Same rule as the web app (api/delete_product.php, core/product_delete.php):
+    // refused while any shop still holds stock; the delete keeps every past
+    // sale, stock movement, batch and ledger entry. products.status ENUM has no
+    // 'deleted', so this stays a real delete of the product row only.
+    $pdo->beginTransaction();
+    $check = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ? FOR UPDATE");
     $check->execute([$product_id]);
     $name = $check->fetchColumn();
-    if (!$name) { http_response_code(404); echo json_encode(['success'=>false,'message'=>'Product not found']); exit; }
+    if (!$name) { $pdo->rollBack(); http_response_code(404); echo json_encode(['success'=>false,'message'=>'Product not found']); exit; }
 
-    // Guard: cannot delete a product that has POS sales
-    $hasSales = $pdo->prepare("SELECT 1 FROM pos_sale_items si JOIN pos_sales s ON s.sale_id = si.sale_id WHERE si.product_id = ? AND s.sale_status NOT IN ('voided') LIMIT 1");
-    $hasSales->execute([$product_id]);
-    if ($hasSales->fetchColumn()) {
+    $pdo->prepare("SELECT stock_id FROM product_stocks WHERE product_id = ? FOR UPDATE")->execute([$product_id]);
+    $blocker = productStockBlocker($pdo, $product_id, (string)$name);
+    if ($blocker !== null) {
+        $pdo->rollBack();
         http_response_code(409);
-        echo json_encode(['success'=>false,'message'=>'Cannot delete: product has POS sales on record. Set it to Inactive instead.']);
+        echo json_encode(['success'=>false,'message'=>$blocker]);
         exit;
     }
 
-    // Hard-delete matching the web app (api/delete_product.php).
-    // products.status ENUM does not include 'deleted', so a soft-delete UPDATE
-    // fails in strict-mode MySQL. The guard above ensures no sale references exist.
-    $pdo->beginTransaction();
-    $pdo->prepare("DELETE FROM stock_movements WHERE product_id = ?")->execute([$product_id]);
-    $pdo->prepare("DELETE FROM product_stocks WHERE product_id = ?")->execute([$product_id]);
-    $pdo->prepare("DELETE FROM product_batches WHERE product_id = ?")->execute([$product_id]);
-    $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$product_id]);
+    deleteProductKeepHistory($pdo, $product_id);
     $pdo->commit();
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: deleted product #$product_id ($name)");

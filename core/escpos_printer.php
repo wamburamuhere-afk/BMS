@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/currency.php';   // bmsCompanyCurrency() fallback for the receipt currency
 /**
  * core/escpos_printer.php
  *
@@ -52,7 +53,7 @@ const ESCPOS_DRAWER_KICK = "\x1B\x70\x00\x19\xFA";
 function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
 {
     $w = (int)($data['char_width'] ?? 42);
-    $currency = $data['currency'] ?? 'TZS';
+    $currency = $data['currency'] ?? bmsCompanyCurrency();
     $line = str_repeat('-', $w) . "\n";
 
     $center = function (string $s) use ($w) {
@@ -84,7 +85,7 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
 
     foreach (($data['items'] ?? []) as $item) {
         $out .= (string)($item['product_name'] ?? '') . "\n";
-        $qtyPrice = number_format((float)($item['quantity'] ?? 0), 2) . ' x ' . number_format((float)($item['unit_price'] ?? 0), 2);
+        $qtyPrice = format_qty($item['quantity'] ?? 0) . ' x ' . number_format((float)($item['unit_price'] ?? 0), 2);
         $out .= $twoCol('  ' . $qtyPrice, number_format((float)($item['line_total'] ?? 0), 2));
     }
     $out .= $line;

@@ -60,6 +60,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($_POST[$field])) {
                 $value = trim($_POST[$field]);
 
+                // Currency: one of the supported operating currencies, or the company's
+                // current one (a legacy code re-saves unchanged). Anything else keeps the
+                // current currency. Mirrored into `currency` (the key the web reads) below.
+                if ($field === 'company_currency') {
+                    $posted  = strtoupper($value);
+                    $current = bmsCompanyCurrency();
+                    $value   = ($posted !== '' && (isset(bmsSupportedCurrencies()[$posted]) || $posted === $current)) ? $posted : $current;
+                    $company_currency_saved = $value;
+                }
+
                 // Document-code prefix: letters only, uppercase, 2–5 chars.
                 if ($field === 'company_code_prefix') {
                     $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value));
@@ -78,6 +88,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, setting_group, is_public) VALUES (?, ?, 'company', 1)");
                     $stmt->execute([$field, $value]);
                 }
+            }
+        }
+
+        // Keep the web's `currency` key in step with Company Profile's.
+        if (isset($company_currency_saved)) {
+            $check = $pdo->prepare("SELECT COUNT(*) FROM system_settings WHERE setting_key = 'currency'");
+            $check->execute();
+            if ($check->fetchColumn()) {
+                $pdo->prepare("UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = 'currency'")->execute([$company_currency_saved]);
+            } else {
+                $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value, setting_group, is_public) VALUES ('currency', ?, 'general', 1)")->execute([$company_currency_saved]);
             }
         }
 
@@ -247,8 +268,21 @@ try {
 
 
                             <div class="col-md-6">
-                                <label for="company_currency" class="form-label"><?= t('Currency Code') ?></label>
-                                <input type="text" class="form-control" id="company_currency" name="company_currency" value="<?= htmlspecialchars($current_settings['company_currency']) ?>" placeholder="e.g. TZS, USD">
+                                <label for="company_currency" class="form-label"><?= t('Currency') ?></label>
+                                <?php
+                                // Shows the currency the whole system really uses (`currency`), so saving this
+                                // page can never switch it by accident. Legacy codes stay listed and selected.
+                                $__cp_cur  = bmsCompanyCurrency();
+                                $__cp_list = bmsSupportedCurrencies();
+                                ?>
+                                <select class="form-select" id="company_currency" name="company_currency">
+                                    <?php if (!isset($__cp_list[$__cp_cur])): ?>
+                                    <option value="<?= htmlspecialchars($__cp_cur) ?>" selected><?= htmlspecialchars($__cp_cur) ?></option>
+                                    <?php endif; ?>
+                                    <?php foreach ($__cp_list as $__code => $__meta): ?>
+                                    <option value="<?= $__code ?>" <?= $__cp_cur === $__code ? 'selected' : '' ?>><?= $__code ?> — <?= t($__meta['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
 
                             <div class="col-md-6">
@@ -266,7 +300,7 @@ try {
                                 <h6 class="text-muted text-uppercase small fw-bold mt-3"><i class="bi bi-cash-stack me-1"></i> <?= t('Equity') ?></h6>
                             </div>
                             <div class="col-md-6">
-                                <label for="share_capital_paid_in" class="form-label"><?= t('Share Capital (Paid-up, TZS)') ?></label>
+                                <label for="share_capital_paid_in" class="form-label"><?= str_replace('TZS', bmsCompanyCurrency(), t('Share Capital (Paid-up, TZS)')) ?></label>
                                 <input type="number" step="0.01" min="0" class="form-control" id="share_capital_paid_in" name="share_capital_paid_in" value="<?= htmlspecialchars($current_settings['share_capital_paid_in']) ?>">
                                 <small class="text-muted"><?= t("Owner's paid-in capital. Used by the Balance Sheet Equity section.") ?></small>
                             </div>

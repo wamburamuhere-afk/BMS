@@ -165,7 +165,7 @@ if (empty($items)) {
                                         </select>
                                     </td>
                                     <td class="text-end fw-bold">
-                                        <span class="text-primary"><?= $return['currency'] ?? 'TZS' ?></span>
+                                        <span class="text-primary"><?= $return['currency'] ?? bmsCompanyCurrency() ?></span>
                                         <span class="item-total"><?= number_format($row_total, 2) ?></span>
                                     </td>
                                 </tr>

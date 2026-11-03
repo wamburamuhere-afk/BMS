@@ -351,8 +351,6 @@ function exportRFQ(){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
-}
-
 </script>
 
 <div class="d-none d-print-block">

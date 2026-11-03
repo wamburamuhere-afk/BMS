@@ -77,7 +77,7 @@ try {
     die("Error: " . $e->getMessage());
 }
 
-$currency = $invoice['currency'] ?? 'TZS';
+$currency = $invoice['currency'] ?? bmsCompanyCurrency();
 
 $inv_postal  = trim($invoice['c_postal_address'] ?? '');
 $inv_address = trim($invoice['c_address'] ?? '');

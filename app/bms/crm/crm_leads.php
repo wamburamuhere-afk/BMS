@@ -138,7 +138,7 @@ $export_qs = http_build_query(array_filter([
         </div>
         <div class="col-6 col-md-3">
             <div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe;">
-                <div class="fs-4 fw-bold text-primary"><?= number_format($stats['pipeline_value']) ?> <small class="fs-6">TZS</small></div>
+                <div class="fs-4 fw-bold text-primary"><?= number_format($stats['pipeline_value']) ?> <small class="fs-6"><?= htmlspecialchars(bmsCompanyCurrency()) ?></small></div>
                 <div class="small text-muted">Pipeline Value</div>
             </div>
         </div>
@@ -240,7 +240,7 @@ $export_qs = http_build_query(array_filter([
                         <th><?= t('Company') ?></th>
                         <th><?= t('Source') ?></th>
                         <th><?= t('Stage') ?></th>
-                        <th class="text-end"><?= t('Value (TZS)') ?></th>
+                        <th class="text-end"><?= str_replace('TZS', bmsCompanyCurrency(), t('Value (TZS)')) ?></th>
                         <th><?= t('Assigned To') ?></th>
                         <th><?= t('Expected Close') ?></th>
                         <th><?= t('Status') ?></th>
@@ -382,7 +382,7 @@ function crm_lead_form_fields($prefix, $stages, $users, $labels, $lead_sources) 
             </select>
         </div>
         <div class="col-md-4">
-            <label class="form-label"><?= t('Lead Value (TZS)') ?></label>
+            <label class="form-label"><?= str_replace('TZS', bmsCompanyCurrency(), t('Lead Value (TZS)')) ?></label>
             <input type="number" class="form-control" name="lead_value" id="<?= $prefix ?>_lead_value" min="0" step="0.01" value="0">
         </div>
         <div class="col-md-4">
@@ -767,7 +767,7 @@ function renderCards(rows) {
                     </div>
                     <div class="d-flex justify-content-between align-items-center mt-2">
                         <div>${row[4]}</div>
-                        <div class="fw-semibold">${row[5]} <small class="text-muted">TZS</small></div>
+                        <div class="fw-semibold">${row[5]} <small class="text-muted"><?= htmlspecialchars(bmsCompanyCurrency()) ?></small></div>
                     </div>
                 </div>
                 ${buttons ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;flex-wrap:nowrap;gap:4px;padding:6px;">${buttons}</div></div>` : ''}

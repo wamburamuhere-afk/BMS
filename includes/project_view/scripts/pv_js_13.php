@@ -72,7 +72,7 @@ function projNipRenderTable(products) {
                     </div>
                 </div>
             </td>
-            <td class="fw-bold">TZS ${parseFloat(p.selling_price||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+            <td class="fw-bold"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${parseFloat(p.selling_price||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
             <td><span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">${taxInfo}</span></td>
             <td>${statusBadge}</td>
             <td class="text-end pe-3 d-print-none">
@@ -276,7 +276,7 @@ function _projNipDropdown(input, whId, idx, selectFnName) {
                             <small class="text-muted">${p.sku||'No SKU'}</small></div>
                             <div class="text-end ms-2" style="white-space:nowrap;">
                                 <small class="d-block text-muted">Stock: ${parseFloat(p.current_stock)||0}</small>
-                                <span class="fw-bold text-primary" style="font-size:12px;">TZS ${price.toLocaleString()}</span>
+                                <span class="fw-bold text-primary" style="font-size:12px;"><?= htmlspecialchars(bmsCompanyCurrency()) ?> ${price.toLocaleString()}</span>
                             </div>
                         </div></button>`;
                 }).join('');

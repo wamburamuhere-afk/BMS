@@ -345,7 +345,7 @@ try {
     ok('FAB/sheet buttons escape the global .btn min-width', str_contains($pos, '#mobileCartFab { min-width: 0; }') && str_contains($pos, '.pos-search-group .btn, .pos-restock-btn, .pos-sheet-btn { min-width: 0; }'));
     ok('old-shift reminder shown for a shift opened yesterday', str_contains($pos, 'id="posOldShiftNotice"') && str_contains($pos, date('d/m/Y', strtotime('-1 day'))));
     ok('JS flag POS_SIMPLE_MODE = true', str_contains($pos, 'const POS_SIMPLE_MODE = true'));
-    ok('header: Shop menu offers Receive Stock', str_contains($pos, 'id="simpleShopDropdown"') && str_contains($pos, 'pos?restock=1'));
+    ok('header: Shop menu offers Receive Stock', str_contains($pos, 'id="simpleShopDropdown"') && str_contains($pos, '/receive_stock"'));   // the Receive Stock page
     ok('header: "Core" renamed to My Business', str_contains($pos, 'My Business') || str_contains($pos, 'Biashara Yangu'));
 
     $rep = $run('app/constant/reports/sales_report.php');

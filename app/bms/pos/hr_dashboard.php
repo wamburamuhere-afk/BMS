@@ -195,7 +195,7 @@ $recruitment = [
         <div class="col-12 col-lg-6">
             <a href="<?= getUrl('payroll') ?>" class="text-decoration-none">
                 <div class="card border-0 shadow-sm text-center p-3 h-100" style="background:#d1e7dd;">
-                    <div class="fs-3 fw-bold text-primary">TSh <?= number_format($kpi_payroll_amount, 0) ?></div>
+                    <div class="fs-3 fw-bold text-primary"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($kpi_payroll_amount, 0) ?></div>
                     <div class="small text-muted">Payroll Paid (<?= $year ?>) · <?= $kpi_payroll_employees ?> employee<?= $kpi_payroll_employees === 1 ? '' : 's' ?> paid</div>
                 </div>
             </a>
@@ -409,7 +409,7 @@ new Chart(document.getElementById('empVsPayrollChart').getContext('2d'), {
     data: {
         labels: <?= json_encode($evp_labels) ?>,
         datasets: [{
-            label: 'Payroll Paid (TSh)',
+            label: 'Payroll Paid (<?= htmlspecialchars(trim(bmsCurrencySymbol())) ?>)',
             data: <?= json_encode($evp_payroll) ?>,
             yAxisID: 'yMoney',
             borderColor: '#0d6efd',
@@ -462,9 +462,9 @@ new Chart(document.getElementById('empVsPayrollChart').getContext('2d'), {
                         const label = context.dataset.label || '';
                         const val = context.parsed.y;
                         if (context.dataset.yAxisID === 'yMoney') {
-                            if (val >= 1000000) return label + ': TSh ' + (val / 1000000).toFixed(2) + 'M';
-                            if (val >= 1000) return label + ': TSh ' + (val / 1000).toFixed(1) + 'K';
-                            return label + ': TSh ' + val.toLocaleString();
+                            if (val >= 1000000) return label + ': <?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (val / 1000000).toFixed(2) + 'M';
+                            if (val >= 1000) return label + ': <?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (val / 1000).toFixed(1) + 'K';
+                            return label + ': <?= htmlspecialchars(bmsCurrencySymbol()) ?>' + val.toLocaleString();
                         }
                         return label + ': ' + val;
                     },
@@ -473,7 +473,7 @@ new Chart(document.getElementById('empVsPayrollChart').getContext('2d'), {
                         const count = items.find(i => i.dataset.yAxisID === 'yCount');
                         if (money && count && count.parsed.y > 0) {
                             const perHead = money.parsed.y / count.parsed.y;
-                            return ['─────────────────', 'Avg cost per employee: TSh ' + Math.round(perHead).toLocaleString()];
+                            return ['─────────────────', 'Avg cost per employee: <?= htmlspecialchars(bmsCurrencySymbol()) ?>' + Math.round(perHead).toLocaleString()];
                         }
                         return [];
                     }
@@ -486,9 +486,9 @@ new Chart(document.getElementById('empVsPayrollChart').getContext('2d'), {
                 ticks: {
                     color: '#6b7280', font: { size: 11 }, maxTicksLimit: 7,
                     callback: function (value) {
-                        if (value >= 1000000) return 'TSh ' + (value / 1000000).toFixed(1) + 'M';
-                        if (value >= 1000) return 'TSh ' + (value / 1000).toFixed(0) + 'K';
-                        return 'TSh ' + value;
+                        if (value >= 1000000) return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (value / 1000000).toFixed(1) + 'M';
+                        if (value >= 1000) return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + (value / 1000).toFixed(0) + 'K';
+                        return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + value;
                     }
                 },
                 grid: { color: 'rgba(107,114,128,0.15)', lineWidth: 1, drawBorder: false },

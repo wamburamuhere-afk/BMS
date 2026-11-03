@@ -279,7 +279,7 @@ try {
         FROM stock_movements sm
         LEFT JOIN warehouses w ON sm.warehouse_id = w.warehouse_id
         LEFT JOIN users u ON sm.created_by = u.user_id
-        WHERE sm.product_id = ?
+        WHERE sm.product_id = ?" . stockMovementNotVoidedSaleSql($pdo, 'sm') . "
         ORDER BY sm.created_at DESC
         LIMIT 10
     ";

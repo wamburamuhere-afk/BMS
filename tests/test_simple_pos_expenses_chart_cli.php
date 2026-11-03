@@ -170,11 +170,15 @@ $normalChartBody = substr($dashSrc, strpos($dashSrc, 'function renderNormalChart
 strpos($normalChartBody, 'if (POS_SIMPLE_MODE)') === false
     ? pass('renderNormalChart() no longer branches on POS_SIMPLE_MODE — Simple Mode never touches this code path')
     : fail('renderNormalChart() still contains a POS_SIMPLE_MODE branch — the old dead-weight duplication was not cleaned up');
-strpos($dashSrc, "lineDataset(<?= json_encode(t('Sales')) ?>") !== false
-    && strpos($dashSrc, "lineDataset(<?= json_encode(t('Cost of Goods')) ?>") !== false
-    && strpos($dashSrc, "lineDataset(<?= json_encode(t('Expenses')) ?>") !== false
-    ? pass('renderSimpleChart() plots exactly 3 lines: Sales, Cost of Goods, Expenses')
-    : fail('renderSimpleChart() does not wire up all 3 expected datasets');
+// 2026-10-27 ("Chart 2"): Sales + Expenses bars and a Net profit line; the
+// cost of goods sold is in the tooltip and the "how your profit is worked
+// out" row below the chart.
+strpos($dashSrc, "{ label: <?= json_encode(t('Sales')) ?>, data: salesData") !== false
+    && strpos($dashSrc, "{ label: <?= json_encode(t('Expenses')) ?>, data: opExpenseData") !== false
+    && strpos($dashSrc, "{ type: 'line', label: <?= json_encode(t('Net Profit')) ?>, data: profitData") !== false
+    && strpos($dashSrc, "<?= json_encode(t('Cost of goods sold')) ?> + ': ' + fmtFull(cogsData[i])") !== false
+    ? pass('renderSimpleChart() plots Sales + Expenses bars and a Net profit line; cost of goods sold is in the tooltip')
+    : fail('renderSimpleChart() does not wire up the expected datasets');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Live-DB (BEGIN/ROLLBACK) — real expense math + shop-scope isolation');

@@ -47,8 +47,8 @@ try {
         $isPartial = $r['payment_status'] === 'partial';
         $label = $r['payroll_number'] . ' — ' . $r['payroll_period']
                . ($isPartial
-                   ? ' — TZS ' . number_format($remaining, 2) . ' remaining of ' . number_format($net, 2)
-                   : ' — TZS ' . number_format($net, 2));
+                   ? ' — ' . bmsCompanyCurrency() . ' ' . number_format($remaining, 2) . ' remaining of ' . number_format($net, 2)
+                   : ' — ' . bmsCompanyCurrency() . ' ' . number_format($net, 2));
         return [
             'id'        => $r['payroll_id'],
             'label'     => $label,

@@ -48,11 +48,7 @@
 
     function columns(cfg) {
         var all = [
-            { key: 'sno', col: {
-                data: null, orderable: false, searchable: false, width: '50px',
-                className: 'text-center text-muted small fw-bold',
-                render: function (d, t, r, meta) { return meta.row + meta.settings._iDisplayStart + 1; }
-            }},
+            { key: 'sno', col: BMSSerial.column({ width: '50px', className: 'text-center text-muted small fw-bold' })},
             { key: 'expense_date', col: {
                 data: 'expense_date', width: '110px',
                 render: function (d) { return fmtDate(d); }

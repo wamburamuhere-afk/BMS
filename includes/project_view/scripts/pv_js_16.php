@@ -141,7 +141,7 @@ function loadProjectPayroll() {
             $('#prStatActive').text(s.active || 0);
             $('#prStatPaid').text(s.paid || 0);
             $('#prStatPending').text(s.pending || 0);
-            $('#prStatTotal').text(formatMoney(s.total_payout || 0) + ' TZS');
+            $('#prStatTotal').text(formatMoney(s.total_payout || 0) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
             renderProjectPayroll(res.data);
         } else {
             $('#hrPayrollContent').html('<div class="alert alert-danger">' + res.message + '</div>');
@@ -192,10 +192,10 @@ function renderProjectPayroll(data) {
                 <small class="badge bg-light text-primary border border-primary-subtle" style="font-size:0.65rem;">${r.employee_number}</small>
             </td>
             <td><small class="text-muted">${r.department_name || '—'}</small></td>
-            <td class="text-end"><small>${formatMoney(r.basic_salary)} TZS</small></td>
-            <td class="text-end"><small>${formatMoney(r.gross_salary)} TZS</small></td>
-            <td class="text-end"><small class="text-danger">${formatMoney(r.deductions)} TZS</small></td>
-            <td class="text-end fw-bold">${formatMoney(r.net_salary)} TZS</td>
+            <td class="text-end"><small>${formatMoney(r.basic_salary)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></small></td>
+            <td class="text-end"><small>${formatMoney(r.gross_salary)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></small></td>
+            <td class="text-end"><small class="text-danger">${formatMoney(r.deductions)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></small></td>
+            <td class="text-end fw-bold">${formatMoney(r.net_salary)} <?= htmlspecialchars(bmsCompanyCurrency()) ?></td>
             <td class="text-center"><span class="badge ${badge}">${stat}</span></td>
             <td class="text-end d-print-none">
                 <div class="dropdown">
@@ -308,7 +308,7 @@ function openEditPayrollModal(id) {
         $('#ep_notes').val(r.notes || '');
         // compute initial net preview
         const net = (parseFloat(r.basic_salary)||0) + (parseFloat(r.allowances)||0) - (parseFloat(r.deductions)||0) - (parseFloat(r.tax_amount)||0);
-        $('#ep_net_preview').text(net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' TZS');
+        $('#ep_net_preview').text(net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
         $('#editPayrollModal').modal('show');
     });
 }
@@ -319,7 +319,7 @@ $(document).on('input change', '.ep-calc', function() {
     const deduct = parseFloat($('#ep_deductions').val())   || 0;
     const tax    = parseFloat($('#ep_tax_amount').val())   || 0;
     const net    = basic + allow - deduct - tax;
-    $('#ep_net_preview').text(net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' TZS');
+    $('#ep_net_preview').text(net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' <?= htmlspecialchars(bmsCompanyCurrency()) ?>');
 });
 
 $('#editPayrollForm').on('submit', function(e) {
@@ -400,7 +400,7 @@ function viewPayrollRecord(id) {
                     <div class="text-muted small">Period: ${period}</div>
                 </div>
                 <div class="text-end">
-                    <div class="fw-bold fs-4 text-primary">TSh ${formatMoney(r.net_salary)}</div>
+                    <div class="fw-bold fs-4 text-primary"><?= htmlspecialchars(bmsCurrencySymbol()) ?>${formatMoney(r.net_salary)}</div>
                 </div>
             </div>`);
     });

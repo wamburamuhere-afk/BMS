@@ -81,13 +81,18 @@ try {
         : 0.0;
 
     // ── Monthly trend: one glProfitLoss() call per calendar month in range,
-    //    capped at 24 points — same engine, never re-derived SQL.
+    //    capped at the LATEST 24 months (a longer range used to show the first
+    //    24 and drop the most recent ones) — same engine, never re-derived SQL.
+    //    The first month starts at date_from itself, not the 1st, so the trend
+    //    adds up to the summary cards.
     $trend = [];
     $cursor = new DateTime(date('Y-m-01', strtotime($date_from)));
     $end    = new DateTime($date_to);
+    $latestStart = (new DateTime($end->format('Y-m-01')))->modify('-23 months');
+    if ($cursor < $latestStart) $cursor = $latestStart;
     $months = 0;
     while ($cursor <= $end && $months < 24) {
-        $mStart = $cursor->format('Y-m-d');
+        $mStart = max($cursor->format('Y-m-d'), $date_from);
         $mEndDt = (clone $cursor)->modify('last day of this month');
         $mEnd   = $mEndDt > $end ? $end->format('Y-m-d') : $mEndDt->format('Y-m-d');
         if ($mStart > $mEnd) break;

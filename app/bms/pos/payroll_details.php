@@ -412,7 +412,7 @@ function loadPayrollDetails() {
 }
 
 function formatCurrency(amount) {
-    return 'TSh ' + parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2});
+    return '<?= htmlspecialchars(bmsCurrencySymbol()) ?>' + parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2});
 }
 
 function approveRecord(id) {
@@ -438,8 +438,8 @@ function bulkAction(status, ids, netSalary, amountPaid) {
             html: `
                 <div class="text-start">
                     ${(parseFloat(amountPaid||0) > 0) ? `<div class="mb-3 p-2 bg-light rounded small">
-                        Paid so far: <strong>TSh ${parseFloat(amountPaid).toLocaleString()}</strong> &nbsp;|&nbsp;
-                        Remaining: <strong class="text-success">TSh ${remaining.toLocaleString()}</strong>
+                        Paid so far: <strong><?= htmlspecialchars(bmsCurrencySymbol()) ?>${parseFloat(amountPaid).toLocaleString()}</strong> &nbsp;|&nbsp;
+                        Remaining: <strong class="text-success"><?= htmlspecialchars(bmsCurrencySymbol()) ?>${remaining.toLocaleString()}</strong>
                     </div>` : ''}
                     <label class="form-label fw-semibold">Paid From Account <span class="text-danger">*</span></label>
                     <select id="pd-swal-account" class="form-select mb-3">

@@ -76,7 +76,7 @@ ok(wLabel('POS', 'Sell') === 'Sell' && wLabel('Point of Sale', 'Sell') === 'Sell
 loadLanguage('sw');
 ok(wLabel('POS', 'Sell') === 'Uza', 'shop mode, Swahili: "Uza"');
 ok(wLabel('Open POS', 'Start Selling') === 'Anza Kuuza', 'shop mode, Swahili: "Anza Kuuza"');
-ok(t('Sale') === 'Muuzo', 'existing "Sale" (one sale record) untouched');
+ok(t('Sale') === 'Uzo', 'existing "Sale" (one sale record) untouched');
 loadLanguage('en');
 $GLOBALS['__bms_features'] = $erp;
 ok(wLabel('POS', 'Sell') === 'POS' && wLabel('Point of Sale', 'Sell') === 'Point of Sale', 'full ERP (Projects on): still "POS"');

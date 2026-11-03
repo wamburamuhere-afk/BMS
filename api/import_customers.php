@@ -167,7 +167,7 @@ while (($row = fgetcsv($handle)) !== false) {
     $vat_number = trim($row[$header_indexes['vat_number']] ?? '');
     $payment_terms = trim($row[$header_indexes['payment_terms']] ?? '30_days');
     $credit_limit = trim($row[$header_indexes['credit_limit']] ?? 0);
-    $currency = trim($row[$header_indexes['currency']] ?? 'TZS');
+    $currency = bmsEnforceDocCurrency(trim($row[$header_indexes['currency']] ?? bmsCompanyCurrency()));   // core/currency.php
     $bank_name = trim($row[$header_indexes['bank_name']] ?? '');
     $bank_account = trim($row[$header_indexes['bank_account']] ?? '');
     $bank_address = trim($row[$header_indexes['bank_address']] ?? '');

@@ -5,6 +5,21 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../../core/dt_order.php';
+
+// Header sorting; S/No = the normal newest-first order (core/dt_order.php).
+$order_sql = dtOrderSql($_GET, [
+    'invoice_number' => 'i.invoice_number',
+    'invoice_date'   => 'i.invoice_date',
+    'customer_name'  => 'c.customer_name',
+    'project_name'   => 'p.project_name',
+    'invoice_type'   => 'invoice_type',
+    'grand_total'    => 'i.grand_total',
+    'balance_due'    => 'balance_due',
+    'display_status' => 'display_status',
+], 'i.invoice_date DESC, i.created_at DESC, i.invoice_id DESC',
+   'i.invoice_date ASC, i.created_at ASC, i.invoice_id ASC', 'i.invoice_id');
+
 
 if (!isAuthenticated()) {
     http_response_code(401);
@@ -48,7 +63,7 @@ try {
     // Get DataTables parameters
     $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
     $start = isset($_GET['start']) ? intval($_GET['start']) : 0;
-    $length = isset($_GET['length']) ? intval($_GET['length']) : 10;
+    $length = dt_page_length($_GET['length'] ?? null, 10);
     $search_value = isset($_GET['search']['value']) ? $_GET['search']['value'] : '';
 
     // Base conditions
@@ -179,7 +194,7 @@ try {
         LEFT JOIN projects p ON i.project_id = p.project_id
         LEFT JOIN users u1 ON i.created_by = u1.user_id
         WHERE $where_sql $scopeI
-        ORDER BY i.invoice_date DESC, i.created_at DESC
+        ORDER BY $order_sql
         LIMIT ? OFFSET ?
     ";
 

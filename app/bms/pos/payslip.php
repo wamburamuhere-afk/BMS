@@ -310,7 +310,7 @@ logAudit($pdo, $_SESSION['user_id'], 'view_payslip', [
             <p class="text-muted small mb-0">Paid via <?= $p['payment_method'] ?: 'Standard Transfer' ?></p>
         </div>
         <div class="text-end">
-            <h3 class="fw-bold mb-0 text-primary">TSh <?= number_format($p['net_salary'], 2) ?></h3>
+            <h3 class="fw-bold mb-0 text-primary"><?= htmlspecialchars(bmsCurrencySymbol()) ?><?= number_format($p['net_salary'], 2) ?></h3>
         </div>
     </div>
 

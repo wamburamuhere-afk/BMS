@@ -208,6 +208,8 @@ $routes = [
     // to the .php form since long before this page existed.
     'forgot-password' => ROOT_DIR . '/forgot-password.php',
     'forgot_password' => ROOT_DIR . '/forgot-password.php',
+    // Public, unauthenticated — required by Google for the BMS Backups app.
+    'privacy'        => ROOT_DIR . '/privacy.php',
     // Signed in, but holding a password their provider chose for them — the
     // only page they may reach until they replace it.
     'change-password' => ROOT_DIR . '/change-password.php',
@@ -548,6 +550,7 @@ $routes = [
     // Field Reports (marketing) module — 2026-10-03
     'field_reports'       => BMS_DIR . '/field_reports/field_visits.php',
     'field_reports/print' => BMS_DIR . '/field_reports/field_report_print.php',
+    'field_reports/details' => BMS_DIR . '/field_reports/field_visit_details.php',
 
     // ========================================================================
     // SALES MODULE
@@ -657,6 +660,7 @@ $routes = [
     'print_credit_note_horizon' => SALES_DIR . '/credit_notes/print_credit_note_horizon.php',
     'print_credit_note_ember' => SALES_DIR . '/credit_notes/print_credit_note_ember.php',
     'pos' => POS_DIR . '/pos.php',
+    'receive_stock' => POS_DIR . '/receive_stock.php',   // Receive Stock window on its own (no till behind it)
 
     // ========================================================================
     // PURCHASES (BMS Directory)
@@ -1172,6 +1176,10 @@ $routes = [
     'restaurant/modifier-group'     => RESTAURANT_DIR . '/modifier_group.php',
     'restaurant/reservations'       => RESTAURANT_DIR . '/reservations.php',
     'restaurant/menu-type'          => RESTAURANT_DIR . '/menu_type.php',
+    'restaurant/menu'               => RESTAURANT_DIR . '/menu.php',   // restaurant_plan.md Phase 1
+    'restaurant/tables-board'       => RESTAURANT_DIR . '/tables_board.php', // restaurant_plan.md Phase 2
+    'restaurant/sales-report'       => RESTAURANT_DIR . '/sales_report.php', // restaurant_plan.md Phase 6
+    'restaurant/purchases'          => RESTAURANT_DIR . '/purchases.php',  // restaurant focus pass: buy stock & ingredients
 
 
     // ========================================================================
@@ -2221,6 +2229,11 @@ function redirectTo($page) {
  */
 function includeHeader() {
     global $pdo, $pdo_accounts, $username, $user_role, $role_id, $company_type, $company_name, $company_logo;
+    // Once per request: report partials (reps/cash_flow.php, reps/trial_balance.php)
+    // call it themselves and are also embedded in wrapper pages that already did.
+    static $done = false;
+    if ($done) return;
+    $done = true;
     if (file_exists(HEADER_FILE)) {
         require HEADER_FILE;
     }
@@ -2231,6 +2244,9 @@ function includeHeader() {
  */
 function includeFooter() {
     global $pdo, $pdo_accounts, $username, $user_role, $role_id, $company_type;
+    static $done = false;   // once per request — see includeHeader()
+    if ($done) return;
+    $done = true;
     if (file_exists(FOOTER_FILE)) {
         require FOOTER_FILE;
     }

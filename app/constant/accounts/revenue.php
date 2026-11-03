@@ -265,14 +265,16 @@ function rev_badge(string $s): string {
 </style>
 
 <script>
+// Permission flags — script level, because renderCards() (outside the ready handler) uses them too.
+const CAN_REVIEW  = <?= json_encode($can_review) ?>;
+const CAN_APPROVE = <?= json_encode($can_approve) ?>;
+const CAN_EDIT    = <?= json_encode($can_edit) ?>;
+
 $(function () {
     const POST_URL   = '<?= buildUrl('api/account/add_revenue.php') ?>';
     const STATUS_URL = '<?= buildUrl('api/account/update_revenue_status.php') ?>';
     const CSRF       = '<?= csrf_token() ?>';
     const CURRENCY   = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
-    const CAN_REVIEW  = <?= json_encode($can_review) ?>;
-    const CAN_APPROVE = <?= json_encode($can_approve) ?>;
-    const CAN_EDIT    = <?= json_encode($can_edit) ?>;
     const fmt = n => CURRENCY + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const esc = s => $('<div>').text(s == null ? '' : s).html();
 

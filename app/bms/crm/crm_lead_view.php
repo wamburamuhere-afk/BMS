@@ -182,7 +182,7 @@ $source_label = $lead_sources[$lead['lead_source']] ?? ucfirst(str_replace('_','
                 <div class="row g-2 mt-3">
                     <div class="col-4">
                         <div class="lv-label">Lead Value</div>
-                        <div class="fw-bold text-primary" style="font-size:1.05rem">TZS <?= number_format((float)$lead['lead_value'], 0) ?></div>
+                        <div class="fw-bold text-primary" style="font-size:1.05rem"><?= htmlspecialchars(bmsCompanyCurrency()) ?> <?= number_format((float)$lead['lead_value'], 0) ?></div>
                     </div>
                     <div class="col-4">
                         <div class="lv-label">Probability</div>

@@ -132,7 +132,7 @@ try {
     $budget_id = $pdo->lastInsertId();
     $log_period = date('F Y', mktime(0, 0, 0, $budget_month, 1, $budget_year));
     $log_project = $project_id ? " (Project #$project_id)" : '';
-    logActivity($pdo, $_SESSION['user_id'], "Created budget: '$budget_name' — TZS " . number_format($allocated_amount, 2) . " for $log_period$log_project");
+    logActivity($pdo, $_SESSION['user_id'], "Created budget: '$budget_name' — " . bmsCompanyCurrency() . " " . number_format($allocated_amount, 2) . " for $log_period$log_project");
     
     header('Content-Type: application/json');
     echo json_encode(['success' => true, 'message' => 'Budget added successfully', 'budget_id' => $budget_id]);

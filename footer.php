@@ -122,3 +122,6 @@ $(document).ajaxSuccess(function(event, xhr, settings, data) {
      from a browser's heuristic cache (Apache sends no Cache-Control on static
      assets, so browsers may otherwise reuse an old copy for a while). -->
 <script defer src="<?= getUrl('assets/js/loading.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/loading.js') ?>"></script>
+
+<!-- Summary-card labels follow the company's Text Display Case setting (see the file's header). -->
+<script defer src="<?= getUrl('assets/js/bms-card-case.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/bms-card-case.js') ?>"></script>
