@@ -689,8 +689,9 @@ try {
 }
 // pages
 $mp = file_get_contents("$root/app/bms/restaurant/menu.php");
-ok(strpos($mp, "t('Cost') ?></th>") !== false && strpos($mp, "t('Profit') ?></th>") !== false && strpos($mp, 'function itemCost(it)') !== false && strpos($mp, 'id="f-plate"') !== false, 'Menu list: Selling price, Cost and Profit columns; a dish can state what one plate costs');
-ok(strpos($mp, 'targets: [8, 9]') !== false && preg_match_all('/<th[ >]/', substr($mp, strpos($mp, '<thead class="table-dark">'), 900)) === 10, 'Menu list: 10 columns, the two unsortable ones moved with them');
+// 2026-11-03 (owner): the column says "Buying price"; a dish's cost comes from its recipe only — no plate guess.
+ok(strpos($mp, "t('Buying price') ?></th>") !== false && strpos($mp, "t('Profit') ?></th>") !== false && strpos($mp, 'function itemCost(it)') !== false && strpos($mp, 'id="f-plate"') === false && strpos($mp, 'it.plate_cost') === false, 'Menu list: Selling price, Buying price and Profit columns; dish cost comes from its recipe, no plate guess');
+ok(strpos($mp, 'targets: [0, 9, 10]') !== false && preg_match_all('/<th[ >]/', substr($mp, strpos($mp, '<thead class="table-dark">'), 1000)) === 11, 'Menu list: 11 columns (S/No. first), S/No. and the two unsortable ones not sortable');
 $h6 = preg_replace('#<!--.*?-->#s', '', body(runWorker(['page' => 'app/bms/restaurant/menu.php'], $ON, $onlyRest, '1'))); preg_match_all('#<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>#s', $h6, $m6); $bad6 = 0;
 foreach ($m6[1] as $js) { if (trim($js) === '') continue; $tmp = tempnam(sys_get_temp_dir(), 'mjs') . '.js'; file_put_contents($tmp, $js); exec('node --check ' . escapeshellarg($tmp) . ' 2>&1', $oo, $rc); @unlink($tmp); if ($rc !== 0) $bad6++; $oo = []; }
 ok($bad6 === 0, 'Menu page: every inline script parses');

@@ -241,7 +241,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
             <span class="fw-bold" id="rpOweTotal"></span>
         </div>
         <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="rpOweTable">
-            <thead><tr><th><?= t('Supplier') ?></th><th><?= t('What') ?></th><th><?= t('Date') ?></th><th><?= t('Pay by') ?></th><th class="text-end"><?= t('Total') ?></th><th class="text-end"><?= t('Paid') ?></th><th class="text-end"><?= t('Owed') ?></th><th></th></tr></thead>
+            <thead><tr><th style="width:48px;"><?= t('S/No.') ?></th><th><?= t('Supplier') ?></th><th><?= t('What') ?></th><th><?= t('Date') ?></th><th><?= t('Pay by') ?></th><th class="text-end"><?= t('Total') ?></th><th class="text-end"><?= t('Paid') ?></th><th class="text-end"><?= t('Owed') ?></th><th></th></tr></thead>
             <tbody><tr><td colspan="8" class="text-muted text-center py-3"><?= t('You owe no supplier anything.') ?></td></tr></tbody>
         </table></div>
     </div>
@@ -633,10 +633,10 @@ function loadDebts() {
     $.getJSON(RP.creditApi, { action: 'debts', warehouse_id: rpWh() }, function (res) {
         const rows = res.success ? res.data : [], body = $('#rpOweTable tbody').empty();
         rpDebts = {};
-        if (!rows.length) { body.append('<tr><td colspan="8" class="text-muted text-center py-3">' + RP.s.noDebts + '</td></tr>'); $('#rpOweTotal').text(''); return; }
-        rows.forEach(r => {
+        if (!rows.length) { body.append('<tr><td colspan="9" class="text-muted text-center py-3">' + RP.s.noDebts + '</td></tr>'); $('#rpOweTotal').text(''); return; }
+        rows.forEach((r, idx) => {
             rpDebts[r.id] = r;
-            body.append('<tr><td><span class="fw-semibold">' + safeOutput(r.supplier_name) + '</span>' + (r.phone ? '<br><small class="text-muted">' + safeOutput(r.phone) + '</small>' : '') + '</td>'
+            body.append('<tr><td class="text-muted">' + (idx + 1) + '</td><td><span class="fw-semibold">' + safeOutput(r.supplier_name) + '</span>' + (r.phone ? '<br><small class="text-muted">' + safeOutput(r.phone) + '</small>' : '') + '</td>'
                 + '<td>' + safeOutput(r.what) + '</td><td>' + safeOutput(r.date_raised) + '</td>'
                 + '<td>' + (r.due_date ? safeOutput(r.due_date) : '—') + (+r.overdue ? '<span class="rp-late">' + RP.s.overdue + '</span>' : '') + '</td>'
                 + '<td class="text-end">' + fmt(r.amount) + '</td><td class="text-end">' + fmt(r.amount_paid) + '</td><td class="text-end fw-bold">' + fmt(r.owed) + '</td>'

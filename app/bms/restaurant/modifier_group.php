@@ -42,7 +42,7 @@ $can_edit = canEdit('restaurant_pos');
         <table id="groupsTable" class="table table-hover align-middle w-100">
             <thead class="table-light">
                 <tr>
-                    <th>#</th>
+                    <th style="width:56px;"><?= t('S/No.') ?></th>
                     <th><?= t('Name') ?></th>
                     <th><?= t('Type') ?></th>
                     <th><?= t('Min-Max') ?></th>
@@ -144,7 +144,7 @@ $can_edit = canEdit('restaurant_pos');
                 </form>
                 <?php endif; ?>
                 <table class="table table-sm table-hover">
-                    <thead><tr><th><?= t('Option') ?></th><th class="text-end"><?= t('Price Adj.') ?></th><th><?= t('Status') ?></th><th></th></tr></thead>
+                    <thead><tr><th style="width:48px;"><?= t('S/No.') ?></th><th><?= t('Option') ?></th><th class="text-end"><?= t('Price Adj.') ?></th><th><?= t('Status') ?></th><th></th></tr></thead>
                     <tbody id="optionsBody"></tbody>
                 </table>
             </div>
@@ -168,7 +168,7 @@ $can_edit = canEdit('restaurant_pos');
                 <select id="addProductSelect" class="form-select mb-3" style="width:100%"></select>
                 <?php endif; ?>
                 <table class="table table-sm table-hover">
-                    <thead><tr><th><?= t('Product') ?></th><th></th></tr></thead>
+                    <thead><tr><th style="width:48px;"><?= t('S/No.') ?></th><th><?= t('Product') ?></th><th></th></tr></thead>
                     <tbody id="productsBody"></tbody>
                 </table>
             </div>
@@ -245,7 +245,7 @@ function renderTable() {
         const statusLabel = g.status === 'active' ? STRINGS.active : STRINGS.inactive;
         const typeLabel = g.selection_type === 'multiple' ? STRINGS.multiple : STRINGS.single;
         html += `<tr>
-            <td>${i + 1}</td>
+            <td class="text-muted">${i + 1}</td>
             <td>${safeOutput(g.name)}</td>
             <td>${typeLabel}</td>
             <td>${g.min_select}-${g.max_select}</td>
@@ -257,12 +257,17 @@ function renderTable() {
         </tr>`;
     });
     $('#groupsBody').html(html);
-    $('#groupsTable').DataTable({
+    const dt = $('#groupsTable').DataTable({
         responsive: false, autoWidth: false, pageLength: 25, order: [],
         dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
-        columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+        columnDefs: [{ orderable: false, searchable: false, targets: [0, -1] }],
         language: { emptyTable: STRINGS.noRecords }
     });
+    // S/No. follows the rows as shown (after sorting / searching / paging).
+    dt.on('draw.dt', function () {
+        const s = dt.page.info().start;
+        dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((c, i) => { c.innerHTML = s + i + 1; });
+    }).draw(false);
 }
 
 function renderCards() {
@@ -322,17 +327,18 @@ function loadOptions() {
     const group = GROUPS_DATA.find(g => g.group_id == currentGroupId);
     const opts = group ? (group.options || []) : [];
     let html = '';
-    opts.forEach(o => {
+    opts.forEach((o, idx) => {
         const statusColor = o.status === 'active' ? '#198754' : '#6c757d';
         const statusLabel = o.status === 'active' ? STRINGS.active : STRINGS.inactive;
         html += `<tr>
+            <td class="text-muted">${idx + 1}</td>
             <td>${safeOutput(o.name)}</td>
             <td class="text-end">${Number(o.price_adjustment).toLocaleString()}</td>
             <td><span class="badge" style="background:${statusColor};color:#fff;">${statusLabel}</span></td>
             <td>${CAN_EDIT ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleOption(${o.option_id}, '${o.status === 'active' ? 'inactive' : 'active'}')"><i class="bi bi-${o.status === 'active' ? 'pause-circle' : 'play-circle'}"></i></button>` : ''}</td>
         </tr>`;
     });
-    $('#optionsBody').html(html || `<tr><td colspan="4" class="text-center text-muted py-3">${STRINGS.noRecords}</td></tr>`);
+    $('#optionsBody').html(html || `<tr><td colspan="5" class="text-center text-muted py-3">${STRINGS.noRecords}</td></tr>`);
 }
 
 $('#addOptionForm').on('submit', function (e) {
@@ -369,11 +375,11 @@ function loadGroupProducts() {
     $.getJSON('<?= buildUrl('api/restaurant/get_group_products.php') ?>', { group_id: currentGroupId }, function (res) {
         const rows = res.success ? res.data : [];
         let html = '';
-        rows.forEach(p => {
-            html += `<tr><td>${safeOutput(p.product_name)} ${p.sku ? '<span class="text-muted small">(' + safeOutput(p.sku) + ')</span>' : ''}</td>
+        rows.forEach((p, idx) => {
+            html += `<tr><td class="text-muted">${idx + 1}</td><td>${safeOutput(p.product_name)} ${p.sku ? '<span class="text-muted small">(' + safeOutput(p.sku) + ')</span>' : ''}</td>
                 <td class="text-end">${CAN_EDIT ? `<button class="btn btn-sm btn-outline-danger" onclick="unlinkProduct(${p.product_id})"><i class="bi bi-x-circle"></i> ${STRINGS.remove}</button>` : ''}</td></tr>`;
         });
-        $('#productsBody').html(html || `<tr><td colspan="2" class="text-center text-muted py-3">${STRINGS.noRecords}</td></tr>`);
+        $('#productsBody').html(html || `<tr><td colspan="3" class="text-center text-muted py-3">${STRINGS.noRecords}</td></tr>`);
     });
 }
 function linkProduct(productId) {
