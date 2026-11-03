@@ -88,7 +88,7 @@ if (!function_exists('createNotification')) {
         if ($userId <= 0) return 0;
 
         $validType = ['loan', 'payment', 'system', 'report', 'alert'];
-        $type = in_array(($p['type'] ?? 'alert'), $validType, true) ? $p['type'] : 'alert';
+        $type = in_array(($p['type'] ?? 'alert'), $validType, true) ? ($p['type'] ?? 'alert') : 'alert';
 
         $validPrio = ['low', 'medium', 'high'];
         $prio = $p['priority'] ?? $p['severity'] ?? 'medium';
@@ -388,7 +388,9 @@ if (!function_exists('enqueueEmail')) {
                 isset($r['dedupe_key']) ? substr((string)$r['dedupe_key'], 0, 191) : null,
                 $r['entity_type'] ?? null,
                 isset($r['entity_id']) ? (int)$r['entity_id'] : null,
-                $r['scheduled_for'] ?? null,
+                // Test servers set BMS_NOTIF_HOLD_EMAIL=1 so a queued test email is parked (never
+                // sent to a real inbox) until the test deletes it. Never set in production.
+                getenv('BMS_NOTIF_HOLD_EMAIL') === '1' ? '2099-12-31 00:00:00' : ($r['scheduled_for'] ?? null),
             ]);
             return $stmt->rowCount() > 0;
         } catch (Throwable $e) {

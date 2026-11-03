@@ -196,3 +196,6 @@ jobs:
 
       - name: Restaurant forms - one layout, no field removed
         run: php tests/test_restaurant_form_layout_cli.php
+
+      - name: Restaurant notifications (bell + email, links)
+        run: php tests/test_restaurant_notifications_cli.php

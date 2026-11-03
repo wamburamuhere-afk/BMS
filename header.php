@@ -151,6 +151,7 @@ $__bmsBackgroundDue = function_exists('get_setting') && (
     || get_setting('hr_expiry_last_run') !== date('Y-m-d')
     || get_setting('notif_checks_last_run') !== date('Y-m-d')
     || (time() - (int) get_setting('notif_outbox_last_ts', '0')) >= 120
+    || (time() - (int) get_setting('rn_checks_last_ts', '0')) >= 120
     || (get_setting('notif_digest_enabled', '0') === '1' && get_setting('notif_digest_last_run') !== date('Y-m-d'))
 );
 
@@ -991,16 +992,89 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 // company only. It opens the existing Notification Center; what appears in it is decided later. Everyone else: no change.
                 require_once __DIR__ . '/core/restaurant_scope.php';
                 $__bell_on = posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo);
-                $__bell = function (string $id) use ($pdo) {
-                    $n = 0;
-                    try { $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $q->execute([(int)($_SESSION['user_id'] ?? 0)]); $n = (int)$q->fetchColumn(); } catch (Throwable $e) { /* the icon still shows */ }
-                    $open = canView('notification_center');
+                // Restaurant notifications (2026-11-03): the bell opens a list of the latest notifications;
+                // each one opens its own record (notification_open marks it read and goes there).
+                $__bell_items = null;
+                $__bell = function (string $id) use ($pdo, &$__bell_items) {
+                    $uid = (int)($_SESSION['user_id'] ?? 0);
+                    if ($__bell_items === null) {
+                        $__bell_items = ['n' => 0, 'rows' => []];
+                        try {
+                            $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $q->execute([$uid]);
+                            $__bell_items['n'] = (int)$q->fetchColumn();
+                            $q = $pdo->prepare("SELECT notification_id, title, message, priority, is_read, created_at, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS mins FROM notifications
+                                                 WHERE user_id = ? ORDER BY is_read ASC, created_at DESC, notification_id DESC LIMIT 8");
+                            $q->execute([$uid]);
+                            $__bell_items['rows'] = $q->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (Throwable $e) { /* the icon still shows */ }
+                    }
+                    $n = $__bell_items['n'];
                     $l = htmlspecialchars(t('Notifications'));
-                    echo '<' . ($open ? 'a href="' . htmlspecialchars(getUrl('notification_center')) . '"' : 'span') . ' id="' . $id . '" class="btn btn-sm btn-outline-light rd-bell position-relative" title="' . $l . '" aria-label="' . $l . '"><i class="ri ri-bell"></i>'
-                       . ($n > 0 ? '<span class="rd-bell-n">' . ($n > 99 ? '99+' : $n) . '</span>' : '') . '</' . ($open ? 'a' : 'span') . '>';
+                    $ago = function (string $ts, $mins): string {   // minutes from the database clock (the PHP clock may differ)
+                        $m = max(0, (int)$mins);
+                        if ($m < 1) return t('just now');
+                        if ($m < 60) return sprintf(t('%d min ago'), $m);
+                        if ($m < 1440) return sprintf(t('%d h ago'), (int)floor($m / 60));
+                        return date('d M', strtotime($ts));
+                    };
+                    echo '<div class="dropdown rd-bell-dd">'
+                       . '<button type="button" id="' . $id . '" class="btn btn-sm btn-outline-light rd-bell position-relative" aria-haspopup="true" aria-expanded="false" title="' . $l . '" aria-label="' . $l . '"><i class="ri ri-bell"></i>'
+                       . ($n > 0 ? '<span class="rd-bell-n">' . ($n > 99 ? '99+' : $n) . '</span>' : '') . '</button>'
+                       . '<div class="dropdown-menu dropdown-menu-end rd-bell-menu shadow border-0 p-0" aria-labelledby="' . $id . '">'
+                       . '<div class="rd-bell-h"><strong>' . $l . '</strong>' . ($n > 0 ? '<span class="rd-bell-new">' . sprintf(htmlspecialchars(t('%d new')), $n) . '</span>' : '') . '</div>';
+                    if (!$__bell_items['rows']) {
+                        echo '<div class="rd-bell-empty"><i class="ri ri-notification-off-line"></i>' . htmlspecialchars(t('No notifications yet.')) . '</div>';
+                    }
+                    foreach ($__bell_items['rows'] as $r) {
+                        $href = getUrl('notification_open') . '?id=' . (int)$r['notification_id'];
+                        $dot = !(int)$r['is_read'] ? ' rd-bell-unread' : '';
+                        $prio = in_array($r['priority'], ['high'], true) ? ' rd-bell-high' : '';
+                        echo '<a class="rd-bell-item' . $dot . $prio . '" href="' . htmlspecialchars($href) . '">'
+                           . '<span class="rd-bell-t">' . htmlspecialchars(mb_strimwidth((string)$r['title'], 0, 70, '…')) . '</span>'
+                           . '<span class="rd-bell-m">' . htmlspecialchars(mb_strimwidth((string)$r['message'], 0, 110, '…')) . '</span>'
+                           . '<span class="rd-bell-a">' . htmlspecialchars($ago((string)$r['created_at'], $r['mins'])) . '</span></a>';
+                    }
+                    if (canView('notification_center')) {
+                        echo '<a class="rd-bell-all" href="' . htmlspecialchars(getUrl('notification_center')) . '">' . htmlspecialchars(t('See all notifications')) . ' <i class="bi bi-arrow-right"></i></a>';
+                    }
+                    echo '</div></div>';
                 };
                 if ($__bell_on): ?>
-                <style>.rd-bell.btn{border-radius:50%!important;width:32px!important;min-width:32px!important;max-width:32px;height:32px!important;padding:0!important;flex:none;display:inline-flex;align-items:center;justify-content:center}.rd-bell .rd-bell-n{position:absolute;top:-6px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#f59e0b;color:#3b2500;font-size:.62rem;font-weight:700;line-height:17px;text-align:center}</style>
+                <style>.rd-bell-dd{display:inline-block;position:relative}.rd-bell-menu{width:340px;max-width:calc(100vw - 24px);border-radius:12px;overflow:hidden;font-size:13px}.rd-bell-h{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eef0f3;color:#111827}.rd-bell-new{background:#e7f0ff;color:#084298;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600}.rd-bell-item{display:block;padding:10px 14px 10px 26px;border-bottom:1px solid #f3f4f6;color:#111827;text-decoration:none;position:relative}.rd-bell-item:hover{background:#f8fafc;color:#111827}.rd-bell-unread{background:#f5f9ff}.rd-bell-unread::before{content:'';position:absolute;left:11px;top:15px;width:8px;height:8px;border-radius:50%;background:#0d6efd}.rd-bell-high.rd-bell-unread::before{background:#dc3545}.rd-bell-t{display:block;font-weight:600;line-height:1.3}.rd-bell-m{display:block;color:#4b5563;line-height:1.35;margin-top:2px}.rd-bell-a{display:block;color:#9ca3af;font-size:11px;margin-top:3px}.rd-bell-empty{padding:24px 14px;text-align:center;color:#6b7280}.rd-bell-empty i{display:block;font-size:22px;margin-bottom:4px}.rd-bell-all{display:block;text-align:center;padding:10px;font-weight:600;color:#0d6efd;text-decoration:none;background:#fff}.rd-bell-all:hover{background:#f8fafc}.rd-bell.btn{border-radius:50%!important;width:32px!important;min-width:32px!important;max-width:32px;height:32px!important;padding:0!important;flex:none;display:inline-flex;align-items:center;justify-content:center}.rd-bell .rd-bell-n{position:absolute;top:-6px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#f59e0b;color:#3b2500;font-size:.62rem;font-weight:700;line-height:17px;text-align:center}</style>
+                <script>
+                // The bell opens and closes its own list (no data-bs-toggle: other click handlers on the page
+                // toggled it a second time, so it closed the moment it opened). Outside click / Escape close it.
+                document.addEventListener('DOMContentLoaded', function () {
+                    const close = function (except) {
+                        document.querySelectorAll('.rd-bell-dd .rd-bell-menu.show').forEach(function (m) {
+                            if (m === except) return;
+                            m.classList.remove('show'); m.style.cssText = '';
+                            const b = m.parentElement.querySelector('.rd-bell'); if (b) b.setAttribute('aria-expanded', 'false');
+                        });
+                    };
+                    document.querySelectorAll('.rd-bell-dd .rd-bell').forEach(function (b) {
+                        const m = b.parentElement.querySelector('.rd-bell-menu');
+                        b.addEventListener('click', function (e) {
+                            e.preventDefault(); e.stopPropagation();
+                            const open = !m.classList.contains('show');
+                            close(null);
+                            if (open) {
+                                m.classList.add('show');
+                                if (window.innerWidth < 576) {   // phone: full width under the header, whatever side the bell is on
+                                    const r = b.getBoundingClientRect();
+                                    m.style.cssText = 'position:fixed;left:12px;right:12px;width:auto;max-width:none;top:' + Math.round(r.bottom + 8) + 'px;display:block;z-index:1060;max-height:calc(100vh - ' + Math.round(r.bottom + 24) + 'px);overflow-y:auto;';
+                                } else {
+                                    m.style.cssText = 'position:absolute;right:0;left:auto;top:calc(100% + 8px);display:block;z-index:1060;max-height:70vh;overflow-y:auto;';
+                                }
+                                b.setAttribute('aria-expanded', 'true');
+                            }
+                        });
+                        m.addEventListener('click', function (e) { e.stopPropagation(); });
+                    });
+                    document.addEventListener('click', function () { close(null); });
+                    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(null); });
+                });
+                </script>
                 <?php endif; ?>
                 <?php if (!posSimpleModeEnabled()) helpPanelButton('mobile', 'ms-auto me-2 d-lg-none'); ?>
                 <button class="navbar-toggler<?= posSimpleModeEnabled() ? ' ms-auto' : '' ?>" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">

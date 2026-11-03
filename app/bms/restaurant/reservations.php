@@ -23,6 +23,17 @@ $can_create = canCreate('restaurant_pos');
 $can_edit   = canEdit('restaurant_pos');
 
 $warehouses = restaurantWarehousesForSelect($pdo);
+// Opened from a notification: reservations?date=YYYY-MM-DD&id=N — that day, that booking's shop, the row highlighted.
+$focusRes  = (int)($_GET['id'] ?? 0);
+$focusDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? '')) ? (string)$_GET['date'] : '';
+$focusWh   = 0;
+if ($focusRes > 0 && $warehouses) {
+    $fr = $pdo->prepare("SELECT warehouse_id, DATE(reservation_time) FROM restaurant_reservations WHERE id = ?");
+    $fr->execute([$focusRes]);
+    [$fw, $fd] = $fr->fetch(PDO::FETCH_NUM) ?: [0, ''];
+    if (in_array((int)$fw, array_map(fn($w) => (int)$w['warehouse_id'], $warehouses), true)) { $focusWh = (int)$fw; if ($focusDate === '') $focusDate = (string)$fd; }
+    else $focusRes = 0;
+}
 ?>
 
 <div class="container-fluid mt-4">
@@ -53,7 +64,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select id="whSelect" class="form-select form-select-sm select2-static" style="min-width:220px;">
                         <?php foreach ($warehouses as $w): ?>
-                        <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
+                        <option value="<?= (int)$w['warehouse_id'] ?>"<?= (int)$w['warehouse_id'] === $focusWh ? ' selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -162,6 +173,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
 
 <script>
 const CAN_EDIT = <?= json_encode($can_edit) ?>;
+const RES_FOCUS = { id: <?= (int)$focusRes ?>, date: <?= json_encode($focusDate) ?>, done: false };
 const CSRF_FIELD = <?= json_encode(csrf_token()) ?>;
 const STATUS_LABELS = {
     booked: <?= json_encode(t('Booked')) ?>, seated: <?= json_encode(t('Seated')) ?>,
@@ -177,7 +189,7 @@ const STRINGS = {
 };
 
 $(document).ready(function () {
-    $('#dateFilter').val(new Date().toISOString().slice(0, 10));
+    $('#dateFilter').val(RES_FOCUS.date || new Date().toISOString().slice(0, 10));
     if ($('#whSelect').length) {
         $('#whSelect').select2({ theme: 'bootstrap-5', width: '100%' });
         $('#whSelect').on('change', loadReservations);
@@ -216,7 +228,7 @@ function loadReservations() {
             } else if (CAN_EDIT && r.status === 'seated') {
                 actions += `<button class="btn btn-sm btn-outline-secondary" onclick="setResStatus(${r.id}, 'completed')" title="${STATUS_LABELS.completed}"><i class="bi bi-check2-circle"></i></button>`;
             }
-            html += `<tr>
+            html += `<tr data-res-id="${+r.id}"${+r.id === RES_FOCUS.id ? ' class="table-primary"' : ''}>
                 <td data-order="${safeOutput(r.reservation_time)}">${time}</td>
                 <td>${safeOutput(r.customer_name)}${r.customer_phone ? '<div class="small text-muted">' + safeOutput(r.customer_phone) + '</div>' : ''}</td>
                 <td>${safeOutput(r.table_number)}</td>
@@ -232,6 +244,12 @@ function loadReservations() {
             columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
             language: { emptyTable: STRINGS.noRecords }
         });
+        if (RES_FOCUS.id && !RES_FOCUS.done) {   // from a notification: show the booking
+            RES_FOCUS.done = true;
+            const tr = document.querySelector('#resTable tr[data-res-id="' + RES_FOCUS.id + '"]');
+            if (tr) tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['id', 'date']);
+        }
     });
 }
 

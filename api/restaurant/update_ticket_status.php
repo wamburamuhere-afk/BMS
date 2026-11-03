@@ -48,5 +48,10 @@ if ($sequence[$status] < $sequence[$ticket['status']]) {
 $pdo->prepare("UPDATE kitchen_tickets SET status = ?, updated_at = NOW() WHERE ticket_id = ?")->execute([$status, $ticket_id]);
 $pdo->prepare("UPDATE kitchen_ticket_items SET status = ? WHERE ticket_id = ?")->execute([$status, $ticket_id]);
 logActivity($pdo, $_SESSION['user_id'], "Kitchen ticket #$ticket_id -> $status");
+if ($status === 'ready' && $ticket['status'] !== 'ready') {
+    // Restaurant notifications: "ready to serve" to the waiter who took the order.
+    require_once __DIR__ . '/../../core/restaurant_notify.php';
+    rnNotifyKitchenReady($pdo, $ticket_id);
+}
 
 echo json_encode(['success' => true, 'message' => t('Ticket status updated.')]);
