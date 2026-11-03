@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-11-03 — ui(restaurant): one professional layout for every restaurant form (phone + desktop)
+
+**Branch:** `feat/restaurant-form-layout` (off `develop`). Owner approved the layout and the list of 11 forms.
+**New:** `includes/restaurant/form_kit.php` (shared layout: CSS, Select2 set-up, `rfMoneyPrefix()`), `includes/restaurant/table_form_modal.php` (the one Add / Edit Table form), `tests/test_restaurant_form_layout_cli.php`.
+**Changed:** `app/bms/restaurant/reservations.php`, `menu.php` (Add/Edit item + Recipe), `modifier_group.php`, `purchases.php` (buying form + Pay supplier), `floors.php`, `tables.php`, `includes/restaurant/buy_ingredients_modal.php`, `getting_started.php`, `online_menu_share.php`, `lang/sw.php` (14 phrases), `tests/test_restaurant_online_menu_cli.php` (fixture also removes its reservations).
+
+- **Layout:** sections with small titles and thin dividers; two columns on desktop, one column and full screen on a phone; labels above, same size, red `*` for required, help text under its field; Cancel / Save always visible at the bottom (side by side on a phone).
+- **Dropdowns:** Select2 everywhere — click to see the options, type to narrow them (the ingredient and "already in my products" searches now list options on click too). Dropdowns stay inside their window on a phone.
+- **Money fields:** the company currency in front (TSh by default) — prices, totals, plate cost, paid now, pay amount, amount paid, quick-start prices. Purchases text amounts use the same symbol (was "TZS" after the number).
+- **Choices:** Dish / Bought item / Already in my products and the ordering switches are cards; "Required" for add-on groups is a card.
+- **Create = Edit:** each form is one window for both (title changes only). Floors and Tables now share ONE table form file. Windows reopen their single instance (no stacked copies).
+- **No field removed:** the test compares every name/id with the version before this change (all 9 files pass). Purchases keeps every behaviour (Counted item / Something else, Paid / Partly paid / Credit, live summary).
+- **Checked in a real browser at 390 px (phone) and 1366 px (desktop):** all 11 forms; real saves for reservation, menu item (create + edit), table (create + edit), add-on group (create + edit); captured (not sent, they post to accounts) payloads for Purchases, Buy ingredients and the quick-start list — all fields arrive as before.
+
 ## 2026-11-03 — feat(restaurant): online menu + ordering by link and table QR (staff accept first)
 
 **Branch:** `feat/restaurant-online-menu` (off `develop`). Plan: `restaurant_online_menu_plan.md` (owner approved; Storefront-style look chosen).

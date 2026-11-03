@@ -115,13 +115,14 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 </div>
 
 <?php if ($can_edit && $warehouses): ?>
-<!-- Add / Edit Menu Item -->
-<div class="modal fade" id="itemModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+<!-- Add / Edit Menu Item (one form for both; restaurant form layout — includes/restaurant/form_kit.php) -->
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); $rfCur = htmlspecialchars(rfMoneyPrefix()); ?>
+<div class="modal fade rf-modal" id="itemModal" tabindex="-1" aria-labelledby="itemModalTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="itemModalTitle"><?= t('Add Item') ?></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title"><i class="bi bi-journal-richtext"></i><span id="itemModalTitle"><?= t('Add Item') ?></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <form id="itemForm" autocomplete="off">
                 <div class="modal-body">
@@ -130,92 +131,107 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                     <input type="hidden" name="item_type" id="f-type" value="dish">
                     <div id="item-message" class="mb-2"></div>
 
-                    <div id="typeChooser" class="mb-3">
-                        <div class="fw-semibold mb-2"><?= t('What is this?') ?></div>
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn rm-type text-start" data-type="dish">
-                                <i class="ri ri-cooking-pot fs-4 text-primary me-2"></i>
-                                <span><strong><?= t('Dish (cooked here)') ?></strong><br><small class="text-muted"><?= t('Chai, mandazi, lunch, soup… sells without stock.') ?></small></span>
+                    <div class="rf-sec" id="typeChooser">
+                        <div class="rf-sec-title"><i class="bi bi-ui-radios-grid"></i><?= t('What is this?') ?></div>
+                        <?php $rfThree = !restaurantOnlyCompany($pdo); ?>
+                        <div class="rf-choices <?= $rfThree ? 'rf-c3' : 'rf-c2' ?>">
+                            <button type="button" class="rf-choice rm-type" data-type="dish">
+                                <i class="ri ri-cooking-pot fs-4 text-primary"></i>
+                                <span><span class="rf-ct"><?= t('Dish (cooked here)') ?></span><span class="rf-cd"><?= t('Chai, mandazi, lunch, soup… sells without stock.') ?></span></span>
                             </button>
-                            <button type="button" class="btn rm-type text-start" data-type="bought">
-                                <i class="ri ri-cup-soda fs-4 text-primary me-2"></i>
-                                <span><strong><?= t('Bought item (has stock)') ?></strong><br><small class="text-muted"><?= t('Water, soda… you buy it and count the stock.') ?></small></span>
+                            <button type="button" class="rf-choice rm-type" data-type="bought">
+                                <i class="ri ri-cup-soda fs-4 text-primary"></i>
+                                <span><span class="rf-ct"><?= t('Bought item (has stock)') ?></span><span class="rf-cd"><?= t('Water, soda… you buy it and count the stock.') ?></span></span>
                             </button>
-                            <?php if (!restaurantOnlyCompany($pdo)): // a restaurant-only company has no retail products to bring in ?>
-                            <button type="button" class="btn rm-type text-start" data-type="existing">
-                                <i class="bi bi-box-seam fs-4 text-primary me-2"></i>
-                                <span><strong><?= t('Already in my products') ?></strong><br><small class="text-muted"><?= t('Put a product you already have on the menu.') ?></small></span>
+                            <?php if ($rfThree): // a restaurant-only company has no retail products to bring in ?>
+                            <button type="button" class="rf-choice rm-type" data-type="existing">
+                                <i class="bi bi-box-seam fs-4 text-primary"></i>
+                                <span><span class="rf-ct"><?= t('Already in my products') ?></span><span class="rf-cd"><?= t('Put a product you already have on the menu.') ?></span></span>
                             </button>
                             <?php endif; ?>
                         </div>
                     </div>
 
-                    <div id="existingFields" class="d-none">
-                        <div class="mb-3">
-                            <label class="form-label"><?= t('Product') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select" name="existing_product_id" id="f-existing"></select>
-                        </div>
-                    </div>
-
-                    <div id="itemFields">
-                        <div class="mb-3">
-                            <label class="form-label"><?= t('Name') ?> <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control form-control-lg" name="product_name" id="f-name" maxlength="150">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label"><?= t('Group') ?></label>
-                            <select class="form-select select2-static" name="category_id" id="f-cat">
-                                <option value=""><?= t('-- No group --') ?></option>
-                                <?php foreach ($categories as $c): ?>
-                                <option value="<?= (int)$c['category_id'] ?>"><?= safe_output($c['category_name']) ?></option>
-                                <?php endforeach; ?>
-                                <option value="__new"><?= t('+ New group') ?></option>
-                            </select>
-                            <input type="text" class="form-control mt-2 d-none" name="new_category" id="f-newcat" maxlength="100" placeholder="<?= htmlspecialchars(t('Group name')) ?>">
-                            <div class="d-flex flex-wrap gap-1 mt-2" id="starterGroups">
-                                <?php foreach ($starterGroups as $g): ?>
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 rm-starter"><?= htmlspecialchars($g) ?></button>
-                                <?php endforeach; ?>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-tag"></i><?= t('Item') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full d-none" id="existingFields">
+                                <label class="form-label" for="f-existing"><?= t('Product') ?><span class="rf-req">*</span></label>
+                                <select class="form-select" name="existing_product_id" id="f-existing"></select>
                             </div>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-6 bought-only">
-                                <label class="form-label"><?= t('Buying price') ?></label>
-                                <input type="number" step="any" min="0" class="form-control" name="cost_price" id="f-cost" inputmode="decimal">
+                            <div class="rf-field rf-full item-field">
+                                <label class="form-label" for="f-name"><?= t('Name') ?><span class="rf-req">*</span></label>
+                                <input type="text" class="form-control" name="product_name" id="f-name" maxlength="150">
                             </div>
-                            <div class="col-6" id="priceCol">
-                                <label class="form-label"><?= t('Selling price') ?> <span class="text-danger">*</span></label>
-                                <input type="number" step="any" min="0" class="form-control" name="selling_price" id="f-price" inputmode="decimal">
-                            </div>
-                        </div>
-                        <div class="mt-3 dish-only">
-                            <label class="form-label"><?= t('What does one plate cost you?') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
-                            <input type="number" step="any" min="0" class="form-control" name="plate_cost" id="f-plate" inputmode="decimal">
-                            <div class="form-text"><?= t('A rough figure, to show the profit on each plate. For an exact cost add a recipe.') ?></div>
-                        </div>
-                        <div class="mt-3 bought-only new-only">
-                            <label class="form-label"><?= t('Opening stock') ?></label>
-                            <input type="number" step="any" min="0" class="form-control" name="opening_stock" id="f-stock" inputmode="decimal" placeholder="0">
-                        </div>
-                        <div class="mt-3">
-                            <label class="form-label"><?= t('Prepared at') ?></label>
-                            <div class="btn-group w-100" role="group" id="prepGroup">
-                                <input type="radio" class="btn-check" name="prep_area" id="prep-kitchen" value="kitchen">
-                                <label class="btn btn-outline-primary" for="prep-kitchen"><i class="ri ri-chef-hat me-1"></i><?= t('Kitchen') ?></label>
-                                <input type="radio" class="btn-check" name="prep_area" id="prep-bar" value="bar">
-                                <label class="btn btn-outline-primary" for="prep-bar"><i class="bi bi-cup me-1"></i><?= t('Bar') ?></label>
-                                <input type="radio" class="btn-check" name="prep_area" id="prep-none" value="none">
-                                <label class="btn btn-outline-primary" for="prep-none"><?= t('No preparation') ?></label>
+                            <div class="rf-field rf-full item-field">
+                                <label class="form-label" for="f-cat"><?= t('Group') ?></label>
+                                <select class="form-select rf-select2" name="category_id" id="f-cat">
+                                    <option value=""><?= t('-- No group --') ?></option>
+                                    <?php foreach ($categories as $c): ?>
+                                    <option value="<?= (int)$c['category_id'] ?>"><?= safe_output($c['category_name']) ?></option>
+                                    <?php endforeach; ?>
+                                    <option value="__new"><?= t('+ New group') ?></option>
+                                </select>
+                                <input type="text" class="form-control mt-2 d-none" name="new_category" id="f-newcat" maxlength="100" placeholder="<?= htmlspecialchars(t('Group name')) ?>">
+                                <div class="d-flex flex-wrap gap-1 mt-2" id="starterGroups">
+                                    <?php foreach ($starterGroups as $g): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 rm-starter"><?= htmlspecialchars($g) ?></button>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-check form-switch mt-3">
-                        <input class="form-check-input" type="checkbox" id="f-avail" checked>
-                        <label class="form-check-label" for="f-avail"><?= t('Available today') ?></label>
+                    <div class="rf-sec item-field">
+                        <div class="rf-sec-title"><i class="bi bi-cash-coin"></i><?= t('Price') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field bought-only">
+                                <label class="form-label" for="f-cost"><?= t('Buying price') ?></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
+                                    <input type="number" step="any" min="0" class="form-control" name="cost_price" id="f-cost" inputmode="decimal"></div>
+                            </div>
+                            <div class="rf-field" id="priceCol">
+                                <label class="form-label" for="f-price"><?= t('Selling price') ?><span class="rf-req">*</span></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
+                                    <input type="number" step="any" min="0" class="form-control" name="selling_price" id="f-price" inputmode="decimal"></div>
+                            </div>
+                            <div class="rf-field dish-only">
+                                <label class="form-label" for="f-plate"><?= t('What does one plate cost you?') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
+                                    <input type="number" step="any" min="0" class="form-control" name="plate_cost" id="f-plate" inputmode="decimal"></div>
+                                <div class="rf-help"><?= t('A rough figure, to show the profit on each plate. For an exact cost add a recipe.') ?></div>
+                            </div>
+                            <div class="rf-field bought-only new-only">
+                                <label class="form-label" for="f-stock"><?= t('Opening stock') ?></label>
+                                <input type="number" step="any" min="0" class="form-control" name="opening_stock" id="f-stock" inputmode="decimal" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="ri ri-chef-hat"></i><?= t('Kitchen & availability') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full item-field">
+                                <span class="rf-label"><?= t('Prepared at') ?></span>
+                                <div class="btn-group w-100" role="group" id="prepGroup">
+                                    <input type="radio" class="btn-check" name="prep_area" id="prep-kitchen" value="kitchen">
+                                    <label class="btn btn-outline-primary" for="prep-kitchen"><i class="ri ri-chef-hat me-1"></i><?= t('Kitchen') ?></label>
+                                    <input type="radio" class="btn-check" name="prep_area" id="prep-bar" value="bar">
+                                    <label class="btn btn-outline-primary" for="prep-bar"><i class="bi bi-cup me-1"></i><?= t('Bar') ?></label>
+                                    <input type="radio" class="btn-check" name="prep_area" id="prep-none" value="none">
+                                    <label class="btn btn-outline-primary" for="prep-none"><?= t('No preparation') ?></label>
+                                </div>
+                            </div>
+                            <div class="rf-field rf-full">
+                                <div class="rf-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="f-avail" checked>
+                                    <label class="form-check-label" for="f-avail"><?= t('Available today') ?></label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer rf-foot">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
                 </div>
@@ -226,29 +242,39 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 <?php endif; ?>
 
 <?php if ($can_edit && $warehouses): ?>
-<!-- Recipe — restaurant_plan.md Phase 7 -->
-<div class="modal fade" id="recipeModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+<!-- Recipe — restaurant_plan.md Phase 7 (restaurant form layout) -->
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); ?>
+<div class="modal fade rf-modal" id="recipeModal" tabindex="-1" aria-labelledby="rcpTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="ri ri-scroll-text me-1"></i> <?= t('Recipe') ?> — <span id="rcpDish"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="rcpTitle"><i class="ri ri-scroll-text"></i><span class="text-truncate"><?= t('Recipe') ?> — <span id="rcpDish"></span></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <div class="modal-body">
-                <div class="small text-muted mb-2"><?= t('What goes into ONE plate. Selling it uses up these ingredients from stock. A dish without a recipe still sells normally.') ?></div>
-                <div id="rcpLines"></div>
-                <div class="d-flex gap-2 mt-2">
-                    <div class="flex-grow-1" style="min-width:0;"><select id="rcpPick" class="form-select"></select></div>
-                    <button type="button" class="btn btn-outline-primary flex-shrink-0" onclick="rcpNewIngredient()" title="<?= htmlspecialchars(t('New ingredient')) ?>"><i class="bi bi-plus-lg"></i></button>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-basket"></i><?= t('Ingredients in one plate') ?></div>
+                    <div class="rf-help mt-0 mb-2"><?= t('What goes into ONE plate. Selling it uses up these ingredients from stock. A dish without a recipe still sells normally.') ?></div>
+                    <div id="rcpLines"></div>
+                    <div class="rf-field mt-2">
+                        <label class="form-label" for="rcpPick"><?= t('Add an ingredient') ?></label>
+                        <div class="d-flex gap-2">
+                            <div class="flex-grow-1" style="min-width:0;"><select id="rcpPick" class="form-select"></select></div>
+                            <button type="button" class="btn btn-outline-primary flex-shrink-0" style="min-width:0;" onclick="rcpNewIngredient()" title="<?= htmlspecialchars(t('New ingredient')) ?>" aria-label="<?= htmlspecialchars(t('New ingredient')) ?>"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div class="card rm-stat mt-3 p-2">
-                    <div class="d-flex justify-content-between"><span><?= t('Cost of one plate') ?></span><strong id="rcpCost">0</strong></div>
-                    <div class="d-flex justify-content-between"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
-                    <div class="d-flex justify-content-between"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-calculator"></i><?= t('Cost of one plate') ?></div>
+                    <div class="card rm-stat p-3">
+                        <div class="d-flex justify-content-between py-1"><span><?= t('Cost of one plate') ?></span><strong id="rcpCost">0</strong></div>
+                        <div class="d-flex justify-content-between py-1"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
+                        <div class="d-flex justify-content-between border-top mt-1 pt-2"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
+                    </div>
+                    <div class="rf-help mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.') ?></div>
                 </div>
-                <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.') ?></div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer rf-foot">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                 <button type="button" class="btn btn-primary" onclick="rcpSave()"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
             </div>
@@ -271,7 +297,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 .rm-card.rm-off { opacity:.6; }
 .rm-badge { background:#cfe2ff; color:#084298; font-weight:500; }
 .rm-badge-out { background:#dc3545; color:#fff; }
-#prepGroup .btn { font-size:.85rem; padding-left:4px; padding-right:4px; }
+#prepGroup .btn { font-size:.85rem; padding-left:4px; padding-right:4px; flex:1 1 0; min-width:0; }
 </style>
 
 <script>
@@ -351,7 +377,7 @@ $(function () {
         if (!$('#f-existing').hasClass('select2-hidden-accessible')) {
             $('#f-existing').select2({
                 theme: 'bootstrap-5', dropdownParent: modal, width: '100%', placeholder: RM.chooseProduct, allowClear: true,
-                minimumInputLength: 1,
+                minimumInputLength: 0,   // click shows the first products; typing narrows them
                 ajax: {
                     url: '<?= buildUrl('api/restaurant/search_products_for_menu.php') ?>', dataType: 'json', delay: 300,
                     data: p => ({ q: p.term, warehouse_id: whId() }), processResults: d => ({ results: d.results }), cache: true
@@ -498,12 +524,12 @@ function openRecipe(id) {
         rcpRender();
         const m = $('#recipeModal');
         if (!$('#rcpPick').hasClass('select2-hidden-accessible')) {
-            $('#rcpPick').select2({ theme: 'bootstrap-5', dropdownParent: m, width: '100%', placeholder: RM.pickIngredient, allowClear: true, minimumInputLength: 1,
+            $('#rcpPick').select2({ theme: 'bootstrap-5', dropdownParent: m, width: '100%', placeholder: RM.pickIngredient, allowClear: true, minimumInputLength: 0,
                 ajax: { url: '<?= buildUrl('api/restaurant/recipe.php') ?>', dataType: 'json', delay: 300,
                         data: p => ({ action: 'search', q: p.term, warehouse_id: whId() }), processResults: d => ({ results: d.results }), cache: true } })
             .on('select2:select', function (e) { rcpAdd(e.params.data); $(this).val(null).trigger('change'); });
         }
-        new bootstrap.Modal(document.getElementById('recipeModal')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show();
     }).fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));
 }
 function rcpAdd(d) {
@@ -539,8 +565,8 @@ function rcpNewIngredient() {
     }).then(r => {
         if (!r.isConfirmed) return;
         $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', Object.assign({ action: 'new_ingredient', warehouse_id: whId(), _csrf: CSRF_FIELD }, r.value), function (res) {
-            if (res.success) { rcpAdd({ id: res.id, text: res.text, unit: res.unit, cost_price: res.cost_price }); new bootstrap.Modal(document.getElementById('recipeModal')).show(); }
-            else Swal.fire({ icon: 'error', title: RM.error, text: res.message }).then(() => new bootstrap.Modal(document.getElementById('recipeModal')).show());
+            if (res.success) { rcpAdd({ id: res.id, text: res.text, unit: res.unit, cost_price: res.cost_price }); bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show(); }
+            else Swal.fire({ icon: 'error', title: RM.error, text: res.message }).then(() => bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show());
         }, 'json');
     });
 }
@@ -575,7 +601,7 @@ function setType(type) {
     $('.rm-type').removeClass('active').filter(`[data-type="${type}"]`).addClass('active');
     const isNew = !$('#f-id').val();
     $('#existingFields').toggleClass('d-none', type !== 'existing');
-    $('#itemFields').toggleClass('d-none', type === 'existing');
+    $('.item-field').toggleClass('d-none', type === 'existing');
     // Buying price: bought items only. Opening stock: NEW bought items only (one combined rule,
     // so the two conditions can't undo each other).
     $('.bought-only').each(function () {
@@ -583,7 +609,7 @@ function setType(type) {
         $(this).toggleClass('d-none', !show);
     });
     $('.dish-only').toggleClass('d-none', type !== 'dish');
-    $('#priceCol').toggleClass('col-6', type === 'bought').toggleClass('col-12', type !== 'bought');
+    $('#priceCol').toggleClass('rf-full', type !== 'bought');   // full width when there is no buying price beside it
     if (isNew) $(`#prep-${type === 'dish' ? 'kitchen' : 'none'}`).prop('checked', true);
 }
 
