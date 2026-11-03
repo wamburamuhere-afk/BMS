@@ -45,6 +45,9 @@ try {
         'supplier_id'          => $_POST['supplier_id'] ?? 0,
         'expiry_date'          => $_POST['expiry_date'] ?? '',
         'paid_from_account_id' => $_POST['paid_from_account_id'] ?? 0,
+        'payment'              => $_POST['payment'] ?? 'paid',        // paid (default) | partial | credit
+        'amount_paid'          => $_POST['amount_paid'] ?? 0,
+        'due_date'             => $_POST['due_date'] ?? '',
     ], (int)$_SESSION['user_id']);
     echo json_encode(['success' => true, 'message' => t('Purchase saved.')] + $r);
 } catch (Throwable $e) {

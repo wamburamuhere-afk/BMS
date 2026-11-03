@@ -1,5 +1,65 @@
 # BMS Changelog
 
+## 2026-11-03 — fix(restaurant): bring the latest `develop` into pay-later; two fixes found by the full test run
+
+**Branch:** `feat/restaurant-pay-later` (PR #2695). Merged `develop` again (free-trial PR #2552 had landed); only `changelog.md` clashed, both entries kept.
+- **`api/restaurant/get_purchases.php`:** `rgpPayment()` is now declared once (`function_exists` guard). Called twice in one process it was a fatal error, which silently cut `test_restaurant_focus_cli` short (it reported 227 checks instead of 409). Live requests were not affected (one process each).
+- **`lang/sw.php`:** removed two duplicate keys the pay-later work added ('Open the till', 'Running low'); they silently overrode develop's words. Develop's are kept: "Fungua kaunta ya mauzo", "Zinakaribia kuisha". After the Tables PR (#2705) landed, a third merge found 7 more pay-later duplicates of develop's restaurant-dashboard words ('Money', '%d with order', '%d waiting long', '%d need a cost', '%d running low', 'Today and past', 'Kitchen waiting'); removed the same way. The 5 duplicates already on develop are untouched.
+- **Tests:** restaurant focus 409/409, pay-later 53/53 (twice), dashboard 67, simplicity 70, phases 0–7 all pass. `test_restaurant_pos_cli` (1) and `test_restaurant_pos_mode_setup_cli` (10) fail identically on plain `develop` — not caused here.
+
+## 2026-11-03 — merge(restaurant): bring `develop` into `feat/restaurant-pay-later` (PR #2695 conflicts)
+
+**Branch:** `feat/restaurant-pay-later`.
+- **Dashboard and bell:** `develop` already has the newer restaurant dashboard (Layout 2 with arrangement A, bell beside Help). It is kept exactly; this branch's older dashboard and its second header bell are dropped. `includes/restaurant/dashboard.php`, `includes/restaurant/dash_panel.php` and `header.php` are now identical to `develop`. `core/restaurant_notifications.php` (used only by the dropped bell and dashboard) is removed.
+- **Kept whole:** buying on credit or partly paid, paying suppliers later, and the simpler Purchases screen. `app/bms/restaurant/purchases.php` keeps this branch's version plus `develop`'s basket icon.
+- **Security:** removed `_dashboard_kpi_row_test_probe.php`, a test helper committed by mistake at the web root that logged anyone in as admin. `.gitignore` now blocks `/_*_test_probe.php`.
+- **Tests:** `tests/test_restaurant_focus_cli.php` keeps both sides' new sections (develop's P8–P11; this branch's Purchases screen section, now P12).
+
+## 2026-11-02 — ui(restaurant): Purchases screen — simpler, with quiet checks; Recent purchases full width with S/No.
+
+**Branch:** `feat/restaurant-purchases-ui` (stacked on `feat/restaurant-pay-later`, PR #2695).
+**Changed:** `app/bms/restaurant/purchases.php`, `api/restaurant/get_purchases.php` (adds `product_id` to counted rows, read-only), `assets/js/bms-mobile-cards.js` (`s/no.` and `na.` count as serial-number headers, so they are never a phone card's title), `lang/sw.php`, `tests/test_restaurant_focus_cli.php`.
+**Not changed:** how a purchase is saved — the same APIs receive the same fields (checked in the browser); pay-later (Paid / Partly paid / Credit, Suppliers you owe) as it was.
+
+- **Removed:** the "How it works" box that took a third of the screen (now behind a **?** button); the long help sentence (now an "or" before Total paid); the "On hand · Cost" line that the preview repeated; the separate "New ingredient" link.
+- **Counted item | Something else** is a switch on top instead of the last line of the search list.
+- **Search results** show the unit, on hand and cost, and an "On the menu" tag; "+ Add "…" as a new ingredient" when nothing matches, opening the small window with the name filled in.
+- **Live Summary** beside the form (below it on a phone): item, quantity × price, on hand before → after, cost before → after, profit on each, what is owed; the Date and the one **Save purchase** button live there.
+- **Selling price** shows as a line and opens for editing only with the pencil.
+- **Quiet checks (only speak when something looks wrong):** a price 1.5× or more, or half or less, of the average cost asks once; the same purchase already saved for that date asks "Already saved?"; count units (pcs, crate, loaf…) take whole numbers only; a "Something else" whose name matches a counted item warns it would count twice and offers "Buy as counted item".
+- **Recent purchases:** fills the whole width (it sat on the left — `width:100%`, no second scroll box), **S/No.** first and counted across pages, Item before Date (also the phone card title), headers aligned with their columns, a **Total** row, All / Today / This week, a count badge, and a gear menu with **Buy again** (fills the form from that row).
+- **Tests:** restaurant focus 227 (new section P8), pay-later 53 — all pass.
+
+## 2026-11-02 — feat(restaurant): smarter restaurant dashboard — Layout 2, summary cards that open their page, a notification bell, activity
+
+**Branch:** `feat/restaurant-pay-later` (second commit).
+**New:** `core/restaurant_notifications.php`.
+**Changed:** `includes/restaurant/dashboard.php`, `includes/restaurant/dash_panel.php`, `header.php` (bell only), `core/restaurant_supplier_credit.php`, `lang/sw.php`, `tests/test_restaurant_pay_later_cli.php`.
+**Only for a restaurant-only Smart POS company** (the same test as the restaurant menu). Retail Smart POS, mixed companies and Smart BMS: no bell, dashboard unchanged (checked in the browser on a database copy).
+
+- **Header:** unchanged except a notification bell next to the location. Its list opens under the bell; each item opens the page that fixes it; an engine notification is marked read when opened.
+- **Quick actions** in a blue side bar, each with a live count: Take order, Tables (with order), Kitchen (waiting long / cooking / by mouth), Menu (need a cost), Buy stock (running low), Expenses (to approve), Reservations (today), Sales report. A 4-column grid on a phone.
+- **Summary cards, each opens its page:** Today: Sales today (yesterday, 7-day trend), Orders today (average bill), Open tables (of all tables, not paid yet), Kitchen waiting (over 20 minutes). Money (users who see profit): Customers owe us (same figure as Who Owes Me), We owe suppliers (from the ledger: the restaurant's supplier bills and their payments), Expenses this month (ledger), Profit this month (ledger, margin, "Estimated" when an item has no cost).
+- **Notifications | Activities | Running low | Orders** in one box beside Performance. Notifications: bills open 90+ minutes, kitchen orders waiting 20+ minutes, reservations today, low stock, customer credit past due, expenses waiting for approval, supplier bills overdue or due in 3 days, and the user's unread notifications; filters All / Urgent / Today / Stock / Money. Activities: the retail dashboard's source and rule (page views hidden), with Sales / Kitchen / Stock / Staff filters.
+- **Shorter:** money, what earns and busy hours share one row; "Money check this month" folds away; the old "Needs your attention" list moved into Notifications. White with blue; urgent is amber, never red or black.
+- **Bug found by clicking in the browser:** paying a supplier from the "Pay" button failed (`posReceiptAccountId()` not loaded by the pay-later file on its own). Fixed, with a test.
+- **Tests:** restaurant suites all pass (pay-later 53, dashboard 67, phase 6 18, simplicity 70, focus 225, mode gating 22, phase 0 44, phase 7 26). `test_header_nav_menu_cli` (2), `test_mobile_side_menu_cli` (2), `test_pos_simple_mode_nav_hide_cli` (10) and `test_dashboard_kpi_row_cli` (3) fail identically on the base commit `3e1a4962` — not caused by this change.
+
+## 2026-11-02 — feat(restaurant): buy on credit or partly paid, and pay suppliers later
+
+**Branch:** `feat/restaurant-pay-later`.
+**New:** `core/restaurant_supplier_credit.php`, `api/restaurant/supplier_credit.php`, `tests/test_restaurant_pay_later_cli.php` (52 checks).
+**Changed:** `core/restaurant_purchases.php`, `api/restaurant/buy_stock.php`, `api/restaurant/get_purchases.php`, `app/bms/restaurant/purchases.php`, `lang/sw.php`.
+**Not changed:** retail Receive Stock (`api/pos/quick_restock.php`), the Smart BMS supplier bills and payments (`api/received_invoices.php`), and every retail or full-BMS screen.
+
+- **Payment on Purchases:** Paid (the default, unchanged), Partly paid (enter what you paid now) or Credit, with an optional "Pay by" date. A purchase that is not fully paid needs a supplier.
+- **One payable, shared with the Smart BMS:** the purchase becomes an approved supplier bill for the whole amount, posted exactly like a Bill (Dr Inventory, or Cost of food for groceries / Cr Accounts Payable). The part paid now is a payment on that bill (Dr Payable / Cr Cash), linked to it in the ledger. Example: 30,000 with 10,000 paid gives Inventory +30,000, Cash −10,000, Payable +20,000.
+- **New supplier with only a name and a phone number,** like adding a credit customer at the retail till. The same name and phone gives the same supplier.
+- **Suppliers you owe** on the Purchases page: supplier and phone, what, date, pay-by (with an Overdue mark), total, paid, owed, and a Pay button for part or all of it, with the payments made so far.
+- **Recent purchases** marks Credit / Partly paid with what is still owed, and lists groceries bought on credit.
+- **For the dashboard:** `restaurantOwedToSuppliers()` reads what is owed from the ledger (the bills' payable and their payments).
+- **Known, not changed:** `apSupplierInvoicesPosition()` in `core/receivables_payables.php` ignores part-payments; nothing uses it now.
+
 ## 2026-11-02 — ui(restaurant): Tables screen — simpler and calmer; long-open bills flagged; today's booking on the table
 
 **Branch:** `feat/restaurant-tables-board-ui` (off `develop`).
