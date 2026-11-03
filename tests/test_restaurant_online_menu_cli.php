@@ -231,6 +231,10 @@ ok(!isset($h['set-cookie']) || true, 'page served');
 ok($c2 === 200 && !str_contains($b2, 'logout') && !str_contains($b2, 'Dashboard'), 'a logged-in staff member sees the same public page (no staff menu, no session data)');
 [$c, , $b] = http('GET', "/m/$shopTok");
 ok($c === 200 && (str_contains($b, 'pick up') || str_contains($b, 'Pickup') || str_contains($b, 'chukua')), 'shop link opens the pickup menu');
+ok(str_contains($b, 'id="cartBtn"') && str_contains($b, 'id="cartCnt"') && str_contains($b, "getElementById('cartBtn').addEventListener('click', openCart)"), 'a bag icon in the top bar opens the basket from anywhere on the page');
+ok(str_contains($b, 'id="myOrdersBtn"') && str_contains($b, 'id="ordSheet"') && str_contains($b, 'window.roRememberOrder'), '"My orders" icon + panel are on the menu (orders remembered on this phone)');
+ok(str_contains($b, 'window.location.assign(d.status_url)') && !str_contains($b, 'window.location.replace(d.status_url)'), 'after sending, Back returns to the menu (assign, not replace)');
+ok(!str_contains($b, 'Online ordering is not available right now'), 'no "ordering off" note while ordering is on');
 
 echo "\n── 3. Links that must not work (all look the same) ──\n";
 $generic = function (string $path) { [$c, , $b] = http('GET', $path); return [$c, str_contains($b, 'This menu is not available') || str_contains($b, 'Menyu hii haipatikani')]; };
@@ -297,11 +301,13 @@ $pdo->prepare("UPDATE warehouses SET online_order_pickup = 0 WHERE warehouse_id 
 $pdo->exec("UPDATE restaurant_online_orders SET status = 'completed' WHERE warehouse_id = $wid");
 [$c, $r] = order($shopTok, [['id' => $pSoda, 'qty' => 1]], ['name' => 'Asha', 'phone' => '0712345678']); ok($c === 403, 'pickup ordering switched off → refused');
 [$c, , $b] = http('GET', "/m/$shopTok"); ok($c === 200 && !str_contains($b, 'id="bar"') && !str_contains($b, 'id="cartSheet"'), '…and the menu shows no basket (menu only)');
+ok(!str_contains($b, 'id="cartBtn"') && (str_contains($b, 'Online ordering is not available right now') || str_contains($b, 'Kuagiza mtandaoni hakupatikani')), '…no bag icon, and a clear note tells the customer to order with a waiter');
 $pdo->prepare("UPDATE warehouses SET online_order_pickup = 1 WHERE warehouse_id = ?")->execute([$wid]);
 
 echo "\n── 6. Order status page ──\n";
 [$c, , $b] = http('GET', $statusUrl);
 ok($c === 200 && preg_match('/W-\d{4}/', $b) && str_contains($b, 'Chips Kuku'), 'the status page shows the order code and its lines');
+ok(str_contains($b, 'window.roRememberOrder(') && str_contains($b, 'id="myOrdersBtn"'), 'the status page remembers itself in "My orders" (findable again after leaving)');
 [$c, , $b] = http('GET', $statusUrl . '/status');
 $j = json_decode($b, true);
 ok($c === 200 && ($j['status'] ?? '') === 'completed' && count($j) === 3, 'status JSON returns only success/status/reason');
