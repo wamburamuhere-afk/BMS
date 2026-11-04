@@ -1122,12 +1122,24 @@ if (!function_exists('tenantOperationalSnapshot')) {
 
             $shops = (int)$tPdo->query("SELECT COUNT(*) FROM warehouses WHERE status = 'active'")->fetchColumn();
 
+            // Non-voided POS receipts (all plans that have Smart POS).
+            $receipts = 0;
+            try {
+                $receipts = (int)$tPdo->query("SELECT COUNT(*) FROM pos_sales WHERE sale_status != 'voided'")->fetchColumn();
+            } catch (Throwable $e) { /* table absent on very old installs */ }
+
+            // Active sales invoices (Smart BMS only; 0 for Smart POS tenants).
+            $invCount = 0;
+            try {
+                $invCount = (int)$tPdo->query("SELECT COUNT(*) FROM invoices WHERE status NOT IN ('cancelled','deleted','void')")->fetchColumn();
+            } catch (Throwable $e) { /* invoices module not present */ }
+
             return [
                 'shops'   => $shops,
                 'records' => [
                     'products'  => (int)$tPdo->query("SELECT COUNT(*) FROM products")->fetchColumn(),
                     'customers' => (int)$tPdo->query("SELECT COUNT(*) FROM customers WHERE status != 'deleted'")->fetchColumn(),
-                    'invoices'  => (int)$tPdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn(),
+                    'invoices'  => $receipts + $invCount,
                 ],
             ];
         } catch (Throwable $e) {
