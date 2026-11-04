@@ -964,12 +964,17 @@ function actionItems(row) {
     return items;
 }
 
-// The toggle carries the word "Actions" (not just a gear) so it is clear what it is.
-// block=true → full-width button for the phone cards. strategy:fixed keeps the menu
-// from being clipped by the card / bottom bar.
+// block=true (phone cards): icon-only button on the right, opens upward so the last
+// card's menu is never clipped by the viewport. strategy:fixed escapes overflow:hidden.
 function actionMenu(row, block) {
-    return `<div class="dropdown ${block ? 'w-100' : 'd-flex justify-content-end'}">
-        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2${block ? ' w-100' : ''}" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear-fill me-1"></i> ${T.actions}</button>
+    if (block) {
+        return `<div class="dropdown dropup d-flex justify-content-end">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" title="${T.actions}"><i class="bi bi-gear-fill"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${actionItems(row)}</ul>
+        </div>`;
+    }
+    return `<div class="dropdown d-flex justify-content-end">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false"><i class="bi bi-gear-fill me-1"></i> ${T.actions}</button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2">${actionItems(row)}</ul>
     </div>`;
 }
