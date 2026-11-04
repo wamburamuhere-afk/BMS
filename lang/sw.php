@@ -6553,6 +6553,16 @@ return [
     'No notifications yet.' => 'Bado hakuna taarifa.',
     'See all notifications' => 'Tazama taarifa zote',
 
+    // Restaurant dashboard: Profit view
+    'Drinks & stock sold' => 'Vinywaji na bidhaa za stoo zilizouzwa',
+    'Drinks and stock items count when they are sold; other food counts the day it is bought; expenses the day they are recorded.' => 'Vinywaji na bidhaa za stoo vinahesabiwa vinapouzwa; chakula kingine kinahesabiwa siku kinaponunuliwa; matumizi siku yanaporekodiwa.',
+    'Food bought' => 'Chakula kilichonunuliwa',
+    'Loss so far' => 'Hasara hadi sasa',
+    'Profit is not shown by hour: food is bought in the morning and sold all day, so hours would mislead. Choose This week or longer to see profit day by day.' => 'Faida haionyeshwi kwa saa: chakula hununuliwa asubuhi na kuuzwa siku nzima, hivyo saa zingepotosha. Chagua Wiki hii au zaidi kuona faida siku kwa siku.',
+    'Profit so far' => 'Faida hadi sasa',
+    'The line ends at the Profit figure above.' => 'Mstari unaishia kwenye kiasi cha Faida kilicho juu.',
+    'vs %s' => 'ukilinganisha na %s',
+
     // Online menu: cart icon, My orders, ordering-off notices
     'My orders' => 'Oda zangu',
     'No orders yet from this phone.' => 'Bado hakuna oda kutoka kwenye simu hii.',
