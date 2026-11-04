@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-11-04 — ui(restaurant): Menu white header; Purchases tab layout + owe DataTable
+
+- `app/bms/restaurant/menu.php` — changed `thead.table-dark` → `thead.rm-thead` with `#f4f8ff` background and `#0b3d91` text (blue-tint, matches restaurant style)
+- `app/bms/restaurant/purchases.php` — replaced two separate "Suppliers you owe" and "Recent purchases" cards with a tab strip; "Recent purchases" is the default tab; "Suppliers you owe" table upgraded to DataTable (sort, pagination) with `rpOweDT`; badge on tab button shows debt count; `location.hash === '#rpOwe'` activates the owe tab
+
 ## 2026-11-03 — fix(restaurant): bring the latest `develop` into pay-later; two fixes found by the full test run
 
 **Branch:** `feat/restaurant-pay-later` (PR #2695). Merged `develop` again (free-trial PR #2552 had landed); only `changelog.md` clashed, both entries kept.

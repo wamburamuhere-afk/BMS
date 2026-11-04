@@ -87,7 +87,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 
     <div id="tableView" class="d-none d-md-block">
         <table id="menuTable" class="table table-hover align-middle w-100" data-bms-cards="off">
-            <thead class="table-dark">
+            <thead class="rm-thead">
                 <tr>
                     <th><?= t('Item') ?></th>
                     <th><?= t('Group') ?></th>
@@ -254,6 +254,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 
 <style>
 .rm-stat { background:#e7f0ff; border:1px solid #b6ccfe; }
+.rm-page .rm-thead th { background:#f4f8ff; color:#0b3d91; font-weight:700; white-space:nowrap; border-bottom:2px solid #cfe2ff; }
 .rm-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
 .rm-chips::-webkit-scrollbar { display:none; }
 .rm-chip { white-space:nowrap; border-radius:999px; flex:0 0 auto; width:auto !important; min-width:0 !important; padding:.3rem .9rem !important; font-size:.85rem; line-height:1.3; }
