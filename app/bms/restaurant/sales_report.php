@@ -87,7 +87,7 @@ $cur = getSetting('currency', 'TZS');
         <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><?= t('By order type') ?></h6></div>
         <div class="card-body">
             <table id="rrTypeTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark"><tr><th style="width:56px;"><?= t('S/No.') ?></th><th><?= t('Order type') ?></th><th class="text-end"><?= t('Orders') ?></th><th class="text-end"><?= t('Sales') ?></th><th class="text-end"><?= t('Share') ?></th></tr></thead>
+                <thead class="rm-thead"><tr><th style="width:56px;"><?= t('S/No.') ?></th><th><?= t('Order type') ?></th><th class="text-end"><?= t('Orders') ?></th><th class="text-end"><?= t('Sales') ?></th><th class="text-end"><?= t('Share') ?></th></tr></thead>
                 <tbody>
                 <?php foreach (array_values($byType) as $rn => $r): ?>
                     <tr>
@@ -108,7 +108,7 @@ $cur = getSetting('currency', 'TZS');
         <div class="card-header bg-white"><h6 class="mb-0 fw-bold"><?= t('Dishes and drinks sold') ?></h6></div>
         <div class="card-body">
             <table id="rrItemsTable" class="table table-hover align-middle w-100">
-                <thead class="table-dark"><tr><th style="width:56px;"><?= t('S/No.') ?></th><th><?= t('Item') ?></th><th><?= t('Group') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Selling price') ?></th><th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Profit on each') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
+                <thead class="rm-thead"><tr><th style="width:56px;"><?= t('S/No.') ?></th><th><?= t('Item') ?></th><th><?= t('Group') ?></th><th><?= t('Type') ?></th><th class="text-end"><?= t('Quantity') ?></th><th class="text-end"><?= t('Selling price') ?></th><th class="text-end"><?= t('Cost') ?></th><th class="text-end"><?= t('Profit on each') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
                 <tbody>
                 <?php foreach (array_values($items) as $rn => $it): ?>
                     <tr>
@@ -132,7 +132,10 @@ $cur = getSetting('currency', 'TZS');
     <?php endif; ?>
 </div>
 
-<style>.rr-stat { background:#e7f0ff; border:1px solid #b6ccfe; }</style>
+<style>
+.rr-stat { background:#e7f0ff; border:1px solid #b6ccfe; }
+.rm-thead th { background:#f4f8ff; color:#0b3d91; font-weight:700; white-space:nowrap; border-bottom:2px solid #cfe2ff; }
+</style>
 <script>
 $(function () {
     const lang = { emptyTable: <?= json_encode(t('No records found.')) ?>, zeroRecords: <?= json_encode(t('No matching records.')) ?> };
