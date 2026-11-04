@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-11-04 — ui(restaurant): Public menu — professional language dropdown + cart3 icon
+
+- `public_menu.php` — replaced plain language link with a dropdown button (globe icon, current code EN/SW, flag + full name options, checkmark on active, matches login page style); changed cart button icon from `bi-bag` → `bi-cart3` (matches retail POS)
+
 ## 2026-11-04 — ui(restaurant): Menu white header; Purchases tab layout + owe DataTable
 
 - `app/bms/restaurant/menu.php` — changed `thead.table-dark` → `thead.rm-thead` with `#f4f8ff` background and `#0b3d91` text (blue-tint, matches restaurant style)
