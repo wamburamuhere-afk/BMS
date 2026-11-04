@@ -106,7 +106,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     <div class="card border-0 shadow-sm">
         <div class="table-responsive d-none d-md-block">
             <table class="table table-hover align-middle mb-0" id="tablesTable">
-                <thead class="table-dark">
+                <thead class="rm-thead">
                     <tr>
                         <th style="width:56px;"><?= t('S/No.') ?></th>
                         <th><?= t('Table #') ?></th>
@@ -133,6 +133,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
 <style>
 /* Filters: half-width each on phones (no sideways scroll), a comfortable fixed width on desktop. */
 @media (min-width: 768px) { .restaurant-filter-select + .select2-container { min-width: 200px; } }
+.rm-thead th { background:#f4f8ff; color:#0b3d91; font-weight:700; white-space:nowrap; border-bottom:2px solid #cfe2ff; }
 </style>
 
 <script>
