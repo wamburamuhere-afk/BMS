@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-03 — feat(restaurant): dashboard Profit view (Sales | Orders | Profit) + Money panel in four lines
+
+**Branch:** `feat/restaurant-profit-chart` (off `develop`). Owner chose the "After — Profit button selected" mock-up, with costs split three ways.
+**Changed:** `core/restaurant_insights.php` (`rdCompareSeries` also returns each slot's costs split + profit so far + period totals), `includes/restaurant/dash_panel.php` (Layout 2 chart + Money panel), `lang/sw.php`, CI. **New:** `tests/test_restaurant_profit_chart_cli.php`.
+
+- **Profit button** next to Sales | Orders (users who see money only). For the period in "Showing": headline "Profit so far · This month: TSh X" (or "Loss so far", red) with the change vs the same stretch before and the "Estimated" tag when costs are missing.
+- **Chart:** sales bars up; each day's costs down, in three colours — **drinks & stock sold** (cost counted when sold, like retail), **food bought** without stock ("Something else", Buy ingredients, grocery bills — counted the day bought), **expenses**; and a **profit-so-far line**, red while the period is still at a loss, dark blue once in profit. Hover a day for its figures. Week/month by day, quarter by week, year by month. **Today:** no hourly profit (food bought in the morning is sold all day — hours would mislead); a plain breakdown instead.
+- **Money panel:** Sales − Drinks & stock sold − Food bought − Expenses = Net Profit (the two cost parts always add up to the old Cost of goods figure).
+- **Source:** the one ledger only (posted entries): drinks & stock sold = Cost-of-goods lines of `*_cogs` entries (sale/return/void), food bought = every other Cost-of-goods line, expenses = expense lines. The line ends at the same figure as the Profit tile (`rdPeriodStory`).
+- **Tests:** `test_restaurant_profit_chart_cli` 19 — real ledger entries for a temporary shop (removed after): split 300 / 200 / 150, parts = Cost of goods, line ends at the ledger profit 850, day-1 running total. `test_restaurant_dashboard_cli`, phase 6, simplicity pass; focus = develop (Kitchen link check fails on develop too). Checked in headless Chrome at 1366 px and 390 px (no sideways scroll), month and today views.
+
 ## 2026-11-03 — ui(restaurant): Menu photos, Buying price column, recipe cost only, S/No. on every restaurant table, 3-decimal recipe amounts
 
 **Branch:** `feat/restaurant-menu-photos` (off `develop`).
