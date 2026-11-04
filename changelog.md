@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-11-04 — ui(restaurant): Menu white header; Purchases tab layout + owe DataTable
+
+- `app/bms/restaurant/menu.php` — changed `thead.table-dark` → `thead.rm-thead` with `#f4f8ff` background and `#0b3d91` text (blue-tint, matches restaurant style)
+- `app/bms/restaurant/purchases.php` — replaced two separate "Suppliers you owe" and "Recent purchases" cards with a tab strip; "Recent purchases" is the default tab; "Suppliers you owe" table upgraded to DataTable (sort, pagination) with `rpOweDT`; badge on tab button shows debt count; `location.hash === '#rpOwe'` activates the owe tab
+
 ## 2026-11-03 — feat(restaurant): dashboard Profit view (Sales | Orders | Profit) + Money panel in four lines
 
 **Branch:** `feat/restaurant-profit-chart` (off `develop`). Owner chose the "After — Profit button selected" mock-up, with costs split three ways.
@@ -126,6 +131,7 @@
 - **Record numbers in the path:** 50 record pages (`core/detail_routes.php`) now live at `/invoice_view/231` instead of `/invoice_view?id=231`. All existing `?id=` links keep working and forward there (other query values kept); the router fills in `$_GET['id']`, so the pages themselves are unchanged. Links inside those pages that were relative (`expenses.php`, `api/update_expense.php`, `customer_details.php?id=`, …) are now absolute so they work under the new address. Not moved yet (no local record to verify against): sales order view/edit, quotation view, payslip, project view, field visit details. Print pages keep `?id=`.
 - **Bugs fixed on the way:** several pages printed the site header before redirecting (edit expense, edit customer, warehouse view, payroll details, GRN/sales-order login checks), so their redirects never worked; they now use `bmsRedirect()`, which falls back to a browser redirect. The page-visit log no longer records "View 231" for a record page.
 - **Tests:** clean URLs 32, flash messages 32, form-address cleanup 27, record paths 29; restaurant phase 1 / phase 6 pass. Failures in other suites (restaurant focus 6, tenant registration 5, header nav 2, mobile side menu 2, POS nav wiring) are identical on plain `develop`.
+>>>>>>> origin/develop
 
 ## 2026-11-03 — fix(restaurant): bring the latest `develop` into pay-later; two fixes found by the full test run
 
