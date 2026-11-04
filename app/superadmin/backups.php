@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * app/superadmin/backups.php — is every company's data backed up?
  *
@@ -66,6 +66,7 @@ $off = $health['offsite'] ?? null;
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="<?= saUrl('assets/images/favicon.png') ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title>Backups | Platform Administration</title>

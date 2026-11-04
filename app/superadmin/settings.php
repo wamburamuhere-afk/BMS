@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * app/superadmin/settings.php — platform-wide branding + email (SMTP) settings.
  *
@@ -52,6 +52,7 @@ $isAutoUser   = ($emailProvider === 'sendgrid');   // auto-fill username = "apik
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="<?= saUrl('assets/images/favicon.png') ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title>Platform Settings | Platform Administration</title>

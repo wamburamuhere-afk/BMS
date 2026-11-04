@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-11-04 — feat(ui): Add company favicon to all pages
+
+- `assets/images/favicon.png` — company logo added as site favicon
+- `header.php` — `<link rel="icon">` + `<link rel="apple-touch-icon">` added (covers all app pages)
+- `login.php` — favicon link added; replaced inline base64 apple-touch-icon with the file
+- `public_menu.php` — favicon link added (public customer-facing menu)
+- `app/superadmin/*.php` (18 files) — favicon link added via `saUrl()`
+- `register.php`, `forgot-password.php`, `privacy.php`, `change-password.php`, `continue-smart-pos.php`, `shop_catalog.php`, `sign_document.php` — favicon link added via relative path
+
 ## 2026-11-04 — fix(superadmin): Receipts & Invoices column counts POS receipts + active invoices correctly
 
 - `core/tenant_admin.php` — `tenantOperationalSnapshot()`: replaced single unfiltered `SELECT COUNT(*) FROM invoices` with two graceful try/catch queries: (1) `pos_sales WHERE sale_status != 'voided'` for all tenants, (2) `invoices WHERE status NOT IN ('cancelled','deleted','void')` for BMS tenants; total returned as `invoices` key

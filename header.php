@@ -210,6 +210,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title : 'Business Management System'; ?></title>
 
+    <link rel="icon" type="image/png" href="<?= getUrl('assets/images/favicon.png') ?>">
+    <link rel="apple-touch-icon" href="<?= getUrl('assets/images/favicon.png') ?>">
     <link rel="manifest" href="<?= getUrl('manifest.json') ?>">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">

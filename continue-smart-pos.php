@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * continue-smart-pos.php — the link emailed to an owner whose Smart BMS request
  * was declined. The GET only shows a confirmation (mail scanners prefetch links);
@@ -56,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="<?= $sw ? 'sw' : 'en' ?>">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="assets/images/favicon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= htmlspecialchars($tx['title']) ?></title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">

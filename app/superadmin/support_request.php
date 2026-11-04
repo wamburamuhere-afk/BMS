@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * app/superadmin/support_request.php — one request that reached BJP: the conversation
  * (internal notes included), reply / internal note, saved replies, assign, status,
@@ -30,6 +30,7 @@ if ($t && $t['page_key']) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="<?= saUrl('assets/images/favicon.png') ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title><?= $t ? $h($t['ref_no']) : 'Request' ?> | Platform Administration</title>

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * app/superadmin/tenant_view.php — one tenant's detail and lifecycle actions.
  *
@@ -160,6 +160,7 @@ function svBadge(string $status): string
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/png" href="<?= saUrl('assets/images/favicon.png') ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
 <title><?= $tenant ? safe_output($tenant['company_name'], '') : 'Tenant' ?> | Platform Administration</title>
