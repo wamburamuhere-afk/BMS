@@ -281,7 +281,7 @@ if (!function_exists('run_notification_checks')) {
                     'warehouse_id'  => (int)$r['warehouse_id'],
                     'title'         => "Reservation $when: {$r['customer_name']}",
                     'message'       => "{$r['customer_name']} ({$r['party_size']} guest(s)) reserved for {$timeLabel}.",
-                    'action_url'    => 'restaurant/reservations',
+                    'action_url'    => 'reservations?date=' . date('Y-m-d', strtotime($r['reservation_time'])) . '&id=' . (int)$r['id'],   // opens this booking
                     'severity'      => 'medium',
                     'dedupe_suffix' => 'm' . min($newMilestones),
                 ]);
@@ -373,6 +373,19 @@ if (!function_exists('run_notification_checks')) {
             }
         } catch (Throwable $e) {
             error_log('run_notification_checks field_visit.follow_up_due: ' . $e->getMessage());
+        }
+
+        // ── Restaurant: low stock, supplier payments due, yesterday's summary, dishes with no cost ──
+        try {
+            require_once __DIR__ . '/../core/restaurant_notify.php';
+            if (rnModuleOn($pdo)) {
+                $rn = rnRunDailyChecks($pdo);
+                foreach ($rn as $k => $v) $sum['restaurant_' . $k] = $v;
+                if ($isCli) echo '  restaurant daily checks: ' . json_encode($rn) . "
+";
+            }
+        } catch (Throwable $e) {
+            error_log('run_notification_checks restaurant daily: ' . $e->getMessage());
         }
 
         return $sum;

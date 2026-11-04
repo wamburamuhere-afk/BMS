@@ -108,6 +108,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
             <table class="table table-hover align-middle mb-0" id="tablesTable">
                 <thead class="table-dark">
                     <tr>
+                        <th style="width:56px;"><?= t('S/No.') ?></th>
                         <th><?= t('Table #') ?></th>
                         <th><?= t('Floor') ?></th>
                         <th><?= t('Seats') ?></th>
@@ -116,7 +117,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     </tr>
                 </thead>
                 <tbody id="tablesTbody">
-                    <tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                    <tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -126,40 +127,8 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     <?php endif; ?>
 </div>
 
-<!-- Add/Edit Table Modal -->
-<div class="modal fade" id="tableModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><span id="tableModalTitle"><?= t('Add Table') ?></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="tableForm" autocomplete="off">
-                <div class="modal-body">
-                    <input type="hidden" name="table_id" id="f-table-id">
-                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-                    <div id="table-message" class="mb-2"></div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Floor') ?> <span class="text-muted small">(<?= t('optional') ?>)</span></label>
-                        <select class="form-select" name="floor_id" id="f-table-floor"></select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Table Number') ?> <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="table_number" id="f-table-number" required maxlength="50">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Seats') ?></label>
-                        <input type="number" class="form-control" name="seats" id="f-table-seats" value="2" min="1">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<!-- Add/Edit Table Modal — one shared form (includes/restaurant/table_form_modal.php) -->
+<?php require __DIR__ . '/../../../includes/restaurant/table_form_modal.php'; ?>
 
 <style>
 /* Filters: half-width each on phones (no sideways scroll), a comfortable fixed width on desktop. */
@@ -210,7 +179,7 @@ function loadFloorsThenTables() {
             formOpts += `<option value="${f.floor_id}">${safeOutput(name)}</option>`;
         });
         $('#floorFilter').html(opts).trigger('change.select2');
-        $('#f-table-floor').html(formOpts);
+        $('#f-table-floor').html(formOpts).trigger('change.select2');
         loadTables();
     });
 }
@@ -219,7 +188,7 @@ function loadTables() {
     const wid = currentWarehouseId();
     if (!wid) return;
     if ($.fn.DataTable.isDataTable('#tablesTable')) $('#tablesTable').DataTable().destroy();
-    $('#tablesTbody').html('<tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>');
+    $('#tablesTbody').html('<tr><td colspan="6" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>');
     $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid }, function (res) {
         TABLES_CACHE = res.success ? res.data : [];
         renderTables();
@@ -241,7 +210,7 @@ function renderTables() {
     }
 
     let tbody = '', cards = '';
-    rows.forEach(t => {
+    rows.forEach((t, idx) => {
         const color = STATUS_COLORS[t.status] || '#6c757d';
         const label = STATUS_LABELS[t.status] || t.status;
         const statusSelect = CAN_EDIT ? `
@@ -253,6 +222,7 @@ function renderTables() {
             </select>` : `<span class="badge" style="background:${color};color:#fff;">${safeOutput(label)}</span>`;
 
         tbody += `<tr>
+            <td class="text-muted">${idx + 1}</td>
             <td class="fw-bold">${safeOutput(t.table_number)}</td>
             <td>${safeOutput(t.floor_name === 'Main Area' ? STRINGS.mainArea : t.floor_name)}</td>
             <td>${t.seats}</td>
@@ -270,23 +240,28 @@ function renderTables() {
     });
     $('#tablesTbody').html(tbody);
     if (rows.length) $('#tablesCards').html(cards);
-    $('#tablesTable').DataTable({
+    const dt = $('#tablesTable').DataTable({
         responsive: false, autoWidth: false, pageLength: 25, order: [],
         dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
-        columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+        columnDefs: [{ orderable: false, searchable: false, targets: [0, -1] }],
         language: { emptyTable: STRINGS.noTables }
     });
+    // S/No. follows the rows as shown (after sorting / searching / paging).
+    dt.on('draw.dt', function () {
+        const s = dt.page.info().start;
+        dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((c, i) => { c.innerHTML = s + i + 1; });
+    }).draw(false);
 }
 
 function openTableModal() {
     $('#tableModalTitle').text(<?= json_encode(t('Add Table')) ?>);
     $('#f-table-id').val(''); $('#f-table-number').val(''); $('#f-table-seats').val(2);
-    new bootstrap.Modal(document.getElementById('tableModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('tableModal')).show();
 }
 function editTable(id, floorId, number, seats) {
     $('#tableModalTitle').text(<?= json_encode(t('Edit Table')) ?>);
-    $('#f-table-id').val(id); $('#f-table-floor').val(floorId); $('#f-table-number').val(number); $('#f-table-seats').val(seats);
-    new bootstrap.Modal(document.getElementById('tableModal')).show();
+    $('#f-table-id').val(id); $('#f-table-floor').val(floorId).trigger('change.select2'); $('#f-table-number').val(number); $('#f-table-seats').val(seats);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('tableModal')).show();
 }
 
 $('#tableForm').on('submit', function (e) {

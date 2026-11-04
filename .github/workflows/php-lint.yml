@@ -183,3 +183,22 @@ jobs:
           php tests/test_plan_line_columns_fast_cli.php
           php tests/test_smart_products_cli.php
           php tests/test_legacy_migration_mirrors_cli.php
+
+      - name: Clean URLs (short addresses, flash messages, form-address cleanup, record paths)
+        run: |
+          php tests/test_clean_urls_cli.php
+          php tests/test_flash_messages_cli.php
+          php tests/test_query_cleanup_cli.php
+          php tests/test_detail_urls_cli.php
+
+      - name: Restaurant online menu & ordering (security + flow)
+        run: php tests/test_restaurant_online_menu_cli.php
+
+      - name: Restaurant forms - one layout, no field removed
+        run: php tests/test_restaurant_form_layout_cli.php
+
+      - name: Restaurant notifications (bell + email, links)
+        run: php tests/test_restaurant_notifications_cli.php
+
+      - name: Restaurant dashboard profit view
+        run: php tests/test_restaurant_profit_chart_cli.php

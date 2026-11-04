@@ -384,8 +384,8 @@ function createProduct(status = 'active') {
                 // value comes straight from the URL a user clicked).
                 const returnParam = new URLSearchParams(window.location.search).get('return');
                 const returnTo = (returnParam && /^[A-Za-z0-9_\-\/?=&.]+$/.test(returnParam) && !returnParam.startsWith('//'))
-                    ? returnParam
-                    : 'products';
+                    ? (returnParam.startsWith('/') ? returnParam : APP_URL + '/' + returnParam)   // root-anchored: this page may sit at /product_edit/5
+                    : APP_URL + '/products';
                 const finish = () => Swal.fire({
                     icon: 'success',
                     title: isEdit ? PE_I18N.product_updated : PE_I18N.product_created,
@@ -427,7 +427,7 @@ function createProduct(status = 'active') {
                     const saved = (r.results || []).some(p => $.trim(p.name || '').toLowerCase() === name.toLowerCase());
                     if (saved) {
                         Swal.fire({ icon: 'success', title: PE_I18N.product_created, text: PE_I18N.saved_despite_connection, confirmButtonColor: '#28a745', confirmButtonText: PE_I18N.ok })
-                            .then(() => window.location.href = 'products');
+                            .then(() => window.location.href = APP_URL + '/products');
                     } else {
                         Swal.fire({ icon: 'warning', title: PE_I18N.connection_lost, text: PE_I18N.not_saved_retry });
                     }

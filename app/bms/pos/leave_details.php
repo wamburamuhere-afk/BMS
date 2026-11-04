@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../../roots.php';
 
 // Check permissions
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login");
+    bmsRedirect(getUrl('login'));
     exit();
 }
 
@@ -15,7 +15,7 @@ autoEnforcePermission('leaves');
 $leave_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($leave_id <= 0) {
-    header("Location: leaves.php?error=Invalid Leave ID");
+    bmsFlashRedirect(getUrl('leaves'), 'error', t('Invalid Leave ID'));
     exit();
 }
 
@@ -55,14 +55,14 @@ $stmt->execute([$leave_id]);
 $leave = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$leave) {
-    header("Location: leaves.php?error=Leave Application Not Found");
+    bmsFlashRedirect(getUrl('leaves'), 'error', t('Leave Application Not Found'));
     exit();
 }
 
 // Phase D — project-scope gate
 $leave_project_id = $leave['employee_project_id'] ?? null;
 if (!empty($leave_project_id) && function_exists('userCan') && !userCan('project', (int)$leave_project_id)) {
-    header("Location: leaves.php?error=Access+denied:+this+leave+is+not+in+your+project+scope");
+    bmsFlashRedirect(getUrl('leaves'), 'error', t('Access denied: this leave is not in your project scope'));
     exit();
 }
 
@@ -533,7 +533,7 @@ require_once 'header.php';
                 <!-- Actions -->
                 <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center border-top pt-4 d-print-none">
                     <div>
-                        <a href="leaves.php" class="btn btn-outline-secondary btn-premium">
+                        <a href="<?= getUrl('leaves') ?>" class="btn btn-outline-secondary btn-premium">
                             <i class="bi bi-arrow-left"></i> Back to List
                         </a>
                     </div>

@@ -840,7 +840,7 @@ function get_quick_actions($product) {
                         <tbody>
                             <?php foreach ($products as $index => $product): 
                                 $row_number = $offset + $index + 1;
-                                $available_stock = $product['available_stock'];
+                                $available_stock = format_qty($product['available_stock']); // 12.000 → 12, 2.500 → 2.5
                                 $is_critical = $product['stock_status'] == 'out_of_stock';
                             ?>
                             <tr>
@@ -1027,7 +1027,7 @@ function get_quick_actions($product) {
         <?php if (count($products) > 0): ?>
             <div class="row g-3">
                 <?php foreach ($products as $product): 
-                    $available_stock = $product['available_stock'];
+                    $available_stock = format_qty($product['available_stock']);
                     $stock_status = $product['stock_status'];
                 ?>
                 <div class="col-12 col-md-6 col-lg-4 col-xl-3">
@@ -1316,8 +1316,8 @@ function adjustStock(productId) {
                 const product = response.data;
                 $('#adjust_product_id').val(product.product_id);
                 $('#adjust_product_name').val(product.product_name);
-                $('#current_stock').val(product.total_stock);
-                $('#available_stock').val(product.available_stock);
+                $('#current_stock').val(bmsQtyPlain(product.total_stock));
+                $('#available_stock').val(bmsQtyPlain(product.available_stock));
                 
                 // Load warehouses
                 loadWarehouses(productId);
@@ -1349,12 +1349,19 @@ function loadWarehouses(productId) {
             if (response.success) {
                 response.data.forEach(warehouse => {
                     select.append(`<option value="${warehouse.warehouse_id}">
-                        ${warehouse.warehouse_name} (${<?= json_encode(t('Stock')) ?>}: ${warehouse.stock_quantity})
+                        ${warehouse.warehouse_name} (${<?= json_encode(t('Stock')) ?>}: ${bmsQtyPlain(warehouse.stock_quantity)})
                     </option>`);
                 });
             }
         }
     });
+}
+
+// A stock figure without padding zeros, and no thousands commas (it is read back
+// with parseFloat): "12.000" → "12", "2.500" → "2.5", "0.125" → "0.125".
+function bmsQtyPlain(v) {
+    const n = parseFloat(v);
+    return isFinite(n) ? String(Math.round(n * 1000) / 1000) : '0';
 }
 
 // Calculate new stock level
@@ -1378,7 +1385,7 @@ $('#adjustment_type, #adjustment_quantity').on('change keyup', function() {
     }
     
     if (type) {
-        $('#new_stock_level').text(newStock.toFixed(3));
+        $('#new_stock_level').text(bmsQtyPlain(newStock));
         $('#new_stock_info').show();
     } else {
         $('#new_stock_info').hide();

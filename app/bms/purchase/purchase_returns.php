@@ -862,6 +862,8 @@ $(document).ready(function() {
         new bootstrap.Modal(document.getElementById('addReturnModal')).show();
     }
     
+    bmsCleanQuery(['edit', 'add']);   // the form is open; a refresh must not reopen it
+
     // Hide search results when clicking outside
     $(document).on('click', function(e) {
         if (!$(e.target).closest('.item-name, #productSearchResults').length) {

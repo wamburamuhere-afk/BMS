@@ -15,7 +15,7 @@ $can_create_grn = isAdmin() || canCreate('grn');
 // Get parameters
 $receipt_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($receipt_id <= 0) {
-    header("Location: grn.php?error=" . urlencode(t('Invalid GRN ID')));
+    bmsFlashRedirect(getUrl('grn'), 'error', t('Invalid GRN ID'));
     exit();
 }
 
@@ -26,7 +26,7 @@ $stmt->execute([$receipt_id]);
 $grn = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$grn) {
-    header("Location: grn.php?error=" . urlencode(t('GRN Not Found')));
+    bmsFlashRedirect(getUrl('grn'), 'error', t('GRN Not Found'));
     exit();
 }
 
@@ -1116,7 +1116,7 @@ function loadSupplierInfo() {
     }
     
     $.ajax({
-        url: 'api/get_supplier.php',
+        url: '<?= buildUrl('api/get_supplier.php') ?>',
         type: 'GET',
         data: { id: supplierId },
         dataType: 'json',

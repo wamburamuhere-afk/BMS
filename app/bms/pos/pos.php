@@ -1358,6 +1358,11 @@ body.pos-actions-open #mobileCartFab { visibility: hidden; }
 .pos-sheet-btn { width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 .pos-sheet-qty { width: 64px; height: 40px; padding: 0 4px; font-size: 1.05rem; -moz-appearance: textfield; }
 .pos-sheet-qty::-webkit-outer-spin-button, .pos-sheet-qty::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* Cart qty box: the − / + buttons do the stepping, so the browser's own tiny arrows are hidden
+   (they covered "0.5"). A part quantity (kg, litre …) gets a little more room on a phone. */
+#cartTable input[type="number"] { -moz-appearance: textfield; }
+#cartTable input[type="number"]::-webkit-outer-spin-button, #cartTable input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+@media (max-width: 767.98px) { #cartTable input.pos-qty-part { width: 40px !important; } }
 #mobileCartOffcanvas #paymentMethodGroup .btn { font-size: .8rem !important; padding: 10px 2px !important; }
 #mobileCartOffcanvas .pos-pay-actions { padding-top: .75rem; }
 /* The sheet already shows the total in the VAT/total block above. */

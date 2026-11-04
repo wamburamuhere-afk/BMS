@@ -23,6 +23,17 @@ $can_create = canCreate('restaurant_pos');
 $can_edit   = canEdit('restaurant_pos');
 
 $warehouses = restaurantWarehousesForSelect($pdo);
+// Opened from a notification: reservations?date=YYYY-MM-DD&id=N — that day, that booking's shop, the row highlighted.
+$focusRes  = (int)($_GET['id'] ?? 0);
+$focusDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? '')) ? (string)$_GET['date'] : '';
+$focusWh   = 0;
+if ($focusRes > 0 && $warehouses) {
+    $fr = $pdo->prepare("SELECT warehouse_id, DATE(reservation_time) FROM restaurant_reservations WHERE id = ?");
+    $fr->execute([$focusRes]);
+    [$fw, $fd] = $fr->fetch(PDO::FETCH_NUM) ?: [0, ''];
+    if (in_array((int)$fw, array_map(fn($w) => (int)$w['warehouse_id'], $warehouses), true)) { $focusWh = (int)$fw; if ($focusDate === '') $focusDate = (string)$fd; }
+    else $focusRes = 0;
+}
 ?>
 
 <div class="container-fluid mt-4">
@@ -53,7 +64,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
                     <label class="form-label small mb-1"><?= wLabel('Warehouse', 'Shop') ?></label>
                     <select id="whSelect" class="form-select form-select-sm select2-static" style="min-width:220px;">
                         <?php foreach ($warehouses as $w): ?>
-                        <option value="<?= (int)$w['warehouse_id'] ?>"><?= caseFormat($w['warehouse_name']) ?></option>
+                        <option value="<?= (int)$w['warehouse_id'] ?>"<?= (int)$w['warehouse_id'] === $focusWh ? ' selected' : '' ?>><?= caseFormat($w['warehouse_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -76,6 +87,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
         <table id="resTable" class="table table-hover align-middle w-100">
             <thead class="table-light">
                 <tr>
+                    <th style="width:56px;"><?= t('S/No.') ?></th>
                     <th><?= t('Time') ?></th>
                     <th><?= t('Customer') ?></th>
                     <th><?= t('Table') ?></th>
@@ -91,54 +103,69 @@ $warehouses = restaurantWarehousesForSelect($pdo);
     <?php endif; ?>
 </div>
 
-<div class="modal fade" id="reservationModal" tabindex="-1">
-    <div class="modal-dialog">
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); ?>
+<div class="modal fade rf-modal" id="reservationModal" tabindex="-1" aria-labelledby="resModalTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><?= t('New Reservation') ?></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="resModalTitle"><i class="bi bi-calendar-plus"></i><?= t('New Reservation') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <form id="resForm" autocomplete="off">
                 <div class="modal-body">
                     <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-                    <div id="res-message" class="mb-2"></div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Customer') ?></label>
-                        <select id="f-res-customer" class="form-select" style="width:100%"></select>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Customer Name') ?> <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="customer_name" id="f-res-name" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Phone') ?></label>
-                            <input type="text" class="form-control" name="customer_phone" id="f-res-phone">
-                        </div>
-                    </div>
-                    <div class="row g-2 mt-1">
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Table') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select" name="table_id" id="f-res-table" required></select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?= t('Party Size') ?></label>
-                            <input type="number" class="form-control" name="party_size" id="f-res-party" value="2" min="1">
-                        </div>
-                    </div>
-                    <div class="mb-3 mt-2">
-                        <label class="form-label"><?= t('Reservation Time') ?> <span class="text-danger">*</span></label>
-                        <input type="datetime-local" class="form-control" name="reservation_time" id="f-res-time" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?= t('Notes') ?></label>
-                        <textarea class="form-control" name="notes" id="f-res-notes" rows="2"></textarea>
-                    </div>
                     <input type="hidden" name="customer_id" id="f-res-customer-id">
+                    <div id="res-message" class="mb-2"></div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-person"></i><?= t('Customer') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="f-res-customer"><?= t('Customer') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></label>
+                                <select id="f-res-customer" class="form-select" style="width:100%"></select>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-name"><?= t('Customer Name') ?><span class="rf-req">*</span></label>
+                                <input type="text" class="form-control" name="customer_name" id="f-res-name" required>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-phone"><?= t('Phone') ?></label>
+                                <input type="tel" class="form-control" name="customer_phone" id="f-res-phone" inputmode="tel">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-calendar-event"></i><?= t('Booking') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-table"><?= t('Table') ?><span class="rf-req">*</span></label>
+                                <select class="form-select rf-select2" name="table_id" id="f-res-table" required data-placeholder="<?= htmlspecialchars(t('Choose a table')) ?>"></select>
+                            </div>
+                            <div class="rf-field">
+                                <label class="form-label" for="f-res-party"><?= t('Party Size') ?></label>
+                                <input type="number" class="form-control" name="party_size" id="f-res-party" value="2" min="1" inputmode="numeric">
+                            </div>
+                            <div class="rf-field rf-full">
+                                <label class="form-label" for="f-res-time"><?= t('Reservation Time') ?><span class="rf-req">*</span></label>
+                                <input type="datetime-local" class="form-control" name="reservation_time" id="f-res-time" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-chat-left-text"></i><?= t('Notes') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full">
+                                <label class="form-label visually-hidden" for="f-res-notes"><?= t('Notes') ?></label>
+                                <textarea class="form-control" name="notes" id="f-res-notes" rows="2" placeholder="<?= htmlspecialchars(t('e.g. window seat, birthday')) ?>"></textarea>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer rf-foot">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i> <?= t('Save') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
                 </div>
             </form>
         </div>
@@ -147,6 +174,7 @@ $warehouses = restaurantWarehousesForSelect($pdo);
 
 <script>
 const CAN_EDIT = <?= json_encode($can_edit) ?>;
+const RES_FOCUS = { id: <?= (int)$focusRes ?>, date: <?= json_encode($focusDate) ?>, done: false };
 const CSRF_FIELD = <?= json_encode(csrf_token()) ?>;
 const STATUS_LABELS = {
     booked: <?= json_encode(t('Booked')) ?>, seated: <?= json_encode(t('Seated')) ?>,
@@ -162,7 +190,7 @@ const STRINGS = {
 };
 
 $(document).ready(function () {
-    $('#dateFilter').val(new Date().toISOString().slice(0, 10));
+    $('#dateFilter').val(RES_FOCUS.date || new Date().toISOString().slice(0, 10));
     if ($('#whSelect').length) {
         $('#whSelect').select2({ theme: 'bootstrap-5', width: '100%' });
         $('#whSelect').on('change', loadReservations);
@@ -171,6 +199,7 @@ $(document).ready(function () {
     }
     $('#f-res-customer').select2({
         theme: 'bootstrap-5', width: '100%', placeholder: STRINGS.searchCustomer, allowClear: true,
+        dropdownParent: $('#reservationModal'),   // keeps the search box typeable inside the modal
         ajax: { url: '<?= buildUrl('api/pos/search_customers.php') ?>', dataType: 'json', delay: 250, data: p => ({ q: p.term }) }
     }).on('select2:select', function (e) {
         $('#f-res-customer-id').val(e.params.data.id);
@@ -188,7 +217,7 @@ function loadReservations() {
         const rows = res.success ? res.data : [];
         if ($.fn.DataTable.isDataTable('#resTable')) $('#resTable').DataTable().destroy();
         let html = '';
-        rows.forEach(r => {
+        rows.forEach((r, idx) => {
             const time = new Date(r.reservation_time.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const color = STATUS_COLORS[r.status] || '#6c757d';
             const label = STATUS_LABELS[r.status] || r.status;
@@ -200,7 +229,8 @@ function loadReservations() {
             } else if (CAN_EDIT && r.status === 'seated') {
                 actions += `<button class="btn btn-sm btn-outline-secondary" onclick="setResStatus(${r.id}, 'completed')" title="${STATUS_LABELS.completed}"><i class="bi bi-check2-circle"></i></button>`;
             }
-            html += `<tr>
+            html += `<tr data-res-id="${+r.id}"${+r.id === RES_FOCUS.id ? ' class="table-primary"' : ''}>
+                <td class="text-muted">${idx + 1}</td>
                 <td data-order="${safeOutput(r.reservation_time)}">${time}</td>
                 <td>${safeOutput(r.customer_name)}${r.customer_phone ? '<div class="small text-muted">' + safeOutput(r.customer_phone) + '</div>' : ''}</td>
                 <td>${safeOutput(r.table_number)}</td>
@@ -210,12 +240,23 @@ function loadReservations() {
             </tr>`;
         });
         $('#resBody').html(html);
-        $('#resTable').DataTable({
-            responsive: false, autoWidth: false, pageLength: 25, order: [[0, 'asc']],
+        const dt = $('#resTable').DataTable({
+            responsive: false, autoWidth: false, pageLength: 25, order: [[1, 'asc']],
             dom: '<"d-flex justify-content-end mb-2"f>rt<"d-flex justify-content-between align-items-center mt-2"ip>',
-            columnDefs: [{ orderable: false, searchable: false, targets: -1 }],
+            columnDefs: [{ orderable: false, searchable: false, targets: [0, -1] }],
             language: { emptyTable: STRINGS.noRecords }
         });
+        // S/No. follows the rows as shown (after sorting / searching / paging).
+        dt.on('draw.dt', function () {
+            const s = dt.page.info().start;
+            dt.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((c, i) => { c.innerHTML = s + i + 1; });
+        }).draw(false);
+        if (RES_FOCUS.id && !RES_FOCUS.done) {   // from a notification: show the booking
+            RES_FOCUS.done = true;
+            const tr = document.querySelector('#resTable tr[data-res-id="' + RES_FOCUS.id + '"]');
+            if (tr) tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['id', 'date']);
+        }
     });
 }
 
@@ -229,9 +270,9 @@ function openReservationModal() {
     $.getJSON('<?= buildUrl('api/restaurant/get_tables.php') ?>', { warehouse_id: wid }, function (res) {
         let opts = '';
         (res.success ? res.data : []).forEach(t => { opts += `<option value="${t.table_id}">${safeOutput(t.table_number)} (${t.floor_name})</option>`; });
-        $('#f-res-table').html(opts);
+        $('#f-res-table').html(opts).trigger('change');
     });
-    new bootstrap.Modal(document.getElementById('reservationModal')).show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('reservationModal')).show();
 }
 
 $('#resForm').on('submit', function (e) {

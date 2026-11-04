@@ -21,6 +21,7 @@ if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
 require_once __DIR__ . '/../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../core/restaurant_menu_photo.php';
 
 if (!isAuthenticated())         { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
@@ -37,7 +38,14 @@ $item_type    = (string)($_POST['item_type'] ?? 'dish');
 $name         = trim((string)($_POST['product_name'] ?? ''));
 $price        = (float)($_POST['selling_price'] ?? 0);
 $cost         = max(0, (float)($_POST['cost_price'] ?? 0));
-$plate_cost   = max(0, (float)($_POST['plate_cost'] ?? 0));   // a dish's rough cost of one plate — an estimate for profit per plate, never posted
+// A dish's rough "cost of one plate" guess. 2026-11-03: the Menu form no longer asks for it (a
+// dish's real cost comes from its recipe and the ingredients bought in Purchases). Still accepted
+// when a caller sends it; an edit that doesn't send it leaves any stored guess untouched.
+$plate_sent   = array_key_exists('plate_cost', $_POST);
+$plate_cost   = max(0, (float)($_POST['plate_cost'] ?? 0));
+$remove_photo = (string)($_POST['remove_photo'] ?? '') === '1';
+$newPhoto     = null;   // web path of a photo saved during this request (removed again if the save fails)
+$oldPhoto     = null;   // the photo it replaces (removed only after the save commits)
 $opening      = max(0, (float)($_POST['opening_stock'] ?? 0));
 $prep_area    = trim((string)($_POST['prep_area'] ?? ''));
 $is_available = ((string)($_POST['is_available'] ?? '1') === '1') ? 1 : 0;
@@ -71,6 +79,19 @@ $resolveCategory = function () use ($pdo): ?int {
     return $id > 0 ? $id : null;
 };
 
+/**
+ * The item's photo: a new upload replaces the old one, "remove photo" clears it, nothing sent
+ * keeps it. The old file is deleted only after the save commits (see $oldPhoto).
+ */
+$setMenuPhoto = function (int $pid) use ($pdo, $remove_photo, &$newPhoto, &$oldPhoto): void {
+    $newPhoto = restaurantStoreMenuPhoto($pdo, $_FILES['photo'] ?? null);
+    if ($newPhoto === null && !$remove_photo) return;
+    $st = $pdo->prepare("SELECT image_url FROM products WHERE product_id = ?");
+    $st->execute([$pid]);
+    $oldPhoto = $st->fetchColumn() ?: null;
+    $pdo->prepare("UPDATE products SET image_url = ? WHERE product_id = ?")->execute([$newPhoto, $pid]);
+};
+
 try {
     $pdo->beginTransaction();
 
@@ -90,16 +111,16 @@ try {
         $sets = "product_name = ?, category_id = ?, selling_price = ?, kitchen_station_id = ?, is_available = ?, updated_by = ?";
         $params = [$name, $resolveCategory(), $price, $stationId, $is_available, $user_id];
         if (!(int)$row['is_service']) { $sets .= ", cost_price = ?, purchase_price = ?"; $params[] = $cost; $params[] = $cost; }
-        else { $sets .= ", purchase_price = ?"; $params[] = $plate_cost; }
+        elseif ($plate_sent) { $sets .= ", purchase_price = ?"; $params[] = $plate_cost; }
         $params[] = $product_id;
         $pdo->prepare("UPDATE products SET $sets WHERE product_id = ?")->execute($params);
+        $setMenuPhoto($product_id);
         $pdo->commit();
+        $newPhoto = null;   // committed: it is the item's photo now
+        restaurantDeleteMenuPhoto($oldPhoto);
         logActivity($pdo, $user_id, "Updated menu item: $name (ID $product_id)");
         echo json_encode(['success' => true, 'message' => t('Menu item updated.'), 'product_id' => $product_id]);
-        exit;
-    }
-
-    if ($item_type === 'existing') {
+    } elseif ($item_type === 'existing') {
         // ── Put an existing product on the menu (menu flags only) ───────
         $existing = (int)($_POST['existing_product_id'] ?? 0);
         $st = $pdo->prepare("SELECT product_name FROM products WHERE product_id = ? AND status = 'active'");
@@ -113,27 +134,29 @@ try {
         $pdo->commit();
         logActivity($pdo, $user_id, "Added product to menu: $pname (ID $existing)");
         echo json_encode(['success' => true, 'message' => t('Added to the menu.'), 'product_id' => $existing]);
-        exit;
+    } else {
+        // ── New dish / new bought item (shared with the quick start) ─────────
+        $newId = restaurantCreateMenuItem($pdo, $warehouse_id, [
+            'type'         => $item_type,
+            'name'         => $name,
+            'price'        => $price,
+            'cost'         => $cost,
+            'plate_cost'   => $plate_cost,
+            'opening'      => $opening,
+            'prep_area'    => $prep_area,
+            'category_id'  => $resolveCategory(),
+            'is_available' => $is_available,
+        ], $user_id);
+        $setMenuPhoto($newId);
+
+        $pdo->commit();
+        $newPhoto = null;
+        logActivity($pdo, $user_id, "Created menu item: $name (ID $newId)");
+        echo json_encode(['success' => true, 'message' => t('Menu item added.'), 'product_id' => $newId]);
     }
-
-    // ── New dish / new bought item (shared with the quick start) ─────────
-    $newId = restaurantCreateMenuItem($pdo, $warehouse_id, [
-        'type'         => $item_type,
-        'name'         => $name,
-        'price'        => $price,
-        'cost'         => $cost,
-        'plate_cost'   => $plate_cost,
-        'opening'      => $opening,
-        'prep_area'    => $prep_area,
-        'category_id'  => $resolveCategory(),
-        'is_available' => $is_available,
-    ], $user_id);
-
-    $pdo->commit();
-    logActivity($pdo, $user_id, "Created menu item: $name (ID $newId)");
-    echo json_encode(['success' => true, 'message' => t('Menu item added.'), 'product_id' => $newId]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    restaurantDeleteMenuPhoto($newPhoto);   // the save failed: don't leave the new file behind
     if (!($e instanceof PDOException)) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     } else {

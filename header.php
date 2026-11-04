@@ -151,6 +151,7 @@ $__bmsBackgroundDue = function_exists('get_setting') && (
     || get_setting('hr_expiry_last_run') !== date('Y-m-d')
     || get_setting('notif_checks_last_run') !== date('Y-m-d')
     || (time() - (int) get_setting('notif_outbox_last_ts', '0')) >= 120
+    || (time() - (int) get_setting('rn_checks_last_ts', '0')) >= 120
     || (get_setting('notif_digest_enabled', '0') === '1' && get_setting('notif_digest_last_run') !== date('Y-m-d'))
 );
 
@@ -183,6 +184,8 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         $clean     = trim($base !== '' ? ltrim(substr($req_path, strlen('/' . $base)), '/') : ltrim($req_path, '/'), '/');
         $parts     = array_values(array_filter(explode('/', $clean)));
         $last      = array_pop($parts) ?? 'page';
+        // /invoice_view/231: the last segment is the record id — name the page, not the number.
+        if ($parts && ctype_digit($last)) { $last = array_pop($parts); }
         $parent    = $parts ? array_pop($parts) : '';
         // If last segment is a generic action word, prepend the parent segment for context.
         if (in_array(strtolower($last), ['view', 'details', 'edit', 'add', 'create', 'list', 'index', ''], true) && $parent !== '') {
@@ -268,6 +271,7 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
 
 <!-- SweetAlert2 (REQUIRED for Swal.fire) -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<?= function_exists('bmsFlashScript') ? bmsFlashScript() : '' ?>
 
 <script>
     // Global App Configuration
@@ -350,6 +354,20 @@ if (function_exists('logActivity') && !empty($_SESSION['user_id'])) {
         }
         return originalSwalFire(...args);
     };
+    // Clean the address bar once a page has used a one-shot value from it.
+    // A link such as /expenses?edit=12 or /customers?action=add opens a form;
+    // after the page has opened it, the value only does harm (a refresh or a
+    // shared link would reopen the form). Only the named keys are removed —
+    // filters, tabs and dates stay, so those pages can still be bookmarked.
+    // Display only: no navigation, no reload, history is replaced in place.
+    function bmsCleanQuery(keys) {
+        try {
+            const u = new URL(window.location.href);
+            let changed = false;
+            (keys || []).forEach(function (k) { if (u.searchParams.has(k)) { u.searchParams.delete(k); changed = true; } });
+            if (changed) window.history.replaceState(window.history.state, '', u.pathname + (u.search || '') + u.hash);
+        } catch (e) { /* old browser: leave the address as it is */ }
+    }
     // Global Activity Logging Helper
     function logActivityAction(action, activity_type, description, entity_type = null, entity_id = null) {
         $.post(APP_URL + '/api/log_audit', { // keeping API name to avoid breakage elsewhere if any
@@ -974,16 +992,89 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 // company only. It opens the existing Notification Center; what appears in it is decided later. Everyone else: no change.
                 require_once __DIR__ . '/core/restaurant_scope.php';
                 $__bell_on = posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo);
-                $__bell = function (string $id) use ($pdo) {
-                    $n = 0;
-                    try { $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $q->execute([(int)($_SESSION['user_id'] ?? 0)]); $n = (int)$q->fetchColumn(); } catch (Throwable $e) { /* the icon still shows */ }
-                    $open = canView('notification_center');
+                // Restaurant notifications (2026-11-03): the bell opens a list of the latest notifications;
+                // each one opens its own record (notification_open marks it read and goes there).
+                $__bell_items = null;
+                $__bell = function (string $id) use ($pdo, &$__bell_items) {
+                    $uid = (int)($_SESSION['user_id'] ?? 0);
+                    if ($__bell_items === null) {
+                        $__bell_items = ['n' => 0, 'rows' => []];
+                        try {
+                            $q = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"); $q->execute([$uid]);
+                            $__bell_items['n'] = (int)$q->fetchColumn();
+                            $q = $pdo->prepare("SELECT notification_id, title, message, priority, is_read, created_at, TIMESTAMPDIFF(MINUTE, created_at, NOW()) AS mins FROM notifications
+                                                 WHERE user_id = ? ORDER BY is_read ASC, created_at DESC, notification_id DESC LIMIT 8");
+                            $q->execute([$uid]);
+                            $__bell_items['rows'] = $q->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (Throwable $e) { /* the icon still shows */ }
+                    }
+                    $n = $__bell_items['n'];
                     $l = htmlspecialchars(t('Notifications'));
-                    echo '<' . ($open ? 'a href="' . htmlspecialchars(getUrl('notification_center')) . '"' : 'span') . ' id="' . $id . '" class="btn btn-sm btn-outline-light rd-bell position-relative" title="' . $l . '" aria-label="' . $l . '"><i class="ri ri-bell"></i>'
-                       . ($n > 0 ? '<span class="rd-bell-n">' . ($n > 99 ? '99+' : $n) . '</span>' : '') . '</' . ($open ? 'a' : 'span') . '>';
+                    $ago = function (string $ts, $mins): string {   // minutes from the database clock (the PHP clock may differ)
+                        $m = max(0, (int)$mins);
+                        if ($m < 1) return t('just now');
+                        if ($m < 60) return sprintf(t('%d min ago'), $m);
+                        if ($m < 1440) return sprintf(t('%d h ago'), (int)floor($m / 60));
+                        return date('d M', strtotime($ts));
+                    };
+                    echo '<div class="dropdown rd-bell-dd">'
+                       . '<button type="button" id="' . $id . '" class="btn btn-sm btn-outline-light rd-bell position-relative" aria-haspopup="true" aria-expanded="false" title="' . $l . '" aria-label="' . $l . '"><i class="ri ri-bell"></i>'
+                       . ($n > 0 ? '<span class="rd-bell-n">' . ($n > 99 ? '99+' : $n) . '</span>' : '') . '</button>'
+                       . '<div class="dropdown-menu dropdown-menu-end rd-bell-menu shadow border-0 p-0" aria-labelledby="' . $id . '">'
+                       . '<div class="rd-bell-h"><strong>' . $l . '</strong>' . ($n > 0 ? '<span class="rd-bell-new">' . sprintf(htmlspecialchars(t('%d new')), $n) . '</span>' : '') . '</div>';
+                    if (!$__bell_items['rows']) {
+                        echo '<div class="rd-bell-empty"><i class="ri ri-notification-off-line"></i>' . htmlspecialchars(t('No notifications yet.')) . '</div>';
+                    }
+                    foreach ($__bell_items['rows'] as $r) {
+                        $href = getUrl('notification_open') . '?id=' . (int)$r['notification_id'];
+                        $dot = !(int)$r['is_read'] ? ' rd-bell-unread' : '';
+                        $prio = in_array($r['priority'], ['high'], true) ? ' rd-bell-high' : '';
+                        echo '<a class="rd-bell-item' . $dot . $prio . '" href="' . htmlspecialchars($href) . '">'
+                           . '<span class="rd-bell-t">' . htmlspecialchars(mb_strimwidth((string)$r['title'], 0, 70, '…')) . '</span>'
+                           . '<span class="rd-bell-m">' . htmlspecialchars(mb_strimwidth((string)$r['message'], 0, 110, '…')) . '</span>'
+                           . '<span class="rd-bell-a">' . htmlspecialchars($ago((string)$r['created_at'], $r['mins'])) . '</span></a>';
+                    }
+                    if (canView('notification_center')) {
+                        echo '<a class="rd-bell-all" href="' . htmlspecialchars(getUrl('notification_center')) . '">' . htmlspecialchars(t('See all notifications')) . ' <i class="bi bi-arrow-right"></i></a>';
+                    }
+                    echo '</div></div>';
                 };
                 if ($__bell_on): ?>
-                <style>.rd-bell.btn{border-radius:50%!important;width:32px!important;min-width:32px!important;max-width:32px;height:32px!important;padding:0!important;flex:none;display:inline-flex;align-items:center;justify-content:center}.rd-bell .rd-bell-n{position:absolute;top:-6px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#f59e0b;color:#3b2500;font-size:.62rem;font-weight:700;line-height:17px;text-align:center}</style>
+                <style>.rd-bell-dd{display:inline-block;position:relative}.rd-bell-menu{width:340px;max-width:calc(100vw - 24px);border-radius:12px;overflow:hidden;font-size:13px}.rd-bell-h{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #eef0f3;color:#111827}.rd-bell-new{background:#e7f0ff;color:#084298;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600}.rd-bell-item{display:block;padding:10px 14px 10px 26px;border-bottom:1px solid #f3f4f6;color:#111827;text-decoration:none;position:relative}.rd-bell-item:hover{background:#f8fafc;color:#111827}.rd-bell-unread{background:#f5f9ff}.rd-bell-unread::before{content:'';position:absolute;left:11px;top:15px;width:8px;height:8px;border-radius:50%;background:#0d6efd}.rd-bell-high.rd-bell-unread::before{background:#dc3545}.rd-bell-t{display:block;font-weight:600;line-height:1.3}.rd-bell-m{display:block;color:#4b5563;line-height:1.35;margin-top:2px}.rd-bell-a{display:block;color:#9ca3af;font-size:11px;margin-top:3px}.rd-bell-empty{padding:24px 14px;text-align:center;color:#6b7280}.rd-bell-empty i{display:block;font-size:22px;margin-bottom:4px}.rd-bell-all{display:block;text-align:center;padding:10px;font-weight:600;color:#0d6efd;text-decoration:none;background:#fff}.rd-bell-all:hover{background:#f8fafc}.rd-bell.btn{border-radius:50%!important;width:32px!important;min-width:32px!important;max-width:32px;height:32px!important;padding:0!important;flex:none;display:inline-flex;align-items:center;justify-content:center}.rd-bell .rd-bell-n{position:absolute;top:-6px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#f59e0b;color:#3b2500;font-size:.62rem;font-weight:700;line-height:17px;text-align:center}</style>
+                <script>
+                // The bell opens and closes its own list (no data-bs-toggle: other click handlers on the page
+                // toggled it a second time, so it closed the moment it opened). Outside click / Escape close it.
+                document.addEventListener('DOMContentLoaded', function () {
+                    const close = function (except) {
+                        document.querySelectorAll('.rd-bell-dd .rd-bell-menu.show').forEach(function (m) {
+                            if (m === except) return;
+                            m.classList.remove('show'); m.style.cssText = '';
+                            const b = m.parentElement.querySelector('.rd-bell'); if (b) b.setAttribute('aria-expanded', 'false');
+                        });
+                    };
+                    document.querySelectorAll('.rd-bell-dd .rd-bell').forEach(function (b) {
+                        const m = b.parentElement.querySelector('.rd-bell-menu');
+                        b.addEventListener('click', function (e) {
+                            e.preventDefault(); e.stopPropagation();
+                            const open = !m.classList.contains('show');
+                            close(null);
+                            if (open) {
+                                m.classList.add('show');
+                                if (window.innerWidth < 576) {   // phone: full width under the header, whatever side the bell is on
+                                    const r = b.getBoundingClientRect();
+                                    m.style.cssText = 'position:fixed;left:12px;right:12px;width:auto;max-width:none;top:' + Math.round(r.bottom + 8) + 'px;display:block;z-index:1060;max-height:calc(100vh - ' + Math.round(r.bottom + 24) + 'px);overflow-y:auto;';
+                                } else {
+                                    m.style.cssText = 'position:absolute;right:0;left:auto;top:calc(100% + 8px);display:block;z-index:1060;max-height:70vh;overflow-y:auto;';
+                                }
+                                b.setAttribute('aria-expanded', 'true');
+                            }
+                        });
+                        m.addEventListener('click', function (e) { e.stopPropagation(); });
+                    });
+                    document.addEventListener('click', function () { close(null); });
+                    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(null); });
+                });
+                </script>
                 <?php endif; ?>
                 <?php if (!posSimpleModeEnabled()) helpPanelButton('mobile', 'ms-auto me-2 d-lg-none'); ?>
                 <button class="navbar-toggler<?= posSimpleModeEnabled() ? ' ms-auto' : '' ?>" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -1020,7 +1111,39 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                     // retail, Hybrid, mixed) is false, and every line below that reads it then renders exactly as before.
                     require_once __DIR__ . '/core/restaurant_scope.php';
                     $__rf = posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo);
+                    // Online menu (restaurant_online_menu_plan.md): "Online orders" link + new-order alert, only once a shop switched it on.
+                    $__ro_nav = false;
+                    if (canView('restaurant_pos') && canCreate('pos')) {
+                        require_once __DIR__ . '/core/restaurant_online.php';
+                        $__ro_nav = restaurantModuleOn($pdo) && roAnyShopOnline($pdo);
+                    }
                     ?>
+                    <?php if ($__ro_nav && basename((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) !== 'online_orders.php' && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), 'online_orders') === false): ?>
+                    <script>
+                    // New online order alert (restaurant_online_menu_plan.md): checks every 20 s while the tab is visible.
+                    (function () {
+                        const URL_ = <?= json_encode(buildUrl('api/restaurant/online_orders.php') . '?action=count') ?>, GO = <?= json_encode(getUrl('online_orders')) ?>;
+                        const T_ = <?= json_encode(['title' => t('New online order'), 'table' => t('Table %s'), 'pickup' => t('Pickup'), 'open' => t('Open')], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                        let last = null;
+                        try { last = parseInt(sessionStorage.getItem('bms_ro_last') || '', 10) || null; } catch (e) {}
+                        function check() {
+                            if (document.hidden) return;
+                            fetch(URL_, { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
+                                if (!d || !d.success || !d.latest) return;
+                                const id = d.latest.order_id;
+                                if (last !== null && id > last && window.Swal) {
+                                    Swal.fire({ toast: true, position: 'top-end', icon: 'info', showConfirmButton: true, confirmButtonText: T_.open, timer: 15000,
+                                        titleText: T_.title + ' ' + d.latest.code + ' · ' + (d.latest.table !== null ? T_.table.replace('%s', d.latest.table) : T_.pickup) })
+                                        .then(r => { if (r.isConfirmed) window.location.href = GO; });
+                                }
+                                last = Math.max(last || 0, id);
+                                try { sessionStorage.setItem('bms_ro_last', String(last)); } catch (e) {}
+                            }).catch(() => {});
+                        }
+                        setTimeout(check, 3000); setInterval(check, 20000);
+                    })();
+                    </script>
+                    <?php endif; ?>
                     <ul class="navbar-nav me-auto">
                         <!-- Core Modules — every group below is rendered by bmsNavMenu()
                              (core/nav_menu.php): 0 granted links = hidden, 1 = direct header
@@ -1043,6 +1166,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <ul class="dropdown-menu" aria-labelledby="rfOrdersDropdown">
                                 <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="ri ri-hand-platter"></i> <?= t('Take order') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="ri ri-armchair"></i> <?= t('Tables') ?></a></li>
+                                <?php if ($__ro_nav): ?><li><a class="dropdown-item" href="<?= getUrl('online_orders') ?>"><i class="bi bi-phone"></i> <?= t('Online orders') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="ri ri-chef-hat"></i> <?= t('Kitchen') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="ri ri-calendar-check"></i> <?= t('Reservations') ?></a></li>
                                 <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos/credit-customers') ?>"><i class="ri ri-hand-coins"></i> <?= t('Who Owes Me') ?></a></li><?php endif; ?>
@@ -1263,6 +1387,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <ul class="dropdown-menu" aria-labelledby="restaurantDropdown">
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i> <?= t('Menu') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
+                                <?php if ($__ro_nav): ?><li><a class="dropdown-item" href="<?= getUrl('online_orders') ?>"><i class="bi bi-phone"></i> <?= t('Online orders') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Modifier Group') ?></a></li>
@@ -1946,6 +2071,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 if (!empty($__rest_on)) {
                     $__side_rest[] = [getUrl('restaurant/menu'), 'bi-journal-richtext', t('Menu')];
                     $__side_rest[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
+                    if (!empty($__ro_nav)) $__side_rest[] = [getUrl('online_orders'), 'bi-phone', t('Online orders')];
                 }
                 $__side_rest[] = [getUrl('restaurant'), 'bi-cup-hot', t('Restaurant')];
             }
@@ -1959,6 +2085,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 $__rf_o = [];
                 if (canView('pos')) $__rf_o[] = [getUrl('pos'), 'ri ri-hand-platter', t('Take order')];
                 $__rf_o[] = [getUrl('restaurant/tables-board'), 'ri ri-armchair', t('Tables')];
+                if (!empty($__ro_nav)) $__rf_o[] = [getUrl('online_orders'), 'bi bi-phone', t('Online orders')];
                 $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'ri ri-chef-hat', t('Kitchen')];
                 $__rf_o[] = [getUrl('restaurant/reservations'), 'ri ri-calendar-check', t('Reservations')];
                 if (canView('pos')) $__rf_o[] = [getUrl('pos/credit-customers'), 'ri ri-hand-coins', t('Who Owes Me')];

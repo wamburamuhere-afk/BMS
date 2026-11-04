@@ -26,7 +26,7 @@ if ($is_edit) {
     $stmt->execute([$quotation_id]);
     $quotation = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$quotation) {
-        header("Location: " . getUrl('quotations') . "?error=Quotation Not Found");
+        bmsFlashRedirect(getUrl('quotations'), 'error', t('Quotation Not Found'));
         exit();
     }
     // An approved quotation is locked — it can no longer be edited.
@@ -60,7 +60,7 @@ if (!$is_edit && isset($_GET['request'])) {
     require_once ROOT_DIR . '/core/subscription_requests.php';
     if (isPlatformVendorContext()) $sub_request = srGet($pdo, (int)$_GET['request']);
     if (!$sub_request || $sub_request['status'] !== 'pending') {
-        header("Location: " . getUrl('quotations') . "?requests=1&error=" . urlencode('That request was already handled or no longer exists.'));
+        bmsFlashRedirect(getUrl('quotations') . "?requests=1", 'error', t('That request was already handled or no longer exists.'));
         exit();
     }
     $sr_tenant = vlFindTenant(null, $sub_request['tenant_id']);

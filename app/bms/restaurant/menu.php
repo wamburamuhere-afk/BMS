@@ -16,6 +16,7 @@ ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
 require_once __DIR__ . '/../../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../../core/restaurant_online.php';
 
 $page_title = 'Menu';
 require_once 'header.php';
@@ -28,6 +29,7 @@ $can_edit    = canEdit('restaurant_pos');
 $module_on   = restaurantModuleOn($pdo);
 $warehouses  = $module_on ? restaurantWarehousesForSelect($pdo) : [];
 $categories  = $pdo->query("SELECT category_id, category_name FROM categories WHERE type = 'product' AND status = 'active' ORDER BY sort_order, category_name")->fetchAll(PDO::FETCH_ASSOC);
+$can_share   = $can_edit && $warehouses && roSchemaReady($pdo);   // online menu & QR (restaurant_online_menu_plan.md)
 $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('Drinks')];
 ?>
 
@@ -36,6 +38,9 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
         <h4 class="mb-0 text-truncate"><i class="ri ri-book-open-text text-primary me-2"></i><?= t('Menu') ?></h4>
         <div class="d-flex gap-2 flex-shrink-0">
             <a href="<?= getUrl('restaurant') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1"><?= t('Restaurant') ?></span></a>
+            <?php if ($can_share): ?>
+            <button class="btn btn-outline-primary btn-sm" onclick="openShareMenu()"><i class="bi bi-qr-code"></i><span class="d-none d-md-inline ms-1"><?= t('Share menu') ?></span></button>
+            <?php endif; ?>
             <?php if ($can_edit && $warehouses): ?>
             <button class="btn btn-primary btn-sm" onclick="openAddItem()"><i class="bi bi-plus-circle me-1"></i><?= t('Add Item') ?></button>
             <?php endif; ?>
@@ -71,10 +76,12 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
     <?php endif; ?>
 
     <div class="row g-2 g-md-3 mb-3">
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stTotal">0</div><div class="small text-muted"><?= t('Items') ?></div></div></div>
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stAvail">0</div><div class="small text-muted"><?= t('Available today') ?></div></div></div>
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-danger" id="stOut">0</div><div class="small text-muted"><?= t('Sold out') ?></div></div></div>
-        <div class="col-6 col-md-3"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stGroups">0</div><div class="small text-muted"><?= t('Groups') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stTotal">0</div><div class="small text-muted"><?= t('Items') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stAvail">0</div><div class="small text-muted"><?= t('Available today') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-danger" id="stOut">0</div><div class="small text-muted"><?= t('Sold out') ?></div></div></div>
+        <div class="col-6 col-md"><div class="card rm-stat text-center p-2 p-md-3"><div class="fs-4 fw-bold text-primary" id="stGroups">0</div><div class="small text-muted"><?= t('Groups') ?></div></div></div>
+        <?php /* 2026-11-03: dishes still without a recipe (their cost is unknown) — tap to see them. */ ?>
+        <div class="col-12 col-md"><button type="button" class="card rm-stat rm-need text-center p-2 p-md-3 w-100" id="stNeedBtn" aria-pressed="false"><div class="fs-4 fw-bold" id="stNoRecipe">0</div><div class="small text-muted"><?= t('Dishes without a recipe') ?></div></button></div>
     </div>
 
     <div class="d-flex flex-column flex-md-row gap-2 mb-2 align-items-md-center">
@@ -89,12 +96,13 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
         <table id="menuTable" class="table table-hover align-middle w-100" data-bms-cards="off">
             <thead class="rm-thead">
                 <tr>
+                    <th style="width:48px;"><?= t('S/No.') ?></th>
                     <th><?= t('Item') ?></th>
                     <th><?= t('Group') ?></th>
                     <th><?= t('Type') ?></th>
                     <th><?= t('Prepared at') ?></th>
                     <th class="text-end"><?= t('Selling price') ?></th>
-                    <th class="text-end"><?= t('Cost') ?></th>
+                    <th class="text-end"><?= t('Buying price') ?></th>
                     <th class="text-end"><?= t('Profit') ?></th>
                     <th class="text-end"><?= t('Stock') ?></th>
                     <th class="text-center"><?= t('Available today') ?></th>
@@ -110,13 +118,14 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 </div>
 
 <?php if ($can_edit && $warehouses): ?>
-<!-- Add / Edit Menu Item -->
-<div class="modal fade" id="itemModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+<!-- Add / Edit Menu Item (one form for both; restaurant form layout — includes/restaurant/form_kit.php) -->
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); $rfCur = htmlspecialchars(rfMoneyPrefix()); ?>
+<div class="modal fade rf-modal" id="itemModal" tabindex="-1" aria-labelledby="itemModalTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="itemModalTitle"><?= t('Add Item') ?></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title"><i class="bi bi-journal-richtext"></i><span id="itemModalTitle"><?= t('Add Item') ?></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <form id="itemForm" autocomplete="off">
                 <div class="modal-body">
@@ -125,92 +134,120 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                     <input type="hidden" name="item_type" id="f-type" value="dish">
                     <div id="item-message" class="mb-2"></div>
 
-                    <div id="typeChooser" class="mb-3">
-                        <div class="fw-semibold mb-2"><?= t('What is this?') ?></div>
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn rm-type text-start" data-type="dish">
-                                <i class="ri ri-cooking-pot fs-4 text-primary me-2"></i>
-                                <span><strong><?= t('Dish (cooked here)') ?></strong><br><small class="text-muted"><?= t('Chai, mandazi, lunch, soup… sells without stock.') ?></small></span>
+                    <div class="rf-sec" id="typeChooser">
+                        <div class="rf-sec-title"><i class="bi bi-ui-radios-grid"></i><?= t('What is this?') ?></div>
+                        <?php $rfThree = !restaurantOnlyCompany($pdo); ?>
+                        <div class="rf-choices <?= $rfThree ? 'rf-c3' : 'rf-c2' ?>">
+                            <button type="button" class="rf-choice rm-type" data-type="dish">
+                                <i class="ri ri-cooking-pot fs-4 text-primary"></i>
+                                <span><span class="rf-ct"><?= t('Dish (cooked here)') ?></span><span class="rf-cd"><?= t('Chai, mandazi, lunch, soup… sells without stock.') ?></span></span>
                             </button>
-                            <button type="button" class="btn rm-type text-start" data-type="bought">
-                                <i class="ri ri-cup-soda fs-4 text-primary me-2"></i>
-                                <span><strong><?= t('Bought item (has stock)') ?></strong><br><small class="text-muted"><?= t('Water, soda… you buy it and count the stock.') ?></small></span>
+                            <button type="button" class="rf-choice rm-type" data-type="bought">
+                                <i class="ri ri-cup-soda fs-4 text-primary"></i>
+                                <span><span class="rf-ct"><?= t('Bought item (has stock)') ?></span><span class="rf-cd"><?= t('Water, soda… you buy it and count the stock.') ?></span></span>
                             </button>
-                            <?php if (!restaurantOnlyCompany($pdo)): // a restaurant-only company has no retail products to bring in ?>
-                            <button type="button" class="btn rm-type text-start" data-type="existing">
-                                <i class="bi bi-box-seam fs-4 text-primary me-2"></i>
-                                <span><strong><?= t('Already in my products') ?></strong><br><small class="text-muted"><?= t('Put a product you already have on the menu.') ?></small></span>
+                            <?php if ($rfThree): // a restaurant-only company has no retail products to bring in ?>
+                            <button type="button" class="rf-choice rm-type" data-type="existing">
+                                <i class="bi bi-box-seam fs-4 text-primary"></i>
+                                <span><span class="rf-ct"><?= t('Already in my products') ?></span><span class="rf-cd"><?= t('Put a product you already have on the menu.') ?></span></span>
                             </button>
                             <?php endif; ?>
                         </div>
                     </div>
 
-                    <div id="existingFields" class="d-none">
-                        <div class="mb-3">
-                            <label class="form-label"><?= t('Product') ?> <span class="text-danger">*</span></label>
-                            <select class="form-select" name="existing_product_id" id="f-existing"></select>
-                        </div>
-                    </div>
-
-                    <div id="itemFields">
-                        <div class="mb-3">
-                            <label class="form-label"><?= t('Name') ?> <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control form-control-lg" name="product_name" id="f-name" maxlength="150">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label"><?= t('Group') ?></label>
-                            <select class="form-select select2-static" name="category_id" id="f-cat">
-                                <option value=""><?= t('-- No group --') ?></option>
-                                <?php foreach ($categories as $c): ?>
-                                <option value="<?= (int)$c['category_id'] ?>"><?= safe_output($c['category_name']) ?></option>
-                                <?php endforeach; ?>
-                                <option value="__new"><?= t('+ New group') ?></option>
-                            </select>
-                            <input type="text" class="form-control mt-2 d-none" name="new_category" id="f-newcat" maxlength="100" placeholder="<?= htmlspecialchars(t('Group name')) ?>">
-                            <div class="d-flex flex-wrap gap-1 mt-2" id="starterGroups">
-                                <?php foreach ($starterGroups as $g): ?>
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 rm-starter"><?= htmlspecialchars($g) ?></button>
-                                <?php endforeach; ?>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="bi bi-tag"></i><?= t('Item') ?></div>
+                        <?php /* Photo (2026-11-03): shown on the menu, the POS tiles and the online menu. */ ?>
+                        <div class="rm-photo item-field" id="photoField">
+                            <div class="rm-photo-box" id="photoBox"><i class="bi bi-camera"></i></div>
+                            <div class="min-w-0">
+                                <div class="fw-semibold small mb-1"><?= t('Photo') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <label class="btn btn-sm btn-outline-primary rm-photo-btn mb-0" for="f-photo"><i class="bi bi-image me-1"></i><span id="photoPickLabel"><?= t('Choose photo') ?></span></label>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rm-photo-btn d-none" id="photoRemove"><i class="bi bi-x-lg me-1"></i><?= t('Remove') ?></button>
+                                </div>
+                                <div class="rf-help mt-1"><?= t('JPG, PNG or WebP, up to 2 MB. Take it with the phone camera or pick one.') ?></div>
                             </div>
+                            <input type="file" class="d-none" name="photo" id="f-photo" accept="image/jpeg,image/png,image/webp">
+                            <input type="hidden" name="remove_photo" id="f-remove-photo" value="0">
                         </div>
-                        <div class="row g-2">
-                            <div class="col-6 bought-only">
-                                <label class="form-label"><?= t('Buying price') ?></label>
-                                <input type="number" step="any" min="0" class="form-control" name="cost_price" id="f-cost" inputmode="decimal">
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full d-none" id="existingFields">
+                                <label class="form-label" for="f-existing"><?= t('Product') ?><span class="rf-req">*</span></label>
+                                <select class="form-select" name="existing_product_id" id="f-existing"></select>
                             </div>
-                            <div class="col-6" id="priceCol">
-                                <label class="form-label"><?= t('Selling price') ?> <span class="text-danger">*</span></label>
-                                <input type="number" step="any" min="0" class="form-control" name="selling_price" id="f-price" inputmode="decimal">
+                            <div class="rf-field rf-full item-field">
+                                <label class="form-label" for="f-name"><?= t('Name') ?><span class="rf-req">*</span></label>
+                                <input type="text" class="form-control" name="product_name" id="f-name" maxlength="150">
                             </div>
-                        </div>
-                        <div class="mt-3 dish-only">
-                            <label class="form-label"><?= t('What does one plate cost you?') ?> <small class="text-muted">(<?= t('optional') ?>)</small></label>
-                            <input type="number" step="any" min="0" class="form-control" name="plate_cost" id="f-plate" inputmode="decimal">
-                            <div class="form-text"><?= t('A rough figure, to show the profit on each plate. For an exact cost add a recipe.') ?></div>
-                        </div>
-                        <div class="mt-3 bought-only new-only">
-                            <label class="form-label"><?= t('Opening stock') ?></label>
-                            <input type="number" step="any" min="0" class="form-control" name="opening_stock" id="f-stock" inputmode="decimal" placeholder="0">
-                        </div>
-                        <div class="mt-3">
-                            <label class="form-label"><?= t('Prepared at') ?></label>
-                            <div class="btn-group w-100" role="group" id="prepGroup">
-                                <input type="radio" class="btn-check" name="prep_area" id="prep-kitchen" value="kitchen">
-                                <label class="btn btn-outline-primary" for="prep-kitchen"><i class="ri ri-chef-hat me-1"></i><?= t('Kitchen') ?></label>
-                                <input type="radio" class="btn-check" name="prep_area" id="prep-bar" value="bar">
-                                <label class="btn btn-outline-primary" for="prep-bar"><i class="bi bi-cup me-1"></i><?= t('Bar') ?></label>
-                                <input type="radio" class="btn-check" name="prep_area" id="prep-none" value="none">
-                                <label class="btn btn-outline-primary" for="prep-none"><?= t('No preparation') ?></label>
+                            <div class="rf-field rf-full item-field">
+                                <label class="form-label" for="f-cat"><?= t('Group') ?></label>
+                                <select class="form-select rf-select2" name="category_id" id="f-cat">
+                                    <option value=""><?= t('-- No group --') ?></option>
+                                    <?php foreach ($categories as $c): ?>
+                                    <option value="<?= (int)$c['category_id'] ?>"><?= safe_output($c['category_name']) ?></option>
+                                    <?php endforeach; ?>
+                                    <option value="__new"><?= t('+ New group') ?></option>
+                                </select>
+                                <input type="text" class="form-control mt-2 d-none" name="new_category" id="f-newcat" maxlength="100" placeholder="<?= htmlspecialchars(t('Group name')) ?>">
+                                <div class="d-flex flex-wrap gap-1 mt-2" id="starterGroups">
+                                    <?php foreach ($starterGroups as $g): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 rm-starter"><?= htmlspecialchars($g) ?></button>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-check form-switch mt-3">
-                        <input class="form-check-input" type="checkbox" id="f-avail" checked>
-                        <label class="form-check-label" for="f-avail"><?= t('Available today') ?></label>
+                    <div class="rf-sec item-field">
+                        <div class="rf-sec-title"><i class="bi bi-cash-coin"></i><?= t('Price') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field bought-only">
+                                <label class="form-label" for="f-cost"><?= t('Buying price') ?></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
+                                    <input type="number" step="any" min="0" class="form-control" name="cost_price" id="f-cost" inputmode="decimal"></div>
+                            </div>
+                            <div class="rf-field" id="priceCol">
+                                <label class="form-label" for="f-price"><?= t('Selling price') ?><span class="rf-req">*</span></label>
+                                <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span>
+                                    <input type="number" step="any" min="0" class="form-control" name="selling_price" id="f-price" inputmode="decimal"></div>
+                            </div>
+                            <?php /* 2026-11-03: no "cost of one plate" guess for a dish — its cost comes from its
+                                     recipe (ingredients at the price paid in Purchases). */ ?>
+                            <div class="rf-field rf-full dish-only">
+                                <div class="rf-help mt-0"><i class="ri ri-scroll-text me-1"></i><?= t('A dish\'s cost comes from its recipe: the ingredients at the price you paid in Purchases. Add the recipe after saving (Actions → Recipe).') ?></div>
+                            </div>
+                            <div class="rf-field bought-only new-only">
+                                <label class="form-label" for="f-stock"><?= t('Opening stock') ?></label>
+                                <input type="number" step="any" min="0" class="form-control" name="opening_stock" id="f-stock" inputmode="decimal" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="ri ri-chef-hat"></i><?= t('Kitchen & availability') ?></div>
+                        <div class="rf-grid">
+                            <div class="rf-field rf-full item-field">
+                                <span class="rf-label"><?= t('Prepared at') ?></span>
+                                <div class="btn-group w-100" role="group" id="prepGroup">
+                                    <input type="radio" class="btn-check" name="prep_area" id="prep-kitchen" value="kitchen">
+                                    <label class="btn btn-outline-primary" for="prep-kitchen"><i class="ri ri-chef-hat me-1"></i><?= t('Kitchen') ?></label>
+                                    <input type="radio" class="btn-check" name="prep_area" id="prep-bar" value="bar">
+                                    <label class="btn btn-outline-primary" for="prep-bar"><i class="bi bi-cup me-1"></i><?= t('Bar') ?></label>
+                                    <input type="radio" class="btn-check" name="prep_area" id="prep-none" value="none">
+                                    <label class="btn btn-outline-primary" for="prep-none"><?= t('No preparation') ?></label>
+                                </div>
+                            </div>
+                            <div class="rf-field rf-full">
+                                <div class="rf-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="f-avail" checked>
+                                    <label class="form-check-label" for="f-avail"><?= t('Available today') ?></label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer rf-foot">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
                 </div>
@@ -221,29 +258,50 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 <?php endif; ?>
 
 <?php if ($can_edit && $warehouses): ?>
-<!-- Recipe — restaurant_plan.md Phase 7 -->
-<div class="modal fade" id="recipeModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+<!-- Recipe — restaurant_plan.md Phase 7 (restaurant form layout) -->
+<?php require_once __DIR__ . '/../../../includes/restaurant/form_kit.php'; rfKitAssets(); ?>
+<div class="modal fade rf-modal" id="recipeModal" tabindex="-1" aria-labelledby="rcpTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="ri ri-scroll-text me-1"></i> <?= t('Recipe') ?> — <span id="rcpDish"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="rcpTitle"><i class="ri ri-scroll-text"></i><span class="text-truncate"><?= t('Recipe') ?> — <span id="rcpDish"></span></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <div class="modal-body">
-                <div class="small text-muted mb-2"><?= t('What goes into ONE plate. Selling it uses up these ingredients from stock. A dish without a recipe still sells normally.') ?></div>
-                <div id="rcpLines"></div>
-                <div class="d-flex gap-2 mt-2">
-                    <div class="flex-grow-1" style="min-width:0;"><select id="rcpPick" class="form-select"></select></div>
-                    <button type="button" class="btn btn-outline-primary flex-shrink-0" onclick="rcpNewIngredient()" title="<?= htmlspecialchars(t('New ingredient')) ?>"><i class="bi bi-plus-lg"></i></button>
+                <?php /* 2026-11-03: cooking by the pot — "1 pot of pilau = 20 plates". */ ?>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-cup-hot"></i><?= t('How much does this recipe make?') ?></div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <label class="mb-0" for="rcpYield"><?= t('This recipe makes') ?></label>
+                        <input type="number" id="rcpYield" class="form-control text-center fw-bold" style="width:90px;" min="1" max="1000" step="1" value="1" inputmode="numeric">
+                        <span><?= t('plate(s)') ?></span>
+                    </div>
+                    <div class="rf-help"><?= t('Cooking by the pot? Enter everything that goes into the pot and how many plates it gives — each plate sold uses its share. For a single plate, leave 1.') ?></div>
                 </div>
-                <div class="card rm-stat mt-3 p-2">
-                    <div class="d-flex justify-content-between"><span><?= t('Cost of one plate') ?></span><strong id="rcpCost">0</strong></div>
-                    <div class="d-flex justify-content-between"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
-                    <div class="d-flex justify-content-between"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-basket"></i><span id="rcpLinesTitle"><?= t('Ingredients in one plate') ?></span></div>
+                    <div class="rf-help mt-0 mb-2"><?= t('Selling the dish uses up these ingredients from stock. Type grams (g) or millilitres (ml) for small amounts. A dish without a recipe still sells normally.') ?></div>
+                    <div id="rcpLines"></div>
+                    <div class="rf-field mt-2">
+                        <label class="form-label" for="rcpPick"><?= t('Add an ingredient') ?></label>
+                        <div class="d-flex gap-2">
+                            <div class="flex-grow-1" style="min-width:0;"><select id="rcpPick" class="form-select"></select></div>
+                            <button type="button" class="btn btn-outline-primary flex-shrink-0" style="min-width:0;" onclick="rcpNewIngredient()" title="<?= htmlspecialchars(t('New ingredient')) ?>" aria-label="<?= htmlspecialchars(t('New ingredient')) ?>"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.') ?></div>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-calculator"></i><?= t('Cost of one plate') ?></div>
+                    <div class="card rm-stat p-3">
+                        <div class="d-flex justify-content-between py-1 d-none" id="rcpPotRow"><span><?= t('Cost of the whole recipe') ?></span><strong id="rcpPotCost">0</strong></div>
+                        <div class="d-flex justify-content-between py-1"><span><?= t('Cost of one plate') ?></span><strong id="rcpCost">0</strong></div>
+                        <div class="d-flex justify-content-between py-1"><span><?= t('Selling price') ?></span><strong id="rcpPrice">0</strong></div>
+                        <div class="d-flex justify-content-between border-top mt-1 pt-2"><span><?= t('Profit per plate') ?></span><strong id="rcpProfit">0</strong></div>
+                    </div>
+                    <div class="rf-help mt-2"><i class="bi bi-info-circle me-1"></i><?= t('With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.') ?></div>
+                </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer rf-foot">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                 <button type="button" class="btn btn-primary" onclick="rcpSave()"><i class="bi bi-check-circle me-1"></i><?= t('Save') ?></button>
             </div>
@@ -267,13 +325,32 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 .rm-card.rm-off { opacity:.6; }
 .rm-badge { background:#cfe2ff; color:#084298; font-weight:500; }
 .rm-badge-out { background:#dc3545; color:#fff; }
-#prepGroup .btn { font-size:.85rem; padding-left:4px; padding-right:4px; }
+#prepGroup .btn { font-size:.85rem; padding-left:4px; padding-right:4px; flex:1 1 0; min-width:0; }
+/* Photos (2026-11-03) */
+.rm-photo { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.rm-photo-box { width:72px; height:72px; flex:0 0 72px; border-radius:12px; border:1px dashed #b6ccfe; background:#f5f9ff; color:#0d6efd; display:flex; align-items:center; justify-content:center; font-size:1.6rem; overflow:hidden; }
+.rm-photo-box img { width:100%; height:100%; object-fit:cover; }
+.rm-photo-btn { width:auto !important; min-width:0 !important; font-size:.85rem !important; }
+.rm-thumb { width:40px; height:40px; flex:0 0 40px; border-radius:10px; object-fit:cover; background:#e7f0ff; color:#0d6efd; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; }
+.rm-card .rm-thumb { width:52px; height:52px; flex-basis:52px; font-size:1.2rem; }
+#menuTable td:first-child, #menuTable th:first-child { text-align:center !important; color:#6c757d; }
+.rm-loss { color:#b45309; }
+.rm-warn { color:#b45309; }   /* amber: something to do, never red */
+.rm-need { cursor:pointer; border-radius:var(--bs-card-border-radius, .375rem); }
+.rm-need:hover, .rm-need.active { border-color:#0d6efd; background:#dbe8ff; }
+.rm-need.active { box-shadow:0 0 0 .15rem rgba(13,110,253,.35); }   /* selling below cost: amber, never red */
+.rcp-amt { width:150px; }
+.rcp-amt .rcp-unit { max-width:64px; flex:0 0 64px; padding-right:1.4rem; }
+.rcp-no { width:24px; flex:0 0 24px; text-align:center; color:#6c757d; font-size:.85rem; }
 </style>
 
 <script>
 const CAN_EDIT = <?= json_encode($can_edit) ?>;
 const CSRF_FIELD = <?= json_encode(csrf_token()) ?>;
+let NOCOST = <?= !empty($_GET['nocost']) ? 'true' : 'false' ?>;   // menu?nocost=1 from a notification
+if (NOCOST && typeof bmsCleanQuery === 'function') bmsCleanQuery(['nocost']);
 const RM = {
+    noCostOnly: <?= json_encode(t('Dishes with no cost')) ?>,
     dish: <?= json_encode(t('Dish')) ?>,
     stockItem: <?= json_encode(t('Stock item')) ?>,
     noPrep: <?= json_encode(t('No preparation')) ?>,
@@ -311,9 +388,24 @@ const RM = {
     ingUnit: <?= json_encode(t('Unit (kg, litre, pcs)')) ?>,
     ingCost: <?= json_encode(t('Buying price per unit')) ?>,
     noIngredients: <?= json_encode(t('No ingredients yet — this dish sells without stock.')) ?>,
+    addRecipe: <?= json_encode(t('Add recipe')) ?>,
+    ingOne: <?= json_encode(t('Ingredients in one plate')) ?>,
+    ingWhole: <?= json_encode(t('Ingredients for the whole recipe (%d plates)')) ?>,
+    perPlateIs: <?= json_encode(t('one plate uses %s')) ?>,
+    unit: <?= json_encode(t('Unit')) ?>,
+    addBuyingPrice: <?= json_encode(t('Add buying price')) ?>,
+    recipeCost: <?= json_encode(t('recipe')) ?>,
+    buying: <?= json_encode(t('buying')) ?>,
+    choosePhoto: <?= json_encode(t('Choose photo')) ?>,
+    changePhoto: <?= json_encode(t('Change photo')) ?>,
+    photoTooBig: <?= json_encode(t('The photo is too large. The maximum is 2 MB.')) ?>,
+    photoType: <?= json_encode(t('Choose a photo (JPG, PNG or WebP).')) ?>,
 };
+// Names follow the company's text style (Company Profile → text case), like everywhere else.
+const nm = s => safeOutput(caseFormatJs(String(s || '')));
 let MENU = [];
 let ACTIVE_CAT = 'all';
+let NEED_RECIPE = false;   // the "Dishes without a recipe" card is pressed: show only those
 let menuTable = null;
 const fmt = n => Number(n || 0).toLocaleString();
 
@@ -325,10 +417,18 @@ $(function () {
     menuTable = $('#menuTable').DataTable({
         responsive: false, scrollX: true, pageLength: 25, order: [], dom: 'rtipB',
         buttons: [{ extend: 'excelHtml5', className: 'd-none', exportOptions: { columns: ':not(:last-child)' } }],
-        columnDefs: [{ targets: [8, 9], orderable: false }],
+        columnDefs: [{ targets: [0, 9, 10], orderable: false }],
         language: { emptyTable: RM.empty, zeroRecords: RM.noMatch }
     });
+    // S/No. follows the rows as shown (after sorting / paging), always 1, 2, 3…
+    menuTable.on('draw.dt', function () {
+        const info = menuTable.page.info();
+        menuTable.column(0, { search: 'applied', order: 'applied', page: 'current' }).nodes().each((cell, i) => { cell.innerHTML = info.start + i + 1; });
+    });
+    $('#f-photo').on('change', photoPicked);
+    $('#photoRemove').on('click', function () { $('#f-photo').val(''); $('#f-remove-photo').val('1'); showPhoto(''); });
     $('#rmSearch').on('input', render);
+    $('#stNeedBtn').on('click', function () { NEED_RECIPE = !NEED_RECIPE; render(); });
     loadMenu();
 
     $('.rm-type').on('click', function () { setType($(this).data('type')); });
@@ -347,7 +447,7 @@ $(function () {
         if (!$('#f-existing').hasClass('select2-hidden-accessible')) {
             $('#f-existing').select2({
                 theme: 'bootstrap-5', dropdownParent: modal, width: '100%', placeholder: RM.chooseProduct, allowClear: true,
-                minimumInputLength: 1,
+                minimumInputLength: 0,   // click shows the first products; typing narrows them
                 ajax: {
                     url: '<?= buildUrl('api/restaurant/search_products_for_menu.php') ?>', dataType: 'json', delay: 300,
                     data: p => ({ q: p.term, warehouse_id: whId() }), processResults: d => ({ results: d.results }), cache: true
@@ -375,17 +475,22 @@ function buildChips() {
     const cats = {};
     MENU.forEach(it => { cats[catKey(it)] = it.category_name || RM.noGroup; });
     if (ACTIVE_CAT !== 'all' && !cats[ACTIVE_CAT]) ACTIVE_CAT = 'all';
-    let html = `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === 'all' ? 'btn-primary' : 'btn-outline-primary'}" data-cat="all">${RM.all}</button>`;
+    // From the "Dishes with no cost" notification (menu?nocost=1): a chip that shows only those; ✕ shows everything again.
+    let html = NOCOST ? `<button class="btn btn-sm rm-chip btn-primary" id="rmNoCost">${RM.noCostOnly} <i class="bi bi-x-lg ms-1"></i></button>` : '';
+    html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === 'all' && !NOCOST ? 'btn-primary' : 'btn-outline-primary'}" data-cat="all">${RM.all}</button>`;
     Object.keys(cats).forEach(k => {
-        html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === k ? 'btn-primary' : 'btn-outline-primary'}" data-cat="${k}">${safeOutput(cats[k])}</button>`;
+        html += `<button class="btn btn-sm rm-chip ${ACTIVE_CAT === k ? 'btn-primary' : 'btn-outline-primary'}" data-cat="${k}">${nm(cats[k])}</button>`;
     });
-    $('#rmChips').html(html).find('.rm-chip').on('click', function () { ACTIVE_CAT = String($(this).data('cat')); buildChips(); render(); });
+    $('#rmChips').html(html).find('.rm-chip[data-cat]').on('click', function () { ACTIVE_CAT = String($(this).data('cat')); NOCOST = false; buildChips(); render(); });
+    $('#rmNoCost').on('click', function () { NOCOST = false; buildChips(); render(); });
     $('#stGroups').text(Object.keys(cats).length);
 }
 
 function filtered() {
     const q = ($('#rmSearch').val() || '').toLowerCase().trim();
     return MENU.filter(it => (ACTIVE_CAT === 'all' || catKey(it) === ACTIVE_CAT)
+        && (!NEED_RECIPE || (it.is_service && !it.has_recipe))
+        && (!NOCOST || (it.is_service && itemCost(it) === null))
         && (!q || it.product_name.toLowerCase().includes(q) || (it.category_name || '').toLowerCase().includes(q)));
 }
 
@@ -404,29 +509,38 @@ function actionMenu(it) {
         </ul></div>`;
 }
 function typeLabel(it) { return it.is_service ? RM.dish : RM.stockItem; }
-// What one item costs: a recipe (exact), a bought item's cost, or the owner's plate estimate. null = nothing known yet.
+// What one item costs you (2026-11-03): a bought item → its buying price; a dish → its recipe
+// (ingredients at the price paid in Purchases). No guessed "cost of one plate". null = not known yet.
 function itemCost(it) {
-    if (it.has_recipe) return { v: it.recipe_cost, est: false };
-    if (!it.is_service && it.cost_price > 0) return { v: it.cost_price, est: false };
-    if (it.is_service && it.plate_cost > 0) return { v: it.plate_cost, est: true };
+    if (it.has_recipe) return { v: it.recipe_cost, kind: 'recipe' };
+    if (!it.is_service && it.cost_price > 0) return { v: it.cost_price, kind: 'buying' };
     return null;
 }
 function costCell(it) {
     const c = itemCost(it);
-    if (!c) return `<span data-order="-1"><a href="#" class="text-danger fw-semibold small" onclick="${it.is_service ? `openRecipe(${it.product_id})` : `editItem(${it.product_id})`};return false;">${RM.noCostYet}</a></span>`;
-    return `<span data-order="${c.v}">${c.est ? '~' : ''}${fmt(c.v)}</span>`;
+    if (!c) return `<span data-order="-1"><a href="#" class="text-primary fw-semibold small text-decoration-none" onclick="${it.is_service ? `openRecipe(${it.product_id})` : `editItem(${it.product_id})`};return false;"><i class="bi bi-plus-circle me-1"></i>${it.is_service ? RM.addRecipe : RM.addBuyingPrice}</a></span>`;
+    return `<span data-order="${c.v}">${fmt(c.v)}${c.kind === 'recipe' ? ` <small class="text-muted">· ${RM.recipeCost}</small>` : ''}</span>`;
 }
 function profitCell(it) {
     const c = itemCost(it);
     if (!c) return '<span data-order="-999999999" class="text-muted">—</span>';
     const p = it.selling_price - c.v, pc = it.selling_price > 0 ? Math.round(p / it.selling_price * 100) : 0;
-    return `<span data-order="${p}" class="${p < 0 ? 'text-danger' : 'text-primary'} fw-semibold">${c.est ? '~' : ''}${fmt(p)} <small class="fw-normal">(${pc}%)</small></span>`;
+    return `<span data-order="${p}" class="${p < 0 ? 'rm-loss' : 'text-primary'} fw-semibold">${fmt(p)} <small class="fw-normal">(${pc}%)</small></span>`;
 }
 // Phone card: the same figures in one line.
 function costLine(it) {
     const c = itemCost(it);
     if (!c) return `<div class="small">${costCell(it)}</div>`;
-    return `<div class="small text-muted">${RM.cost} ${c.est ? '~' : ''}${fmt(c.v)} · ${RM.profit} ${profitCell(it)}</div>`;
+    return `<div class="small text-muted">${c.kind === 'recipe' ? RM.recipeCost : RM.buying} ${fmt(c.v)} · ${RM.profit} ${profitCell(it)}</div>`;
+}
+// The item's photo, or its first letter when it has none.
+function thumb(it) {
+    const letter = safeOutput(caseFormatJs(String(it.product_name || '')).charAt(0).toUpperCase());
+    if (it.image) return `<img class="rm-thumb" src="${safeOutput(it.image)}" alt="" loading="lazy" data-l="${letter}" onerror="rmThumbFallback(this)">`;
+    return `<span class="rm-thumb">${letter}</span>`;
+}
+function rmThumbFallback(img) {
+    const s = document.createElement('span'); s.className = 'rm-thumb'; s.textContent = img.dataset.l || ''; img.replaceWith(s);
 }
 function prepLabel(it) { return it.station_name || RM.noPrep; }
 function stockLabel(it) { return it.is_service ? `<span class="text-muted">${RM.madeToOrder}</span>` : fmt(it.stock); }
@@ -436,11 +550,16 @@ function render() {
     $('#stTotal').text(MENU.length);
     $('#stAvail').text(MENU.filter(i => i.is_available).length);
     $('#stOut').text(MENU.filter(i => !i.is_available).length);
+    const need = MENU.filter(i => i.is_service && !i.has_recipe).length;
+    if (!need) NEED_RECIPE = false;
+    $('#stNoRecipe').text(need).toggleClass('rm-warn', need > 0).toggleClass('text-primary', need === 0);
+    $('#stNeedBtn').toggleClass('active', NEED_RECIPE).attr('aria-pressed', NEED_RECIPE ? 'true' : 'false');
 
     menuTable.clear();
     rows.forEach(it => menuTable.row.add([
-        `<span class="fw-semibold">${safeOutput(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}`,
-        safeOutput(it.category_name || RM.noGroup),
+        '',   // S/No. — numbered on draw
+        `<div class="d-flex align-items-center gap-2">${thumb(it)}<div class="min-w-0"><span class="fw-semibold">${nm(it.product_name)}</span>${it.is_available ? '' : ` <span class="badge rm-badge-out ms-1">${RM.soldOut}</span>`}</div></div>`,
+        it.category_name ? nm(it.category_name) : RM.noGroup,
         `<span class="badge rm-badge">${typeLabel(it)}</span>`,
         safeOutput(prepLabel(it)),
         `<span data-order="${it.selling_price}">${fmt(it.selling_price)}</span>`,
@@ -462,9 +581,10 @@ function render() {
             <div class="card border-0 shadow-sm rm-card ${it.is_available ? '' : 'rm-off'}">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div class="min-w-0">
-                            <div class="rm-name">${safeOutput(it.product_name)}</div>
-                            <div class="small text-muted">${safeOutput(it.category_name || RM.noGroup)} · ${safeOutput(prepLabel(it))}</div>
+                        ${thumb(it)}
+                        <div class="min-w-0 flex-grow-1">
+                            <div class="rm-name">${nm(it.product_name)}</div>
+                            <div class="small text-muted">${it.category_name ? nm(it.category_name) : RM.noGroup} · ${safeOutput(prepLabel(it))}</div>
                             ${costLine(it)}
                         </div>
                         <div class="rm-price">${fmt(it.selling_price)}</div>
@@ -485,48 +605,113 @@ function render() {
 }
 
 // ───────── restaurant_plan.md Phase 7 — recipes ─────────
-let RCP = { id: 0, price: 0, lines: [] };
+let RCP = { id: 0, price: 0, yield: 1, lines: [] };
+// Small units for typing (2026-11-03): an ingredient bought in kg can be typed in grams, one in
+// litres in millilitres. The amount is always saved in the ingredient's own unit (250 g -> 0.25 kg).
+const RCP_KG = ['kg', 'kgs', 'kilo', 'kilos', 'kilogram', 'kilograms'];
+const RCP_L  = ['l', 'lt', 'ltr', 'ltrs', 'litre', 'litres', 'liter', 'liters', 'lita'];
+function rcpSmall(unit) {
+    const u = String(unit || '').trim().toLowerCase().replace(/\.+$/, '');
+    if (RCP_KG.includes(u)) return { u: 'g', f: 1000 };
+    if (RCP_L.includes(u))  return { u: 'ml', f: 1000 };
+    return null;
+}
+const r3 = n => Math.round((parseFloat(n) || 0) * 1000) / 1000;
+// One plate's share, exactly as the server keeps it (grams; a pinch is at least 1 g).
+const rcpPerPlate = l => l.qty > 0 ? Math.max(0.001, r3(l.qty / RCP.yield)) : 0;
+function rcpShow(l) { const sm = rcpSmall(l.unit); return sm && l.du === sm.u ? r3(l.qty * sm.f) : r3(l.qty); }
+function rcpFmtQty(q, unit) {
+    const sm = rcpSmall(unit);
+    if (sm && q > 0 && q < 1) return r3(q * sm.f).toLocaleString() + ' ' + sm.u;
+    return r3(q).toLocaleString() + ' ' + safeOutput(unit);
+}
+
 function openRecipe(id) {
     $.getJSON('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'get', product_id: id, warehouse_id: whId() }, function (res) {
         if (!res.success) { Swal.fire({ icon: 'error', title: RM.error, text: res.message }); return; }
-        RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, lines: res.components.map(c => ({ product_id: c.product_id, name: c.product_name, unit: c.unit, qty: c.qty, cost: c.cost_price, stock: c.stock })) };
-        $('#rcpDish').text(res.dish.product_name);
+        RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, yield: Math.max(1, parseInt(res.yield, 10) || 1),
+                lines: res.components.map(c => {
+                    const sm = rcpSmall(c.unit), q = r3(c.pot_qty || c.qty);
+                    return { product_id: c.product_id, name: c.product_name, unit: c.unit, qty: q, du: sm && q < 1 ? sm.u : c.unit, cost: c.cost_price, stock: c.stock };
+                }) };
+        $('#rcpDish').text(caseFormatJs(res.dish.product_name));
+        $('#rcpYield').val(RCP.yield);
         rcpRender();
         const m = $('#recipeModal');
         if (!$('#rcpPick').hasClass('select2-hidden-accessible')) {
-            $('#rcpPick').select2({ theme: 'bootstrap-5', dropdownParent: m, width: '100%', placeholder: RM.pickIngredient, allowClear: true, minimumInputLength: 1,
+            $('#rcpPick').select2({ theme: 'bootstrap-5', dropdownParent: m, width: '100%', placeholder: RM.pickIngredient, allowClear: true, minimumInputLength: 0,
                 ajax: { url: '<?= buildUrl('api/restaurant/recipe.php') ?>', dataType: 'json', delay: 300,
                         data: p => ({ action: 'search', q: p.term, warehouse_id: whId() }), processResults: d => ({ results: d.results }), cache: true } })
             .on('select2:select', function (e) { rcpAdd(e.params.data); $(this).val(null).trigger('change'); });
+            $('#rcpYield').on('input change', function () {
+                const y = parseInt(this.value, 10);
+                RCP.yield = y >= 1 && y <= 1000 ? y : 1;
+                rcpRender(true);
+            });
         }
-        new bootstrap.Modal(document.getElementById('recipeModal')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show();
     }).fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));
 }
 function rcpAdd(d) {
     if (!d || !d.id || RCP.lines.some(l => l.product_id === d.id)) return;
-    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: d.unit || 'pcs', qty: 1, cost: parseFloat(d.cost_price) || null, stock: null });
+    const unit = d.unit || 'pcs', sm = rcpSmall(unit);
+    // kg / litre ingredients start in g / ml, empty, ready to type (e.g. 250 g); pieces start at 1.
+    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: unit, qty: sm ? 0 : 1, du: sm ? sm.u : unit, cost: parseFloat(d.cost_price) || null, stock: null });
     rcpRender();
+    if (sm) setTimeout(() => $('#rcpLines .rcp-qty').last().focus(), 50);
 }
-function rcpRender() {
+function rcpSetQty(i, v) {
+    const l = RCP.lines[i]; if (!l) return;
+    const sm = rcpSmall(l.unit), n = parseFloat(String(v).replace(',', '.')) || 0;
+    l.qty = Math.max(0, r3(sm && l.du === sm.u ? n / sm.f : n));
+    rcpRender(true);
+}
+function rcpSetUnit(i, du) { const l = RCP.lines[i]; if (!l) return; l.du = du; rcpRender(); }
+// keepInputs: only refresh the "per plate" notes and totals, so typing is not interrupted.
+function rcpRender(keepInputs) {
+    $('#rcpLinesTitle').text(RCP.yield > 1 ? RM.ingWhole.replace('%d', RCP.yield) : RM.ingOne);
+    if (keepInputs && $('#rcpLines .rcp-line').length === RCP.lines.length) {
+        RCP.lines.forEach((l, i) => $(`#rcpPer${i}`).html(rcpPerNote(l)));
+        rcpTotals();
+        return;
+    }
     if (!RCP.lines.length) { $('#rcpLines').html(`<div class="text-muted small py-2">${RM.noIngredients}</div>`); }
     else {
-        $('#rcpLines').html(RCP.lines.map((l, i) => `
-            <div class="d-flex align-items-center gap-2 py-2 border-bottom">
-                <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${safeOutput(l.name)}</div>
-                    <div class="small text-muted">${l.cost !== null ? fmt(l.cost) + ' / ' + safeOutput(l.unit) : ''}${l.stock !== null ? ' · ' + fmt(l.stock) + ' ' + RM.inStock : ''}</div></div>
-                <div class="input-group input-group-sm flex-shrink-0" style="width:132px;">
-                    <input type="number" class="form-control text-end" min="0.01" step="0.01" value="${l.qty}" inputmode="decimal" onchange="RCP.lines[${i}].qty = parseFloat(this.value) || 0; rcpTotals();">
-                    <span class="input-group-text">${safeOutput(l.unit)}</span>
+        $('#rcpLines').html(RCP.lines.map((l, i) => {
+            const sm = rcpSmall(l.unit);
+            const unitCtl = sm
+                ? `<select class="form-select form-select-sm rcp-unit" onchange="rcpSetUnit(${i}, this.value)" aria-label="${RM.unit}">
+                       <option value="${safeOutput(sm.u)}" ${l.du === sm.u ? 'selected' : ''}>${safeOutput(sm.u)}</option>
+                       <option value="${safeOutput(l.unit)}" ${l.du !== sm.u ? 'selected' : ''}>${safeOutput(l.unit)}</option>
+                   </select>`
+                : `<span class="input-group-text">${safeOutput(l.unit)}</span>`;
+            return `
+            <div class="d-flex align-items-center gap-2 py-2 border-bottom rcp-line">
+                <span class="rcp-no">${i + 1}</span>
+                <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${nm(l.name)}</div>
+                    <div class="small text-muted">${l.cost !== null ? fmt(l.cost) + ' / ' + safeOutput(l.unit) : ''}${l.stock !== null ? ' · ' + fmt(l.stock) + ' ' + RM.inStock : ''}</div>
+                    <div class="small text-primary" id="rcpPer${i}">${rcpPerNote(l)}</div></div>
+                <div class="input-group input-group-sm flex-shrink-0 rcp-amt">
+                    <input type="number" class="form-control text-end rcp-qty" min="0" step="any" value="${l.qty > 0 ? rcpShow(l) : ''}" placeholder="0" inputmode="decimal" oninput="rcpSetQty(${i}, this.value)">
+                    ${unitCtl}
                 </div>
-                <button type="button" class="btn btn-sm btn-link text-danger p-0 flex-shrink-0" onclick="RCP.lines.splice(${i}, 1); rcpRender();"><i class="bi bi-x-circle fs-5"></i></button>
-            </div>`).join(''));
+                <button type="button" class="btn btn-sm btn-link text-danger p-0 flex-shrink-0" onclick="RCP.lines.splice(${i}, 1); rcpRender();" aria-label="${RM.remove}"><i class="bi bi-x-circle fs-5"></i></button>
+            </div>`;
+        }).join(''));
     }
     rcpTotals();
 }
+function rcpPerNote(l) {
+    if (RCP.yield <= 1 || !(l.qty > 0)) return '';
+    return RM.perPlateIs.replace('%s', rcpFmtQty(rcpPerPlate(l), l.unit));
+}
 function rcpTotals() {
-    const cost = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
-    $('#rcpCost').text(fmt(cost)); $('#rcpPrice').text(fmt(RCP.price));
-    $('#rcpProfit').text(fmt(RCP.price - cost)).toggleClass('text-danger', RCP.price - cost < 0);
+    const pot  = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
+    const cost = RCP.lines.reduce((s, l) => s + rcpPerPlate(l) * (l.cost || 0), 0);
+    $('#rcpPotRow').toggleClass('d-none', RCP.yield <= 1);
+    $('#rcpPotCost').text(fmt(Math.round(pot)));
+    $('#rcpCost').text(fmt(Math.round(cost))); $('#rcpPrice').text(fmt(RCP.price));
+    $('#rcpProfit').text(fmt(Math.round(RCP.price - cost))).toggleClass('rm-loss', RCP.price - cost < 0);
 }
 function rcpNewIngredient() {
     Swal.fire({ title: RM.newIngredient, confirmButtonText: RM.save || 'OK', showCancelButton: true, cancelButtonText: RM.cancel, confirmButtonColor: '#0d6efd',
@@ -535,14 +720,14 @@ function rcpNewIngredient() {
     }).then(r => {
         if (!r.isConfirmed) return;
         $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', Object.assign({ action: 'new_ingredient', warehouse_id: whId(), _csrf: CSRF_FIELD }, r.value), function (res) {
-            if (res.success) { rcpAdd({ id: res.id, text: res.text, unit: res.unit, cost_price: res.cost_price }); new bootstrap.Modal(document.getElementById('recipeModal')).show(); }
-            else Swal.fire({ icon: 'error', title: RM.error, text: res.message }).then(() => new bootstrap.Modal(document.getElementById('recipeModal')).show());
+            if (res.success) { rcpAdd({ id: res.id, text: res.text, unit: res.unit, cost_price: res.cost_price }); bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show(); }
+            else Swal.fire({ icon: 'error', title: RM.error, text: res.message }).then(() => bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show());
         }, 'json');
     });
 }
 function rcpSave() {
     const comps = RCP.lines.filter(l => l.qty > 0).map(l => ({ product_id: l.product_id, qty: l.qty }));
-    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'save', product_id: RCP.id, warehouse_id: whId(), components: JSON.stringify(comps), _csrf: CSRF_FIELD }, function (res) {
+    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'save', product_id: RCP.id, warehouse_id: whId(), yield: RCP.yield, components: JSON.stringify(comps), _csrf: CSRF_FIELD }, function (res) {
         if (res.success) { bootstrap.Modal.getInstance(document.getElementById('recipeModal'))?.hide(); loadMenu(); Swal.fire({ icon: 'success', title: res.message, timer: 1600, showConfirmButton: false }); }
         else Swal.fire({ icon: 'error', title: RM.error, text: res.message });
     }, 'json').fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));
@@ -571,7 +756,7 @@ function setType(type) {
     $('.rm-type').removeClass('active').filter(`[data-type="${type}"]`).addClass('active');
     const isNew = !$('#f-id').val();
     $('#existingFields').toggleClass('d-none', type !== 'existing');
-    $('#itemFields').toggleClass('d-none', type === 'existing');
+    $('.item-field').toggleClass('d-none', type === 'existing');
     // Buying price: bought items only. Opening stock: NEW bought items only (one combined rule,
     // so the two conditions can't undo each other).
     $('.bought-only').each(function () {
@@ -579,7 +764,7 @@ function setType(type) {
         $(this).toggleClass('d-none', !show);
     });
     $('.dish-only').toggleClass('d-none', type !== 'dish');
-    $('#priceCol').toggleClass('col-6', type === 'bought').toggleClass('col-12', type !== 'bought');
+    $('#priceCol').toggleClass('rf-full', type !== 'bought');   // full width when there is no buying price beside it
     if (isNew) $(`#prep-${type === 'dish' ? 'kitchen' : 'none'}`).prop('checked', true);
 }
 
@@ -589,6 +774,24 @@ function resetForm() {
     $('#f-cat').val('').trigger('change'); $('#f-newcat').addClass('d-none');
     if ($('#f-existing').hasClass('select2-hidden-accessible')) $('#f-existing').val(null).trigger('change');
     $('#f-avail').prop('checked', true);
+    $('#f-photo').val(''); $('#f-remove-photo').val('0'); showPhoto('');
+}
+
+// ── Photo (2026-11-03) ──
+function showPhoto(src) {
+    $('#photoBox').html(src ? `<img src="${safeOutput(src)}" alt="">` : '<i class="bi bi-camera"></i>');
+    $('#photoRemove').toggleClass('d-none', !src);
+    $('#photoPickLabel').text(src ? RM.changePhoto : RM.choosePhoto);
+}
+function photoPicked() {
+    const f = this.files && this.files[0];
+    if (!f) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { this.value = ''; Swal.fire({ icon: 'warning', title: RM.photoType }); return; }
+    if (f.size > 2 * 1024 * 1024) { this.value = ''; Swal.fire({ icon: 'warning', title: RM.photoTooBig }); return; }
+    $('#f-remove-photo').val('0');
+    const r = new FileReader();
+    r.onload = e => showPhoto(e.target.result);
+    r.readAsDataURL(f);
 }
 
 function openAddItem() {
@@ -610,8 +813,8 @@ function editItem(id) {
     $('#f-name').val(it.product_name);
     $('#f-price').val(it.selling_price);
     $('#f-cost').val(it.cost_price);
-    $('#f-plate').val(it.plate_cost > 0 ? it.plate_cost : '');
-    $('.dish-only').toggleClass('d-none', !it.is_service || !!it.has_recipe);   // a recipe gives the exact cost
+    $('.dish-only').toggleClass('d-none', !it.is_service || !!it.has_recipe);   // the recipe hint, until it has one
+    showPhoto(it.image || '');
     $('#f-cat').val(it.category_id ? String(it.category_id) : '').trigger('change');
     $('#prepGroup .rm-extra').remove();
     $('input[name="prep_area"]').prop('checked', false);
@@ -655,5 +858,6 @@ function saveItem(e) {
 </script>
 
 <?php
+if ($can_share) require __DIR__ . '/../../../includes/restaurant/online_menu_share.php';
 require_once 'footer.php';
 ob_end_flush();

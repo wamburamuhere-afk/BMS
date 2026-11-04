@@ -81,29 +81,62 @@ $rgsSuggest = [
     </div>
 </div>
 
-<div class="modal fade" id="rgsMenuModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+<?php require_once __DIR__ . '/form_kit.php'; rfKitAssets(); $rgsCur = htmlspecialchars(rfMoneyPrefix()); ?>
+<style>
+.rgs-head, .rgs-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px 96px; gap: 8px; align-items: center; }
+.rgs-head { font-size: 11.5px; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: .05em; padding: 0 0 6px; border-bottom: 1px solid #eef0f3; }
+.rgs-row { padding: 8px 0; border-bottom: 1px solid #f1f3f5; }
+.rgs-row:last-child { border-bottom: 0; }
+.rgs-row .form-control { font-size: 14px; min-height: 38px; border-radius: 8px; }
+.rgs-row .rf-money .form-control { border-radius: 0 8px 8px 0; }
+.rgs-row .rf-money .rf-cur { min-width: 46px; border-radius: 8px 0 0 8px; }
+.rgs-row .rgs-pick { width: 1.35em; height: 1.35em; margin: 0; }
+.rgs-nostock { color: #adb5bd; text-align: center; font-size: 12px; }
+@media (max-width: 575.98px) {
+    .rgs-head { display: none; }
+    .rgs-row { grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "pick name name" ". price stock"; }
+    .rgs-row .rgs-pick { grid-area: pick; } .rgs-row .rgs-name { grid-area: name; } .rgs-row .rgs-pricecell { grid-area: price; } .rgs-row .rgs-stockcell { grid-area: stock; }
+}
+</style>
+<div class="modal fade rf-modal" id="rgsMenuModal" tabindex="-1" aria-labelledby="rgsMenuTitle">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><?= t('What do you sell?') ?></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="rgsMenuTitle"><i class="bi bi-journal-richtext"></i><?= t('What do you sell?') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?= htmlspecialchars(t('Close')) ?>"></button>
             </div>
             <form id="rgsMenuForm" autocomplete="off">
                 <div class="modal-body">
-                    <div class="small text-muted mb-2"><?= t('Tick what you sell and set your price. You can change everything later on the Menu.') ?></div>
-                    <?php foreach ($rgsSuggest as $i => $it): ?>
-                    <div class="d-flex align-items-center gap-2 py-2 border-bottom rgs-row" data-type="<?= $it['type'] ?>">
-                        <input class="form-check-input flex-shrink-0 m-0 rgs-pick" type="checkbox" style="width:1.4em;height:1.4em;">
-                        <input type="text" class="form-control form-control-sm rgs-name" value="<?= htmlspecialchars($it['name']) ?>" maxlength="150">
-                        <input type="number" class="form-control form-control-sm text-end rgs-price" value="<?= (int)$it['price'] ?>" min="0" step="any" inputmode="decimal" style="max-width:96px;">
-                        <?php if ($it['type'] === 'bought'): ?>
-                        <input type="number" class="form-control form-control-sm text-end rgs-stock" placeholder="<?= htmlspecialchars(t('Stock')) ?>" min="0" step="any" inputmode="decimal" style="max-width:76px;">
-                        <?php endif; ?>
+                    <div class="rf-help mt-0 mb-3"><?= t('Tick what you sell and set your price. You can change everything later on the Menu.') ?></div>
+                    <?php
+                    $rgsGroups = [
+                        'dish'   => ['icon' => 'ri ri-cooking-pot', 'title' => t('Dishes'), 'stock' => false],
+                        'bought' => ['icon' => 'ri ri-cup-soda',    'title' => t('Drinks (counted)'), 'stock' => true],
+                    ];
+                    foreach ($rgsGroups as $rgsType => $g):
+                        $rows = array_filter($rgsSuggest, fn($it) => $it['type'] === $rgsType);
+                        if (!$rows) continue; ?>
+                    <div class="rf-sec">
+                        <div class="rf-sec-title"><i class="<?= $g['icon'] ?>"></i><?= $g['title'] ?></div>
+                        <div class="rgs-head"><span></span><span><?= t('Item') ?></span><span><?= t('Selling price') ?></span><span><?= $g['stock'] ? t('Stock') : '' ?></span></div>
+                        <?php foreach ($rows as $it): ?>
+                        <div class="rgs-row" data-type="<?= $it['type'] ?>">
+                            <input class="form-check-input rgs-pick" type="checkbox" aria-label="<?= htmlspecialchars($it['name']) ?>">
+                            <input type="text" class="form-control rgs-name" value="<?= htmlspecialchars($it['name']) ?>" maxlength="150" aria-label="<?= htmlspecialchars(t('Item')) ?>">
+                            <div class="rgs-pricecell"><div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rgsCur ?></span>
+                                <input type="number" class="form-control rgs-price" value="<?= (int)$it['price'] ?>" min="0" step="any" inputmode="decimal" aria-label="<?= htmlspecialchars(t('Selling price')) ?>"></div></div>
+                            <div class="rgs-stockcell">
+                                <?php if ($it['type'] === 'bought'): ?>
+                                <input type="number" class="form-control text-end rgs-stock" placeholder="<?= htmlspecialchars(t('Stock')) ?>" min="0" step="any" inputmode="decimal" aria-label="<?= htmlspecialchars(t('Stock')) ?>">
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                     <?php endforeach; ?>
-                    <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i><?= t('Water and soda are counted as stock; dishes sell without stock.') ?></div>
+                    <div class="rf-help mt-2"><i class="bi bi-info-circle me-1"></i><?= t('Water and soda are counted as stock; dishes sell without stock.') ?></div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer rf-foot">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><?= t('Add to menu') ?></button>
                 </div>

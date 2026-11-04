@@ -107,6 +107,7 @@ require_once ROOT_DIR . '/core/permissions.php'; // Load permissions
 require_once ROOT_DIR . '/core/terminology.php'; // Tenant-conditional Warehouse/Shop display labels (wLabel/wLabelE)
 require_once ROOT_DIR . '/core/tenant_quotas.php'; // Phase 12 — usage quotas (assertUploadWithinQuota, tenantWithinUserLimit)
 require_once ROOT_DIR . '/core/text_display_case.php'; // Global "Text Display Case" setting — read-only display formatting (caseFormat/applyCaseMode)
+require_once ROOT_DIR . '/core/flash.php'; // One-time messages kept in the session, not the URL (bmsFlash / bmsFlashRedirect)
 require_once ROOT_DIR . '/actions/check_auth.php';
 
 // The bootstrap has finished reading the session, so drop the session file lock
@@ -223,6 +224,8 @@ $routes = [
     // api/stock/generate_shop_catalog_link.php.
     'shop-catalog'   => ROOT_DIR . '/shop_catalog.php',
     'shop_catalog'   => ROOT_DIR . '/shop_catalog.php',
+    // Public restaurant menu + ordering — reached only as /m/<link> (see handleRoute()).
+    'public-menu'    => ROOT_DIR . '/public_menu.php',
     // Public, unauthenticated — a Customer Visits report PDF shared as an expiring
     // link (api/field_reports/share_link.php). Token-gated, read-only.
     'report-pdf'     => ROOT_DIR . '/field_report_pdf.php',
@@ -1177,6 +1180,8 @@ $routes = [
     'restaurant/reservations'       => RESTAURANT_DIR . '/reservations.php',
     'restaurant/menu-type'          => RESTAURANT_DIR . '/menu_type.php',
     'restaurant/menu'               => RESTAURANT_DIR . '/menu.php',   // restaurant_plan.md Phase 1
+    'menu_qr'                       => RESTAURANT_DIR . '/menu_qr.php',        // restaurant_online_menu_plan.md Phase 4
+    'online_orders'                 => RESTAURANT_DIR . '/online_orders.php',  // restaurant_online_menu_plan.md Phase 5
     'restaurant/tables-board'       => RESTAURANT_DIR . '/tables_board.php', // restaurant_plan.md Phase 2
     'restaurant/sales-report'       => RESTAURANT_DIR . '/sales_report.php', // restaurant_plan.md Phase 6
     'restaurant/purchases'          => RESTAURANT_DIR . '/purchases.php',  // restaurant focus pass: buy stock & ingredients
@@ -1306,6 +1311,7 @@ $routes = [
     'email_templates' => COMMUNICATION_DIR . '/email_templates.php',
     'email_templates.php' => COMMUNICATION_DIR . '/email_templates.php',
     'notification_center' => COMMUNICATION_DIR . '/notification_center.php',
+    'notification_open'   => COMMUNICATION_DIR . '/notification_open.php',   // mark one read + go to its record
     'notification_center.php' => COMMUNICATION_DIR . '/notification_center.php',
 
     // ========================================================================
@@ -1965,6 +1971,68 @@ $routes = [
 
 ];
 
+// One page, one short address — old address => short address (see the file's
+// header). The short key is registered here for the same file when it is not
+// a route already, so getUrl() and handleRoute() can rely on it existing.
+$GLOBALS['__bms_route_aliases'] = require ROOT_DIR . '/core/route_aliases.php';
+foreach ($GLOBALS['__bms_route_aliases'] as $__old => $__new) {
+    if (isset($routes[$__old]) && !isset($routes[$__new])) {
+        $routes[$__new] = $routes[$__old];
+    }
+}
+unset($__old, $__new);
+
+/**
+ * The single short address for a route key: itself when it has no alias.
+ */
+function canonicalRouteKey(string $key): string {
+    $aliases = $GLOBALS['__bms_route_aliases'] ?? [];
+    return $aliases[$key] ?? $key;
+}
+
+/**
+ * Record pages (core/detail_routes.php) whose id travels in the path:
+ * /invoice_view/231 instead of /invoice_view?id=231.
+ */
+function isDetailRoute(string $key): bool {
+    static $set = null;
+    if ($set === null) $set = array_flip(require ROOT_DIR . '/core/detail_routes.php');
+    return isset($set[$key]);
+}
+
+/**
+ * The path-style address for "page?id=N&rest", or null when the page is not a
+ * record page, has no usable numeric id, or the id is not a plain positive
+ * integer. Other query values stay in the query string.
+ */
+function detailRoutePathFor(string $key, string $queryString): ?string {
+    if (!isDetailRoute($key) || $queryString === '') return null;
+    parse_str($queryString, $q);
+    if (!isset($q['id']) || !is_string($q['id']) || !preg_match('/^[1-9][0-9]{0,18}$/', $q['id'])) return null;
+    $id = $q['id'];
+    unset($q['id']);
+    $rest = $q ? http_build_query($q) : '';
+    return getUrl($key) . '/' . $id . ($rest !== '' ? '?' . $rest : '');
+}
+
+/**
+ * Where a request must be redirected, or null to serve it as it is:
+ *   - an old address (core/route_aliases.php) goes to its short address;
+ *   - "record-page?id=N" goes to "record-page/N" (core/detail_routes.php).
+ * Both can apply at once and are done in a single hop. Only GET/HEAD move; the
+ * query string is kept. Split out of handleRoute() so a CLI test can check the
+ * target (CLI cannot read a Location header).
+ */
+function routeAliasRedirectFor(string $cleanUri, string $method, string $queryString): ?string {
+    $method = strtoupper($method);
+    if ($method !== 'GET' && $method !== 'HEAD') return null;
+    $short = canonicalRouteKey($cleanUri);
+    $path  = detailRoutePathFor($short, $queryString);
+    if ($path !== null) return $path;
+    if ($short === $cleanUri) return null;
+    return getUrl($short) . ($queryString !== '' ? '?' . $queryString : '');
+}
+
 /**
  * Get the clean URL for a page
  * @param string $page The page identifier (e.g., 'accounts/journals')
@@ -2030,8 +2098,18 @@ function getUrl($page) {
                 $cleanPage = $noExt;
             }
         }
+
+        // Old address → its single short address (core/route_aliases.php).
+        // Anything after ? or # is kept as-is.
+        $cut  = strcspn($cleanPage, '?#');
+        $key  = substr($cleanPage, 0, $cut);
+        $tail = substr($cleanPage, $cut);
+        $short = canonicalRouteKey($key);
+        if ($short !== $key) {
+            $cleanPage = $short . $tail;
+        }
     }
-    
+
     // Always prepend base_url to the result
     return $base_url . '/' . $cleanPage;
 }
@@ -2115,6 +2193,36 @@ function handleRoute() {
             header('Location: ' . $target . ($qs !== '' ? '?' . $qs : ''), true, 301);
             exit();
         }
+    }
+
+    // Old address → single short address (core/route_aliases.php). GET/HEAD
+    // only: a POST to an old address is still served below, so no form or
+    // AJAX call breaks. The query string travels with the redirect.
+    $aliasTarget = routeAliasRedirectFor($clean_uri, $_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['QUERY_STRING'] ?? '');
+    if ($aliasTarget !== null) {
+        // 301 for a renamed address (permanent); 302 for ?id=N → /N (the id is data, not a rename).
+        header('Location: ' . $aliasTarget, true, canonicalRouteKey($clean_uri) !== $clean_uri ? 301 : 302);
+        exit();
+    }
+
+    // Record pages: /invoice_view/231 is served as invoice_view with id=231, so
+    // the page reads $_GET['id'] exactly as it always did (GET, POST and all).
+    if (!isset($routes[$clean_uri]) && preg_match('#^([^/]+)/([1-9][0-9]{0,18})$#', $clean_uri, $__dm) && isDetailRoute($__dm[1])) {
+        $_GET['id'] = $_REQUEST['id'] = $__dm[2];
+        $clean_uri = $__dm[1];
+    }
+
+    // Public restaurant menu (restaurant_online_menu_plan.md): /m/<link> is the
+    // menu, /m/<link>/order places an order (POST), /m/<link>/o/<ref> is that
+    // order's status page (/status = its JSON). Only exact 32-hex tokens match;
+    // public_menu.php validates them again and needs no login.
+    if (preg_match('#^m/([a-f0-9]{32})(?:/(order)|/o/([a-f0-9]{32})(/status)?)?$#', $clean_uri, $__rm)) {
+        $GLOBALS['__ro_route'] = [
+            'token'  => $__rm[1],
+            'action' => !empty($__rm[2]) ? 'order' : (!empty($__rm[3]) ? (!empty($__rm[4]) ? 'status' : 'track') : 'menu'),
+            'ref'    => $__rm[3] ?? '',
+        ];
+        $clean_uri = 'public-menu';
     }
 
     // 1. Map lookup

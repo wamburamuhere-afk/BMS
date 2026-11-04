@@ -43,6 +43,12 @@ preg_match('/const fmtDate = .*?;\n/', $report, $mFmt);
 preg_match('/function salesPeriodRange\(.*?\n    }\n/s', $report, $mRange);
 preg_match('/function updateMobileCartFab\(\) \{.*?\n}\n/s', $scripts, $mFab);
 preg_match('/const posPager = .*?\nfunction posRenderPage\(.*?\n}\n/s', $scripts, $mPager);
+// 2026-11-03 — the cart functions now use the shared quantity helpers (core/pos_quantity.php);
+// the unit list is printed by PHP, so Node gets a literal copy of it.
+require_once $root . '/core/pos_quantity.php';
+preg_match('/function posUnitAllowsDecimal\(.*?\nfunction posReadTypedQty\(.*?\n}\n/s', $scripts, $mQty);
+$qtyHelpers = 'const POS_DECIMAL_UNITS = ' . json_encode(posDecimalUnits()) . ";\n" . ($mQty[0] ?? '');
+ok('extracted the quantity helpers from source', !empty($mQty));
 ok('extracted posTapProduct / fmtDate / salesPeriodRange from source', !empty($mTap) && !empty($mFmt) && !empty($mRange));
 
 $node = trim((string)shell_exec('node -v 2>&1'));
@@ -85,7 +91,7 @@ out.ranges = [
 ];
 console.log(JSON.stringify(out));
 JS;
-    $js = str_replace(['__TAP__', '__FMT__', '__RANGE__'], [$mTap[0], $mFmt[0], $mRange[0]], $js);
+    $js = str_replace(['__TAP__', '__FMT__', '__RANGE__'], [$qtyHelpers . $mTap[0], $mFmt[0], $mRange[0]], $js);
     file_put_contents("$tmp/t.js", $js);
     $o = json_decode((string)shell_exec('node ' . escapeshellarg("$tmp/t.js") . ' 2>&1'), true);
     ok('node ran the extracted code', is_array($o), (string)shell_exec('node ' . escapeshellarg("$tmp/t.js") . ' 2>&1'));
@@ -125,7 +131,7 @@ POS_SIMPLE_MODE = false; updateMobileCartFab(); const plain = nodes['#mobileCart
 cart = []; updateMobileCartFab();
 console.log(JSON.stringify({ simple, plain, emptyHidden: hidden }));
 JS;
-    file_put_contents("$tmp/t2.js", str_replace('__FAB__', $mFab[0] ?? '', $js2));
+    file_put_contents("$tmp/t2.js", str_replace('__FAB__', $qtyHelpers . ($mFab[0] ?? ''), $js2));
     $o2 = json_decode((string)shell_exec('node ' . escapeshellarg("$tmp/t2.js") . ' 2>&1'), true);
     ok('sheet rows: node ran updateMobileCartFab', is_array($o2), (string)shell_exec('node ' . escapeshellarg("$tmp/t2.js") . ' 2>&1'));
     if (is_array($o2)) {

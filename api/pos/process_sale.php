@@ -23,6 +23,7 @@ require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
+require_once __DIR__ . '/../../core/pos_quantity.php';
 require_once __DIR__ . '/../../core/pos_credit_limit.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/mobile_auth.php';
@@ -412,7 +413,7 @@ try {
     }
 
     $fetchStmt = $pdo->prepare("
-        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo, p.track_serials,
+        SELECT p.product_id, p.product_name, p.selling_price, p.min_selling_price, p.is_service, p.is_combo, p.track_serials, p.unit,
                COALESCE(SUM(ps.stock_quantity - IFNULL(ps.reserved_quantity, 0)), 0) as general_available,
                $project_stock_subquery as project_available,
                COALESCE(SUM(IFNULL(ps.reserved_quantity, 0)), 0) as current_warehouse_reserved
@@ -457,6 +458,26 @@ try {
         if (isset($products_map[$pid])) {
             $products_map[$pid]['selling_price'] = $price;
         }
+    }
+
+    // 2026-11-03 (core/pos_quantity.php) — every line's quantity is checked BEFORE any stock
+    // is touched: more than 0, at most 3 decimal places, and decimals only for goods sold by
+    // measure (kg, litre, metre …). Without this a 0 or −1 line would have passed and pushed
+    // stock UP. The unit is the selling unit's label when a known unit conversion is used,
+    // otherwise the product's own unit. The cleaned quantity is what every step below uses.
+    foreach ($items as $k => $item) {
+        $db_product = $products_map[(int)($item['product_id'] ?? 0)] ?? null;
+        if (!$db_product) continue; // reported as "not found" by the main loop below
+        $qtyUnit = $db_product['unit'] ?? '';
+        $lineUnitLabel = trim((string)($item['unit_label'] ?? ''));
+        if ($lineUnitLabel !== '' && resolveUnitConversion($pdo, (int)$db_product['product_id'], $lineUnitLabel)) {
+            $qtyUnit = $lineUnitLabel;
+        }
+        $cleanQty = posValidateLineQuantity($item['quantity'] ?? null, $qtyUnit, $db_product['product_name']);
+        if (is_string($cleanQty)) {
+            throw new Exception($cleanQty, 422);
+        }
+        $items[$k]['quantity'] = $cleanQty;
     }
 
     // Phase 23 (pos_upgrade_plan.md §8) — combo/bundle products. Every combo
