@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-11-04 — fix(pos): quantity input updates totals in real-time while typing
+
+- `app/bms/pos/pos_scripts_new.php` — added `oninput="updateCartQuantityLive()"` to the cart quantity input; new function updates only the row's line total + cart total without rebuilding the DOM (cursor stays intact); `onchange` still handles validation toasts + full redraw on blur/Enter
+
 ## 2026-11-04 — ui(restaurant): Replace black table headers with blue-tint across all restaurant pages
 
 - `app/bms/restaurant/tables.php` — `thead.table-dark` → `thead.rm-thead` + `.rm-thead th` CSS added

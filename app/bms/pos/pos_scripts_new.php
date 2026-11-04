@@ -1496,6 +1496,7 @@ function updateCartDisplay() {
                                        value="${posRoundQty(item.quantity)}" min="0" step="any"
                                        inputmode="${posLineAllowsDecimal(item) ? 'decimal' : 'numeric'}"
                                        onfocus="this.select()"
+                                       oninput="updateCartQuantityLive(${index}, this)"
                                        onchange="updateCartQuantityInput(${index}, this.value)">
                                 <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, 1)"
                                         style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">+</button>
@@ -1547,6 +1548,26 @@ function updateCartQuantityInput(index, value) {
     if (quantity !== null) item.quantity = quantity;
     updateCartDisplay();
     saveCartToStorage();
+}
+
+// Live update while typing: only refreshes the row total + cart total,
+// never rebuilds the DOM (which would destroy the cursor position).
+// onchange handles validation toasts and the full redraw on blur/Enter.
+function updateCartQuantityLive(index, inputEl) {
+    const item = cart[index];
+    if (!item) return;
+    const raw = String(inputEl.value).replace(',', '.');
+    if (!raw || raw.endsWith('.') || raw === '0') return; // mid-type, wait
+    const n = posRoundQty(raw);
+    if (!(n > 0)) return;
+    if (!posLineAllowsDecimal(item) && n !== Math.round(n)) return; // onchange will warn
+    item.quantity = n;
+    const row = inputEl.closest('tr');
+    if (row) {
+        const cell = row.querySelector('strong.text-success');
+        if (cell) cell.textContent = (n * item.discounted_price).toLocaleString();
+    }
+    calculateCartTotal();
 }
 
 // Phase 16 (pos_upgrade_plan.md §8) — manual price override, only reachable
