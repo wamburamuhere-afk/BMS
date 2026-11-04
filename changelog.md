@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-11-04 — ui(restaurant): Replace black table headers with blue-tint across all restaurant pages
+
+- `app/bms/restaurant/tables.php` — `thead.table-dark` → `thead.rm-thead` + `.rm-thead th` CSS added
+- `app/bms/restaurant/sales_report.php` — both tables (`rrTypeTable`, `rrItemsTable`) `thead.table-dark` → `thead.rm-thead` + `.rm-thead th` CSS added
+
 ## 2026-11-04 — ui(pos): Sales history mobile cards — icon-only action button, right-aligned, opens upward
 
 - `app/bms/pos/pos_dashboard.php` — `actionMenu(block=true)`: removed "Vitendo/Actions" label (icon only), removed `w-100` (compact, right-aligned via `d-flex justify-content-end`), added `dropup` so dropdown opens upward — fixes "Void Sale" being clipped below viewport for the last card; desktop table unchanged
