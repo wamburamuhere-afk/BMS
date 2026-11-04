@@ -234,16 +234,14 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
         </div>
     </div>
 
-    <!-- Suppliers you owe — pay part or all of a debt later -->
-    <div class="rp-card mb-3" id="rpOwe">
-        <div class="rp-card-h d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h6><i class="bi bi-hourglass-split me-1"></i><?= t('Suppliers you owe') ?></h6>
-            <span class="fw-bold" id="rpOweTotal"></span>
-        </div>
-        <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="rpOweTable">
-            <thead><tr><th style="width:48px;"><?= t('S/No.') ?></th><th><?= t('Supplier') ?></th><th><?= t('What') ?></th><th><?= t('Date') ?></th><th><?= t('Pay by') ?></th><th class="text-end"><?= t('Total') ?></th><th class="text-end"><?= t('Paid') ?></th><th class="text-end"><?= t('Owed') ?></th><th></th></tr></thead>
-            <tbody><tr><td colspan="8" class="text-muted text-center py-3"><?= t('You owe no supplier anything.') ?></td></tr></tbody>
-        </table></div>
+    <!-- Tab strip: Recent purchases | Suppliers you owe -->
+    <div class="rp-tabs mb-0">
+        <button class="rp-tab active" id="rpBtnRecent" data-pane="rpRecent" type="button">
+            <i class="bi bi-clock-history me-1"></i><?= t('Recent purchases') ?> <span class="rp-count" id="rpCount">0</span>
+        </button>
+        <button class="rp-tab" id="rpBtnOwe" data-pane="rpOwe" type="button">
+            <i class="bi bi-hourglass-split me-1"></i><?= t('Suppliers you owe') ?> <span class="rp-owe-ct" id="rpOweBadge"></span>
+        </button>
     </div>
 
     <!-- New supplier: just a name and a phone number -->
@@ -293,10 +291,8 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
         </div></div>
     </div>
 
-    <!-- Recent purchases — full width, numbered, with a total -->
-    <div class="rp-card mb-3" id="rpRecent">
-        <div class="rp-card-h d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h6><i class="bi bi-clock-history me-1"></i><?= t('Recent purchases') ?> <span class="rp-count" id="rpCount">0</span></h6>
+    <div class="rp-card mb-3 rp-tab-card" id="rpRecent">
+        <div class="rp-card-h d-flex justify-content-end align-items-center flex-wrap gap-2">
             <div class="btn-group btn-group-sm rp-seg rp-range" role="group" aria-label="<?= htmlspecialchars(t('Recent purchases')) ?>">
                 <input type="radio" class="btn-check" name="rpRange" id="rpRangeAll" value="all" checked>
                 <label class="btn btn-outline-primary" for="rpRangeAll"><?= t('All') ?></label>
@@ -316,6 +312,18 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
                 <tfoot><tr><th></th><th></th><th></th><th></th><th class="text-end"><?= t('Total') ?></th><th class="text-end" id="rpFootTotal">0</th><th></th><th></th></tr></tfoot>
             </table>
         </div>
+    </div>
+    <div class="rp-card mb-3 rp-tab-card" id="rpOwe" style="display:none;">
+        <div class="rp-card-h d-flex justify-content-end align-items-center flex-wrap gap-2">
+            <span class="fw-bold" id="rpOweTotal"></span>
+        </div>
+        <div class="rp-table-wrap"><table class="table table-sm table-hover align-middle mb-0 w-100 rp-table" id="rpOweTable" style="width:100%">
+            <thead><tr>
+                <th style="width:48px;"><?= t('S/No.') ?></th><th><?= t('Supplier') ?></th><th><?= t('What') ?></th><th><?= t('Date') ?></th><th><?= t('Pay by') ?></th>
+                <th class="text-end"><?= t('Total') ?></th><th class="text-end"><?= t('Paid') ?></th><th class="text-end"><?= t('Owed') ?></th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+        </table></div>
     </div>
 
     <!-- New ingredient (opened from the search: "+ Add … as a new ingredient") -->
@@ -403,6 +411,13 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
 .rp-page .rp-table tfoot th, .rp-page .dataTables_scrollFoot tfoot th { background:#e7f0ff; color:#0b3d91; border-top:1px solid #b6ccfe; white-space:nowrap; }
 .rp-page .rp-empty { color:#6c757d; padding:18px 0; }
 .rp-page .rp-empty i { display:block; font-size:24px; color:#b6ccfe; }
+/* Tab strip */
+.rp-page .rp-tabs { display:flex; gap:0; }
+.rp-page .rp-tab { background:#f4f8ff; border:1px solid #dbe6fb; border-bottom:none; border-radius:10px 10px 0 0; padding:8px 16px; font-size:.88rem; font-weight:600; color:#495057; cursor:pointer; transition:background .15s; margin-right:4px; }
+.rp-page .rp-tab.active { background:#fff; border-color:#dbe6fb; color:#0d6efd; }
+.rp-page .rp-tab:not(.active):hover { background:#e7f0ff; color:#0b3d91; }
+.rp-page .rp-tab-card { border-top-left-radius:0 !important; border-top-right-radius:0 !important; }
+.rp-page .rp-owe-ct { font-size:.7rem; padding:1px 7px; border-radius:20px; background:#fff1d6; color:#7a4b00; display:inline-block; min-width:0; }
 </style>
 
 <?php if ($warehouses && $can_buy): ?>
@@ -631,23 +646,18 @@ function rpAlreadySaved(kind, name, qty, total, date) {
 let rpDebts = {};
 function loadDebts() {
     $.getJSON(RP.creditApi, { action: 'debts', warehouse_id: rpWh() }, function (res) {
-        const rows = res.success ? res.data : [], body = $('#rpOweTable tbody').empty();
+        const rows = res.success ? res.data : [];
         rpDebts = {};
-        if (!rows.length) { body.append('<tr><td colspan="9" class="text-muted text-center py-3">' + RP.s.noDebts + '</td></tr>'); $('#rpOweTotal').text(''); return; }
-        rows.forEach((r, idx) => {
-            rpDebts[r.id] = r;
-            body.append('<tr><td class="text-muted">' + (idx + 1) + '</td><td><span class="fw-semibold">' + safeOutput(r.supplier_name) + '</span>' + (r.phone ? '<br><small class="text-muted">' + safeOutput(r.phone) + '</small>' : '') + '</td>'
-                + '<td>' + safeOutput(r.what) + '</td><td>' + safeOutput(r.date_raised) + '</td>'
-                + '<td>' + (r.due_date ? safeOutput(r.due_date) : '—') + (+r.overdue ? '<span class="rp-late">' + RP.s.overdue + '</span>' : '') + '</td>'
-                + '<td class="text-end">' + fmt(r.amount) + '</td><td class="text-end">' + fmt(r.amount_paid) + '</td><td class="text-end fw-bold">' + fmt(r.owed) + '</td>'
-                + '<td class="text-end"><button type="button" class="btn btn-sm btn-primary rp-pay-btn" data-id="' + (+r.id) + '"><i class="bi bi-cash-coin me-1"></i>' + RP.s.pay + '</button></td></tr>');
-        });
-        $('#rpOweTotal').text(RP.s.totalOwed + ': ' + fmt(res.total) + ' ' + RP.cur);
+        rows.forEach(r => { rpDebts[r.id] = r; });
+        rpOweDT.clear().rows.add(rows).draw();
+        $('#rpOweTotal').text(rows.length ? RP.s.totalOwed + ': ' + fmt(res.total) + ' ' + RP.cur : '');
+        $('#rpOweBadge').text(rows.length ? rows.length : '');
     });
 }
 
 // ── Recent purchases ──
 let rpDT = null;     // standard DataTable; reloaded with clear().rows.add().draw()
+let rpOweDT = null;  // DataTable for the suppliers-you-owe table
 let rpRange = 'all'; // All · Today · This week
 const rpNum = (v, type, html) => (type === 'sort' || type === 'type') ? (v === null || v === undefined ? -1 : +v) : html;
 function loadPurchases() {
@@ -712,6 +722,40 @@ $(function () {
     $(window).on('resize', () => rpDT.columns.adjust());
     $('input[name="rpRange"]').on('change', function () { rpRange = this.value; rpDT.draw(); });
     $('#rpTable').on('click', '.rp-again', function () { rpBuyAgain(+$(this).data('i')); });
+
+    // Suppliers you owe — DataTable
+    rpOweDT = $('#rpOweTable').DataTable({
+        responsive: false, scrollX: true, autoWidth: false, pageLength: 25, order: [], dom: 'rtip',
+        data: [],
+        columns: [
+            { data: null, orderable: false, searchable: false, className: 'rp-sno', render: () => '' },
+            { data: 'supplier_name', render: (d, t, r) => t !== 'display' ? d :
+                '<span class="fw-semibold">' + safeOutput(d) + '</span>' + (r.phone ? '<br><small class="text-muted">' + safeOutput(r.phone) + '</small>' : '') },
+            { data: 'what', render: (d, t) => t !== 'display' ? d : safeOutput(d) },
+            { data: 'date_raised', render: (d, t) => t !== 'display' ? d : safeOutput(d) },
+            { data: 'due_date', render: (d, t, r) => t !== 'display' ? (d || '') :
+                (d ? safeOutput(d) : '—') + (+r.overdue ? '<span class="rp-late ms-1">' + RP.s.overdue + '</span>' : '') },
+            { data: 'amount',      className: 'text-end', render: (d, t) => t === 'display' ? fmt(d) : +d },
+            { data: 'amount_paid', className: 'text-end', render: (d, t) => t === 'display' ? fmt(d) : +d },
+            { data: 'owed',        className: 'text-end', render: (d, t) => t === 'display' ? '<strong>' + fmt(d) + '</strong>' : +d },
+            { data: null, orderable: false, searchable: false, className: 'text-end', render: (d, t, r) => t !== 'display' ? '' :
+                '<button type="button" class="btn btn-sm btn-primary rp-pay-btn" data-id="' + (+r.id) + '"><i class="bi bi-cash-coin me-1"></i>' + RP.s.pay + '</button>' }
+        ],
+        drawCallback: function () {
+            this.api().column(0, { search: 'applied', order: 'applied' }).nodes().each((c, i) => { c.textContent = i + 1; });
+        },
+        language: { emptyTable: '<div class="text-muted text-center py-3">' + RP.s.noDebts + '</div>', zeroRecords: '<div class="text-muted text-center py-3">' + RP.s.noDebts + '</div>' }
+    });
+    $(window).on('resize', () => rpOweDT.columns.adjust());
+
+    // Tab switching
+    $('.rp-tab').on('click', function () {
+        const pane = $(this).data('pane');
+        $('.rp-tab').removeClass('active');
+        $(this).addClass('active');
+        if (pane === 'rpRecent') { $('#rpOwe').hide(); $('#rpRecent').show(); rpDT.columns.adjust(); }
+        else { $('#rpRecent').hide(); $('#rpOwe').show(); rpOweDT.columns.adjust(); }
+    });
 
     $('#rpSupplier, #rpShop').select2({ theme: 'bootstrap-5', width: '100%' });
     $('#rpItem').select2({
@@ -894,7 +938,7 @@ $(function () {
     }
     if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['bill', 'shop']);
     rpPayUi();
-    if (location.hash === '#rpOwe') setTimeout(() => document.getElementById('rpOwe').scrollIntoView({ behavior: 'smooth' }), 400);
+    if (location.hash === '#rpOwe') setTimeout(() => { $('#rpBtnOwe').trigger('click'); document.getElementById('rpOwe').scrollIntoView({ behavior: 'smooth' }); }, 400);
 });
 </script>
 <?php endif; ?>
