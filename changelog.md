@@ -1,5 +1,9 @@
 # BMS Changelog
 
+## 2026-11-04 — ui(pos): Sales history mobile cards — icon-only action button, right-aligned, opens upward
+
+- `app/bms/pos/pos_dashboard.php` — `actionMenu(block=true)`: removed "Vitendo/Actions" label (icon only), removed `w-100` (compact, right-aligned via `d-flex justify-content-end`), added `dropup` so dropdown opens upward — fixes "Void Sale" being clipped below viewport for the last card; desktop table unchanged
+
 ## 2026-11-04 — ui(restaurant): Public menu — professional language dropdown + cart3 icon
 
 - `public_menu.php` — replaced plain language link with a dropdown button (globe icon, current code EN/SW, flag + full name options, checkmark on active, matches login page style); changed cart button icon from `bi-bag` → `bi-cart3` (matches retail POS)
