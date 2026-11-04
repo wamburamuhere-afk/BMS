@@ -248,7 +248,14 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 @keyframes tbBump{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
 .tb-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--brand);color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
 #myOrdersCnt{background:var(--accent)}
-@media(max-width:400px){.lang .lang-t{display:none}.lang{padding:6px 10px}.lang i{margin:0!important}}
+.lang-dd{position:relative}
+.lang-btn-x{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.8rem;font-weight:600;color:#555;cursor:pointer;display:flex;align-items:center;gap:5px;transition:border-color .15s,color .15s;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.lang-btn-x:hover{border-color:#9ca3af;color:var(--ink)}
+.lang-menu-x{position:absolute;right:0;top:40px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;min-width:150px;box-shadow:0 6px 20px rgba(0,0,0,.12);overflow:hidden;z-index:9999;display:none}
+.lang-menu-x a{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:.85rem;color:#333;text-decoration:none;transition:background .15s;white-space:nowrap}
+.lang-menu-x a:hover{background:#f4f8ff;color:var(--brand)}
+.lang-menu-x a.active{font-weight:700;color:var(--brand)}
+.lang-chk{font-size:.7rem;margin-left:auto}
 .ord-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--soft);text-decoration:none;color:var(--ink)}
 .ord-row:last-child{border-bottom:0}
 .ord-row .oc{font-weight:800;font-size:1.05rem;letter-spacing:.01em}
@@ -279,9 +286,23 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
       <button type="button" class="tb-btn d-none" id="myOrdersBtn" aria-label="<?= $e(t('My orders')) ?>" title="<?= $e(t('My orders')) ?>"><i class="bi bi-receipt"></i><span class="tb-badge d-none" id="myOrdersCnt">0</span></button>
       <?php endif; ?>
       <?php if ($canOrder): ?>
-      <button type="button" class="tb-btn" id="cartBtn" aria-label="<?= $e(t('Your order')) ?>" title="<?= $e(t('Your order')) ?>"><i class="bi bi-bag"></i><span class="tb-badge d-none" id="cartCnt">0</span></button>
+      <button type="button" class="tb-btn" id="cartBtn" aria-label="<?= $e(t('Your order')) ?>" title="<?= $e(t('Your order')) ?>"><i class="bi bi-cart3"></i><span class="tb-badge d-none" id="cartCnt">0</span></button>
       <?php endif; ?>
-      <a class="lang" href="<?= $e($langUrl) ?>" rel="nofollow"><i class="bi bi-translate me-1"></i><span class="lang-t"><?= $e($otherLangLabel) ?></span></a>
+      <div class="lang-dd">
+        <button class="lang-btn-x" id="omLangBtn" type="button" aria-label="<?= $e(t('Language')) ?>" aria-haspopup="true" aria-expanded="false">
+          <i class="bi bi-globe2"></i>
+          <?= $e(strtoupper($lang)) ?>
+          <i class="bi bi-chevron-down lang-chk" style="font-size:.6rem"></i>
+        </button>
+        <div class="lang-menu-x" id="omLangMenu" role="menu">
+          <a href="<?= $e($selfPath . '?lang=en') ?>" class="<?= $lang === 'en' ? 'active' : '' ?>" rel="nofollow" role="menuitem">
+            🇬🇧 English<?php if ($lang === 'en'): ?> <i class="bi bi-check2 lang-chk"></i><?php endif; ?>
+          </a>
+          <a href="<?= $e($selfPath . '?lang=sw') ?>" class="<?= $lang === 'sw' ? 'active' : '' ?>" rel="nofollow" role="menuitem">
+            🇹🇿 Kiswahili<?php if ($lang === 'sw'): ?> <i class="bi bi-check2 lang-chk"></i><?php endif; ?>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -742,6 +763,18 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 
   renderChips(); renderGrid(); paintBar();
 <?php endif; ?>
+})();
+// Language dropdown toggle
+(function(){
+  var btn=document.getElementById('omLangBtn'),menu=document.getElementById('omLangMenu');
+  if(!btn||!menu)return;
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    var open=menu.style.display==='block';
+    menu.style.display=open?'none':'block';
+    btn.setAttribute('aria-expanded',open?'false':'true');
+  });
+  document.addEventListener('click',function(){menu.style.display='none';btn.setAttribute('aria-expanded','false');});
 })();
 </script>
 </body>
