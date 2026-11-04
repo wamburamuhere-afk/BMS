@@ -1,5 +1,10 @@
 # BMS Changelog
 
+## 2026-11-04 — fix(superadmin): Receipts & Invoices column counts POS receipts + active invoices correctly
+
+- `core/tenant_admin.php` — `tenantOperationalSnapshot()`: replaced single unfiltered `SELECT COUNT(*) FROM invoices` with two graceful try/catch queries: (1) `pos_sales WHERE sale_status != 'voided'` for all tenants, (2) `invoices WHERE status NOT IN ('cancelled','deleted','void')` for BMS tenants; total returned as `invoices` key
+- `app/superadmin/tenant_view.php` — renamed metric label from "Invoices" to "Receipts & Invoices" to reflect the combined count
+
 ## 2026-11-04 — fix(pos): quantity input updates totals in real-time while typing
 
 - `app/bms/pos/pos_scripts_new.php` — added `oninput="updateCartQuantityLive()"` to the cart quantity input; new function updates only the row's line total + cart total without rebuilding the DOM (cursor stays intact); `onchange` still handles validation toasts + full redraw on blur/Enter

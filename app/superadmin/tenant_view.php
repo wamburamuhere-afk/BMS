@@ -967,7 +967,7 @@ if ($hasContext ?? false):
                             </div>
                             <div class="col-6 col-md-3">
                                 <div class="fs-4 fw-bold" id="opInvoices">0</div>
-                                <div class="small text-muted">Invoices</div>
+                                <div class="small text-muted">Receipts &amp; Invoices</div>
                             </div>
                         </div>
                     </div>
