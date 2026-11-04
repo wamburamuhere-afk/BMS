@@ -401,6 +401,45 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         // the chart: one scale for both series of each tab
         $S = $rdSeries; $mxS = max(1, max(array_merge($S['sales'], $S['sales_prev'], [0]))); $mxO = max(1, max(array_merge($S['orders'], $S['orders_prev'], [0])));
         $every = count($S['labels']) > 16 ? (int)ceil(count($S['labels']) / 12) : 1;   // a label every few bars on a month
+        // Profit view (2026-11-03): sales up, each slot's costs down in three parts (drinks & stock SOLD, food BOUGHT,
+        // expenses), and profit SO FAR in the period as a line — red while still at a loss. Same slots as Sales/Orders;
+        // ends at the Profit tile's figure. Not by hour: food is bought in the morning and sold all day.
+        $PT = ['stock' => (float)($S['p_tot']['stock'] ?? 0), 'food' => 0.0, 'exp' => (float)($cur['expenses'] ?? 0)];
+        $PT['food'] = round((float)$cur['cost'] - $PT['stock'], 2);           // the two always add up to the Cost of goods figure
+        $pSvg = '';
+        if ($rdMoney && $k !== 'today' && !empty($S['labels'])) {
+            $pn = count($S['labels']);
+            $pc = array_map(fn($i) => ($S['p_stock'][$i] ?? 0) + ($S['p_food'][$i] ?? 0) + ($S['p_exp'][$i] ?? 0), range(0, $pn - 1));
+            $up = max(1, max(array_merge($S['sales'], $S['p_cum'], [0]))); $down = max(0, max(array_merge($pc, array_map(fn($v) => -$v, $S['p_cum']), [0])));
+            $W = 1000; $H = 220; $top = 8; $span = ($up + $down) * 1.06; $z = $top + $up / $span * ($H - 2 * $top);
+            $Y = fn($v) => round($z - $v / $span * ($H - 2 * $top), 2);
+            $slot = $W / $pn; $bw = round($slot * 0.46, 2);
+            $o = ['<line x1="0" y1="' . $z . '" x2="' . $W . '" y2="' . $z . '" stroke="#9ca3af" stroke-width="1" vector-effect="non-scaling-stroke"/>'];
+            $pts = [];
+            foreach ($S['labels'] as $i => $lb) {
+                $x = round($i * $slot + ($slot - $bw) / 2, 2); $sv = (float)($S['sales'][$i] ?? 0);
+                if ($sv > 0) $o[] = '<rect x="' . $x . '" y="' . $Y($sv) . '" width="' . $bw . '" height="' . round($z - $Y($sv), 2) . '" fill="#9ec5fe"/>';
+                $base = 0.0;
+                foreach ([['p_stock', '#f59e0b'], ['p_food', '#fdba74'], ['p_exp', '#94a3b8']] as [$key, $col]) {
+                    $v = max(0, (float)($S[$key][$i] ?? 0));
+                    if ($v > 0) { $o[] = '<rect x="' . $x . '" y="' . $Y(-$base) . '" width="' . $bw . '" height="' . round($Y(-$base - $v) - $Y(-$base), 2) . '" fill="' . $col . '"/>'; $base += $v; }
+                }
+                $tip = $lb . ' — ' . t('Sales') . ': ' . $rdFmt($sv) . ' · ' . t('Drinks & stock sold') . ': ' . $rdFmt($S['p_stock'][$i] ?? 0) . ' · ' . t('Food bought') . ': ' . $rdFmt($S['p_food'][$i] ?? 0)
+                     . ' · ' . t('Expenses') . ': ' . $rdFmt($S['p_exp'][$i] ?? 0) . ' · ' . (($S['p_cum'][$i] ?? 0) < 0 ? t('Loss so far') : t('Profit so far')) . ': ' . $rdFmt($S['p_cum'][$i] ?? 0);
+                $o[] = '<rect x="' . round($i * $slot, 2) . '" y="0" width="' . round($slot, 2) . '" height="' . $H . '" fill="transparent"><title>' . htmlspecialchars($tip) . '</title></rect>';
+                $pts[] = [round($i * $slot + $slot / 2, 2), (float)($S['p_cum'][$i] ?? 0)];
+            }
+            for ($i = 1; $i < count($pts); $i++) {           // the line, split where it crosses zero so each part has its colour
+                [$x1, $v1] = $pts[$i - 1]; [$x2, $v2] = $pts[$i];
+                $segs = (($v1 < 0) === ($v2 < 0)) ? [[$x1, $v1, $x2, $v2]] : (function () use ($x1, $v1, $x2, $v2) { $xm = $x1 + ($x2 - $x1) * ($v1 / ($v1 - $v2)); return [[$x1, $v1, $xm, 0.0], [$xm, 0.0, $x2, $v2]]; })();
+                foreach ($segs as [$a, $va, $b, $vb]) {
+                    $neg = ($va + $vb) / 2 < 0;
+                    $o[] = '<line x1="' . $a . '" y1="' . $Y($va) . '" x2="' . $b . '" y2="' . $Y($vb) . '" stroke="' . ($neg ? '#dc3545' : '#052c65') . '" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
+                }
+            }
+            if (count($pts) === 1) $o[] = '<line x1="' . ($pts[0][0] - 6) . '" y1="' . $Y($pts[0][1]) . '" x2="' . ($pts[0][0] + 6) . '" y2="' . $Y($pts[0][1]) . '" stroke="' . ($pts[0][1] < 0 ? '#dc3545' : '#052c65') . '" stroke-width="3" vector-effect="non-scaling-stroke"/>';
+            $pSvg = '<svg class="rd2-psvg" viewBox="0 0 ' . $W . ' ' . $H . '" preserveAspectRatio="none" role="img" aria-label="' . htmlspecialchars($unitWord . ': ' . t('Profit so far')) . '">' . implode('', $o) . '</svg>';
+        }
         // "Needs your attention": warnings first (amber), then the rest (blue); low stock names the items
         $att = [];
         foreach ($rdAttention as $a) {
@@ -478,12 +517,14 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         <section class="rd2-chart rdp-card">
             <div class="rdp-card-h">
                 <div>
-                    <h6 class="rd2-ct-title" data-sales="<?= htmlspecialchars(t('Sales')) ?>" data-orders="<?= htmlspecialchars(t('Orders')) ?>"><?= t('Sales') ?></h6>
-                    <div class="rd2-legend"><?= $unitWord ?> · <span class="rd2-lc">■ <?= $nowWord ?></span> · <span class="rd2-lp">■ <?= $prevWord ?></span></div>
+                    <h6 class="rd2-ct-title" data-sales="<?= htmlspecialchars(t('Sales')) ?>" data-orders="<?= htmlspecialchars(t('Orders')) ?>" data-profit="<?= htmlspecialchars(t('Profit')) ?>"><?= t('Sales') ?></h6>
+                    <div class="rd2-legend" data-ctv="sales orders"><?= $unitWord ?> · <span class="rd2-lc">■ <?= $nowWord ?></span> · <span class="rd2-lp">■ <?= $prevWord ?></span></div>
+                    <?php if ($rdMoney): ?><div class="rd2-legend rd2-plegend d-none" data-ctv="profit"><?= $k === 'today' ? $nowWord : $unitWord . ' · ' . $nowWord ?></div><?php endif; ?>
                 </div>
                 <div class="btn-group btn-group-sm rd2-ct" role="group" aria-label="<?= htmlspecialchars(t('Chart')) ?>">
                     <button type="button" class="btn btn-outline-primary active" data-ct="sales"><?= t('Sales') ?></button>
                     <button type="button" class="btn btn-outline-primary" data-ct="orders"><?= t('Orders') ?></button>
+                    <?php if ($rdMoney): ?><button type="button" class="btn btn-outline-primary" data-ct="profit"><?= t('Profit') ?></button><?php endif; ?>
                 </div>
             </div>
             <div class="rd2-plot">
@@ -496,9 +537,42 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <?php endforeach; ?>
                 </div>
                 <?php endforeach; ?>
-                <div class="rd2-bl"><?php foreach ($S['labels'] as $i => $lb): ?><span><?= $i % $every === 0 ? htmlspecialchars($lb) : '' ?></span><?php endforeach; ?></div>
+                <?php if ($rdMoney):
+                    $pNow = (float)$cur['profit']; $pVs = $rdStory['profit_vs_prev'] ?? null; ?>
+                <div class="rd2-bars rd2-pv d-none" data-ct="profit">
+                    <div class="rd2-pv-h">
+                        <div>
+                            <div class="rd2-pv-k"><?= htmlspecialchars(($pNow < 0 ? t('Loss so far') : t('Profit so far')) . ' · ' . $nowWord) ?></div>
+                            <div class="rd2-pv-v <?= $pNow < 0 ? 'text-danger' : '' ?>"><?= $rdFmt(abs($pNow)) . $rdCurTag ?></div>
+                        </div>
+                        <?php if ($pVs !== null && $hasSales): ?><span class="rd2-pv-vs <?= $pVs < 0 ? 'rd2-pv-down' : '' ?>"><?= ($pVs >= 0 ? '+' : '') . $pct($pVs) ?>% <?= htmlspecialchars(sprintf(t('vs %s'), $prevWord)) ?></span><?php endif; ?>
+                        <?php if ($unc > 0 || $rdWarn): ?><span class="rd2-pv-est"><?= t('Estimated') ?></span><?php endif; ?>
+                    </div>
+                    <?php if ($pSvg !== ''): ?><div class="rd2-pv-legend">
+                        <span><i style="background:#9ec5fe"></i><?= t('Sales') ?></span>
+                        <span><i style="background:#f59e0b"></i><?= t('Drinks & stock sold') ?></span>
+                        <span><i style="background:#fdba74"></i><?= t('Food bought') ?></span>
+                        <span><i style="background:#94a3b8"></i><?= t('Expenses') ?></span>
+                        <span><i class="rd2-pv-ln" style="background:#052c65"></i><?= t('Profit so far') ?></span>
+                        <span><i class="rd2-pv-ln" style="background:#dc3545"></i><?= t('Loss so far') ?></span>
+                    </div><?php endif; ?>
+                    <?php if ($pSvg !== ''): ?>
+                    <?= $pSvg ?>
+                    <?php else: ?>
+                    <div class="rd2-pv-today">
+                        <div class="rd2-pv-row"><span><?= t('Sales') ?></span><b><?= $rdFmt($cur['sales']) ?></b></div>
+                        <div class="rd2-pv-row"><span>− <?= t('Drinks & stock sold') ?></span><b><?= $rdFmt($PT['stock']) ?></b></div>
+                        <div class="rd2-pv-row"><span>− <?= t('Food bought') ?></span><b><?= $rdFmt($PT['food']) ?></b></div>
+                        <div class="rd2-pv-row"><span>− <?= t('Expenses') ?></span><b><?= $rdFmt($PT['exp']) ?></b></div>
+                        <div class="rd2-muted small mt-2"><?= t('Profit is not shown by hour: food is bought in the morning and sold all day, so hours would mislead. Choose This week or longer to see profit day by day.') ?></div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+                <div class="rd2-bl" data-today="<?= $k === 'today' ? '1' : '0' ?>"><?php foreach ($S['labels'] as $i => $lb): ?><span><?= $i % $every === 0 ? htmlspecialchars($lb) : '' ?></span><?php endforeach; ?></div>
             </div>
-            <div class="rdp-foot">
+            <?php if ($rdMoney): ?><div class="rdp-foot d-none" data-ctv="profit"><?= t('Drinks and stock items count when they are sold; other food counts the day it is bought; expenses the day they are recorded.') ?><?= $pSvg !== '' ? ' ' . t('The line ends at the Profit figure above.') : '' ?></div><?php endif; ?>
+            <div class="rdp-foot" data-ctv="sales orders">
                 <?php if ($S['peak'] !== null): ?><?= t('Busiest') ?>: <b><?= htmlspecialchars($k === 'today' ? $S['peak'] . ':00' : $S['peak']) ?></b> · <?php endif; ?>
                 <?= $nowWord ?> <b><?= $rdFmt(array_sum($S['sales'])) ?></b> · <?= $prevWord ?> <?= $rdFmt(array_sum($S['sales_prev'])) ?>
             </div>
@@ -575,7 +649,8 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?php if ($unc > 0 || $rdWarn): ?><span class="rdp-pill rd2-pill-warn"><?= t('Estimated') ?></span><?php else: ?><span class="rdp-pill rdp-pill-ok"><?= t('Complete') ?></span><?php endif; ?></div>
             <div class="p-3">
                 <div class="rd2-ml"><span><?= t('Sales') ?></span><b><?= $rdFmt($cur['sales']) ?></b></div>
-                <div class="rd2-ml"><span><?= t('Cost of Goods') ?></span><b>− <?= $rdFmt($cur['cost']) ?></b></div>
+                <div class="rd2-ml"><span><?= t('Drinks & stock sold') ?></span><b>− <?= $rdFmt($PT['stock']) ?></b></div>
+                <div class="rd2-ml"><span><?= t('Food bought') ?></span><b>− <?= $rdFmt($PT['food']) ?></b></div>
                 <div class="rd2-ml"><span><?= t('Expenses') ?></span><b>− <?= $rdFmt($cur['expenses']) ?></b></div>
                 <div class="rd2-ml rd2-ml-total"><span><?= t('Net Profit') ?></span><b class="<?= $cur['profit'] < 0 ? 'text-danger' : '' ?>"><?= $rdFmt($cur['profit']) ?> <small><?= htmlspecialchars($rdCur) ?></small></b></div>
                 <?php if ($hasSales && $cur['profit'] >= 0): ?><div class="rd2-muted small mt-1"><?= sprintf(t('Of every 100 you sell, %s is yours.'), '<b>' . $pct($rdStory['per100']['profit']) . '</b>') ?></div>
@@ -709,6 +784,18 @@ a.rd2-tile-main:hover { background:#0b5ed7; border-color:#0b5ed7; color:#fff; }
 .rd2-legend { font-size:12px; color:#5b6472; margin-top:2px; } .rd2-lc { color:#0d6efd; font-weight:600; } .rd2-lp { color:#8a94a6; font-weight:600; }
 .rd2-ct .btn, .rdp-ptabs .btn { min-width:0 !important; font-size:12px !important; padding:4px 12px !important; line-height:1.4; font-weight:600; }
 .rd2-plot { padding:12px 16px 4px; }
+.rd2-bars.rd2-pv { display:block; height:auto; border-bottom:0; }
+.rd2-pv-h { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px 12px; margin-bottom:6px; }
+.rd2-pv-k { font-size:12px; color:#5b6472; font-weight:600; }
+.rd2-pv-v { font-size:24px; font-weight:800; color:#052c65; line-height:1.15; } .rd2-pv-v small { font-size:12px; color:#5b6472; font-weight:600; }
+.rd2-pv-vs { font-size:12px; font-weight:700; color:#047857; background:#ecfdf5; border-radius:999px; padding:3px 9px; }
+.rd2-pv-vs.rd2-pv-down { color:#b42318; background:#fef3f2; }
+.rd2-pv-est { font-size:11px; font-weight:700; color:#92400e; background:#fef3c7; border-radius:999px; padding:3px 9px; }
+.rd2-pv-legend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:#374151; margin-bottom:6px; }
+.rd2-pv-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.rd2-pv-legend i.rd2-pv-ln { width:14px; height:3px; border-radius:2px; vertical-align:2px; }
+.rd2-psvg { display:block; width:100%; height:220px; border-bottom:1px solid #e3eaf7; }
+.rd2-pv-today { max-width:420px; padding:6px 0 8px; } .rd2-pv-row { display:flex; justify-content:space-between; font-size:14px; padding:4px 0; border-bottom:1px dashed #eef0f3; }
 .rd2-bars { display:flex; align-items:flex-end; gap:6px; height:210px; border-bottom:1px solid #e3eaf7; }
 .rd2-b { flex:1; display:flex; align-items:flex-end; justify-content:center; gap:2px; height:100%; min-width:0; }
 .rd2-b span { width:44%; max-width:14px; border-radius:4px 4px 0 0; min-height:1px; }
@@ -765,6 +852,7 @@ a.rd2-row:hover { filter:brightness(.98); color:#0a58ca; }
     .rd2-sum { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
     .rd2-tile { padding:12px; } .rd2-tv { font-size:19px; }
     .rd2-bars { height:140px; gap:3px; } .rd2-b span { width:46%; }
+    .rd2-psvg { height:170px; } .rd2-pv-v { font-size:20px; }
 }
 </style>
 
@@ -855,6 +943,8 @@ a.rd2-row:hover { filter:brightness(.98); color:#0a58ca; }
         b.addEventListener('click', function () {
             root.querySelectorAll('.rd2-ct button').forEach(x => x.classList.remove('active')); b.classList.add('active');
             root.querySelectorAll('.rd2-bars').forEach(x => x.classList.toggle('d-none', x.dataset.ct !== b.dataset.ct));
+            root.querySelectorAll('[data-ctv]').forEach(x => x.classList.toggle('d-none', (' ' + x.dataset.ctv + ' ').indexOf(' ' + b.dataset.ct + ' ') < 0));
+            const bl = root.querySelector('.rd2-chart .rd2-bl'); if (bl) bl.classList.toggle('d-none', b.dataset.ct === 'profit' && bl.dataset.today === '1');   // Today: no hourly profit, so no hour labels
             const h = root.querySelector('.rd2-ct-title'); if (h) h.textContent = h.dataset[b.dataset.ct] || h.textContent;
         });
     });

@@ -600,13 +600,46 @@ if (!function_exists('rdCompareSeries')) {
             } catch (Throwable $e) { error_log('rdCompareSeries orders: ' . $e->getMessage()); }
             return $out;
         };
+        // Profit view (2026-11-03): each slot's costs from the one ledger, split the way a restaurant owner
+        // thinks about them — drinks & stock items SOLD (cost posted with the sale: *_cogs entries), food
+        // BOUGHT without stock (every other Cost-of-goods posting: "Something else", Buy ingredients, grocery
+        // bills — counted the day bought), and expenses. Sales − the three = profit, the same buckets as above.
+        $parts = function (string $a, string $b) use ($pdo, $jeScope, $pos, $n): array {
+            $out = ['stock' => array_fill(0, $n, 0.0), 'food' => array_fill(0, $n, 0.0), 'exp' => array_fill(0, $n, 0.0)];
+            try {
+                $st = $pdo->prepare("
+                    SELECT " . $pos('je.entry_date', 'je.created_at', $a) . " AS p,
+                           SUM(CASE WHEN at.category = 'cogs' AND je.entity_type LIKE '%\\_cogs%' THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS stock,
+                           SUM(CASE WHEN at.category = 'cogs' AND (je.entity_type IS NULL OR je.entity_type NOT LIKE '%\\_cogs%') THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS food,
+                           SUM(CASE WHEN at.category IN ('expense','finance_cost') THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS exp
+                      FROM journal_entry_items jei
+                      JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
+                      JOIN accounts a         ON a.account_id = jei.account_id
+                      JOIN account_types at   ON at.type_id = a.account_type_id AND at.category IN ('cogs','expense','finance_cost')
+                     WHERE je.entry_date BETWEEN ? AND ? $jeScope
+                  GROUP BY p");
+                $st->execute([$a, $b]);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $p = (int)$row['p'];
+                    if ($p < 0 || $p >= $n) continue;
+                    foreach (['stock', 'food', 'exp'] as $c) $out[$c][$p] = round((float)$row[$c], 2);
+                }
+            } catch (Throwable $e) { error_log('rdCompareSeries profit: ' . $e->getMessage()); }
+            return $out;
+        };
         $o = ['key' => $key, 'labels' => $labels,
               'sales' => $sales($r['from'], $r['to']), 'sales_prev' => $sales($r['prev_from'], $r['prev_to']),
               'orders' => $orders($r['from'], $r['to']), 'orders_prev' => $orders($r['prev_from'], $r['prev_to'])];
+        $pp = $parts($r['from'], $r['to']);
+        $o['p_stock'] = $pp['stock']; $o['p_food'] = $pp['food']; $o['p_exp'] = $pp['exp'];
+        // Period totals for the Money panel — taken before "today" trims the night hours off the slots.
+        $o['p_tot'] = ['stock' => round(array_sum($pp['stock']), 2), 'food' => round(array_sum($pp['food']), 2), 'exp' => round(array_sum($pp['exp']), 2)];
+        $o['p_cum'] = []; $run = 0.0;
+        foreach ($o['sales'] as $i => $s) { $run += $s - $pp['stock'][$i] - $pp['food'][$i] - $pp['exp'][$i]; $o['p_cum'][] = round($run, 2); }
         if ($key === 'today') {                    // trim the night: from 08:00 (or the first sale) to 21:00 (or the last)
             $busy = []; for ($h = 0; $h < 24; $h++) if ($o['sales'][$h] != 0 || $o['sales_prev'][$h] != 0 || $o['orders'][$h] || $o['orders_prev'][$h]) $busy[] = $h;
             $lo = $busy ? min($busy[0], 8) : 8; $hi = $busy ? max(end($busy), 21) : 21;
-            foreach (['labels', 'sales', 'sales_prev', 'orders', 'orders_prev'] as $k) $o[$k] = array_slice($o[$k], $lo, $hi - $lo + 1);
+            foreach (['labels', 'sales', 'sales_prev', 'orders', 'orders_prev', 'p_stock', 'p_food', 'p_exp', 'p_cum'] as $k) $o[$k] = array_slice($o[$k], $lo, $hi - $lo + 1);
         }
         $mx = $o['sales'] ? max($o['sales']) : 0;
         $o['peak'] = $mx > 0 ? $o['labels'][array_search($mx, $o['sales'], true)] : null;

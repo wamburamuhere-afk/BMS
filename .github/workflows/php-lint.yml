@@ -199,3 +199,6 @@ jobs:
 
       - name: Restaurant notifications (bell + email, links)
         run: php tests/test_restaurant_notifications_cli.php
+
+      - name: Restaurant dashboard profit view
+        run: php tests/test_restaurant_profit_chart_cli.php
