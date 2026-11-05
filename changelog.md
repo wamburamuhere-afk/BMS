@@ -406,6 +406,13 @@ Found by walking one real order through the restaurant on the demo, then fixed a
 - **Not changed (checked, and my first reading was wrong):** the till already has a payment-method choice (Cash by default) and an amount-received field that fills itself; they sit below the cart on a short screen. The Getting-started checklist is correct (earlier sales existed in the demo).
 - **Checked:** `test_restaurant_simplicity_cli` 72/0 (real endpoints in a rolled-back transaction, the till and pages rendered and script-parsed, retail regression cases); restaurant phases 0–7, mode gating and i18n coverage green; the new-company template refreshed (1 migration). Browser walk-through on localhost: tap Pilau ×2 → choose table from the popup → save with no shift → Tables board shows the order → Send to Kitchen → ticket on the Kitchen Display; retail shop control unchanged.
 
+## 2026-11-05 — fix(pos): held sales modal responsive on mobile
+
+**Changed:** `app/bms/pos/pos_modals_new.php`, `app/bms/pos/pos_scripts_new.php`.
+
+- **Why:** the 6-column table wrapped headers and pushed the Load button off-screen on phones.
+- Modal uses `modal-fullscreen-sm-down` (full screen on phones). Desktop keeps the existing table inside a `table-responsive` wrapper. Mobile gets a card list: reference + customer + time on one line, item count + total on the next, and a full-width Load button at the bottom of each card.
+
 ## 2026-11-02 — fix(print): wider Description column on service documents (default templates)
 
 **Changed:** `app/bms/invoice/invoice_print.php`, `app/bms/sales/print_sales_order.php`, `app/bms/sales/quotations/print_quotation.php`.

@@ -2678,14 +2678,13 @@ function showHeldSales() {
                 const tbody = $('#heldSalesBody');
                 tbody.empty();
 
+                const cards = $('#heldSalesCards');
+                cards.empty();
+
                 if (response.data.length === 0) {
-                    tbody.html(`
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">
-                                ${PT.noHeldSalesFound}
-                            </td>
-                        </tr>
-                    `);
+                    const empty = `<div class="text-center text-muted py-4">${PT.noHeldSalesFound}</div>`;
+                    tbody.html(`<tr><td colspan="6" class="text-center text-muted">${PT.noHeldSalesFound}</td></tr>`);
+                    cards.html(empty);
                 } else {
                     response.data.forEach(sale => {
                         const isOnline = !!sale.online_order_id;
@@ -2693,13 +2692,19 @@ function showHeldSales() {
                         const ref = safeOutput(sale.hold_reference || 'HOLD-' + sale.hold_id)
                             + (isOnline ? ` <span class="badge bg-primary-subtle text-primary-emphasis">${PT.onlineOrder}</span>`
                                         + (sale.warehouse_name ? `<div class="small text-muted">${safeOutput(sale.warehouse_name)}</div>` : '') : '');
-                        const row = `
+                        const cust = safeOutput(sale.customer_name ? caseFormatJs(sale.customer_name) : PT.walkIn);
+                        const qty  = JSON.parse(sale.items_data).length;
+                        const amt  = POS_CURRENCY + ' ' + parseFloat(sale.total_amount).toLocaleString();
+                        const time = new Date(sale.held_at).toLocaleTimeString();
+
+                        // Desktop table row
+                        tbody.append(`
                             <tr>
                                 <td>${ref}</td>
-                                <td>${safeOutput(sale.customer_name ? caseFormatJs(sale.customer_name) : PT.walkIn)}</td>
-                                <td>${JSON.parse(sale.items_data).length}</td>
-                                <td>${POS_CURRENCY} ${parseFloat(sale.total_amount).toLocaleString()}</td>
-                                <td>${new Date(sale.held_at).toLocaleTimeString()}</td>
+                                <td>${cust}</td>
+                                <td>${qty}</td>
+                                <td>${amt}</td>
+                                <td>${time}</td>
                                 <td>
                                     <button class="btn btn-sm btn-primary" onclick="loadHeldSale(${sale.hold_id})">
                                         <i class="bi bi-arrow-clockwise"></i> ${PT.load}
@@ -2709,8 +2714,31 @@ function showHeldSales() {
                                     </button>`}
                                 </td>
                             </tr>
-                        `;
-                        tbody.append(row);
+                        `);
+
+                        // Mobile card
+                        cards.append(`
+                            <div class="card mb-2 shadow-sm border-0">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-bold">${ref}</span>
+                                        <small class="text-muted">${time}</small>
+                                    </div>
+                                    <div class="text-muted small mb-1">${cust}</div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="small">${qty} ${qty === 1 ? PT.item || 'item' : PT.items || 'items'} &nbsp;·&nbsp; <strong>${amt}</strong></span>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-top p-2 d-flex gap-2">
+                                    <button class="btn btn-primary flex-fill" onclick="loadHeldSale(${sale.hold_id})">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> ${PT.load}
+                                    </button>
+                                    ${isOnline ? '' : `<button class="btn btn-outline-danger" onclick="deleteHeldSale(${sale.hold_id})">
+                                        <i class="bi bi-trash"></i>
+                                    </button>`}
+                                </div>
+                            </div>
+                        `);
                     });
                 }
                 
