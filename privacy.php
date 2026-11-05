@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * privacy.php — public Privacy Policy, reachable without signing in at /privacy.
  *
@@ -33,6 +33,7 @@ $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
 <link rel="icon" type="image/png" href="assets/images/favicon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Privacy Policy | Business Management System</title>

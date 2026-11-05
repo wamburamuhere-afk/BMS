@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * change-password.php — the one page a user flagged `must_change_password`
  * can reach until they have chosen a password of their own.
@@ -130,6 +130,7 @@ try {
 <html lang="<?= htmlspecialchars($pageLang) ?>">
 <head>
     <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
 <link rel="icon" type="image/png" href="assets/images/favicon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
