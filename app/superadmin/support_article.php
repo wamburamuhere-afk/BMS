@@ -29,7 +29,6 @@ $isNew = (int)$a['id'] === 0;
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/svg+xml" href="<?= saUrl('assets/images/favicon.svg') ?>">
 <link rel="icon" type="image/png" href="<?= saUrl('assets/images/favicon.png') ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
