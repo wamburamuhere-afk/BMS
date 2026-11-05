@@ -50,21 +50,29 @@ try {
         $stmt->execute([$table_id, $warehouse_id]);
         $held_sales = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        // Get held sales for current user
+        // The user's own held sales, plus accepted ONLINE orders of any shop in their scope —
+        // whoever is at the till completes an online order, not only the person who accepted it.
+        $hasOnline = (bool)$pdo->query("SHOW COLUMNS FROM pos_held_sales LIKE 'online_order_id'")->fetch();
         $stmt = $pdo->prepare("
             SELECT
                 h.*,
-                c.customer_name
+                c.customer_name,
+                w.warehouse_name
             FROM pos_held_sales h
             LEFT JOIN customers c ON h.customer_id = c.customer_id
-            WHERE h.user_id = ?
-            AND h.status = 'held'
+            LEFT JOIN warehouses w ON w.warehouse_id = h.warehouse_id
+            WHERE h.status = 'held'
+              AND (h.user_id = ?" . ($hasOnline ? " OR h.online_order_id IS NOT NULL" : "") . ")
             ORDER BY h.held_at DESC
-            LIMIT 20
+            LIMIT 60
         ");
 
         $stmt->execute([$user_id]);
-        $held_sales = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        require_once __DIR__ . '/../../core/project_scope.php';
+        $held_sales = array_values(array_filter($stmt->fetchAll(PDO::FETCH_ASSOC), function ($h) use ($user_id) {
+            if ((int)$h['user_id'] === (int)$user_id) return true;
+            return !empty($h['online_order_id']) && $h['warehouse_id'] !== null && userCan('warehouse', (int)$h['warehouse_id']);
+        }));
     }
     
     echo json_encode([

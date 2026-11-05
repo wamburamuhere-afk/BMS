@@ -269,6 +269,13 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 .ord-row .bi-chevron-right{color:#9ca3af}
 .notice.info{background:#f3f4f6;color:#374151;margin-top:12px}
 .foot{color:var(--muted);font-size:.75rem;text-align:center;padding:24px 0 100px}
+.pay{background:var(--soft);border-radius:16px;padding:14px 16px;margin-top:14px}
+.pay-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.pay-row:last-of-type{border-bottom:0}
+.pay-row i{font-size:1.1rem;color:var(--muted);margin-top:2px}
+.pay-l{font-weight:600}
+.pay-n{font-weight:800;letter-spacing:.02em;user-select:all}
+.pay-row small{display:block;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -361,6 +368,26 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     <?php endforeach; ?>
     <div class="sum"><span><?= $e(t('Total')) ?></span><span data-money="<?= $e($order['subtotal']) ?>"></span></div>
     <p class="hint"><?= $e(t('You pay the waiter or the cashier. The final bill may change if staff adjust your order.')) ?></p>
+    <?php
+      // "Show our payment numbers" (Share menu): numbers from Payment Settings, the order code as reference.
+      // The system never marks an order paid by itself — staff confirm the payment at the till.
+      $payAccts = [];
+      if (!empty($ctx['warehouse']['show_payment']) && in_array($st, ['pending', 'accepted', 'ready'], true)) {
+          require_once __DIR__ . '/core/payment_accounts.php';
+          try { $payAccts = paymentAccountsForBuyer($pdo); } catch (Throwable $ex) { $payAccts = []; }
+      }
+    ?>
+    <?php if ($payAccts): ?>
+    <div class="pay">
+      <b><?= $e(t('You can also pay first')) ?></b>
+      <?php foreach ($payAccts as $a): ?>
+        <div class="pay-row"><i class="bi <?= $a['kind'] === 'bank' ? 'bi-bank' : 'bi-phone' ?>"></i>
+          <div><span class="pay-l"><?= $e($a['label']) ?></span> <span class="pay-n"><?= $e($a['number']) ?></span>
+            <?php if ($a['name'] !== ''): ?><small><?= $e($a['name']) ?></small><?php endif; ?></div></div>
+      <?php endforeach; ?>
+      <p class="hint mb-0 mt-2"><?= $e(sprintf(t('Use your order number %s as the reference. Staff confirm your payment before your order is closed.'), $order['code'])) ?></p>
+    </div>
+    <?php endif; ?>
     <a class="backlink" href="<?= $e($menuUrl) ?>"><i class="bi bi-arrow-left"></i><?= $e(t('Back to the menu')) ?></a>
   </div>
 </main>

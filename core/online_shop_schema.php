@@ -43,6 +43,25 @@ if (!function_exists('onlineShopEnsureSchema')) {
         $addCol('warehouses', 'online_show_payment',   "`online_show_payment` TINYINT(1) NOT NULL DEFAULT 0");
         $addIdx('warehouses', 'uq_wh_online_shop_token', "UNIQUE INDEX `uq_wh_online_shop_token` (`online_shop_token`)");
 
+        // ── Links already posted with the old "Generate Link" keep working: a shop that had a live
+        //    catalog link gets the new online shop switched on in VIEW-ONLY mode (ordering stays off),
+        //    and shop_catalog.php sends the old link on to it. Only shops never moved before. ──
+        if ($hasCol('warehouses', 'public_catalog_token_hash')) {
+            $old = $pdo->query("SELECT warehouse_id FROM warehouses WHERE public_catalog_token_hash IS NOT NULL AND online_shop_token IS NULL")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($old as $w) {
+                for ($i = 0; $i < 3; $i++) {
+                    try {
+                        $pdo->prepare("UPDATE warehouses SET online_shop_token = ?, online_shop_enabled = 1 WHERE warehouse_id = ? AND online_shop_token IS NULL")
+                            ->execute([bin2hex(random_bytes(16)), (int)$w]);
+                        break;
+                    } catch (PDOException $e) {
+                        if ($e->getCode() !== '23000') throw $e;
+                    }
+                }
+            }
+            $log($old ? '  + ' . count($old) . ' shop(s) with an old catalog link moved to the online shop (view only).' : '  ~ no old catalog links to move.');
+        }
+
         // ── Product: hide from the online shop ──
         $addCol('products', 'online_hidden', "`online_hidden` TINYINT(1) NOT NULL DEFAULT 0");
 
@@ -67,9 +86,25 @@ if (!function_exists('onlineShopEnsureSchema')) {
         $addCol('pos_held_sales', 'online_order_id', "`online_order_id` INT NULL DEFAULT NULL");
         $addIdx('pos_held_sales', 'idx_phs_online_order', "INDEX `idx_phs_online_order` (`online_order_id`)");
 
-        // ── Alerts: register the online-shop events + default "All admins" rule ──
+        // ── Alerts: register the online-shop events + default "All admins" rule, and the restaurant's
+        //    new "not collected" event (the restaurant body only adds what is missing) ──
         require_once __DIR__ . '/retail_online_notify.php';
         rsnEnsureSchema($pdo, $log);
+        if ($pdo->query("SHOW TABLES LIKE 'notification_events'")->fetch() && $pdo->query("SHOW TABLES LIKE 'notification_rules'")->fetch()) {
+            $key = 'restaurant.online_order_uncollected';
+            $ex = $pdo->prepare("SELECT 1 FROM notification_events WHERE event_key = ?");
+            $ex->execute([$key]);
+            if (!$ex->fetchColumn()) {
+                $pdo->prepare("INSERT INTO notification_events (event_key, title, description, module, page_key, required_verb, default_severity, scope_aware, is_active, created_at)
+                               VALUES (?, 'Online order not collected', 'An accepted pickup order has not been paid or collected yet.', 'Restaurant', 'restaurant_pos', 'view', 'medium', 1, 1, NOW())")
+                    ->execute([$key]);
+                $pdo->prepare("INSERT INTO notification_rules (event_key, target_type, target_id, channel_email, channel_inapp, digest, is_active, created_at, updated_at)
+                               VALUES (?, 'admins', NULL, 1, 1, 'immediate', 1, NOW(), NOW())")->execute([$key]);
+                $log("  + event $key registered with rule: All admins — in-app + email.");
+            } else {
+                $log("  ~ event $key already present.");
+            }
+        }
 
         return true;
     }

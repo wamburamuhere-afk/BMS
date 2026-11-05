@@ -219,11 +219,12 @@ $routes = [
     // token emailed by api/document/request_external_signature.php.
     'sign-document'  => ROOT_DIR . '/sign_document.php',
     'sign_document'  => ROOT_DIR . '/sign_document.php',
-    // Public, unauthenticated — reached only via the reusable token a shop
-    // owner generates from warehouse_view.php (Simple POS only). See
-    // api/stock/generate_shop_catalog_link.php.
+    // Public, unauthenticated — the OLD shop catalog link (shop_catalog?token=…); now only
+    // sends a still-posted link on to the online shop (/s/<link>).
     'shop-catalog'   => ROOT_DIR . '/shop_catalog.php',
     'shop_catalog'   => ROOT_DIR . '/shop_catalog.php',
+    // Public retail online shop (Smart POS) — reached only as /s/<link> (see handleRoute()).
+    'public-shop'    => ROOT_DIR . '/public_shop.php',
     // Public restaurant menu + ordering — reached only as /m/<link> (see handleRoute()).
     'public-menu'    => ROOT_DIR . '/public_menu.php',
     // Public, unauthenticated — a Customer Visits report PDF shared as an expiring
@@ -2223,6 +2224,18 @@ function handleRoute() {
             'ref'    => $__rm[3] ?? '',
         ];
         $clean_uri = 'public-menu';
+    }
+
+    // Public retail online shop (retail_online_shop_plan.md): /s/<link> is the shop, /s/<link>/order
+    // places an order (POST), /s/<link>/o/<ref> is that order's page (/status = JSON, /cancel = POST).
+    if (preg_match('#^s/([a-f0-9]{32})(?:/(order)|/o/([a-f0-9]{32})(/status|/cancel)?)?$#', $clean_uri, $__rs)) {
+        $GLOBALS['__rs_route'] = [
+            'token'  => $__rs[1],
+            'action' => !empty($__rs[2]) ? 'order'
+                      : (!empty($__rs[3]) ? (($__rs[4] ?? '') === '/status' ? 'status' : (($__rs[4] ?? '') === '/cancel' ? 'cancel' : 'track')) : 'shop'),
+            'ref'    => $__rs[3] ?? '',
+        ];
+        $clean_uri = 'public-shop';
     }
 
     // 1. Map lookup

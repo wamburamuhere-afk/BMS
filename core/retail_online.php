@@ -432,15 +432,3 @@ if (!function_exists('rsCustomerCancel')) {
     }
 }
 
-if (!function_exists('rsPaymentAccounts')) {
-    /** The company's payment numbers from payment_settings.php, for the buyer (only when the shop switched it on). */
-    function rsPaymentAccounts(PDO $pdo): array
-    {
-        require_once __DIR__ . '/payment_accounts.php';
-        $p = paymentAccountsForPrint(getPaymentAccounts($pdo));
-        $out = [];
-        foreach ($p['mobile'] as $a) $out[] = ['kind' => 'mobile', 'label' => $a['label'], 'number' => $a['number'], 'name' => $a['holder'], 'ref' => $a['ref'] ?? ''];
-        foreach ($p['bank'] as $a)   $out[] = ['kind' => 'bank',   'label' => $a['label'], 'number' => $a['number'], 'name' => $a['holder'], 'ref' => ''];
-        return $out;
-    }
-}

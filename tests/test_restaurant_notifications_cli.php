@@ -54,7 +54,7 @@ $src = fn(string $f) => (string)@file_get_contents("$root/$f");
 echo "\n── 1. Static ──\n";
 $core = $src('core/restaurant_notify.php');
 preg_match_all("/'(restaurant\.[a-z_]+)'\s*=>\s*\[/", $core, $m);
-ok(count(array_unique($m[1])) === 11, '11 restaurant events defined (+ existing customer-credit events)');
+ok(count(array_unique($m[1])) === 12, '12 restaurant events defined (+ existing customer-credit events)');
 ok(str_contains($src('core/restaurant_notify_schema.php'), "\$addRule->execute([\$key, 'admins', 1])"), 'default rule: All admins — in-app + email');
 ok(str_contains($src('core/restaurant_online.php'), 'rnNotifyOnlineOrder($pdo, $id)'), 'hook: new online order');
 ok(str_contains($src('api/restaurant/update_ticket_status.php'), 'rnNotifyKitchenReady($pdo, $ticket_id)'), 'hook: kitchen marks ready');

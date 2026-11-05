@@ -42,6 +42,12 @@
                                         <span><span class="rf-ct"><?= t('Order for pickup') ?></span><span class="rf-cd"><?= t('Anyone with the menu link can order and collect. They give a name and phone number.') ?></span></span>
                                     </label>
                                 </div>
+                                <div class="rf-field d-none" id="smPayWrap">
+                                    <label class="rf-choice" for="smPay">
+                                        <span class="form-check form-switch m-0 p-0"><input class="form-check-input sm-opt m-0" type="checkbox" role="switch" id="smPay"></span>
+                                        <span><span class="rf-ct"><?= t('Show our payment numbers') ?></span><span class="rf-cd"><?= t('After ordering, the customer sees the mobile money and bank numbers from Payment Settings and may pay first. Staff still confirm the payment at the till.') ?></span></span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -116,6 +122,8 @@
         $('#smEnabled').prop('checked', d.enabled);
         $('#smTable').prop('checked', d.order_table);
         $('#smPickup').prop('checked', d.order_pickup);
+        $('#smPay').prop('checked', !!d.show_payment);
+        $('#smPayWrap').toggleClass('d-none', !d.payment_ready);
         $('#smOn').toggleClass('d-none', !d.enabled);
         if (!d.enabled || !d.link) return;
         $('#smLink').val(d.link);
@@ -141,7 +149,8 @@
             .fail(() => { msg('<div class="alert alert-danger py-2 mb-0">' + SM.error + '</div>'); load(); });
     }
     function save() {
-        post({ action: 'save', enabled: $('#smEnabled').is(':checked') ? 1 : 0, order_table: $('#smTable').is(':checked') ? 1 : 0, order_pickup: $('#smPickup').is(':checked') ? 1 : 0 });
+        post({ action: 'save', enabled: $('#smEnabled').is(':checked') ? 1 : 0, order_table: $('#smTable').is(':checked') ? 1 : 0, order_pickup: $('#smPickup').is(':checked') ? 1 : 0,
+               show_payment: $('#smPay').is(':checked') ? 1 : 0 });
     }
 
     window.openShareMenu = function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('shareMenuModal')).show(); load(); };

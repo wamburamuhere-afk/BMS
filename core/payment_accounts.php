@@ -95,6 +95,20 @@ function paymentAccountsForPrint(array $pa): array
     return ['bank' => $pick($pa['bank']), 'mobile' => $pick($pa['mobile']), 'cheque' => $pa['cheque']];
 }
 
+/**
+ * The payment numbers a buyer may see on an online order's page (online menu / online shop),
+ * when the shop switched "Show our payment numbers" on. Only accounts flagged to show.
+ * @return array<int, array{kind:string, label:string, number:string, name:string, ref:string}>
+ */
+function paymentAccountsForBuyer(PDO $pdo): array
+{
+    $p = paymentAccountsForPrint(getPaymentAccounts($pdo));
+    $out = [];
+    foreach ($p['mobile'] as $a) $out[] = ['kind' => 'mobile', 'label' => $a['label'], 'number' => $a['number'], 'name' => $a['holder'], 'ref' => (string)($a['ref'] ?? '')];
+    foreach ($p['bank'] as $a)   $out[] = ['kind' => 'bank',   'label' => $a['label'], 'number' => $a['number'], 'name' => $a['holder'], 'ref' => ''];
+    return $out;
+}
+
 function paymentAccountsHasAny(array $pa): bool
 {
     $p = paymentAccountsForPrint($pa);

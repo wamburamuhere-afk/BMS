@@ -721,8 +721,13 @@ const GET_SALES   = '<?= buildUrl('api/pos/get_sales.php') ?>';
 const T_OLD_SALE  = <?= json_encode(t('Old sale')) ?>;
 const T_ENTERED   = <?= json_encode(t('Entered %s')) ?>;
 function oldSaleBadge(r) {
-    if (!r || !Number(r.is_past_entry)) return '';
-    return ' <span class="badge bg-primary" title="' + safeOutput(T_ENTERED.replace('%s', r.created_at || '')) + '">' + safeOutput(T_OLD_SALE) + '</span>';
+    return onlineOrderBadge(r) + (!r || !Number(r.is_past_entry) ? '' : ' <span class="badge bg-primary" title="' + safeOutput(T_ENTERED.replace('%s', r.created_at || '')) + '">' + safeOutput(T_OLD_SALE) + '</span>');
+}
+// Receipts that paid an online order (online menu / online shop). Searching "Online" lists them.
+const T_ONLINE = <?= json_encode(t('Online')) ?>;
+function onlineOrderBadge(r) {
+    if (!r || !r.online_orders) return '';
+    return ' <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"><i class="bi bi-globe2 me-1"></i>' + safeOutput(T_ONLINE + ' ' + r.online_orders) + '</span>';
 }
 const GET_ITEMS   = '<?= buildUrl('api/pos/get_sale_items.php') ?>';
 const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';

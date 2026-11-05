@@ -50,6 +50,17 @@ if (!function_exists('roSchemaReady')) {
     }
 }
 
+if (!function_exists('roPaymentSwitchReady')) {
+    /** Is the "show our payment numbers" switch there yet (retail_online_shop_plan.md migration)? Cached. */
+    function roPaymentSwitchReady(PDO $pdo): bool
+    {
+        static $r = null;
+        if ($r !== null) return $r;
+        try { $r = (bool)$pdo->query("SHOW COLUMNS FROM warehouses LIKE 'online_show_payment'")->fetch(); } catch (Throwable $e) { $r = false; }
+        return $r;
+    }
+}
+
 if (!function_exists('roModuleOnForPublic')) {
     /**
      * The tenant-level half of the gate WITHOUT a logged-in user (the public has
@@ -111,7 +122,8 @@ if (!function_exists('roResolveToken')) {
         if (!roTokenLooksValid($token) || !roModuleOnForPublic($pdo)) return null;
 
         $cols = "w.warehouse_id, w.warehouse_name, w.pos_mode, w.status, w.online_menu_token,
-                 w.online_menu_enabled, w.online_order_table, w.online_order_pickup";
+                 w.online_menu_enabled, w.online_order_table, w.online_order_pickup"
+              . (roPaymentSwitchReady($pdo) ? ", w.online_show_payment" : ", 0 AS online_show_payment");
         $st = $pdo->prepare("SELECT $cols FROM warehouses w WHERE w.online_menu_token = ? LIMIT 1");
         $st->execute([$token]);
         $wh = $st->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -145,6 +157,7 @@ if (!function_exists('roResolveToken')) {
                 'order_table'    => (int)$wh['online_order_table'] === 1,
                 'order_pickup'   => (int)$wh['online_order_pickup'] === 1,
                 'menu_token'     => (string)$wh['online_menu_token'],
+                'show_payment'   => (int)$wh['online_show_payment'] === 1,
             ],
             'table' => $table,
             'token' => $token,
@@ -175,7 +188,8 @@ if (!function_exists('roShopLinks')) {
     /** A shop's switches, its menu link and one link per table — for STAFF screens only (caller checks access). */
     function roShopLinks(PDO $pdo, int $wid): array
     {
-        $st = $pdo->prepare("SELECT warehouse_name, online_menu_token, online_menu_enabled, online_order_table, online_order_pickup FROM warehouses WHERE warehouse_id = ?");
+        $st = $pdo->prepare("SELECT warehouse_name, online_menu_token, online_menu_enabled, online_order_table, online_order_pickup"
+                          . (roPaymentSwitchReady($pdo) ? ", online_show_payment" : ", 0 AS online_show_payment") . " FROM warehouses WHERE warehouse_id = ?");
         $st->execute([$wid]);
         $w = $st->fetch(PDO::FETCH_ASSOC) ?: [];
         $tables = [];
@@ -192,6 +206,8 @@ if (!function_exists('roShopLinks')) {
             'enabled'      => (int)($w['online_menu_enabled'] ?? 0) === 1,
             'order_table'  => (int)($w['online_order_table'] ?? 0) === 1,
             'order_pickup' => (int)($w['online_order_pickup'] ?? 0) === 1,
+            'show_payment' => (int)($w['online_show_payment'] ?? 0) === 1,
+            'payment_ready'=> roPaymentSwitchReady($pdo),
             'link'         => !empty($w['online_menu_token']) ? roMenuUrl((string)$w['online_menu_token']) : null,
             'tables'       => $tables,
         ];
@@ -541,7 +557,7 @@ if (!function_exists('roPublicOrder')) {
         $st = $pdo->prepare("SELECT o.order_code, o.order_type, o.status, o.reject_reason, o.items_json, o.subtotal, o.created_at,
                                     o.public_ref, t.table_number
                                FROM restaurant_online_orders o LEFT JOIN restaurant_tables t ON t.table_id = o.table_id
-                              WHERE o.public_ref = ? AND o.warehouse_id = ? LIMIT 1");
+                              WHERE o.public_ref = ? AND o.warehouse_id = ? AND o.order_type IN ('table','pickup') LIMIT 1");
         $st->execute([$ref, $warehouseId]);
         $o = $st->fetch(PDO::FETCH_ASSOC);
         if (!$o || !hash_equals((string)$o['public_ref'], $ref)) return null;
