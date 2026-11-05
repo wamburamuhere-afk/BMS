@@ -136,6 +136,9 @@ $title = $ctx ? $ctx['warehouse']['warehouse_name'] : t('Menu');
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#ffffff">
+<link rel="icon" type="image/svg+xml" href="<?= getUrl('assets/images/favicon.svg') ?>">
+<link rel="icon" type="image/png" href="<?= getUrl('assets/images/favicon.png') ?>">
+<link rel="apple-touch-icon" href="<?= getUrl('assets/images/favicon.png') ?>">
 <title><?= $e($title) ?> · <?= $e($companyName) ?></title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" crossorigin="anonymous">
