@@ -117,6 +117,20 @@ $canShare   = canEdit('restaurant_pos');
         'kitchenErr' => t('Accepted, but sending to the kitchen failed: %s'),
         'by'         => t('by %s'),
         'status'     => ['pending' => t('New'), 'accepted' => t('Accepted'), 'ready' => t('Ready'), 'completed' => t('Done'), 'rejected' => t('Rejected'), 'cancelled' => t('Cancelled')],
+        'notCollected' => t('Not collected'),
+        'ncQ'        => t('Cancel this order as not collected?'),
+        'ncText'     => t('It is removed from Held orders on the till. The customer sees the reason.'),
+        'ncPh'       => t('Reason (e.g. customer did not come)'),
+        'ncYes'      => t('Yes, cancel order'),
+        'paidOn'     => t('Paid · receipt %s'),
+        'closesAuto' => t('Closes by itself when paid at the till.'),
+        'customer'   => t('Customer: %s'),
+        'byCustomer' => t('Cancelled by the customer'),
+        'bySystem'   => t('Expired — not confirmed in time'),
+        'hintTitle'  => t('This phone number is already used'),
+        'hintText'   => t('The order is from %1$s (%2$s). Link it to an existing customer, or create a new one?'),
+        'hintNew'    => t('New customer: %s'),
+        'hintGo'     => t('Accept order'),
         'cur'        => bmsCurrencySymbol(),
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
     let tab = 'new', rows = [], seen = null, timer = null, sound = true;
@@ -145,12 +159,26 @@ $canShare   = canEdit('restaurant_pos');
             <span class="text-nowrap">${money(l.price * l.qty)}</span></div>`).join('');
         let who = '';
         if (o.type === 'pickup') who = `<div class="small mb-2"><i class="bi bi-person me-1 text-primary"></i>${esc(o.name)} · <a href="tel:${esc(o.phone)}">${esc(o.phone)}</a></div>`;
+        // The record: who it is linked to, which receipt paid it, who cancelled it.
+        let rec = '';
+        if (o.customer) rec += `<div class="small text-muted"><i class="bi bi-person-check me-1"></i>${OO.customer.replace('%s', esc(o.customer))}</div>`;
+        if (o.receipt)  rec += `<div class="small text-success fw-semibold"><i class="bi bi-receipt me-1"></i>${OO.paidOn.replace('%s', esc(o.receipt))}</div>`;
+        if (o.status === 'cancelled' && o.cancelled_by === 'customer') rec += `<div class="small text-muted">${OO.byCustomer}</div>`;
+        if (o.status === 'cancelled' && o.cancelled_by === 'system')   rec += `<div class="small text-muted">${OO.bySystem}</div>`;
+        const pickup = o.type === 'pickup';
         let btns = '';
         if (o.status === 'pending')  btns = `<button class="btn btn-sm btn-outline-danger" onclick="ooReject(${o.order_id})"><i class="bi bi-x-circle me-1"></i>${OO.reject}</button>
-                                            <button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'accept',this)"><i class="bi bi-check-circle me-1"></i>${OO.accept}</button>`;
-        if (o.status === 'accepted') btns = `<button class="btn btn-sm btn-outline-primary" onclick="ooAct(${o.order_id},'complete',this)">${OO.done}</button>
-                                            <button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'ready',this)"><i class="bi bi-bell me-1"></i>${OO.ready}</button>`;
-        if (o.status === 'ready')    btns = `<button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'complete',this)"><i class="bi bi-check2-all me-1"></i>${OO.done}</button>`;
+                                            <button class="btn btn-sm btn-primary" onclick="ooAccept(${o.order_id},${pickup ? 'true' : 'false'},this)"><i class="bi bi-check-circle me-1"></i>${OO.accept}</button>`;
+        // A pickup order closes itself when it is paid at the till (its receipt is linked); it never gets a hand-pressed "Done".
+        if (o.status === 'accepted') btns = pickup
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="ooNotCollected(${o.order_id})"><i class="bi bi-x-octagon me-1"></i>${OO.notCollected}</button>
+               <button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'ready',this)"><i class="bi bi-bell me-1"></i>${OO.ready}</button>`
+            : `<button class="btn btn-sm btn-outline-primary" onclick="ooAct(${o.order_id},'complete',this)">${OO.done}</button>
+               <button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'ready',this)"><i class="bi bi-bell me-1"></i>${OO.ready}</button>`;
+        if (o.status === 'ready')    btns = pickup
+            ? `<button class="btn btn-sm btn-outline-danger" onclick="ooNotCollected(${o.order_id})"><i class="bi bi-x-octagon me-1"></i>${OO.notCollected}</button>`
+            : `<button class="btn btn-sm btn-primary" onclick="ooAct(${o.order_id},'complete',this)"><i class="bi bi-check2-all me-1"></i>${OO.done}</button>`;
+        if (pickup && (o.status === 'accepted' || o.status === 'ready')) rec += `<div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i>${OO.closesAuto}</div>`;
         return `<div class="col-12 col-md-6 col-xl-4"><div class="card oo-card h-100${o.status === 'pending' ? ' oo-new' : ''}${o.order_id === focus ? ' oo-focus' : ''}" data-oid="${o.order_id}"><div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <div><div class="oo-code">${esc(o.code)}</div><small class="text-muted">${age}${o.handled_by ? ' · ' + OO.by.replace('%s', esc(o.handled_by)) : ''}</small></div>
@@ -160,6 +188,7 @@ $canShare   = canEdit('restaurant_pos');
             ${o.note ? `<div class="small bg-light rounded p-2 mt-2"><i class="bi bi-chat-left-text me-1 text-primary"></i>${esc(o.note)}</div>` : ''}
             ${o.reason ? `<div class="small text-danger mt-2">${esc(o.reason)}</div>` : ''}
             <div class="d-flex justify-content-between fw-bold mt-2"><span>${OO.total}</span><span>${money(o.subtotal)}</span></div>
+            ${rec ? `<div class="mt-2">${rec}</div>` : ''}
             </div>${btns ? `<div class="card-footer bg-white border-top p-2"><div class="oo-actions">${btns}</div></div>` : ''}</div></div>`;
     }
     function render() {
@@ -193,9 +222,9 @@ $canShare   = canEdit('restaurant_pos');
     }
     function post(data) { return $.post(OO.api, Object.assign({ _csrf: OO.csrf }, data), null, 'json'); }
 
-    window.ooAct = function (id, action, btn) {
+    window.ooAct = function (id, action, btn, linkCustomer) {
         const b = $(btn); b.prop('disabled', true);
-        post({ action: action, order_id: id }).done(r => {
+        post({ action: action, order_id: id, link_customer_id: linkCustomer || 0 }).done(r => {
             if (!r.success) { Swal.fire({ icon: r.refresh ? 'info' : 'error', title: r.message }); load(); return; }
             load();
             if (action === 'accept' && r.kitchen && r.hold_id) {
@@ -207,6 +236,29 @@ $canShare   = canEdit('restaurant_pos');
                 Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: r.message, timer: 2200, showConfirmButton: false });
             }
         }).fail(() => Swal.fire({ icon: 'error', title: OO.error })).always(() => b.prop('disabled', false));
+    };
+    // Accept a pickup order: if the buyer's phone already belongs to a customer under another name,
+    // staff choose to link to them or create a new customer (default — the owner's rule).
+    window.ooAccept = function (id, pickup, btn) {
+        if (!pickup) { ooAct(id, 'accept', btn); return; }
+        const o = rows.find(r => r.order_id === id) || {};
+        $.getJSON(OO.api, { action: 'customer_hint', order_id: id }).done(h => {
+            const list = (h && h.success && h.data) || [];
+            if (!list.length) { ooAct(id, 'accept', btn); return; }
+            // SweetAlert puts option labels in as HTML — names come from the public, so escape them.
+            const opts = { 0: esc(OO.hintNew.replace('%s', o.name || '')) };
+            list.forEach(c => { opts[c.customer_id] = esc(c.customer_name + (c.customer_code ? ' (' + c.customer_code + ')' : '')); });
+            Swal.fire({ icon: 'question', title: OO.hintTitle, text: OO.hintText.replace('%1$s', o.name || '').replace('%2$s', o.phone || ''),
+                        input: 'radio', inputOptions: opts, inputValue: '0', showCancelButton: true, confirmButtonText: OO.hintGo, cancelButtonText: OO.cancel })
+                .then(res => { if (res.isConfirmed) ooAct(id, 'accept', btn, parseInt(res.value || '0', 10)); });
+        }).fail(() => ooAct(id, 'accept', btn));
+    };
+    window.ooNotCollected = function (id) {
+        Swal.fire({ icon: 'warning', title: OO.ncQ, text: OO.ncText, input: 'text', inputPlaceholder: OO.ncPh, inputAttributes: { maxlength: 200 },
+                    showCancelButton: true, confirmButtonText: OO.ncYes, cancelButtonText: OO.cancel, confirmButtonColor: '#dc3545' })
+            .then(res => { if (!res.isConfirmed) return;
+                post({ action: 'cancel', order_id: id, reason: res.value || '' }).done(r => { load(); Swal.fire({ icon: r.success ? 'success' : 'error', title: r.message, timer: 2200, showConfirmButton: !r.success }); })
+                    .fail(() => Swal.fire({ icon: 'error', title: OO.error })); });
     };
     window.ooReject = function (id) {
         Swal.fire({ icon: 'warning', title: OO.rejectQ, input: 'text', inputPlaceholder: OO.reasonPh, inputAttributes: { maxlength: 200 },

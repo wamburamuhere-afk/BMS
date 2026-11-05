@@ -1,5 +1,31 @@
 # BMS Changelog
 
+## 2026-11-05 — feat(online-shop): Retail online shop for Smart POS + stronger online-order record
+
+Plan: `retail_online_shop_plan.md`. Branch `feat/retail-online-shop`.
+
+**Retail online shop (Smart POS)**
+- `core/online_shop_schema.php`, `migrations/tenant/2026_11_05_online_shop_and_order_record.php`, `migrations/2026_11_05_online_shop_and_order_record_legacy_db.php` — per-shop switches (online, ordering, pickup, delivery, wholesale, payment numbers) + link; `products.online_hidden`; order record columns (price type, address, customer, sale, who cancelled, completed time); `pos_held_sales.online_order_id`; old catalog links moved to the online shop (view only); alert events registered. Additive, idempotent, all off by default.
+- `core/retail_online.php` — public engine: gate, link, catalog (Available / Sold out only, never a number), server pricing + quiet stock cap, limits, 24 h expiry, buyer cancel.
+- `core/online_customer.php` — customer rule: reuse only when name AND phone match (phone formats normalised); created on Accept only; staff hint when the phone belongs to another name.
+- `core/retail_online_notify.php`, `core/retail_online_notify_events.php`, `cron/run_online_shop_checks.php`, `api/run_background_jobs.php` — alerts: new order, waiting 5 min, not collected 3 h (bell + email, admins by default, others via Notification rules).
+- `public_shop.php`, `roots.php` (`/s/<link>`) — public shop page; `shop_catalog.php` now only redirects old links.
+- `includes/retail/online_shop_share.php`, `api/stock/online_shop.php`, `api/stock/online_shop_product.php` — Share shop window (switches, Copy, WhatsApp, Open, QR, new link) and per-product "show online".
+- `app/bms/stock/shop_online_orders.php`, `api/stock/shop_online_orders.php`, `header.php` — Online orders inbox (accept with stock re-check, reject, ready / on the way, not collected), menu links + new-order alert.
+- `app/bms/product/products.php`, `app/bms/stock/warehouse_view.php` — Share shop buttons; "Hidden online" badge; old Generate/Revoke link box removed (`api/stock/generate_shop_catalog_link.php`, `api/stock/revoke_shop_catalog_link.php` and their tests deleted).
+
+**Online-order record (restaurant + retail)**
+- `core/online_order_record.php` — accept → customer + held order; sale links the receipt and closes the order; void re-opens it into Held orders; Cancel – not collected.
+- `api/pos/process_sale.php`, `api/pos/void_sale.php` — link / re-open online orders inside the sale / void transaction; an order from another shop or already paid is refused.
+- `api/pos/get_held_sales.php`, `api/pos/delete_held_sale.php`, `app/bms/pos/pos_scripts_new.php` — online held orders visible to any staff of the shop, claimed by one till only, never binned from the till; load picks the order's shop and the Wholesale list for wholesale orders.
+- `api/pos/print_receipt.php`, `api/pos/get_sales.php`, `app/bms/pos/pos_dashboard.php` — receipt and Sales history show "Online order S-/W-…".
+- `api/restaurant/online_orders.php`, `app/bms/restaurant/online_orders.php` — restaurant pickup orders get the same record (customer link + hint, auto-close, not collected); retail orders kept off restaurant screens; pickup orders no longer closed silently after 12 h; audit log on every step.
+- `core/restaurant_online.php`, `api/restaurant/online_menu.php`, `includes/restaurant/online_menu_share.php`, `public_menu.php`, `core/payment_accounts.php` — "Show our payment numbers" switch for the restaurant menu.
+- `core/restaurant_notify.php`, `core/restaurant_notify_events.php`, `core/restaurant_notify_schema.php` — new "not collected" reminder; event list moved to a dependency-free file. Fix: the 2026-11-03 restaurant alerts migration loaded roots.php, so its events landed in the main database — the new migration registers every missing restaurant event on each tenant.
+- Fixes found in the browser: Share windows no longer close on every switch (`data-no-autoclose`); Copy really copies; "+" button usable when a product photo fails (`public_shop.php`, `public_menu.php`).
+- `lang/sw.php` — Swahili for every new string. `schema/tenant_*` — new-company template rebuilt.
+- Tests: `tests/test_retail_online_shop_cli.php` (144 checks); `tests/test_restaurant_notifications_cli.php` (12 events).
+
 ## 2026-11-05 — feat(ui): Company icon as favicon on all pages
 
 - `assets/images/favicon.png` — the company icon (blue + gray dot grid, 99×99) supplied by the owner; the only favicon

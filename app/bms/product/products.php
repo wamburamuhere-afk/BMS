@@ -530,6 +530,16 @@ function get_quick_actions($product) {
                         <i class="bi bi-file-earmark-arrow-up"></i> <span><?= t('Import') ?></span>
                     </a>
                     <?php endif; ?>
+                    <?php
+                    // Online shop (retail_online_shop_plan.md): Smart POS, owners / managers who may edit shops.
+                    require_once __DIR__ . '/../../../core/retail_online.php';
+                    $canShareShop = posSimpleModeEnabled() && canEdit('warehouses') && rsSchemaReady($pdo);
+                    ?>
+                    <?php if ($canShareShop): ?>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-1 px-md-2 shadow-sm ms-1" style="border-radius: 6px;" onclick="openShareShop()" title="<?= htmlspecialchars(t('Share shop')) ?>">
+                        <i class="bi bi-share"></i> <span class="d-none d-sm-inline"><?= t('Share shop') ?></span>
+                    </button>
+                    <?php endif; ?>
                 </div>
             </div>
             <hr class="d-md-none mt-2 mb-0 opacity-25">
@@ -857,7 +867,9 @@ function get_quick_actions($product) {
                                             <?php endif; ?>
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark"><?= caseFormat($product['product_name']) ?></div>
+                                            <div class="fw-bold text-dark"><?= caseFormat($product['product_name']) ?>
+                                                <?php if ($canShareShop && !empty($product['online_hidden'])): ?><span class="badge bg-secondary-subtle text-secondary-emphasis ms-1" style="font-size:.65rem;"><i class="bi bi-eye-slash me-1"></i><?= t('Hidden online') ?></span><?php endif; ?>
+                                            </div>
                                             <small class="text-muted"><?= !empty($product['brand_name']) ? caseFormat($product['brand_name']) : t('No Brand') ?></small>
                                         </div>
                                     </div>
@@ -942,6 +954,19 @@ function get_quick_actions($product) {
                                             </li> -->
                                             <?php endif; ?>
                                             
+                                            <?php if ($canShareShop && empty($product['is_service'])): ?>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="setOnlineVisibility(<?= (int)$product['product_id'] ?>, <?= !empty($product['online_hidden']) ? 0 : 1 ?>); return false;">
+                                                    <?php if (!empty($product['online_hidden'])): ?>
+                                                    <i class="bi bi-eye text-success"></i> <?= t('Show in online shop') ?>
+                                                    <?php else: ?>
+                                                    <i class="bi bi-eye-slash text-secondary"></i> <?= t('Hide from online shop') ?>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </li>
+                                            <?php endif; ?>
+
                                             <?php if ($can_edit_products): ?>
                                             <li><hr class="dropdown-divider"></li>
                                             <?php if ($product['status'] == 'active'): ?>
@@ -1057,6 +1082,7 @@ function get_quick_actions($product) {
                                 <div class="flex-grow-1 overflow-hidden">
                                     <h6 class="fw-bold mb-0 text-truncate" title="<?= caseFormat($product['product_name']) ?>"><?= caseFormat($product['product_name']) ?></h6>
                                     <small class="text-muted d-block text-truncate"><?= !empty($product['category_name']) ? caseFormat($product['category_name']) : t('General') ?></small>
+                                    <?php if ($canShareShop && !empty($product['online_hidden'])): ?><span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:.62rem;"><i class="bi bi-eye-slash me-1"></i><?= t('Hidden online') ?></span><?php endif; ?>
                                 </div>
                                 <div class="text-end ms-2">
                                     <div class="fw-bold text-primary small"><?= format_currency($product['selling_price']) ?></div>
@@ -1073,6 +1099,12 @@ function get_quick_actions($product) {
                                 <a href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-primary flex-grow-1 shadow-sm"><i class="bi bi-eye"></i> <?= t('View') ?></a>
                                 <?php if ($can_edit_products): ?>
                                 <a href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-warning flex-grow-1 shadow-sm"><i class="bi bi-pencil"></i> <?= t('Edit') ?></a>
+                                <?php endif; ?>
+                                <?php if ($canShareShop && empty($product['is_service'])): ?>
+                                <button class="btn btn-sm btn-outline-secondary shadow-sm px-2" onclick="setOnlineVisibility(<?= (int)$product['product_id'] ?>, <?= !empty($product['online_hidden']) ? 0 : 1 ?>); return false;"
+                                        title="<?= htmlspecialchars(!empty($product['online_hidden']) ? t('Show in online shop') : t('Hide from online shop')) ?>">
+                                    <i class="bi <?= !empty($product['online_hidden']) ? 'bi-eye' : 'bi-eye-slash' ?>"></i>
+                                </button>
                                 <?php endif; ?>
                                 <?php if ($can_delete_products): ?>
                                 <button class="btn btn-sm btn-outline-danger shadow-sm px-2" onclick="deleteProduct(<?= $product['product_id'] ?>); return false;" title="<?= t('Delete Product') ?>">
@@ -2802,6 +2834,7 @@ function downloadCSV(csv, filename) {
 
 </style>
 <?php
+if (!empty($canShareShop)) require __DIR__ . '/../../../includes/retail/online_shop_share.php';
 include("footer.php");
 ob_end_flush();
 ?>

@@ -169,38 +169,38 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <?php if ($pos_simple_mode): ?>
-    <!-- Public Shop Catalog link — Simple POS only (2026-09-17 request) -->
+    <?php
+    // Online shop (retail_online_shop_plan.md) — Smart POS retail / hybrid shops only.
+    $rsOnline = null;
+    if ($pos_simple_mode) {
+        require_once __DIR__ . '/../../../core/retail_online.php';
+        if (rsSchemaReady($pdo)) {
+            $rsOnline = rsShopSettings($pdo, (int)$warehouse_id);
+            if (!$rsOnline || !$rsOnline['eligible']) $rsOnline = null;
+        }
+    }
+    ?>
+    <?php if ($rsOnline): ?>
     <div class="row mb-4">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
                     <div>
-                        <h6 class="mb-1 fw-bold"><i class="bi bi-link-45deg text-primary me-1"></i> <?= t('Public Shop Catalog Link') ?></h6>
-                        <p class="text-muted small mb-0" id="scLinkStatus">
-                            <?php if (!empty($warehouse['public_catalog_token_hash'])): ?>
-                                <i class="bi bi-check-circle-fill text-success"></i>
-                                <?= t('A link is active') ?>
-                                <?php if (!empty($warehouse['public_catalog_token_created_at'])): ?>
-                                    &middot; <?= t('Generated') ?> <?= date('d M Y', strtotime($warehouse['public_catalog_token_created_at'])) ?>
-                                <?php endif; ?>
+                        <h6 class="mb-1 fw-bold"><i class="bi bi-shop text-primary me-1"></i> <?= t('Online shop') ?></h6>
+                        <p class="text-muted small mb-0">
+                            <?php if ($rsOnline['enabled'] && $rsOnline['ordering'] && ($rsOnline['pickup'] || $rsOnline['delivery'])): ?>
+                                <i class="bi bi-check-circle-fill text-success"></i> <?= t('Online — customers can see products and order.') ?>
+                            <?php elseif ($rsOnline['enabled']): ?>
+                                <i class="bi bi-eye text-primary"></i> <?= t('Online — customers can see products (ordering is off).') ?>
                             <?php else: ?>
-                                <i class="bi bi-dash-circle text-muted"></i> <?= t('No link generated yet — customers cannot view this shop\'s products online.') ?>
+                                <i class="bi bi-dash-circle text-muted"></i> <?= t('Off — share a link so customers can see this shop\'s products and order online.') ?>
                             <?php endif; ?>
                         </p>
                     </div>
                     <?php if ($can_edit_warehouse): ?>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-primary" id="scGenerateBtn">
-                            <i class="bi bi-magic"></i>
-                            <?= !empty($warehouse['public_catalog_token_hash']) ? t('Regenerate Link') : t('Generate Link') ?>
-                        </button>
-                        <?php if (!empty($warehouse['public_catalog_token_hash'])): ?>
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="scRevokeBtn">
-                            <i class="bi bi-x-circle"></i> <?= t('Revoke') ?>
-                        </button>
-                        <?php endif; ?>
-                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="openShareShop(<?= (int)$warehouse_id ?>)">
+                        <i class="bi bi-share me-1"></i><?= t('Share shop') ?>
+                    </button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -764,107 +764,7 @@ function transferStock(id) {
 }
 </script>
 
-<?php if ($pos_simple_mode && $can_edit_warehouse): ?>
-<script>
-$(document).ready(function () {
-    const scWarehouseId = <?= (int)$warehouse_id ?>;
-    const scCsrf = <?= json_encode(csrf_token()) ?>;
-
-    function scShowLink(url) {
-        const $wrap = $('<div class="text-start"></div>');
-        $wrap.append($('<p class="small text-muted mb-2"></p>').text(<?= json_encode(t('Copy this link now — for your security, it will not be shown again. If you lose it, generate a new one.')) ?>));
-        const $box = $('<div class="input-group"></div>');
-        const $input = $('<input type="text" class="form-control form-control-sm" readonly>').val(url);
-        const $btn = $('<button type="button" class="btn btn-sm btn-outline-primary"></button>').html('<i class="bi bi-clipboard"></i> ' + <?= json_encode(t('Copy')) ?>);
-        $btn.on('click', function () {
-            const markCopied = function () {
-                $btn.html('<i class="bi bi-check2"></i> ' + <?= json_encode(t('Copied!')) ?>);
-                setTimeout(function () { $btn.html('<i class="bi bi-clipboard"></i> ' + <?= json_encode(t('Copy')) ?>); }, 1500);
-            };
-            const fallback = function () {
-                $input.select();
-                document.execCommand('copy');
-                markCopied();
-            };
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(url).then(markCopied).catch(fallback);
-            } else {
-                fallback();
-            }
-        });
-        $box.append($input).append($btn);
-        $wrap.append($box);
-        Swal.fire({
-            icon: 'success',
-            title: <?= json_encode(t('Link generated')) ?>,
-            html: $wrap,
-            confirmButtonText: <?= json_encode(t('Done')) ?>,
-        });
-    }
-
-    $('#scGenerateBtn').on('click', function () {
-        const $btn = $(this);
-        const isRegenerate = $btn.text().trim().indexOf(<?= json_encode(t('Regenerate Link')) ?>) !== -1;
-        const proceed = function () {
-            const orig = $btn.html();
-            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
-            $.post(<?= json_encode(buildUrl('api/stock/generate_shop_catalog_link.php')) ?>, {
-                warehouse_id: scWarehouseId, _csrf: scCsrf
-            }, function (res) {
-                if (res.success) {
-                    scShowLink(res.url);
-                    $('#scLinkStatus').html('<i class="bi bi-check-circle-fill text-success"></i> ' + <?= json_encode(t('A link is active')) ?>);
-                } else {
-                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
-                }
-            }, 'json').fail(function () {
-                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Server error.')) ?>, 'error');
-            }).always(function () {
-                $btn.prop('disabled', false).html(orig);
-            });
-        };
-
-        if (isRegenerate) {
-            Swal.fire({
-                icon: 'warning',
-                title: <?= json_encode(t('Regenerate this link?')) ?>,
-                text: <?= json_encode(t('The old link will stop working immediately.')) ?>,
-                showCancelButton: true,
-                confirmButtonColor: '#0d6efd',
-                confirmButtonText: <?= json_encode(t('Yes, regenerate')) ?>,
-            }).then(function (r) { if (r.isConfirmed) proceed(); });
-        } else {
-            proceed();
-        }
-    });
-
-    $('#scRevokeBtn').on('click', function () {
-        Swal.fire({
-            icon: 'warning',
-            title: <?= json_encode(t('Revoke this link?')) ?>,
-            text: <?= json_encode(t('Customers using the current link will no longer be able to view this shop\'s products.')) ?>,
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: <?= json_encode(t('Yes, revoke')) ?>,
-        }).then(function (r) {
-            if (!r.isConfirmed) return;
-            $.post(<?= json_encode(buildUrl('api/stock/revoke_shop_catalog_link.php')) ?>, {
-                warehouse_id: scWarehouseId, _csrf: scCsrf
-            }, function (res) {
-                if (res.success) {
-                    Swal.fire({ icon: 'success', title: <?= json_encode(t('Revoked')) ?>, text: res.message, timer: 1800, showConfirmButton: false })
-                        .then(function () { location.reload(); });
-                } else {
-                    Swal.fire(<?= json_encode(t('Error')) ?>, res.message, 'error');
-                }
-            }, 'json').fail(function () {
-                Swal.fire(<?= json_encode(t('Error')) ?>, <?= json_encode(t('Server error.')) ?>, 'error');
-            });
-        });
-    });
-});
-</script>
-<?php endif; ?>
+<?php if ($rsOnline && $can_edit_warehouse) require __DIR__ . '/../../../includes/retail/online_shop_share.php'; ?>
 
 <?php
 includeFooter();

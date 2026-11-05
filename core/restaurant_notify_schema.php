@@ -15,7 +15,9 @@
  *    configured is never touched.
  * Idempotent.
  */
-require_once __DIR__ . '/restaurant_notify.php';
+// Only the event list: restaurant_notify.php loads notify.php → roots.php, which a tenant migration
+// must never load (it reconnects $pdo to the main database).
+require_once __DIR__ . '/restaurant_notify_events.php';
 
 if (!function_exists('restaurantNotifyEnsureSchema')) {
     function restaurantNotifyEnsureSchema(PDO $pdo, callable $log): bool

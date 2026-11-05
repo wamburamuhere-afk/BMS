@@ -1119,7 +1119,39 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         require_once __DIR__ . '/core/restaurant_online.php';
                         $__ro_nav = restaurantModuleOn($pdo) && roAnyShopOnline($pdo);
                     }
+                    // Online shop (retail_online_shop_plan.md): the shop's "Online orders" link + new-order alert, once a shop is online.
+                    $__rs_nav = false;
+                    if (posSimpleModeEnabled() && canCreate('pos')) {
+                        require_once __DIR__ . '/core/retail_online.php';
+                        $__rs_nav = rsAnyShopOnline($pdo);
+                    }
                     ?>
+                    <?php if ($__rs_nav && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), 'shop_online_orders') === false): ?>
+                    <script>
+                    // New online shop order alert: checks every 20 s while the tab is visible.
+                    (function () {
+                        const URL_ = <?= json_encode(buildUrl('api/stock/shop_online_orders.php') . '?action=count') ?>, GO = <?= json_encode(getUrl('shop_online_orders')) ?>;
+                        const T_ = <?= json_encode(['title' => t('New online shop order'), 'pickup' => t('Pickup'), 'delivery' => t('Delivery'), 'open' => t('Open')], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                        let last = null;
+                        try { last = parseInt(sessionStorage.getItem('bms_rs_last') || '', 10) || null; } catch (e) {}
+                        function check() {
+                            if (document.hidden) return;
+                            fetch(URL_, { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
+                                if (!d || !d.success || !d.latest) return;
+                                const id = d.latest.order_id;
+                                if (last !== null && id > last && window.Swal) {
+                                    Swal.fire({ toast: true, position: 'top-end', icon: 'info', showConfirmButton: true, confirmButtonText: T_.open, timer: 15000,
+                                        titleText: T_.title + ' ' + d.latest.code + ' · ' + (d.latest.type === 'delivery' ? T_.delivery : T_.pickup) })
+                                        .then(r => { if (r.isConfirmed) window.location.href = GO + '?order=' + id; });
+                                }
+                                last = Math.max(last || 0, id);
+                                try { sessionStorage.setItem('bms_rs_last', String(last)); } catch (e) {}
+                            }).catch(() => {});
+                        }
+                        setTimeout(check, 3500); setInterval(check, 20000);
+                    })();
+                    </script>
+                    <?php endif; ?>
                     <?php if ($__ro_nav && basename((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) !== 'online_orders.php' && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), 'online_orders') === false): ?>
                     <script>
                     // New online order alert (restaurant_online_menu_plan.md): checks every 20 s while the tab is visible.
@@ -1356,6 +1388,9 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <?php if(canView('pos')): ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?></a></li>
                                 <?php endif; ?>
+                                <?php if ($__rs_nav): ?>
+                                <li><a class="dropdown-item" href="<?= getUrl('shop_online_orders') ?>"><i class="bi bi-bag-check"></i> <?= t('Online orders') ?></a></li>
+                                <?php endif; ?>
                                 <?php if(canView('invoices')): ?>
                                 <?php // companion: Invoices' own header entry lives under Finance, so it is not counted here (no duplicate direct link) ?>
                                 <li><a class="dropdown-item" data-nav-companion href="<?= getUrl('invoices') ?>"><i class="bi bi-receipt"></i> <?= t('Invoices') ?></a></li>
@@ -1374,6 +1409,11 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <a class="nav-link" href="<?= getUrl('pos') ?>">
                                 <i class="bi bi-cart-check"></i> <?= htmlspecialchars(wLabel('POS', 'Sell')) ?>
                             </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!$__sales_shown && $__rs_nav): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= getUrl('shop_online_orders') ?>"><i class="bi bi-bag-check"></i> <?= t('Online orders') ?></a>
                         </li>
                         <?php endif; ?>
                         <?php // Restaurant — only when superadmin enabled Restaurant POS for this tenant (canView checks the entitlement first, even for admins). ?>
@@ -2056,6 +2096,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             $__side_nav_icons = ['credit_customers' => 'bi-cash-coin', 'catalog_setup' => 'bi-tags'];
             $__side_sales = [];
             if (canView('pos')) $__side_sales[] = [getUrl('pos/shifts'), 'bi-clock-history', t('Shift History')];
+            if (!empty($__rs_nav)) $__side_sales[] = [getUrl('shop_online_orders'), 'bi-bag-check', t('Online orders')];
             foreach (posNavGroups() as $__sg) {
                 if (isset($__side_nav_icons[$__sg['key']])) $__side_sales[] = [getUrl($__sg['url']), $__side_nav_icons[$__sg['key']], $__sg['label']];
             }

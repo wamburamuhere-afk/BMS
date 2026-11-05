@@ -50,10 +50,13 @@ try {
         $enabled = $b('enabled');
         $pdo->prepare("UPDATE warehouses SET online_menu_enabled = ?, online_order_table = ?, online_order_pickup = ? WHERE warehouse_id = ?")
             ->execute([$enabled, $b('order_table'), $b('order_pickup'), $wid]);
+        if (roPaymentSwitchReady($pdo) && array_key_exists('show_payment', $_POST)) {
+            $pdo->prepare("UPDATE warehouses SET online_show_payment = ? WHERE warehouse_id = ?")->execute([$b('show_payment'), $wid]);
+        }
         if ($enabled) $ensureLinks();
         $cur = $read();
-        logActivity($pdo, $_SESSION['user_id'], sprintf('Online menu for "%s": %s, table ordering %s, pickup ordering %s',
-            $cur['shop'], $enabled ? 'on' : 'off', $cur['order_table'] ? 'on' : 'off', $cur['order_pickup'] ? 'on' : 'off'));
+        logActivity($pdo, $_SESSION['user_id'], sprintf('Online menu for "%s": %s, table ordering %s, pickup ordering %s, payment numbers %s',
+            $cur['shop'], $enabled ? 'on' : 'off', $cur['order_table'] ? 'on' : 'off', $cur['order_pickup'] ? 'on' : 'off', $cur['show_payment'] ? 'shown' : 'hidden'));
         $out(200, ['success' => true, 'message' => t('Saved.'), 'data' => $cur]);
     }
 
