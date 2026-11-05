@@ -6840,4 +6840,12 @@ return [
     'Hidden online' => 'Imefichwa mtandaoni',
     'Show in online shop' => 'Onyesha kwenye duka la mtandaoni',
     'Hide from online shop' => 'Ficha kwenye duka la mtandaoni',
+    // ── Online shop — staff Online orders ──
+    'No shop is online yet. Share your shop so customers can see your products and order.' => 'Hakuna duka lililo mtandaoni bado. Shiriki duka lako ili wateja waone bidhaa zako na kuagiza.',
+    'Open it in Held orders on the till and take the payment. It closes by itself when paid.' => 'Ifungue kwenye Mauzo Yaliyosimamishwa kwenye mashine ya mauzo na upokee malipo. Hujifunga yenyewe ikilipwa.',
+    'Marked on the way. The customer can see it.' => 'Imewekwa kuwa iko njiani. Mteja anaweza kuona.',
+    '%1$s (only %2$s left)' => '%1$s (zimebaki %2$s tu)',
+    'Not enough stock to accept this order:' => 'Stoo haitoshi kukubali oda hii:',
+    'Reject it or call the customer.' => 'Ikatae au mpigie mteja simu.',
+    'New online shop order' => 'Oda mpya ya duka la mtandaoni',
 ];

@@ -72,6 +72,35 @@ $pc = substr($core, strpos($core, 'function rsPublicCatalog'), 2500);
 ok(str_contains($pc, "'sold_out'") && !preg_match("/'(available|stock|cost_price|purchase_price|buying_price)'\s*=>/", $pc), 'public catalog returns sold_out yes/no, never a stock number or cost');
 ok(str_contains($core, "p.online_hidden = 0") && str_contains($core, "p.is_service = 0"), 'hidden products and services never appear online');
 ok(str_contains($cust, "nextCode(\$pdo, 'CUST')") && !str_contains($core, 'ocFindOrCreate'), 'customers are created with a proper code, and never by the public engine');
+// A tenant migration must never load roots.php (it reconnects $pdo to the main database): walk every
+// file the migration pulls in. (The 2026-11-03 restaurant alerts migration did, so tenants never got them.)
+$walk = function (string $file, array &$seen) use (&$walk, $root): void {
+    $file = realpath($file) ?: $file;
+    if (isset($seen[$file]) || !is_file($file)) return;
+    $seen[$file] = true;
+    preg_match_all("#require(?:_once)?\s*\(?\s*__DIR__\s*\.\s*'([^']+)'#", (string)file_get_contents($file), $m);
+    foreach ($m[1] as $rel) $walk(dirname($file) . $rel, $seen);
+};
+foreach (['migrations/tenant/2026_11_05_online_shop_and_order_record.php', 'migrations/tenant/2026_11_03_restaurant_notifications.php'] as $mig) {
+    $seen = [];
+    $walk("$root/$mig", $seen);
+    $bad = array_filter(array_keys($seen), fn($f) => preg_match('#[\\\\/](roots|notify)\.php$#', $f) || str_ends_with(str_replace('\\', '/', $f), 'includes/config.php'));
+    ok(!$bad, basename($mig) . ' never loads roots.php / notify.php (stays on the tenant database)' . ($bad ? ' — ' . implode(', ', array_map('basename', $bad)) : ''));
+}
+// Found in the browser click-through (2026-11-05):
+$share = (string)file_get_contents("$root/includes/retail/online_shop_share.php");
+$menuShare = (string)file_get_contents("$root/includes/restaurant/online_menu_share.php");
+ok(str_contains($share, 'id="shareShopModal"') && str_contains($share, 'data-no-autoclose="true"') && str_contains($menuShare, 'data-no-autoclose="true"'),
+   'Share shop / Share menu windows stay open while switches save (footer auto-close opted out)');
+ok(str_contains($share, "document.execCommand('copy')") && str_contains($share, 'Promise.race([navigator.clipboard.writeText') && !str_contains($menuShare, '.finally(() => Swal.fire'),
+   'Copy really copies (direct copy first, timed clipboard backup) and says "copied" only when it did');
+foreach (['public_shop.php', 'public_menu.php'] as $pf) {
+    $ps = (string)file_get_contents("$root/$pf");
+    ok(preg_match('/\n\.add\{position:absolute;z-index:3;/', $ps) === 1 && preg_match('/\n\.badge-x\{position:absolute;z-index:2;/', $ps) === 1,
+       "$pf: the + button stays above the letter shown when a photo fails (tap adds, not opens)");
+}
+ok(str_contains((string)file_get_contents("$root/app/bms/pos/pos_scripts_new.php"), "No shop picked on the till yet: pick the order's own shop"),
+   'loading an online order on a till with no shop picked selects the order\'s shop');
 
 // ─── Fixture ─────────────────────────────────────────────────────────────────
 $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'localhost';
@@ -338,9 +367,10 @@ $mkOrder = function (int $w, string $type, string $name, string $phone, array $i
         [$w, $table, $type, 'W-T' . random_int(100, 999), bin2hex(random_bytes(16)), $name, $phone, json_encode($items), $sub, $status, str_repeat('f', 64)]);
 };
 $order = fn(int $id) => $pdo->query("SELECT * FROM restaurant_online_orders WHERE order_id = $id")->fetch(PDO::FETCH_ASSOC);
-$sale  = function (int $w, array $items, int $user, ?int $cust = null, string $method = 'cash') use (&$saleIds) {
+$sale  = function (int $w, array $items, int $user, ?int $cust = null, string $method = 'cash', int $priceGroup = 0) use (&$saleIds) {
     $tot = array_sum(array_map(fn($l) => $l['price'] * $l['quantity'], $items));
     [$c, $r] = http('POST', '/api/pos/process_sale.php', [
+        'price_group_id' => $priceGroup ?: null,
         'customer_id' => $cust, 'warehouse_id' => $w, 'project_id' => null, 'items' => $items, 'subtotal' => $tot, 'discount_percentage' => 0,
         'discount_amount' => 0, 'tax' => 0, 'total' => $tot, 'payment_method' => $method, 'amount_tendered' => $method === 'credit' ? 0 : $tot,
         'change_given' => 0, 'amount_paid' => $method === 'credit' ? 0 : $tot, 'due_date' => $method === 'credit' ? date('Y-m-d', strtotime('+7 days')) : null,
@@ -549,6 +579,107 @@ http('POST', $SAPI, ['action' => 'save', 'warehouse_id' => $wid, 'enabled' => 0,
 ok($c === 404, 'switching the shop off closes the link');
 $aud = (int)$pdo->query("SELECT COUNT(*) FROM audit_logs WHERE action IN ('online_shop_settings','online_shop_new_link') AND entity_id = $wid AND created_at >= '$T0'")->fetchColumn();
 ok($aud >= 3, "settings changes and new links are in the audit log ($aud)");
+
+// ─── 5. Online orders inbox (retail staff) → till → receipt ─────────────────
+echo "\n── 5. Shop Online orders → till → receipt ──\n";
+$OAPI = '/api/stock/shop_online_orders.php';
+http('POST', $SAPI, ['action' => 'save', 'warehouse_id' => $wid, 'enabled' => 1, 'ordering' => 1, 'pickup' => 1, 'delivery' => 1, 'wholesale' => 1], $uA);
+$tok2 = preg_replace('#.*/s/#', '', (string)$pdo->query("SELECT CONCAT('/s/', online_shop_token) FROM warehouses WHERE warehouse_id = $wid")->fetchColumn());
+$S2 = "/s/$tok2";
+$pdo->exec("DELETE FROM restaurant_online_orders WHERE warehouse_id = $wid");
+$placeOrder = function (array $over) use ($S2, $pSoap): array {
+    [, $html] = http('GET', $S2);
+    preg_match('/var FORM_TOKEN = "([0-9]+\.[a-f0-9]{64})"/', (string)$html, $fm);
+    sleep(2);
+    return http('POST', "$S2/order", array_merge(['form_token' => $fm[1] ?? '', 'website' => '', 'name' => FX . ' Retail Buyer', 'phone' => '0766 555 444',
+        'note' => 'Morning', 'fulfil' => 'pickup', 'address' => '', 'price_type' => 'retail', 'lines' => [['id' => $pSoap, 'qty' => 2]]], $over), 0, true);
+};
+$existingR = $ins("INSERT INTO customers (customer_code, customer_name, phone, customer_type, status, created_at) VALUES (?, ?, ?, 'individual', 'active', NOW())",
+                  ['ZZRS-R' . random_int(1000, 9999), FX . ' Retail B.', '+255766555444']);
+[$c, $r] = $placeOrder(['price_type' => 'wholesale', 'lines' => [['id' => $pSoap, 'qty' => 2]]]);
+$R1 = $pdo->query("SELECT * FROM restaurant_online_orders WHERE warehouse_id = $wid AND status = 'pending' ORDER BY order_id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+ok($c === 200 && $R1 && $R1['price_type'] === 'wholesale', 'buyer sends a wholesale order from the online shop');
+[$c, $r] = http('GET', $OAPI, ['action' => 'count'], $uA);
+ok($c === 200 && ($r['pending'] ?? 0) >= 1 && ($r['latest']['code'] ?? '') === $R1['order_code'], 'staff alert count sees the new order');
+[$c, $r] = http('GET', $OAPI, ['action' => 'list', 'warehouse_id' => $wid], $uA);
+$lst = array_values(array_filter($r['data'] ?? [], fn($o) => $o['order_id'] === (int)$R1['order_id']));
+ok($lst && $lst[0]['price_type'] === 'wholesale' && $lst[0]['type'] === 'pickup' && $lst[0]['phone'] === '0766555444', 'Online orders lists it (wholesale badge, pickup, phone)');
+[$c, $r] = http('POST', $OAPI, ['action' => 'accept', 'order_id' => (int)$oT], $uA);
+ok($c === 404, 'the shop screen cannot handle a restaurant order');
+
+$pdo->exec("UPDATE product_stocks SET stock_quantity = 1 WHERE product_id = $pSoap AND warehouse_id = $wid");
+[$c, $r] = http('POST', $OAPI, ['action' => 'accept', 'order_id' => (int)$R1['order_id']], $uA);
+ok($c === 422 && stripos($r['message'] ?? '', 'Not enough stock') !== false && str_contains($r['message'], 'only 1 left') && $order((int)$R1['order_id'])['status'] === 'pending',
+   'accept re-checks stock: sold at the till meanwhile → refused, staff see how many are left');
+$pdo->exec("UPDATE product_stocks SET stock_quantity = 5 WHERE product_id = $pSoap AND warehouse_id = $wid");
+[$c, $r] = http('GET', $OAPI, ['action' => 'customer_hint', 'order_id' => (int)$R1['order_id']], $uA);
+ok($c === 200 && in_array($existingR, array_column($r['data'] ?? [], 'customer_id')), 'Accept hint: the phone already belongs to a customer with another name');
+[$c, $r] = http('POST', $OAPI, ['action' => 'accept', 'order_id' => (int)$R1['order_id'], 'link_customer_id' => $existingR], $uA);
+$R1 = $order((int)$R1['order_id']);
+$hR = $pdo->query("SELECT * FROM pos_held_sales WHERE online_order_id = " . (int)$R1['order_id'] . " AND status = 'held'")->fetch(PDO::FETCH_ASSOC);
+ok($c === 200 && $R1['status'] === 'accepted' && (int)$R1['customer_id'] === $existingR && $r['customer_created'] === false, 'staff chose "link to this customer" → order linked to the existing customer');
+ok($hR && (int)$hR['customer_id'] === $existingR && (int)$hR['warehouse_id'] === $wid, 'held order on the till for that shop and customer');
+[$c, $r] = http('POST', $OAPI, ['action' => 'ready', 'order_id' => (int)$R1['order_id']], $uA);
+$pubR1 = rsPublicOrder($pdo, $wid, $R1['public_ref']);
+ok($c === 200 && $pubR1['status'] === 'ready', 'Ready → the buyer\'s page shows it is ready to collect');
+
+http('POST', '/api/pos/delete_held_sale.php', ['hold_id' => (int)$hR['hold_id'], 'loaded' => 1], $uB, true);
+$itemsR = json_decode($hR['items_data'], true);
+$stock0 = (float)$pdo->query("SELECT stock_quantity FROM product_stocks WHERE product_id = $pSoap AND warehouse_id = $wid")->fetchColumn();
+[$c, $r] = $sale($wid, $itemsR, $uB, $existingR, 'cash', (int)$wsGroup);
+$R1 = $order((int)$R1['order_id']);
+$sR = (int)($r['sale_id'] ?? 0);
+$sRow = $pdo->query("SELECT grand_total, customer_id FROM pos_sales WHERE sale_id = $sR")->fetch(PDO::FETCH_ASSOC);
+ok($c === 200 && $R1['status'] === 'completed' && (int)$R1['sale_id'] === $sR, 'cashier completes it on the Wholesale list → the order closes with its receipt' . ($c !== 200 ? ' — ' . json_encode($r) : ''));
+ok($sRow && abs((float)$sRow['grand_total'] - 3400) < 0.01 && (int)$sRow['customer_id'] === $existingR, 'receipt total = the wholesale order total, on the linked customer');
+ok(abs((float)$pdo->query("SELECT stock_quantity FROM product_stocks WHERE product_id = $pSoap AND warehouse_id = $wid")->fetchColumn() - ($stock0 - 2)) < 0.001, 'stock goes down only now, at the sale (by the ordered 2)');
+$je = (int)$pdo->query("SELECT COUNT(*) FROM journal_entries WHERE entity_type = 'pos_sale' AND entity_id = $sR AND status = 'posted'")->fetchColumn();
+echo "  (ledger: $je posted entr" . ($je === 1 ? 'y' : 'ies') . " for the receipt — follows this company's posting setting, as every till sale does)\n";
+[$c, $r] = http('GET', $OAPI, ['action' => 'list', 'warehouse_id' => $wid], $uA);
+$lst = array_values(array_filter($r['data'] ?? [], fn($o) => $o['order_id'] === (int)$R1['order_id']));
+ok($lst && $lst[0]['status'] === 'completed' && $lst[0]['receipt'] !== '', 'Done today shows it paid with its receipt number');
+
+$pdo->exec("DELETE FROM restaurant_online_orders WHERE warehouse_id = $wid AND status IN ('pending','cancelled','rejected')");
+[$c, $r] = $placeOrder(['name' => FX . ' Reject Me', 'phone' => '0766000001']);
+$R2 = $pdo->query("SELECT * FROM restaurant_online_orders WHERE warehouse_id = $wid AND customer_name = '" . FX . " Reject Me'")->fetch(PDO::FETCH_ASSOC);
+[$c, $r] = http('POST', $OAPI, ['action' => 'reject', 'order_id' => (int)$R2['order_id'], 'reason' => 'Out of soap today'], $uA);
+[$c2, $st] = http('GET', "$S2/o/{$R2['public_ref']}/status");
+ok($c === 200 && ($st['status'] ?? '') === 'rejected' && ($st['reason'] ?? '') === 'Out of soap today', 'Reject → the buyer sees the reason');
+ok((int)$pdo->query("SELECT COUNT(*) FROM customers WHERE customer_name = '" . FX . " Reject Me'")->fetchColumn() === 0, 'a rejected order never creates a customer');
+
+[$c, $r] = $placeOrder(['name' => FX . ' Never Came', 'phone' => '0766000002', 'fulfil' => 'delivery', 'address' => 'Tegeta']);
+$R3 = $pdo->query("SELECT * FROM restaurant_online_orders WHERE warehouse_id = $wid AND customer_name = '" . FX . " Never Came'")->fetch(PDO::FETCH_ASSOC);
+[$c, $r] = http('POST', $OAPI, ['action' => 'accept', 'order_id' => (int)$R3['order_id']], $uA);
+[$c, $r] = http('POST', $OAPI, ['action' => 'ready', 'order_id' => (int)$R3['order_id']], $uA);
+ok($c === 200 && stripos($r['message'] ?? '', 'on the way') !== false, 'delivery order: Ready says "on the way"');
+$pdo->exec("UPDATE restaurant_online_orders SET accepted_at = NOW() - INTERVAL 4 HOUR WHERE order_id = " . (int)$R3['order_id']);
+require_once "$root/core/retail_online_notify.php";
+$sum = rsnRunFrequentChecks($pdo);
+ok(($sum['online_order_uncollected'] ?? 0) >= 1, 'reminder: accepted but not paid after 3 h alerts staff');
+[$c, $r] = http('POST', $OAPI, ['action' => 'cancel', 'order_id' => (int)$R3['order_id'], 'reason' => 'Customer not reachable'], $uA);
+$R3 = $order((int)$R3['order_id']);
+ok($c === 200 && $R3['status'] === 'cancelled' && $R3['cancelled_by'] === 'staff'
+   && $pdo->query("SELECT status FROM pos_held_sales WHERE online_order_id = " . (int)$R3['order_id'])->fetchColumn() === 'cancelled', 'Not collected → cancelled by staff, removed from the till');
+
+$pdo->exec("DELETE FROM restaurant_online_orders WHERE warehouse_id = $wid AND status IN ('pending','cancelled','rejected')");
+[$c, $r] = $placeOrder(['name' => FX . ' Slow Shop', 'phone' => '0766000003']);
+$R4 = $pdo->query("SELECT * FROM restaurant_online_orders WHERE warehouse_id = $wid AND customer_name = '" . FX . " Slow Shop'")->fetch(PDO::FETCH_ASSOC);
+$pdo->exec("UPDATE restaurant_online_orders SET created_at = NOW() - INTERVAL 6 MINUTE WHERE order_id = " . (int)$R4['order_id']);
+$sum = rsnRunFrequentChecks($pdo);
+ok(($sum['online_order_waiting'] ?? 0) >= 1, 'reminder: an order not accepted after 5 minutes alerts staff');
+$pdo->exec("UPDATE restaurant_online_orders SET created_at = NOW() - INTERVAL 25 HOUR WHERE order_id = " . (int)$R4['order_id']);
+$sum = rsnRunFrequentChecks($pdo);
+[$c, $st] = http('GET', "$S2/o/{$R4['public_ref']}/status");
+ok(($sum['expired'] ?? 0) >= 1 && ($st['status'] ?? '') === 'cancelled' && ($st['cancelled_by'] ?? '') === 'system', 'after 24 h a waiting order expires and the buyer is told');
+
+[$c, $page] = http('GET', '/shop_online_orders', [], $uA);
+ok($c === 200 && is_string($page) && str_contains($page, 'Online orders') && str_contains($page, 'shop_online_orders.php') && str_contains($page, 'openShareShop'), 'Online orders page opens for staff (with Share shop)');
+[$c, $page] = http('GET', '/dashboard', [], $uA);
+ok(is_string($page) && str_contains($page, 'shop_online_orders'), 'the menu links to Online orders once a shop is online');
+[$c, $page] = http('GET', '/products', [], $uA);
+ok(is_string($page) && str_contains($page, 'openShareShop()') && str_contains($page, 'id="shareShopModal"'), 'Products page has the Share shop button and window');
+[$c, $page] = http('GET', "/warehouse_view/$wid", [], $uA);
+ok(is_string($page) && str_contains($page, 'openShareShop(' . $wid . ')') && !str_contains($page, 'scGenerateBtn'), 'shop page: Online shop box with Share shop (old Generate Link gone)');
 
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 $pdo->prepare("DELETE FROM audit_logs WHERE action IN ('online_shop_settings','online_shop_new_link') AND created_at >= ?")->execute([$T0]);

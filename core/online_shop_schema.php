@@ -86,25 +86,13 @@ if (!function_exists('onlineShopEnsureSchema')) {
         $addCol('pos_held_sales', 'online_order_id', "`online_order_id` INT NULL DEFAULT NULL");
         $addIdx('pos_held_sales', 'idx_phs_online_order', "INDEX `idx_phs_online_order` (`online_order_id`)");
 
-        // ── Alerts: register the online-shop events + default "All admins" rule, and the restaurant's
-        //    new "not collected" event (the restaurant body only adds what is missing) ──
-        require_once __DIR__ . '/retail_online_notify.php';
+        // ── Alerts: the online-shop events, and every restaurant event this tenant is missing (the
+        //    2026-11-03 restaurant migration loaded roots.php and wrote its events to the main database,
+        //    so tenants never got them). Dependency-free files only — never roots.php here. ──
+        require_once __DIR__ . '/retail_online_notify_events.php';
+        require_once __DIR__ . '/restaurant_notify_events.php';
         rsnEnsureSchema($pdo, $log);
-        if ($pdo->query("SHOW TABLES LIKE 'notification_events'")->fetch() && $pdo->query("SHOW TABLES LIKE 'notification_rules'")->fetch()) {
-            $key = 'restaurant.online_order_uncollected';
-            $ex = $pdo->prepare("SELECT 1 FROM notification_events WHERE event_key = ?");
-            $ex->execute([$key]);
-            if (!$ex->fetchColumn()) {
-                $pdo->prepare("INSERT INTO notification_events (event_key, title, description, module, page_key, required_verb, default_severity, scope_aware, is_active, created_at)
-                               VALUES (?, 'Online order not collected', 'An accepted pickup order has not been paid or collected yet.', 'Restaurant', 'restaurant_pos', 'view', 'medium', 1, 1, NOW())")
-                    ->execute([$key]);
-                $pdo->prepare("INSERT INTO notification_rules (event_key, target_type, target_id, channel_email, channel_inapp, digest, is_active, created_at, updated_at)
-                               VALUES (?, 'admins', NULL, 1, 1, 'immediate', 1, NOW(), NOW())")->execute([$key]);
-                $log("  + event $key registered with rule: All admins — in-app + email.");
-            } else {
-                $log("  ~ event $key already present.");
-            }
-        }
+        rnRegisterMissingEvents($pdo, $log);
 
         return true;
     }

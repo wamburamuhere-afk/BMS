@@ -2780,7 +2780,12 @@ function loadHeldSale(holdId) {
 // server first so two tills can never open the same order, then loaded with its customer and
 // the price list it was ordered at (wholesale orders switch the till to the Wholesale list).
 function loadOnlineHeldSale(sale) {
-    const tillShop = String($('#posWarehouseId').val() || '');
+    let tillShop = String($('#posWarehouseId').val() || '');
+    // No shop picked on the till yet: pick the order's own shop (the sale must take that shop's stock).
+    if (sale.warehouse_id && !tillShop && $('#posWarehouseId option[value="' + sale.warehouse_id + '"]').length && !$('#posWarehouseId').prop('disabled')) {
+        $('#posWarehouseId').val(String(sale.warehouse_id)).trigger('change');
+        tillShop = String(sale.warehouse_id);
+    }
     if (sale.warehouse_id && tillShop && String(sale.warehouse_id) !== tillShop) {
         Swal.fire({ icon: 'warning', title: PT.onlineOrder, text: PT.onlineOtherShop.replace('%s', sale.warehouse_name || '') });
         return;

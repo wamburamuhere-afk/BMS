@@ -7,7 +7,8 @@
  */
 ?>
 <?php require_once __DIR__ . '/form_kit.php'; rfKitAssets(); ?>
-<div class="modal fade rf-modal" id="shareMenuModal" tabindex="-1" aria-labelledby="shareMenuTitle">
+<!-- data-no-autoclose: each switch saves on its own; footer.php's "close the modal after a successful save" must not shut it. -->
+<div class="modal fade rf-modal" id="shareMenuModal" tabindex="-1" aria-labelledby="shareMenuTitle" data-no-autoclose="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
@@ -106,6 +107,7 @@
         'tables'    => t('%d tables'),
         'noTables'  => t('No tables yet — add tables to print table QR codes.'),
         'copied'    => t('Link copied'),
+        'copyFail'  => t('Could not copy. Select the link and copy it.'),
         'error'     => t('Something went wrong. Please try again.'),
         'rotateQ'   => t('Make new links?'),
         'rotateTxt' => t('The current link and every printed table QR code will stop working. You will need to share and print the new ones.'),
@@ -158,8 +160,15 @@
     $('.sm-opt').on('change', save);
     $('#smCopy').on('click', function () {
         const v = $('#smLink').val(); if (!v) return;
-        (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).catch(() => { $('#smLink').trigger('select'); document.execCommand('copy'); })
-            .finally(() => Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: SM.copied, timer: 1400, showConfirmButton: false }));
+        const toast = (ok) => Swal.fire({ toast: true, position: 'top-end', icon: ok ? 'success' : 'warning', title: ok ? SM.copied : SM.copyFail, timer: 1600, showConfirmButton: false });
+        // Copy from the selected link first; the Clipboard API can hang without answering, so it is only a timed backup.
+        const i = document.getElementById('smLink'); i.focus(); i.select(); i.setSelectionRange(0, v.length);
+        let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+        if (ok) { toast(true); return; }
+        if (navigator.clipboard && window.isSecureContext) {
+            Promise.race([navigator.clipboard.writeText(v), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 1500))])
+                .then(() => toast(true)).catch(() => toast(false));
+        } else toast(false);
     });
     $('#smDownload').on('click', function () {
         const c = document.querySelector('#smQr canvas'); if (!c) return;

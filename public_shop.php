@@ -204,9 +204,9 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .card-x .ph img{width:100%;height:100%;object-fit:cover;transition:transform .35s}
 .card-x:hover .ph img{transform:scale(1.04)}
 .ph .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.4rem;font-weight:800;color:rgba(17,24,39,.35)}
-.badge-x{position:absolute;top:10px;left:10px;background:#fff;border-radius:999px;font-size:.72rem;font-weight:600;padding:4px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.badge-x{position:absolute;z-index:2;top:10px;left:10px;background:#fff;border-radius:999px;font-size:.72rem;font-weight:600;padding:4px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .badge-x.av{color:#047857}
-.add{position:absolute;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:#fff;color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
+.add{position:absolute;z-index:3;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:#fff;color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
 .add .n{font-size:.8rem;font-weight:700}
 .card-x.has .add{background:var(--brand);color:#fff}
 .card-x .nm{font-size:.95rem;font-weight:600;margin:10px 0 2px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -705,7 +705,7 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     cur = it;
     document.getElementById('isName').textContent = it.name;
     var body = document.getElementById('isBody'); body.textContent = '';
-    if (it.image) { var img = el('img', 'big'); img.src = it.image; img.alt = ''; body.appendChild(img); }
+    if (it.image) { var img = el('img', 'big'); img.alt = ''; img.addEventListener('error', function () { img.remove(); }); img.src = it.image; body.appendChild(img); }
     var top = el('div', 'd-flex justify-content-between align-items-baseline');
     top.appendChild(el('div', 'hint', CATS[it.category_id] || ''));
     var p = el('div', 'fw-bold fs-5', money(priceOf(it))); if (it.decimal && it.unit) p.appendChild(el('small', 'hint', ' ' + fmt(T.per, it.unit)));

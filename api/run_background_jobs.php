@@ -87,6 +87,17 @@ if (function_exists('get_setting') && (time() - (int) get_setting('rn_checks_las
     }
 }
 
+// Online shop (retail_online_shop_plan.md): orders not accepted, accepted but not collected, 24 h expiry.
+if (function_exists('get_setting') && (time() - (int) get_setting('rsn_checks_last_ts', '0')) >= 120) {
+    if (function_exists('save_setting')) save_setting('rsn_checks_last_ts', (string) time());
+    try {
+        require_once __DIR__ . '/../core/retail_online_notify.php';
+        if (rsnModuleOn($pdo)) { rsnRunFrequentChecks($pdo); $ran[] = 'online_shop_checks'; }
+    } catch (Throwable $e) {
+        error_log('run_background_jobs online_shop_checks: ' . $e->getMessage());
+    }
+}
+
 if (function_exists('get_setting') && (time() - (int) get_setting('notif_outbox_last_ts', '0')) >= 120) {
     if (function_exists('save_setting')) save_setting('notif_outbox_last_ts', (string) time());
     @include_once __DIR__ . '/../cron/process_notifications.php';

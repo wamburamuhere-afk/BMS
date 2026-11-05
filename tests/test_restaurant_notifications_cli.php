@@ -52,7 +52,7 @@ function done_exit() { global $pass, $fail; echo "\n" . ($fail === 0 ? "\033[32m
 $src = fn(string $f) => (string)@file_get_contents("$root/$f");
 
 echo "\n── 1. Static ──\n";
-$core = $src('core/restaurant_notify.php');
+$core = $src('core/restaurant_notify_events.php');   // the event list lives in its own dependency-free file
 preg_match_all("/'(restaurant\.[a-z_]+)'\s*=>\s*\[/", $core, $m);
 ok(count(array_unique($m[1])) === 12, '12 restaurant events defined (+ existing customer-credit events)');
 ok(str_contains($src('core/restaurant_notify_schema.php'), "\$addRule->execute([\$key, 'admins', 1])"), 'default rule: All admins — in-app + email');
@@ -66,6 +66,7 @@ ok(str_contains($src('app/constant/communication/notification_center.php'), "NC_
 
 if (!is_file("$root/includes/config.php")) { echo "  (no includes/config.php — runtime checks skipped)\n"; done_exit(); }
 
+require_once "$root/core/restaurant_notify.php";          // loads the app ($pdo) + the restaurant alert helpers
 require_once "$root/core/restaurant_notify_schema.php";
 global $pdo;
 restaurantNotifyEnsureSchema($pdo, function () {});

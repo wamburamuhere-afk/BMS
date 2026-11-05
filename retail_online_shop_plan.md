@@ -1,7 +1,14 @@
 # Retail Online Shop (Smart POS) + Online-Order Record Strengthening — Plan
 
-Status: **IN PROGRESS** — owner approved 2026-11-05 ("yes go ahead", incl. the 3 extra suggestions). Branch `feat/retail-online-shop` (worktree `bms-online-shop`).
-Phase 1 DONE (schema, engine, customer rule, alerts registered; 51 checks).
+Status: **BUILT 2026-11-05** — all 7 phases done (owner approved: "yes go ahead", incl. the 3 extra suggestions).
+Branch `feat/retail-online-shop` (worktree `bms-online-shop`) → PR into `develop`.
+Tests: `tests/test_retail_online_shop_cli.php` — 144 checks (engine, real HTTP through the till, browser-found fixes).
+Browser click-through (desktop + phone layout) found and fixed: Share windows closed on every switch (footer
+auto-close), Copy could hang without copying, "+" was covered when a product photo failed (also on the
+restaurant menu), till did not pick the order's shop. Also found: the 2026-11-03 restaurant alerts migration
+loaded roots.php, so its events went to the main database and tenants never got restaurant alerts — this
+migration now registers every missing restaurant event on each tenant, and a test guards the rule.
+Deviation: the receipt link is `restaurant_online_orders.sale_id` (see "Online order → receipt" §3).
 Scope A: **Smart POS retail shops only** (`posSimpleModeEnabled()`); not Smart BMS.
 Scope B: **Restaurant online orders** — strengthen the record (owner asked), no change to how
 the restaurant menu looks or works for customers.

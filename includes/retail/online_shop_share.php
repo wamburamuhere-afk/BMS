@@ -18,7 +18,8 @@ if (rsSchemaReady($pdo)) {
 }
 rfKitAssets();
 ?>
-<div class="modal fade rf-modal" id="shareShopModal" tabindex="-1" aria-labelledby="shareShopTitle">
+<!-- data-no-autoclose: each switch saves on its own; footer.php's "close the modal after a successful save" must not shut it. -->
+<div class="modal fade rf-modal" id="shareShopModal" tabindex="-1" aria-labelledby="shareShopTitle" data-no-autoclose="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
@@ -208,9 +209,16 @@ rfKitAssets();
     $('#ssCopy').on('click', function () {
         const v = $('#ssLink').val(); if (!v) return;
         const toast = (ok) => Swal.fire({ toast: true, position: 'top-end', icon: ok ? 'success' : 'warning', title: ok ? SS.copied : SS.copyFail, timer: 1800, showConfirmButton: false });
-        const fallback = () => { const i = document.getElementById('ssLink'); i.focus(); i.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} toast(ok); };
-        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(v).then(() => toast(true)).catch(fallback);
-        else fallback();
+        // Copy straight from the selected link first (works on every phone, http or https, inside this tap).
+        // The Clipboard API can hang without ever answering (e.g. a permission prompt), so it is only the
+        // backup, with a time limit — "Link copied" shows only when a copy really happened.
+        const i = document.getElementById('ssLink'); i.focus(); i.select(); i.setSelectionRange(0, v.length);
+        let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+        if (ok) { toast(true); return; }
+        if (navigator.clipboard && window.isSecureContext) {
+            Promise.race([navigator.clipboard.writeText(v), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 1500))])
+                .then(() => toast(true)).catch(() => toast(false));
+        } else toast(false);
     });
     $('#ssDownload').on('click', function () {
         const c = document.querySelector('#ssQr canvas'); if (!c) return;

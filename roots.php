@@ -454,6 +454,7 @@ $routes = [
     'stock_transfers' => STOCK_DIR . '/stock_transfers.php',
     'stock_transfers.php' => STOCK_DIR . '/stock_transfers.php',
     'warehouse_view' => STOCK_DIR . '/warehouse_view.php',
+    'shop_online_orders' => STOCK_DIR . '/shop_online_orders.php',   // retail_online_shop_plan.md Phase 5
     'warehouse_view.php' => STOCK_DIR . '/warehouse_view.php',
     'bms/warehouse_view' => STOCK_DIR . '/warehouse_view.php',
     'bms/locations' => STOCK_DIR . '/locations.php',

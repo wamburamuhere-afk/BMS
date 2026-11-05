@@ -5304,7 +5304,7 @@ CREATE TABLE `notification_rules` (
   PRIMARY KEY (`id`),
   KEY `idx_nr_event` (`event_key`),
   KEY `idx_nr_target` (`target_type`,`target_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -5906,12 +5906,14 @@ CREATE TABLE `pos_held_sales` (
   `loaded_at` datetime DEFAULT NULL,
   `expires_at` datetime DEFAULT NULL,
   `notes` text,
+  `online_order_id` int DEFAULT NULL,
   PRIMARY KEY (`hold_id`),
   KEY `idx_shift_id` (`shift_id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_status` (`status`),
   KEY `idx_held_at` (`held_at`),
-  KEY `customer_id` (`customer_id`)
+  KEY `customer_id` (`customer_id`),
+  KEY `idx_phs_online_order` (`online_order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -6561,6 +6563,7 @@ CREATE TABLE `products` (
   `is_menu_item` tinyint(1) NOT NULL DEFAULT '0',
   `is_available` tinyint(1) NOT NULL DEFAULT '1',
   `recipe_yield` int unsigned NOT NULL DEFAULT '1',
+  `online_hidden` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `product_code` (`product_code`),
   UNIQUE KEY `ux_products_client_uuid` (`client_uuid`),
@@ -7546,7 +7549,7 @@ CREATE TABLE `restaurant_online_orders` (
   `order_id` int NOT NULL AUTO_INCREMENT,
   `warehouse_id` int NOT NULL,
   `table_id` int DEFAULT NULL,
-  `order_type` enum('table','pickup') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'table',
+  `order_type` enum('table','pickup','shop_pickup','shop_delivery') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'table',
   `order_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `public_ref` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `customer_name` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7562,11 +7565,19 @@ CREATE TABLE `restaurant_online_orders` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `accepted_at` datetime DEFAULT NULL,
+  `price_type` enum('retail','wholesale') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'retail',
+  `delivery_address` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_id` int DEFAULT NULL,
+  `sale_id` int DEFAULT NULL,
+  `cancelled_by` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
   PRIMARY KEY (`order_id`),
   UNIQUE KEY `uq_roo_public_ref` (`public_ref`),
   KEY `idx_roo_wh_status` (`warehouse_id`,`status`),
   KEY `idx_roo_client` (`client_hash`,`created_at`),
-  KEY `idx_roo_table_status` (`table_id`,`status`)
+  KEY `idx_roo_table_status` (`table_id`,`status`),
+  KEY `idx_roo_sale` (`sale_id`),
+  KEY `idx_roo_type_status` (`order_type`,`status`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -8119,7 +8130,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=104 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=105 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -9686,12 +9697,20 @@ CREATE TABLE `warehouses` (
   `online_menu_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `online_order_table` tinyint(1) NOT NULL DEFAULT '0',
   `online_order_pickup` tinyint(1) NOT NULL DEFAULT '0',
+  `online_shop_token` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `online_shop_enabled` tinyint(1) NOT NULL DEFAULT '0',
+  `online_shop_ordering` tinyint(1) NOT NULL DEFAULT '0',
+  `online_shop_pickup` tinyint(1) NOT NULL DEFAULT '1',
+  `online_shop_delivery` tinyint(1) NOT NULL DEFAULT '0',
+  `online_shop_wholesale` tinyint(1) NOT NULL DEFAULT '0',
+  `online_show_payment` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`warehouse_id`),
   UNIQUE KEY `warehouse_code` (`warehouse_code`),
   UNIQUE KEY `idx_warehouses_public_catalog_token_hash` (`public_catalog_token_hash`),
   UNIQUE KEY `ux_warehouses_client_uuid` (`client_uuid`),
   UNIQUE KEY `uq_warehouses_client_uuid` (`client_uuid`),
   UNIQUE KEY `uq_wh_online_menu_token` (`online_menu_token`),
+  UNIQUE KEY `uq_wh_online_shop_token` (`online_shop_token`),
   KEY `idx_warehouse_code` (`warehouse_code`),
   KEY `idx_warehouse_name` (`warehouse_name`),
   KEY `idx_status` (`status`),
