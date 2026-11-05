@@ -110,7 +110,7 @@ if ($can_restock_product ?? false) {
 
 <!-- Held Sales Modal -->
 <div class="modal fade" id="heldSalesModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-info text-white">
                 <h5 class="modal-title">
@@ -118,22 +118,27 @@ if ($can_restock_product ?? false) {
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th><?= t('Hold #') ?></th>
-                            <th><?= t('Customer') ?></th>
-                            <th><?= t('Items') ?></th>
-                            <th><?= t('Total') ?></th>
-                            <th><?= t('Held At') ?></th>
-                            <th><?= t('Actions') ?></th>
-                        </tr>
-                    </thead>
-                    <tbody id="heldSalesBody">
-                        <!-- Held sales will be loaded here -->
-                    </tbody>
-                </table>
+            <div class="modal-body p-2 p-md-3">
+                <!-- Desktop table -->
+                <div class="table-responsive d-none d-md-block">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th><?= t('Hold #') ?></th>
+                                <th><?= t('Customer') ?></th>
+                                <th><?= t('Items') ?></th>
+                                <th><?= t('Total') ?></th>
+                                <th><?= t('Held At') ?></th>
+                                <th><?= t('Actions') ?></th>
+                            </tr>
+                        </thead>
+                        <tbody id="heldSalesBody">
+                            <!-- Held sales will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Mobile card list -->
+                <div id="heldSalesCards" class="d-md-none"></div>
             </div>
         </div>
     </div>
