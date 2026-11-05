@@ -7,7 +7,8 @@
  */
 ?>
 <?php require_once __DIR__ . '/form_kit.php'; rfKitAssets(); ?>
-<div class="modal fade rf-modal" id="shareMenuModal" tabindex="-1" aria-labelledby="shareMenuTitle">
+<!-- data-no-autoclose: each switch saves on its own; footer.php's "close the modal after a successful save" must not shut it. -->
+<div class="modal fade rf-modal" id="shareMenuModal" tabindex="-1" aria-labelledby="shareMenuTitle" data-no-autoclose="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
@@ -40,6 +41,12 @@
                                     <label class="rf-choice" for="smPickup">
                                         <span class="form-check form-switch m-0 p-0"><input class="form-check-input sm-opt m-0" type="checkbox" role="switch" id="smPickup"></span>
                                         <span><span class="rf-ct"><?= t('Order for pickup') ?></span><span class="rf-cd"><?= t('Anyone with the menu link can order and collect. They give a name and phone number.') ?></span></span>
+                                    </label>
+                                </div>
+                                <div class="rf-field d-none" id="smPayWrap">
+                                    <label class="rf-choice" for="smPay">
+                                        <span class="form-check form-switch m-0 p-0"><input class="form-check-input sm-opt m-0" type="checkbox" role="switch" id="smPay"></span>
+                                        <span><span class="rf-ct"><?= t('Show our payment numbers') ?></span><span class="rf-cd"><?= t('After ordering, the customer sees the mobile money and bank numbers from Payment Settings and may pay first. Staff still confirm the payment at the till.') ?></span></span>
                                     </label>
                                 </div>
                             </div>
@@ -100,6 +107,7 @@
         'tables'    => t('%d tables'),
         'noTables'  => t('No tables yet — add tables to print table QR codes.'),
         'copied'    => t('Link copied'),
+        'copyFail'  => t('Could not copy. Select the link and copy it.'),
         'error'     => t('Something went wrong. Please try again.'),
         'rotateQ'   => t('Make new links?'),
         'rotateTxt' => t('The current link and every printed table QR code will stop working. You will need to share and print the new ones.'),
@@ -116,6 +124,8 @@
         $('#smEnabled').prop('checked', d.enabled);
         $('#smTable').prop('checked', d.order_table);
         $('#smPickup').prop('checked', d.order_pickup);
+        $('#smPay').prop('checked', !!d.show_payment);
+        $('#smPayWrap').toggleClass('d-none', !d.payment_ready);
         $('#smOn').toggleClass('d-none', !d.enabled);
         if (!d.enabled || !d.link) return;
         $('#smLink').val(d.link);
@@ -141,7 +151,8 @@
             .fail(() => { msg('<div class="alert alert-danger py-2 mb-0">' + SM.error + '</div>'); load(); });
     }
     function save() {
-        post({ action: 'save', enabled: $('#smEnabled').is(':checked') ? 1 : 0, order_table: $('#smTable').is(':checked') ? 1 : 0, order_pickup: $('#smPickup').is(':checked') ? 1 : 0 });
+        post({ action: 'save', enabled: $('#smEnabled').is(':checked') ? 1 : 0, order_table: $('#smTable').is(':checked') ? 1 : 0, order_pickup: $('#smPickup').is(':checked') ? 1 : 0,
+               show_payment: $('#smPay').is(':checked') ? 1 : 0 });
     }
 
     window.openShareMenu = function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('shareMenuModal')).show(); load(); };
@@ -149,8 +160,15 @@
     $('.sm-opt').on('change', save);
     $('#smCopy').on('click', function () {
         const v = $('#smLink').val(); if (!v) return;
-        (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).catch(() => { $('#smLink').trigger('select'); document.execCommand('copy'); })
-            .finally(() => Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: SM.copied, timer: 1400, showConfirmButton: false }));
+        const toast = (ok) => Swal.fire({ toast: true, position: 'top-end', icon: ok ? 'success' : 'warning', title: ok ? SM.copied : SM.copyFail, timer: 1600, showConfirmButton: false });
+        // Copy from the selected link first; the Clipboard API can hang without answering, so it is only a timed backup.
+        const i = document.getElementById('smLink'); i.focus(); i.select(); i.setSelectionRange(0, v.length);
+        let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+        if (ok) { toast(true); return; }
+        if (navigator.clipboard && window.isSecureContext) {
+            Promise.race([navigator.clipboard.writeText(v), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 1500))])
+                .then(() => toast(true)).catch(() => toast(false));
+        } else toast(false);
     });
     $('#smDownload').on('click', function () {
         const c = document.querySelector('#smQr canvas'); if (!c) return;

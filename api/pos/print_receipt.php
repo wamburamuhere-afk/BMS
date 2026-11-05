@@ -297,6 +297,16 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <span><?= caseFormat($sale['customer_name']) ?></span>
         </div>
         <?php endif; ?>
+        <?php
+            require_once __DIR__ . '/../../core/online_order_record.php';
+            $onlineCodes = oorCodesForSale($pdo, (int)$sale['sale_id']);
+        ?>
+        <?php if ($onlineCodes): ?>
+        <div>
+            <span><?= t('Online order:') ?></span>
+            <span><?= htmlspecialchars(implode(', ', $onlineCodes)) ?></span>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div class="items-table">

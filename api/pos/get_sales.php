@@ -57,9 +57,16 @@ try {
     $hasPastCol = (bool)$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'is_past_entry'")->fetch();
     $pastExpr   = $hasPastCol ? "ps.is_past_entry" : "0";
 
+    // Online orders (online menu / online shop) this receipt paid for — retail_online_shop_plan.md.
+    $hasOnline  = false;
+    try { $hasOnline = (bool)$pdo->query("SHOW COLUMNS FROM restaurant_online_orders LIKE 'sale_id'")->fetch(); } catch (Throwable $e) {}
+    $onlineExpr = $hasOnline
+        ? "(SELECT GROUP_CONCAT(roo.order_code ORDER BY roo.order_id SEPARATOR ', ') FROM restaurant_online_orders roo WHERE roo.sale_id = ps.sale_id)"
+        : "NULL";
+
     $sql = "SELECT ps.sale_id, ps.receipt_number, ps.sale_date, ps.grand_total, ps.tax_amount,
                    ps.payment_method, ps.payment_status, ps.sale_status, ps.is_return_sale,
-                   {$pastExpr} AS is_past_entry, ps.created_at,
+                   {$pastExpr} AS is_past_entry, {$onlineExpr} AS online_orders, ps.created_at,
                    ps.original_sale_id, ps.void_reason,
                    COALESCE(NULLIF(ps.customer_name,''), c.customer_name, c.company_name, 'Walk-in') AS party,
                    pr.project_name, {$paidExpr} AS amount_paid

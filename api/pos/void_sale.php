@@ -181,7 +181,17 @@ try {
     require_once __DIR__ . '/../../core/pos_loyalty.php';
     reverseLoyaltyForSale($pdo, $sale_id, (int)$_SESSION['user_id']);
 
+    // An online order paid on this receipt goes back to Accepted and back into Held orders,
+    // so the cashier can take its payment again (core/online_order_record.php).
+    require_once __DIR__ . '/../../core/online_order_record.php';
+    $reopenedOnline = oorOnVoid($pdo, $sale_id, (int)$_SESSION['user_id']);
+
     $pdo->commit();
+
+    if ($reopenedOnline) {
+        logActivity($pdo, $_SESSION['user_id'], 'Online order re-opened',
+            'Online order ' . implode(', ', $reopenedOnline) . " back in Held orders after voiding receipt #{$sale['receipt_number']}");
+    }
 
     // An old sale sits in a closed shift: refresh that shift's saved Z-report figures.
     if (!empty($sale['is_past_entry'])) {

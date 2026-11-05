@@ -1009,7 +1009,17 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         $pdo->prepare("UPDATE pos_sales SET is_past_entry = 1 WHERE sale_id = ?")->execute([$sale_id]);
     }
 
+    // Online orders on this sale (online menu / online shop): link the receipt and close them,
+    // inside this transaction — a line from another shop or an order already paid elsewhere
+    // stops the sale here (core/online_order_record.php).
+    require_once __DIR__ . '/../../core/online_order_record.php';
+    $online_order_codes = oorAttachSale($pdo, $items, (int)$sale_id, (int)$warehouse_id, (bool)$keep_table);
+
     $pdo->commit();
+
+    if ($online_order_codes) {
+        logActivity($pdo, $user_id, 'Online order paid', 'Online order ' . implode(', ', $online_order_codes) . " paid on POS receipt #$receipt_number");
+    }
 
     // An old sale that landed in a closed shift (the cashier's own, or the
     // back-dated one) refreshes that shift's saved Z-report figures.
@@ -1071,8 +1081,9 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         'sale_date' => $sale_date_value,
         'shift_code' => $is_old_sale ? ($shift['shift_code'] ?? null) : null,
         'shift_created' => $is_old_sale && !empty($shift['created']),
+        'online_orders' => $online_order_codes,
     ]);
-    
+
 } catch (PosCreditLimitExceededException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(409);

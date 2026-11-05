@@ -27,6 +27,7 @@
  * Everything here is fail-silent: a notification problem never breaks a sale.
  */
 
+require_once __DIR__ . '/restaurant_notify_events.php';   // rnEvents() — dependency-free, migrations read it
 require_once __DIR__ . '/notify.php';
 require_once __DIR__ . '/restaurant_scope.php';
 require_once __DIR__ . '/pos_nav.php';
@@ -35,27 +36,8 @@ const RN_ORDER_WAIT_MIN    = 5;
 const RN_KITCHEN_WAIT_MIN  = 20;
 const RN_RESERVATION_AHEAD = 60;   // minutes
 const RN_TABLE_OPEN_HOURS  = 3;
+const RN_UNCOLLECTED_HOURS = 3;    // accepted pickup order not paid at the till
 const RN_FREQUENT_EVERY    = 120;  // seconds between frequent checks
-
-if (!function_exists('rnEvents')) {
-    /** key => [title, description, severity] — the events the migration registers (module "Restaurant"). */
-    function rnEvents(): array
-    {
-        return [
-            'restaurant.online_order_new'      => ['New online order', 'A customer sent an order from the online menu or a table QR code.', 'high'],
-            'restaurant.online_order_waiting'  => ['Online order waiting', 'An online order has not been accepted yet.', 'high'],
-            'restaurant.kitchen_ready'         => ['Kitchen order ready', 'The kitchen marked an order ready to serve.', 'medium'],
-            'restaurant.kitchen_waiting'       => ['Kitchen order waiting long', 'A kitchen order has been waiting a long time.', 'high'],
-            'restaurant.reservation_new'       => ['New reservation', 'A table reservation was booked.', 'medium'],
-            'restaurant.reservation_upcoming'  => ['Reservation upcoming', 'A restaurant table reservation is coming up soon', 'medium'],
-            'restaurant.stock_low'             => ['Running low on stock', 'A drink or ingredient is low or out of stock.', 'medium'],
-            'restaurant.supplier_payment_due'  => ['Supplier payment due', 'A supplier bill from Purchases is due or overdue.', 'high'],
-            'restaurant.table_open_long'       => ['Table bill open long', 'A table bill has been open for a long time.', 'medium'],
-            'restaurant.daily_summary'         => ['Restaurant daily summary', "Yesterday's sales, orders and profit.", 'low'],
-            'restaurant.dishes_no_cost'        => ['Dishes with no cost', 'Dishes were sold with no cost, so profit may look too high.', 'low'],
-        ];
-    }
-}
 
 if (!function_exists('rnModuleOn')) {
     /** Restaurant on for this tenant — WITHOUT a logged-in user (background jobs, the public menu). */
@@ -213,7 +195,8 @@ if (!function_exists('rnRunFrequentChecks')) {
             if ($pdo->query("SHOW TABLES LIKE 'restaurant_online_orders'")->fetch()) {
                 $rows = $pdo->query("SELECT o.order_id, o.order_code, o.warehouse_id, o.subtotal, TIMESTAMPDIFF(MINUTE, o.created_at, NOW()) AS mins, t.table_number
                                        FROM restaurant_online_orders o LEFT JOIN restaurant_tables t ON t.table_id = o.table_id
-                                      WHERE o.status = 'pending' AND o.created_at <= NOW() - INTERVAL " . RN_ORDER_WAIT_MIN . " MINUTE
+                                      WHERE o.status = 'pending' AND o.order_type IN ('table','pickup')
+                                        AND o.created_at <= NOW() - INTERVAL " . RN_ORDER_WAIT_MIN . " MINUTE
                                         AND o.created_at >= NOW() - INTERVAL 12 HOUR LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($rows as $o) {
                     $sum['online_order_waiting'] += $count(rnDispatch($pdo, 'restaurant.online_order_waiting', [
@@ -226,6 +209,27 @@ if (!function_exists('rnRunFrequentChecks')) {
                 }
             }
         } catch (Throwable $e) { error_log('rn online_order_waiting: ' . $e->getMessage()); }
+
+        // Pickup orders accepted but not paid / collected (closes itself on its sale at the till).
+        $sum['online_order_uncollected'] = 0;
+        try {
+            if ($pdo->query("SHOW COLUMNS FROM restaurant_online_orders LIKE 'sale_id'")->fetch()) {
+                $rows = $pdo->query("SELECT o.order_id, o.order_code, o.warehouse_id, o.customer_name, TIMESTAMPDIFF(HOUR, o.accepted_at, NOW()) AS hrs
+                                       FROM restaurant_online_orders o
+                                      WHERE o.order_type = 'pickup' AND o.status IN ('accepted','ready')
+                                        AND o.accepted_at <= NOW() - INTERVAL " . RN_UNCOLLECTED_HOURS . " HOUR LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($rows as $o) {
+                    $sum['online_order_uncollected'] += $count(rnDispatch($pdo, 'restaurant.online_order_uncollected', [
+                        'entity_type' => 'online_order', 'entity_id' => (int)$o['order_id'], 'warehouse_id' => (int)$o['warehouse_id'],
+                        'title'       => "Online order {$o['order_code']} not collected",
+                        'message'     => "{$o['order_code']} · Pickup" . ($o['customer_name'] ? ' · ' . $o['customer_name'] : '') . " was accepted {$o['hrs']} hours ago and is not paid yet. "
+                                       . 'Complete it at the till, or cancel it as not collected.',
+                        'action_url'  => 'online_orders?order=' . (int)$o['order_id'],
+                        'severity'    => 'medium', 'dedupe_suffix' => 'once',
+                    ]));
+                }
+            }
+        } catch (Throwable $e) { error_log('rn online_order_uncollected: ' . $e->getMessage()); }
 
         // Kitchen orders waiting long.
         try {

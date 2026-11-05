@@ -175,8 +175,8 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .card-x .ph img{width:100%;height:100%;object-fit:cover;transition:transform .35s}
 .card-x:hover .ph img{transform:scale(1.04)}
 .ph .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.4rem;font-weight:800;color:rgba(17,24,39,.35)}
-.badge-x{position:absolute;top:10px;left:10px;background:#fff;border-radius:999px;font-size:.72rem;font-weight:600;padding:4px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.add{position:absolute;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:#fff;color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
+.badge-x{position:absolute;z-index:2;top:10px;left:10px;background:#fff;border-radius:999px;font-size:.72rem;font-weight:600;padding:4px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.add{position:absolute;z-index:3;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:#fff;color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
 .add .n{font-size:.85rem;font-weight:700}
 .card-x.has .add{background:var(--brand);color:#fff}
 .card-x .nm{font-size:.95rem;font-weight:600;margin:10px 0 2px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -269,6 +269,13 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 .ord-row .bi-chevron-right{color:#9ca3af}
 .notice.info{background:#f3f4f6;color:#374151;margin-top:12px}
 .foot{color:var(--muted);font-size:.75rem;text-align:center;padding:24px 0 100px}
+.pay{background:var(--soft);border-radius:16px;padding:14px 16px;margin-top:14px}
+.pay-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.pay-row:last-of-type{border-bottom:0}
+.pay-row i{font-size:1.1rem;color:var(--muted);margin-top:2px}
+.pay-l{font-weight:600}
+.pay-n{font-weight:800;letter-spacing:.02em;user-select:all}
+.pay-row small{display:block;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -361,6 +368,26 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     <?php endforeach; ?>
     <div class="sum"><span><?= $e(t('Total')) ?></span><span data-money="<?= $e($order['subtotal']) ?>"></span></div>
     <p class="hint"><?= $e(t('You pay the waiter or the cashier. The final bill may change if staff adjust your order.')) ?></p>
+    <?php
+      // "Show our payment numbers" (Share menu): numbers from Payment Settings, the order code as reference.
+      // The system never marks an order paid by itself — staff confirm the payment at the till.
+      $payAccts = [];
+      if (!empty($ctx['warehouse']['show_payment']) && in_array($st, ['pending', 'accepted', 'ready'], true)) {
+          require_once __DIR__ . '/core/payment_accounts.php';
+          try { $payAccts = paymentAccountsForBuyer($pdo); } catch (Throwable $ex) { $payAccts = []; }
+      }
+    ?>
+    <?php if ($payAccts): ?>
+    <div class="pay">
+      <b><?= $e(t('You can also pay first')) ?></b>
+      <?php foreach ($payAccts as $a): ?>
+        <div class="pay-row"><i class="bi <?= $a['kind'] === 'bank' ? 'bi-bank' : 'bi-phone' ?>"></i>
+          <div><span class="pay-l"><?= $e($a['label']) ?></span> <span class="pay-n"><?= $e($a['number']) ?></span>
+            <?php if ($a['name'] !== ''): ?><small><?= $e($a['name']) ?></small><?php endif; ?></div></div>
+      <?php endforeach; ?>
+      <p class="hint mb-0 mt-2"><?= $e(sprintf(t('Use your order number %s as the reference. Staff confirm your payment before your order is closed.'), $order['code'])) ?></p>
+    </div>
+    <?php endif; ?>
     <a class="backlink" href="<?= $e($menuUrl) ?>"><i class="bi bi-arrow-left"></i><?= $e(t('Back to the menu')) ?></a>
   </div>
 </main>
@@ -624,7 +651,7 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     dish = { it: it, qty: 1, sel: {} };
     document.getElementById('dsName').textContent = it.name;
     var body = document.getElementById('dsBody'); body.textContent = '';
-    if (it.image) { var img = el('img', 'big'); img.src = it.image; img.alt = ''; body.appendChild(img); }
+    if (it.image) { var img = el('img', 'big'); img.alt = ''; img.addEventListener('error', function () { img.remove(); }); img.src = it.image; body.appendChild(img); }
     var top = el('div', 'd-flex justify-content-between align-items-baseline');
     top.appendChild(el('div', 'hint', CATS[it.category_id] || ''));
     top.appendChild(el('div', 'fw-bold fs-5', money(it.price)));

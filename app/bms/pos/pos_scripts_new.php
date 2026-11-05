@@ -20,6 +20,7 @@ let splitAmounts = { cash: 0, mobile: 0, bank: 0, card: 0 };
 let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; // 'percentage' or 'fixed'
 let posShowAllProducts = false; // Simple Mode "Show all" — lifts the default grid cap for this page view
 let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = no group chosen, plain selling_price
+const POS_WHOLESALE_GROUP_ID = <?php require_once __DIR__ . '/../../../core/pos_price_groups.php'; echo (int)(wholesalePriceGroupId($GLOBALS['pdo']) ?? 0); ?>; // wholesale online orders load on this list
 const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
@@ -121,6 +122,8 @@ const PT = {
     loadHeldSaleTitle: <?= json_encode(t('Load Held Sale?')) ?>,
     loadHeldSaleText: <?= json_encode(t('Current cart will be replaced. Continue?')) ?>,
     yesLoadIt: <?= json_encode(t('Yes, Load it')) ?>,
+    onlineOrder: <?= json_encode(t('Online order')) ?>,
+    onlineOtherShop: <?= json_encode(t('This online order is for %s. Switch the till to that shop to complete it.')) ?>,
     loaded: <?= json_encode(t('Loaded')) ?>,
     saleLoadedSuccessfully: <?= json_encode(t('Sale loaded successfully')) ?>,
     failedToLoadSaleData: <?= json_encode(t('Failed to load sale data')) ?>,
@@ -2685,10 +2688,15 @@ function showHeldSales() {
                     `);
                 } else {
                     response.data.forEach(sale => {
+                        const isOnline = !!sale.online_order_id;
+                        // Online orders: a badge + the shop; they are removed on Online orders (the customer is told), never with the bin here.
+                        const ref = safeOutput(sale.hold_reference || 'HOLD-' + sale.hold_id)
+                            + (isOnline ? ` <span class="badge bg-primary-subtle text-primary-emphasis">${PT.onlineOrder}</span>`
+                                        + (sale.warehouse_name ? `<div class="small text-muted">${safeOutput(sale.warehouse_name)}</div>` : '') : '');
                         const row = `
                             <tr>
-                                <td>${sale.hold_reference || 'HOLD-' + sale.hold_id}</td>
-                                <td>${sale.customer_name ? caseFormatJs(sale.customer_name) : PT.walkIn}</td>
+                                <td>${ref}</td>
+                                <td>${safeOutput(sale.customer_name ? caseFormatJs(sale.customer_name) : PT.walkIn)}</td>
                                 <td>${JSON.parse(sale.items_data).length}</td>
                                 <td>${POS_CURRENCY} ${parseFloat(sale.total_amount).toLocaleString()}</td>
                                 <td>${new Date(sale.held_at).toLocaleTimeString()}</td>
@@ -2696,9 +2704,9 @@ function showHeldSales() {
                                     <button class="btn btn-sm btn-primary" onclick="loadHeldSale(${sale.hold_id})">
                                         <i class="bi bi-arrow-clockwise"></i> ${PT.load}
                                     </button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteHeldSale(${sale.hold_id})">
+                                    ${isOnline ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteHeldSale(${sale.hold_id})">
                                         <i class="bi bi-trash"></i>
-                                    </button>
+                                    </button>`}
                                 </td>
                             </tr>
                         `;
@@ -2730,7 +2738,9 @@ function loadHeldSale(holdId) {
                         confirmButtonText: PT.yesLoadIt,
                         cancelButtonText: PT.cancel
                     }).then((result) => {
-                        if (result.isConfirmed) {
+                        if (result.isConfirmed && sale.online_order_id) {
+                            loadOnlineHeldSale(sale);
+                        } else if (result.isConfirmed) {
                             // Parse items and load into cart
                             try {
                                 cart = JSON.parse(sale.items_data);
@@ -2763,6 +2773,47 @@ function loadHeldSale(holdId) {
                 }
             }
         }
+    });
+}
+
+// An accepted online order (online menu / online shop): only at its own shop, claimed on the
+// server first so two tills can never open the same order, then loaded with its customer and
+// the price list it was ordered at (wholesale orders switch the till to the Wholesale list).
+function loadOnlineHeldSale(sale) {
+    let tillShop = String($('#posWarehouseId').val() || '');
+    // No shop picked on the till yet: pick the order's own shop (the sale must take that shop's stock).
+    if (sale.warehouse_id && !tillShop && $('#posWarehouseId option[value="' + sale.warehouse_id + '"]').length && !$('#posWarehouseId').prop('disabled')) {
+        $('#posWarehouseId').val(String(sale.warehouse_id)).trigger('change');
+        tillShop = String(sale.warehouse_id);
+    }
+    if (sale.warehouse_id && tillShop && String(sale.warehouse_id) !== tillShop) {
+        Swal.fire({ icon: 'warning', title: PT.onlineOrder, text: PT.onlineOtherShop.replace('%s', sale.warehouse_name || '') });
+        return;
+    }
+    $.ajax({
+        url: '<?= buildUrl('/api/pos/delete_held_sale.php') ?>',
+        type: 'POST',
+        data: JSON.stringify({ hold_id: sale.hold_id, loaded: 1 }),
+        contentType: 'application/json',
+        dataType: 'json',
+        success: function (res) {
+            if (!res.success) { Swal.fire(PT.error, res.message, 'error'); showHeldSales(); return; }
+            try { cart = JSON.parse(sale.items_data); } catch (e) { Swal.fire(PT.error, PT.failedToLoadSaleData, 'error'); return; }
+            const wholesale = cart.some(it => it.online_price_type === 'wholesale');
+            const groupId = wholesale ? POS_WHOLESALE_GROUP_ID : 0;
+            if ($('#posPriceGroupId').length) {
+                const target = groupId && $('#posPriceGroupId option[value="' + groupId + '"]').length ? String(groupId) : $('#posPriceGroupId option:first').val();
+                if ($('#posPriceGroupId').val() !== target) $('#posPriceGroupId').val(target).trigger('change');
+            } else {
+                posSelectedPriceGroupId = groupId;
+            }
+            if (sale.customer_id) setCustomerSelection(sale.customer_id, applyCaseModeJs(sale.customer_name));
+            updateCartDisplay();
+            saveCartToStorage();
+            $('#heldSalesModal').modal('hide');
+            Swal.fire({ icon: 'success', title: PT.loaded, text: PT.saleLoadedSuccessfully, timer: 1000, showConfirmButton: false });
+        },
+        error: function () { Swal.fire(PT.error, PT.failedToLoadSaleData, 'error'); }
     });
 }
 
