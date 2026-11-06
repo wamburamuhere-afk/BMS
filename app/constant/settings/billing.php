@@ -15,6 +15,10 @@ if (!isAdmin()) {
 }
 $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
 
+require_once __DIR__ . '/../../../core/support.php';
+$__sup = supportSettings();
+$__sup_tel = static fn(string $n): string => preg_replace('/[^0-9+]/', '', $n);
+
 $page_title = 'Subscription';
 require_once __DIR__ . '/../../../header.php';
 ?>
@@ -119,7 +123,8 @@ require_once __DIR__ . '/../../../header.php';
         </ul>
         <div class="tab-content">
             <div class="tab-pane fade" id="tabPlans">
-                <p class="small text-muted mb-3"><?= t('Choose a plan and a period, add extras if you need them, and send the request. BJP reviews it and the quotation appears here once approved. Pay the invoice and the plan applies automatically — an upgrade at once, a smaller plan when your current period ends.') ?></p>
+                <div id="plansTabDesc" class="small text-muted mb-3"></div>
+                <div id="planCurrentCard" class="d-none mb-3"></div>
                 <div id="catalog"><div class="text-muted small"><?= t('Loading...') ?></div></div>
             </div>
             <div class="tab-pane fade show active" id="tabInvoices">
@@ -165,6 +170,54 @@ require_once __DIR__ . '/../../../header.php';
 </div>
 
 <?php if ($tenantId !== null): ?>
+<!-- Upgrade contact modal -->
+<div class="modal fade" id="upgradeModal" tabindex="-1" aria-labelledby="upgradeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#0d6efd;color:#fff">
+                <h5 class="modal-title" id="upgradeModalLabel"><i class="bi bi-arrow-up-circle me-2"></i><?= t('Request plan change') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3" id="upgradeCompare"></div>
+                <div class="alert alert-info border-0 small mb-0" id="upgradeMsg"></div>
+                <?php
+                $__e  = $__sup['support_email']     ?? '';
+                $__ph = $__sup['support_phone']     ?? '';
+                $__wa = $__sup['support_whatsapp']  ?? '';
+                $__hrs= $__sup['support_hours']     ?? '';
+                if ($__e !== '' || $__ph !== '' || $__wa !== ''):
+                ?>
+                <hr class="my-3">
+                <p class="small fw-semibold mb-2"><?= t('Contact BJP Technologies (T) Ltd') ?></p>
+                <div class="d-flex flex-column gap-2">
+                    <?php if ($__e !== ''): ?>
+                    <a href="mailto:<?= htmlspecialchars($__e, ENT_QUOTES) ?>" class="btn btn-outline-primary btn-sm text-start">
+                        <i class="bi bi-envelope me-2"></i><?= htmlspecialchars($__e, ENT_QUOTES) ?>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($__ph !== ''): ?>
+                    <a href="tel:<?= htmlspecialchars($__sup_tel($__ph), ENT_QUOTES) ?>" class="btn btn-outline-primary btn-sm text-start">
+                        <i class="bi bi-telephone me-2"></i><?= htmlspecialchars($__ph, ENT_QUOTES) ?>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($__wa !== ''): ?>
+                    <a href="https://wa.me/<?= htmlspecialchars($__sup_tel($__wa), ENT_QUOTES) ?>" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm text-start">
+                        <i class="bi bi-whatsapp me-2"></i><?= htmlspecialchars($__wa, ENT_QUOTES) ?> <span class="text-muted">(WhatsApp)</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($__hrs !== ''): ?>
+                    <div class="small text-muted"><i class="bi bi-clock me-1"></i><?= htmlspecialchars($__hrs, ENT_QUOTES) ?></div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Close') ?></button>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
 $(function () {
     const API = '<?= buildUrl('api/my_subscription.php') ?>', CSRF = <?= json_encode(csrf_token()) ?>;
@@ -200,6 +253,13 @@ $(function () {
         'noReq' => t('No open requests'), 'sinceX' => t('%n · waiting since %d'),
         'eInv' => t('No invoices yet.'), 'eQt' => t('No quotations yet.'), 'ePay' => t('No payments recorded yet.'), 'eCon' => t('No contracts yet.'), 'eReq' => t('No requests yet. Choose a plan under Plans to send one.'),
         'subscription' => t('Subscription'), 'billing' => t('Billing details'), 'balance' => t('Balance'),
+        'plansTrialDesc' => t('Choose a plan and a period, add extras if you need them, and send the request. BJP reviews it and the quotation appears here once approved. Pay the invoice and your plan starts right away.'),
+        'plansPaidDesc'  => t('Your current plan is shown below. To upgrade or change your plan, contact BJP Technologies (T) Ltd — they will prepare a quotation and your new plan applies when you pay.'),
+        'yourCurrentPlan' => t('Your current plan'), 'requestUpgrade' => t('Request plan change'),
+        'contactBJP' => t('Contact BJP Technologies (T) Ltd to change your plan.'),
+        'requestedPlan' => t('Requested plan'), 'or' => t('or'),
+        'upgradeNote' => t('You are on a paid plan. To upgrade or switch plans, contact BJP — they will prepare a quotation. An upgrade applies immediately when you pay; a smaller plan applies when your current period ends.'),
+        'sendRequest' => t('Send request'),
     ]) ?>;
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const money = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -232,7 +292,7 @@ $(function () {
     const cardBtn = url => url ? `<div class="card-footer bg-white border-top p-0"><div style="display:flex;gap:4px;padding:6px;"><a class="btn btn-sm btn-outline-primary" style="flex:1;padding:3px 4px" href="${esc(url)}" target="_blank" rel="noopener"><i class="bi bi-eye"></i></a></div></div>` : '';
     const items = list => (list || []).map(i => `<div class="d-flex justify-content-between py-1"><span><i class="bi bi-check2 text-primary me-1"></i>${esc(i.label)}</span>${i.value ? `<span class="text-muted">${esc(i.value)}</span>` : ''}</div>`).join('');
     const storage = mb => mb === null || mb === undefined ? L.unlimited : (mb >= 1024 ? (Math.round(mb / 102.4) / 10) + ' GB' : mb + ' MB');
-    let curPlanKey = null, curPlanName = '';
+    let curPlanKey = null, curPlanName = '', tenantStatus = null, periodKind = null, curMaxUsers = null, curMaxShops = null;
 
     // ── Views ──────────────────────────────────────────────────────────
     function showView(details, tab) {
@@ -261,6 +321,31 @@ $(function () {
         const st = r.tenant.status, per = r.period || { kind: 'no_end' }, d = r.days_left, p = r.plan;
         curPlanKey = p ? p.plan_key : null;
         curPlanName = p && p.name ? p.name : '';
+        tenantStatus = st;
+        periodKind = per.kind;
+        curMaxUsers = p ? (p.max_users === null ? null : Number(p.max_users)) : null;
+        curMaxShops = p ? (p.max_shops === null ? null : Number(p.max_shops)) : null;
+        // Plans tab description + current plan card (shown for paid; hidden for trial)
+        const isPaid = per.kind === 'paid';
+        $('#plansTabDesc').text(isPaid ? L.plansPaidDesc : L.plansTrialDesc);
+        if (isPaid && p) {
+            const uLbl = curMaxUsers === null ? L.unlimited : String(curMaxUsers) + ' ' + L.users;
+            const sLbl = curMaxShops === null ? L.unlimited : String(curMaxShops) + ' ' + L.shops;
+            $('#planCurrentCard').html(
+                `<div class="card border-primary" style="border-width:2px">
+                    <div class="card-body p-3">
+                        <div class="small fw-bold text-muted mb-1" style="letter-spacing:.8px;text-transform:uppercase">${esc(L.yourCurrentPlan)}</div>
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <span class="fw-bold fs-5">${esc(p.name)}</span>
+                            <span class="text-muted small">${esc(uLbl)} · ${esc(sLbl)}</span>
+                            ${p.tagline ? `<span class="text-primary small">${esc(p.tagline)}</span>` : ''}
+                        </div>
+                    </div>
+                </div>`
+            ).removeClass('d-none');
+        } else {
+            $('#planCurrentCard').addClass('d-none').html('');
+        }
         $('#sbProduct').text(p && p.product ? p.product : ' ');
         $('#sbName').text(curPlanName || L.noPlan);
         $('#sbDesc').text(p ? (p.tagline || p.description || '') : '').toggleClass('d-none', !(p && (p.tagline || p.description)));
@@ -369,8 +454,21 @@ $(function () {
         markCurrent();
         recalc(s.product_id);
     }
-    const footer = s => `<div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top"><span class="small">${L.total}: <span class="fw-bold text-primary" id="tot${s.product_id}">—</span></span>
-        <button type="button" class="btn btn-primary bl-send" data-svc="${s.product_id}"><i class="bi bi-send me-1"></i>${L.send}</button></div>`;
+    const footer = s => {
+        const pk = sel[s.product_id] && sel[s.product_id].plan;
+        const isSame = pk && pk === curPlanKey;
+        const isPaid = periodKind === 'paid';
+        let btnLabel, btnClass;
+        if (isPaid) {
+            if (isSame) { btnLabel = `<i class="bi bi-arrow-repeat me-1"></i>${esc(L.renew)}`; btnClass = 'btn-primary'; }
+            else        { btnLabel = `<i class="bi bi-arrow-up-circle me-1"></i>${esc(L.requestUpgrade)}`; btnClass = 'btn-outline-primary'; }
+        } else {
+            btnLabel = `<i class="bi bi-send me-1"></i>${esc(L.sendRequest || L.send)}`;
+            btnClass = 'btn-primary';
+        }
+        return `<div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top"><span class="small">${L.total}: <span class="fw-bold text-primary" id="tot${s.product_id}">—</span></span>
+        <button type="button" class="btn ${btnClass} bl-send" data-svc="${s.product_id}">${btnLabel}</button></div>`;
+    };
     function recalc(pid) {
         const s = services.find(x => x.product_id === pid), t = s && s.terms.find(x => String(x.term_id) === sel[pid].term);
         let tot = t ? Number(t.price) : 0;
@@ -409,10 +507,7 @@ $(function () {
         if (isNaN(v) || v < 0) this.value = 0; else if (v > 99) this.value = 99; else if (String(v) !== this.value) this.value = v;
         recalc(Number($(this).data('svc')));
     });
-    $(document).on('click', '.bl-send', function () {
-        const b = $(this), pid = Number(b.data('svc')), s = services.find(x => x.product_id === pid);
-        const t = s.terms.find(x => String(x.term_id) === sel[pid].term);
-        if (!t) { Swal.fire({ icon: 'info', title: L.pickPeriod, confirmButtonColor: '#0d6efd' }); return; }
+    function sendRequest(b, pid, s, t) {
         const extras = {};
         $(`.bl-extra[data-svc="${pid}"]`).each(function () { const q = parseInt(this.value, 10) || 0; if (q > 0) extras[$(this).data('tok')] = q; });
         Swal.fire({ title: L.confirmQ, text: L.confirmTxt.replace('%s', $(`#tot${pid}`).text()).replace('%p', t.term_label),
@@ -431,6 +526,33 @@ $(function () {
                 .fail(x => Swal.fire({ icon: 'error', title: L.error, text: (x.responseJSON || {}).message || L.unreachable }))
                 .always(() => b.prop('disabled', false).html(orig));
         });
+    }
+    function showUpgradeModal(s, targetPlanKey) {
+        const curPlan = s.plans.find(p => p.plan_key === curPlanKey);
+        const tPlan   = s.plans.find(p => p.plan_key === targetPlanKey);
+        const fmtU = u => u === null ? L.unlimited : String(u) + ' ' + L.users;
+        const fmtS = sh => sh === null ? L.unlimited : String(sh) + ' ' + L.shops;
+        const col = (p, lbl) => p ? `<div class="col-6"><div class="border rounded p-2 h-100"><div class="small fw-bold text-muted mb-1">${esc(lbl)}</div>
+            <div class="fw-bold">${esc(p.name)}</div>
+            <div class="small text-muted">${esc(fmtU(p.max_users === undefined ? null : p.max_users))} · ${esc(fmtS(p.max_shops === undefined ? null : p.max_shops))}</div>
+            ${p.tagline ? `<div class="small text-primary">${esc(p.tagline)}</div>` : ''}</div></div>` : '';
+        const curCol = col(curPlan, L.yourCurrentPlan);
+        const tCol   = col(tPlan,   L.requestedPlan);
+        $('#upgradeCompare').html(curCol + tCol);
+        $('#upgradeMsg').text(L.upgradeNote);
+        new bootstrap.Modal(document.getElementById('upgradeModal')).show();
+    }
+    $(document).on('click', '.bl-send', function () {
+        const b = $(this), pid = Number(b.data('svc')), s = services.find(x => x.product_id === pid);
+        const t = s.terms.find(x => String(x.term_id) === sel[pid].term);
+        if (!t) { Swal.fire({ icon: 'info', title: L.pickPeriod, confirmButtonColor: '#0d6efd' }); return; }
+        // Paid tenant switching to a DIFFERENT plan → show contact modal instead of sending immediately
+        const targetPlanKey = sel[pid].plan;
+        if (periodKind === 'paid' && targetPlanKey && targetPlanKey !== curPlanKey) {
+            showUpgradeModal(s, targetPlanKey);
+            return;
+        }
+        sendRequest(b, pid, s, t);
     });
 
     // ── Documents ──────────────────────────────────────────────────────
