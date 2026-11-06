@@ -682,19 +682,33 @@ if ($hasContext ?? false):
                     <?php if (!$plans): ?>
                         <p class="text-muted small mb-0">No plans created yet — <a href="<?= saUrl('plans') ?>">create one</a> to apply it here.</p>
                     <?php else: ?>
-                    <div class="d-flex gap-2 flex-wrap">
+                    <div class="d-flex gap-2 flex-wrap align-items-end">
                         <select class="form-select form-select-sm w-auto" id="f-apply-plan">
                             <?php foreach ($plans as $p): ?>
-                            <option value="<?= (int)$p['id'] ?>" <?= $currentPlan && (int)$currentPlan['id'] === (int)$p['id'] ? 'selected' : '' ?>>
+                            <option value="<?= (int)$p['id'] ?>" data-key="<?= htmlspecialchars((string)($p['plan_key'] ?? ''), ENT_QUOTES) ?>" <?= $currentPlan && (int)$currentPlan['id'] === (int)$p['id'] ? 'selected' : '' ?>>
                                 <?= safe_output($p['name'], '') ?>
                             </option>
                             <?php endforeach; ?>
                         </select>
                         <button class="btn btn-sm btn-primary" onclick="applyPlan()" id="btnApplyPlan">
-                            <i class="bi bi-check2-circle me-1"></i> Apply plan
+                            <i class="bi bi-check2-circle me-1"></i> Apply now
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="schedulePlan()" id="btnSchedulePlan">
+                            <i class="bi bi-calendar-event me-1"></i> Schedule for end of period
                         </button>
                     </div>
-                    <div class="form-text">Sets this tenant's modules and quotas to match the selected plan immediately. It stays independently editable below afterward.</div>
+                    <div class="form-text">
+                        <b>Apply now</b> sets modules and quotas immediately.
+                        <b>Schedule</b> queues the plan to apply automatically at the end of the current period.
+                    </div>
+                    <?php if (!empty($scheduledPlan)): ?>
+                    <div class="mt-2 d-flex align-items-center gap-2">
+                        <span class="badge bg-info text-dark"><i class="bi bi-calendar-event me-1"></i>Scheduled: <?= safe_output($scheduledPlan['name'], '') ?> on <?= safe_output(date('d M Y', strtotime((string)$scheduledPlan['at'])), '') ?></span>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearScheduledPlan()" id="btnClearSchedule">
+                            <i class="bi bi-x-circle me-1"></i> Cancel scheduled change
+                        </button>
+                    </div>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -1915,6 +1929,69 @@ function applyPlan() {
             }
         }).fail(function (xhr) {
             let msg = 'Could not apply the plan.';
+            try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }).always(function () { btn.prop('disabled', false).html(orig); });
+    });
+}
+
+function schedulePlan() {
+    const planId   = $('#f-apply-plan').val();
+    const planName = $('#f-apply-plan option:selected').text().trim();
+    const defaultDate = <?= json_encode($subEndsAt ? substr((string)$subEndsAt, 0, 10) : date('Y-m-d')) ?>;
+    Swal.fire({
+        title: 'Schedule plan change',
+        html: `<p class="text-muted small mb-3">The plan <strong>${safeOutput(planName)}</strong> will be applied to <strong>${safeOutput(TENANT_NAME)}</strong> automatically on the chosen date.</p>
+               <input type="date" id="sched-date" class="form-control form-control-sm" value="${safeOutput(defaultDate)}">`,
+        icon: 'info', showCancelButton: true, confirmButtonText: 'Schedule', cancelButtonText: 'Cancel', confirmButtonColor: '#0d6efd',
+        preConfirm: () => {
+            const d = document.getElementById('sched-date').value;
+            if (!d) { Swal.showValidationMessage('Please choose a date.'); return false; }
+            return d;
+        }
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        const btn  = $('#btnSchedulePlan'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Scheduling...');
+        $.ajax({
+            url: '/actions/superadmin_schedule_plan.php', method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, plan_id: planId, date: r.value, action: 'schedule' }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Scheduled', text: res.message, timer: 2200, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not schedule the plan.' });
+            }
+        }).fail(function (xhr) {
+            let msg = 'Could not schedule the plan.';
+            try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }).always(function () { btn.prop('disabled', false).html(orig); });
+    });
+}
+
+function clearScheduledPlan() {
+    Swal.fire({
+        title: 'Cancel scheduled plan change?',
+        text: 'The scheduled change will be removed and the tenant keeps their current plan.',
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'Yes, cancel it', cancelButtonText: 'Keep it'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+        const btn  = $('#btnClearSchedule'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+        $.ajax({
+            url: '/actions/superadmin_schedule_plan.php', method: 'POST', dataType: 'json',
+            data: { _csrf: SA_CSRF_TOKEN, tenant_id: TENANT_ID, action: 'clear' }
+        }).done(function (res) {
+            if (res && res.success) {
+                Swal.fire({ icon: 'success', title: 'Cleared', text: res.message, timer: 2000, showConfirmButton: false })
+                    .then(() => location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Could not clear the schedule.' });
+            }
+        }).fail(function (xhr) {
+            let msg = 'Could not clear the schedule.';
             try { const j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
             Swal.fire({ icon: 'error', title: 'Error', text: msg });
         }).always(function () { btn.prop('disabled', false).html(orig); });

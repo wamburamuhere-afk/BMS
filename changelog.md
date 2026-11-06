@@ -1,5 +1,28 @@
 # BMS Changelog
 
+## 2026-11-06 — feat(subscription): professional plan-change UX for tenants + superadmin schedule
+
+**Changed:** `app/constant/settings/billing.php`, `app/superadmin/tenant_view.php`
+**Created:** `actions/superadmin_schedule_plan.php`
+
+**Tenant-facing (billing.php):**
+- Trial tenants: existing flow unchanged — choose plan, pick period, send request to BJP.
+- Paid tenants: Plans tab now shows a "Your current plan" card (plan name, users, shops) and a descriptive note explaining to contact BJP for changes. If a paid tenant picks a **different** plan and clicks the action button, an upgrade-contact modal appears — it shows current vs requested plan side-by-side and displays live contact details (email, phone, WhatsApp, support hours) from `supportSettings()` — no request is sent automatically, BJP handles it manually. If they pick the **same** plan (renew), the existing send-request flow continues.
+- `sendRequest()` extracted from the inline click handler so both paths can call it.
+- `footer()` is context-aware: button label and style vary by trial vs paid and same vs different plan.
+
+**Superadmin (tenant_view.php):**
+- Plan card adds a **"Schedule for end of period"** button. SweetAlert2 date picker opens, defaulting to `subscription_ends_at`. On confirm, the schedule is written to the DB.
+- When a scheduled change exists, a badge shows the pending plan + date plus a **"Cancel scheduled change"** button.
+- The existing "Apply now" button is unchanged.
+
+**New backend (actions/superadmin_schedule_plan.php):**
+- `action=schedule`: validates plan + date, writes `scheduled_plan_key` + `scheduled_plan_at` to tenants; logs via `tenantLifecycleLog`.
+- `action=clear`: calls `planClearSchedule()` to remove any pending change.
+- Guards: `assertSuperadminHost`, `superadminSessionReady`, POST, CSRF, `currentSuperadmin`.
+
+---
+
 ## 2026-11-05 — feat(online-shop): Retail online shop for Smart POS + stronger online-order record
 
 Plan: `retail_online_shop_plan.md`. Branch `feat/retail-online-shop`.
@@ -189,7 +212,6 @@ Plan: `retail_online_shop_plan.md`. Branch `feat/retail-online-shop`.
 - **Record numbers in the path:** 50 record pages (`core/detail_routes.php`) now live at `/invoice_view/231` instead of `/invoice_view?id=231`. All existing `?id=` links keep working and forward there (other query values kept); the router fills in `$_GET['id']`, so the pages themselves are unchanged. Links inside those pages that were relative (`expenses.php`, `api/update_expense.php`, `customer_details.php?id=`, …) are now absolute so they work under the new address. Not moved yet (no local record to verify against): sales order view/edit, quotation view, payslip, project view, field visit details. Print pages keep `?id=`.
 - **Bugs fixed on the way:** several pages printed the site header before redirecting (edit expense, edit customer, warehouse view, payroll details, GRN/sales-order login checks), so their redirects never worked; they now use `bmsRedirect()`, which falls back to a browser redirect. The page-visit log no longer records "View 231" for a record page.
 - **Tests:** clean URLs 32, flash messages 32, form-address cleanup 27, record paths 29; restaurant phase 1 / phase 6 pass. Failures in other suites (restaurant focus 6, tenant registration 5, header nav 2, mobile side menu 2, POS nav wiring) are identical on plain `develop`.
->>>>>>> origin/develop
 
 ## 2026-11-03 — fix(restaurant): bring the latest `develop` into pay-later; two fixes found by the full test run
 
