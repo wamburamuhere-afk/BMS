@@ -28,6 +28,7 @@ if (!isAuthenticated()) $out(['success' => false, 'message' => 'Unauthorized'], 
 // A decision about the company's own subscription — the same hard admin gate as Available Modules.
 if (!isAdmin()) $out(['success' => false, 'message' => 'Permission denied'], 403);
 $tenantId = function_exists('bmsCurrentTenantId') ? bmsCurrentTenantId() : null;
+if (isset($_SESSION['user_lang']) && function_exists('loadLanguage')) loadLanguage($_SESSION['user_lang']);
 if ($tenantId === null) $out(['success' => false, 'message' => 'Not available on this installation.'], 404);
 
 $action = (string)($_REQUEST['action'] ?? '');
@@ -245,6 +246,94 @@ if ($action === 'request') {
         logActivity($pdo, (int)$_SESSION['user_id'], 'Subscription request', "Requested {$r['term_label']} — BJP request " . ($r['request_number'] ?? $r['quotation_number'] ?? '') . ' (waiting for BJP)');
     }
     $out($r, !empty($r['success']) ? 200 : 422);
+}
+
+/**
+ * Free trial only: the company may move between public, priced plans of its product
+ * itself — no money is involved, so BJP does not need to approve it. The trial end
+ * date never moves. Once paid, plan changes go through BJP again.
+ */
+function msTrialContext(int $tenantId): array
+{
+    $st = getControlPdo()->prepare("SELECT status, plan, trial_ends_at, subscription_ends_at, grace_until, created_at"
+        . (controlColumnExists('tenants', 'trial_starts_at') ? ', trial_starts_at' : '') . " FROM tenants WHERE id = ?");
+    $st->execute([$tenantId]);
+    $t = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$t) return ['ok' => false, 'message' => 'Company not found.'];
+    $days = tenantDaysRemaining($t);
+    if ((string)$t['status'] !== 'trial' || $days === null || $days < 0) {
+        return ['ok' => false, 'message' => 'Plans can be changed here only during the free trial. Contact BJP to change a paid plan.'];
+    }
+    $cur = !empty($t['plan']) ? getPlanByKey((string)$t['plan']) : null;
+    $productKey = $cur && !empty($cur['product_key']) && $t['plan'] !== 'blank' ? (string)$cur['product_key'] : null;
+    $plans = [];
+    foreach (listPublicOffers($productKey) as $prod) {
+        foreach ($prod['plans'] as $p) $plans[] = $p + ['product_key' => $prod['product_key'], 'product_name' => $prod['name']];
+    }
+    return ['ok' => true, 'tenant' => $t, 'current' => (string)($t['plan'] ?? ''), 'plans' => $plans,
+            'trial_ends_at' => tenantAccessEndsAt($t)];
+}
+/** Active users and shops now, against a plan's limits (+ extras bought). Null = within limits. */
+function msTrialOverLimit(PDO $pdo, int $tenantId, array $plan): ?string
+{
+    require_once __DIR__ . '/../core/tenant_quotas.php';
+    $extra = fn(string $q) => function_exists('tenantAddonUnits') ? (int)tenantAddonUnits($tenantId, $q) : 0;
+    $users = tenantActiveUserCount($pdo);
+    $shops = tenantActiveShopCount($pdo);
+    $msg = [];
+    if ($plan['max_users'] !== null && $users > (int)$plan['max_users'] + $extra('max_users')) {
+        $msg[] = sprintf(t('You have %1$d active users; this plan allows %2$d.'), $users, (int)$plan['max_users'] + $extra('max_users'));
+    }
+    if ($plan['max_shops'] !== null && $shops > (int)$plan['max_shops'] + $extra('max_shops')) {
+        $msg[] = sprintf(t('You have %1$d active shops; this plan allows %2$d.'), $shops, (int)$plan['max_shops'] + $extra('max_shops'));
+    }
+    return $msg ? implode(' ', $msg) . ' ' . t('Deactivate some first, then switch.') : null;
+}
+
+if ($action === 'trial_plans') {
+    try {
+        $c = msTrialContext($tenantId);
+        if (!$c['ok']) $out(['success' => true, 'available' => false, 'message' => $c['message']]);
+        require_once __DIR__ . '/../core/tenant_quotas.php';
+        $out(['success' => true, 'available' => true, 'current' => $c['current'], 'trial_ends_at' => $c['trial_ends_at'],
+              'usage' => ['users' => tenantActiveUserCount($pdo), 'shops' => tenantActiveShopCount($pdo)],
+              'plans' => array_map(fn($p) => [
+                  'plan_key' => $p['plan_key'], 'name' => $p['name'], 'tagline' => $p['tagline'], 'is_popular' => $p['is_popular'],
+                  'max_users' => $p['max_users'], 'max_shops' => $p['max_shops'], 'max_storage_mb' => $p['max_storage_mb'],
+                  'modules' => $p['modules'], 'product_name' => $p['product_name'],
+                  'price' => (function ($prices) { foreach ($prices as $x) if ($x['is_default']) return $x; return $prices[0] ?? null; })($p['prices']),
+              ], $c['plans'])]);
+    } catch (Throwable $e) {
+        error_log('my_subscription trial_plans: ' . $e->getMessage());
+        $out(['success' => false, 'message' => 'Could not load the plans right now.'], 500);
+    }
+}
+
+if ($action === 'trial_switch') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') $out(['success' => false, 'message' => 'Method not allowed'], 405);
+    csrf_check();
+    try {
+        $key = trim((string)($_POST['plan_key'] ?? ''));
+        $c = msTrialContext($tenantId);
+        if (!$c['ok']) $out(['success' => false, 'message' => t($c['message'])], 422);
+        if ($key === $c['current']) $out(['success' => false, 'message' => t('You are already on this plan.')], 422);
+        $offer = null;
+        foreach ($c['plans'] as $p) if ($p['plan_key'] === $key) { $offer = $p; break; }
+        if ($offer === null) $out(['success' => false, 'message' => t('This plan is not available.')], 422);
+        $over = msTrialOverLimit($pdo, $tenantId, $offer);
+        if ($over !== null) $out(['success' => false, 'message' => $over], 422);
+        $plan = getPlanByKey($key);
+        $from = $c['current'];
+        $r = applyPlanToTenant($tenantId, (int)$plan['id']);
+        if (!$r['ok']) $out(['success' => false, 'message' => (string)$r['error']], 422);
+        $sub = (string)(bmsCurrentTenant()['subdomain'] ?? '');
+        tenantLifecycleLog($tenantId, $sub, 'plan_trial_switch', "$from → $key during the free trial (by the company admin)", 'tenant:' . (int)$_SESSION['user_id']);
+        logActivity($pdo, (int)$_SESSION['user_id'], 'Plan changed', "Changed plan to {$offer['name']} during the free trial");
+        $out(['success' => true, 'message' => sprintf(t('You are now on %s. Your free trial still ends on %s.'), $offer['name'], date('d M Y', strtotime((string)$c['trial_ends_at'])))]);
+    } catch (Throwable $e) {
+        error_log('my_subscription trial_switch: ' . $e->getMessage());
+        $out(['success' => false, 'message' => t('Could not change the plan right now.')], 500);
+    }
 }
 
 $out(['success' => false, 'message' => 'Unknown action'], 422);

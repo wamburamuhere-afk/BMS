@@ -125,6 +125,7 @@ require_once __DIR__ . '/../../../header.php';
             <div class="tab-pane fade" id="tabPlans">
                 <div id="plansTabDesc" class="small text-muted mb-3"></div>
                 <div id="planCurrentCard" class="d-none mb-3"></div>
+                <div id="trialSwitch" class="d-none mb-4"></div>
                 <div id="catalog"><div class="text-muted small"><?= t('Loading...') ?></div></div>
             </div>
             <div class="tab-pane fade show active" id="tabInvoices">
@@ -253,13 +254,21 @@ $(function () {
         'noReq' => t('No open requests'), 'sinceX' => t('%n · waiting since %d'),
         'eInv' => t('No invoices yet.'), 'eQt' => t('No quotations yet.'), 'ePay' => t('No payments recorded yet.'), 'eCon' => t('No contracts yet.'), 'eReq' => t('No requests yet. Choose a plan under Plans to send one.'),
         'subscription' => t('Subscription'), 'billing' => t('Billing details'), 'balance' => t('Balance'),
-        'plansTrialDesc' => t('Choose a plan and a period, add extras if you need them, and send the request. BJP reviews it and the quotation appears here once approved. Pay the invoice and your plan starts right away.'),
+        'plansTrialDesc' => t('During your free trial you can change plan yourself, below. When you are ready to pay, choose a period and send the request to BJP — the quotation appears here once approved.'),
         'plansPaidDesc'  => t('Your current plan is shown below. To upgrade or change your plan, contact BJP Technologies (T) Ltd — they will prepare a quotation and your new plan applies when you pay.'),
         'yourCurrentPlan' => t('Your current plan'), 'requestUpgrade' => t('Request plan change'),
         'contactBJP' => t('Contact BJP Technologies (T) Ltd to change your plan.'),
         'requestedPlan' => t('Requested plan'), 'or' => t('or'),
         'upgradeNote' => t('You are on a paid plan. To upgrade or switch plans, contact BJP — they will prepare a quotation. An upgrade applies immediately when you pay; a smaller plan applies when your current period ends.'),
         'sendRequest' => t('Send request'),
+        'tsTitle' => t('Change plan during your free trial'),
+        'tsNote' => t('Switch to any plan now — free until %e. Your trial end date stays the same. After the trial you pay for the plan you are on.'),
+        'tsUsage' => t('You use %u users and %s shops now.'),
+        'tsSwitch' => t('Switch to this plan'), 'tsCurrent' => t('Your plan'),
+        'tsConfirmQ' => t('Switch to %n?'),
+        'tsConfirmTxt' => t('Your limits become: %l. The change applies right away. Your free trial still ends on %e.'),
+        'tsYes' => t('Yes, switch'), 'tsDone' => t('Plan changed'),
+        'tsPayLater' => t('Ready to pay? Choose a period below and send the request to BJP.'),
     ]) ?>;
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const money = n => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -479,8 +488,9 @@ $(function () {
         $.getJSON(API, { action: 'catalog' }).done(r => {
             if (!r.success) { $('#catalog').html(`<div class="small text-muted">${esc(r.message || L.unreachable)}</div>`); return; }
             services = r.services || [];
-            if (!services.length) { $('#catalog').html(`<div class="sb-empty">${L.noServices}</div>`); return; }
-            $('#catalog').html(services.map(s => `<div class="mb-3">${services.length > 1 ? `<div class="fw-bold mb-2">${esc(s.name)}</div>` : ''}<div id="svc${s.product_id}"></div></div>`).join(''));
+            // On trial the switch block above is the way to change plan; an empty BJP list adds nothing.
+            if (!services.length) { $('#catalog').html(periodKind === 'trial' ? '' : `<div class="sb-empty">${L.noServices}</div>`); return; }
+            $('#catalog').html((periodKind === 'trial' ? `<div class="small fw-semibold text-muted mb-2">${esc(L.tsPayLater)}</div>` : '') + services.map(s => `<div class="mb-3">${services.length > 1 ? `<div class="fw-bold mb-2">${esc(s.name)}</div>` : ''}<div id="svc${s.product_id}"></div></div>`).join(''));
             services.forEach(s => {
                 const def = s.terms.find(t => t.is_default) || s.terms[0];
                 const onCur = (s.plans || []).some(p => p.plan_key === curPlanKey);
@@ -555,6 +565,58 @@ $(function () {
         sendRequest(b, pid, s, t);
     });
 
+    // ── Free trial: switch plan yourself ───────────────────────────────
+    let trialPlans = [];
+    const limTxt = p => `${p.max_users === null ? L.unlimited : p.max_users} ${L.users} · ${p.max_shops === null ? L.unlimited : p.max_shops} ${L.shops}`;
+    function loadTrialPlans() {
+        if (periodKind !== 'trial') { $('#trialSwitch').addClass('d-none').html(''); return; }
+        $.getJSON(API, { action: 'trial_plans' }).done(r => {
+            if (!r.success || !r.available || !(r.plans || []).length) { $('#trialSwitch').addClass('d-none').html(''); return; }
+            trialPlans = r.plans;
+            const u = r.usage || {};
+            $('#trialSwitch').html(`
+                <div class="fw-bold mb-1"><i class="bi bi-arrow-left-right text-primary me-1"></i>${esc(L.tsTitle)}</div>
+                <div class="small text-muted mb-1">${esc(L.tsNote.replace('%e', longDate(r.trial_ends_at)))}</div>
+                <div class="small text-muted mb-3">${esc(L.tsUsage.replace('%u', u.users ?? 0).replace('%s', u.shops ?? 0))}</div>
+                <div class="row g-2">${r.plans.map(p => {
+                    const cur = p.plan_key === r.current;
+                    return `<div class="col-12 col-sm-6 col-lg-3"><div class="card h-100 border p-3 d-flex flex-column ${cur ? 'border-primary' : ''}" style="${cur ? 'border-width:2px!important' : ''}">
+                        <div class="d-flex justify-content-between align-items-start gap-1"><span class="fw-bold fs-6">${esc(p.name)}</span>
+                            ${cur ? `<span class="badge" style="background:#052c65;color:#fff;font-size:.6rem">${esc(L.tsCurrent)}</span>`
+                                  : (p.is_popular ? `<span class="badge" style="background:#0d6efd;color:#fff;font-size:.6rem">${esc(L.popular)}</span>` : '')}</div>
+                        ${p.tagline ? `<div class="small text-primary">${esc(p.tagline)}</div>` : ''}
+                        <div class="small text-muted mt-1">${esc(limTxt(p))}</div>
+                        ${p.price ? `<div class="small mt-1"><b>${money(p.price.price_tzs)} TZS</b> <span class="text-muted">/ ${esc(p.price.term_label)}</span></div>` : ''}
+                        <div class="mt-auto pt-2">${cur
+                            ? `<button type="button" class="btn btn-sm btn-outline-secondary w-100" disabled><i class="bi bi-check2 me-1"></i>${esc(L.tsCurrent)}</button>`
+                            : `<button type="button" class="btn btn-sm btn-primary w-100 ts-switch" data-plan="${esc(p.plan_key)}"><i class="bi bi-arrow-left-right me-1"></i>${esc(L.tsSwitch)}</button>`}</div>
+                    </div></div>`;
+                }).join('')}</div>`).removeClass('d-none');
+            $('#trialSwitch').data('ends', r.trial_ends_at);
+        });
+    }
+    $(document).on('click', '.ts-switch', function () {
+        const b = $(this), p = trialPlans.find(x => x.plan_key === String(b.data('plan')));
+        if (!p) return;
+        const ends = longDate($('#trialSwitch').data('ends'));
+        Swal.fire({ title: L.tsConfirmQ.replace('%n', p.name), text: L.tsConfirmTxt.replace('%l', limTxt(p)).replace('%e', ends),
+            icon: 'question', showCancelButton: true, confirmButtonText: L.tsYes, cancelButtonText: L.cancel, confirmButtonColor: '#0d6efd' })
+        .then(x => {
+            if (!x.isConfirmed) return;
+            const orig = b.html();
+            b.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+            $.ajax({ url: API, type: 'POST', dataType: 'json', data: { action: 'trial_switch', _csrf: CSRF, plan_key: p.plan_key } })
+                .done(r => {
+                    if (r.success) {
+                        // Menus and limits follow the new plan on the next page load.
+                        Swal.fire({ icon: 'success', title: L.tsDone, text: r.message, confirmButtonColor: '#0d6efd' }).then(() => location.reload());
+                    } else Swal.fire({ icon: 'error', title: L.error, text: r.message });
+                })
+                .fail(x => Swal.fire({ icon: 'error', title: L.error, text: (x.responseJSON || {}).message || L.unreachable }))
+                .always(() => b.prop('disabled', false).html(orig));
+        });
+    });
+
     // ── Documents ──────────────────────────────────────────────────────
     function loadDocs() {
         $.getJSON(API, { action: 'documents' }).done(r => {
@@ -625,7 +687,7 @@ $(function () {
     });
 
     // The catalog opens on the plan the company is on, so it waits for status.
-    loadStatus().always(loadCatalog); loadDocs(); loadContracts();
+    loadStatus().always(() => { loadTrialPlans(); loadCatalog(); }); loadDocs(); loadContracts();
 });
 </script>
 <?php endif; ?>

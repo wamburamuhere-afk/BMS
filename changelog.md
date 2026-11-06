@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-11-06 — feat(subscription): change plan yourself during the free trial
+
+**Changed:** `api/my_subscription.php`, `app/constant/settings/billing.php`, `lang/sw.php`
+**Created:** `tests/test_subscription_trial_switch_cli.php`
+
+- **Why:** a company in its free trial on Basic (1 shop) could not try a bigger plan — choosing one only sent a request to BJP and the plan stayed the same. At registration it may pick any plan for free, so the same choice is now open during the trial.
+- **API:** `action=trial_plans` lists the public, priced plans of the company's product straight from Superadmin (the same source as Register — it does not depend on BJP's service catalog), with the current plan, trial end date and active users/shops. `action=trial_switch` (POST, CSRF) applies the chosen plan at once through `applyPlanToTenant()` (modules, user/shop/storage limits).
+- **Rules:** trial only, and not after the trial has ended (paid companies keep the BJP flow); the trial end date never moves; same plan, private, unpriced or other-product plans refused; a smaller plan is refused while active users or shops are above its limits ("Deactivate some first"); each switch goes to the tenant history (`plan_trial_switch`, actor `tenant:<user id>`) and the activity log.
+- **Page:** Plans tab shows "Change plan during your free trial" with one card per plan (limits, default price, Your plan / Switch to this plan) and a confirm that repeats the new limits and the unchanged trial end date; the page reloads so menus and limits follow. On trial an empty BJP catalog no longer shows "BJP has not published subscription periods yet". API messages now follow the user's language.
+- **Swahili:** lines added for every new string, including the PR #2747 ones that were missing.
+- **Tests:** trial switch 24/24 (new), my subscription 45/45, subscription redesign 46/46.
+
 ## 2026-11-06 — feat(subscription): professional plan-change UX for tenants + superadmin schedule
 
 **Changed:** `app/constant/settings/billing.php`, `app/superadmin/tenant_view.php`
