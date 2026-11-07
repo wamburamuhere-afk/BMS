@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-07 — feat(ui): phone gear menu on the Products and Shops lists
+
+**Changed:** `app/bms/product/products.php`, `app/bms/stock/warehouses.php`
+
+- **Products list (phone):** each product card's View / Edit / Hide / Delete button row is now one full-width gear **Actions** menu holding the same options (same permission checks). The button row stays on desktop, including desktop card view.
+- **Shops / Warehouses list (phone):** the table now opts into the shared `data-actions-dropdown` card mode, so each card shows one gear **Actions** menu with the full desktop menu (View Details, Edit, Manage Storage Areas, Transfer Stock, Delete) instead of only the first three icon buttons. Desktop unchanged.
+- **Checked:** PHP syntax on both files; not yet clicked through on a phone.
+
 ## 2026-11-07 — feat(ui): phone gear menu on product + warehouse view; expiry banner closes until the day count changes
 
 **Changed:** `app/bms/product/product_view.php`, `app/bms/stock/warehouse_view.php`, `header.php`
