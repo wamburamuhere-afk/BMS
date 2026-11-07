@@ -2252,6 +2252,14 @@ $(document).ready(function() {
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
+/* A card lifted by :hover becomes its own stacking layer, so its open Actions menu was painted
+   under the cards below it. While a menu is open: no lift, and the card sits above its neighbours. */
+#cardView .card:has(.dropdown-menu.show) {
+    transform: none;
+    position: relative;
+    z-index: 20;
+}
+
 /* Tab styling */
 .nav-tabs .nav-link {
     font-size: 0.85rem;
