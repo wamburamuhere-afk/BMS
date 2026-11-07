@@ -102,6 +102,9 @@ try {
     
     // Use calculated value, or manual override if provided
     $min_selling_price = !empty($_POST['min_selling_price']) ? floatval($_POST['min_selling_price']) : $calculated_min_price;
+    // Smart POS: no minimum selling price — the minimum is the buying price (core/pos_min_price.php).
+    require_once __DIR__ . '/../core/pos_min_price.php';
+    $min_selling_price = posMinPriceFor(floatval($_POST['cost_price'] ?? 0), $min_selling_price);
     
     // Combine dimensions
     $dimensions = null;

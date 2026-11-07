@@ -232,7 +232,7 @@ if (!function_exists('piColumns')) {
                     'product_name' => $p['product_name'], 'sku' => $sku, 'product_code' => $sku, 'barcode' => $barcode,
                     'description' => null, 'category_id' => $categoryId, 'brand_id' => null, 'unit' => $p['unit'],
                     'weight' => 0, 'dimensions' => null, 'cost_price' => $cost, 'selling_price' => $sell,
-                    'min_selling_price' => $sell, 'wholesale_price' => $whole, 'tax_id' => null, 'tax_rate' => 0,
+                    'min_selling_price' => $cost, 'wholesale_price' => $whole, 'tax_id' => null, 'tax_rate' => 0,
                     'discount_rate' => 0, 'reorder_level' => 0, 'min_stock_level' => (float)($p['min_stock_level'] ?? 0),
                     'max_stock_level' => 0, 'image_url' => '', 'status' => 'active', 'is_service' => 0, 'is_taxable' => 0,
                     'track_inventory' => 1, 'manufacturer' => null, 'model' => null, 'serial_number' => null,

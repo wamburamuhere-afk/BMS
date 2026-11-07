@@ -655,8 +655,11 @@ try {
         $requested_price = floatval($item['discounted_price'] ?? $item['price'] ?? $item['unit_price'] ?? 0);
         $min_price = floatval($db_product['min_selling_price']);
 
-        // Allow a small epsilon for float comparison
-        if ($requested_price < ($min_price - 0.01)) {
+        // Allow a small epsilon for float comparison.
+        // Smart POS (Simple Mode) has no minimum selling price — never refuse a price
+        // because of it (core/pos_min_price.php). Full BMS keeps the check.
+        require_once __DIR__ . '/../../core/pos_min_price.php';
+        if (!posMinPriceOff() && $requested_price < ($min_price - 0.01)) {
             throw new Exception("Price for '{$db_product['product_name']}' is below minimum selling price.", 422);
         }
         

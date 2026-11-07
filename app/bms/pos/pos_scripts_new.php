@@ -24,6 +24,8 @@ const POS_WHOLESALE_GROUP_ID = <?php require_once __DIR__ . '/../../../core/pos_
 const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
+const POS_MIN_PRICE_OFF = <?php require_once __DIR__ . '/../../../core/pos_min_price.php'; echo posMinPriceOff() ? 'true' : 'false'; ?>; // Smart POS: no minimum selling price (core/pos_min_price.php)
+function posMinOf(p) { return POS_MIN_PRICE_OFF ? 0 : (parseFloat(p && p.min_selling_price) || 0); }
 const POS_SIMPLE_MODE = <?= posSimpleModeEnabled() ? 'true' : 'false' ?>; // pos_credit_receivables_plan.md Phase 1 — due-date popup on credit sales is Simple-POS-only
 const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value', '50') ?>; // currency value of 1 point — preview only, server re-validates
 
@@ -1041,7 +1043,7 @@ function posTapProduct(productId) {
             price: price,
             quantity: 1,
             tax_rate: saleVatRate,
-            min_selling_price: parseFloat(product.min_selling_price) || 0,
+            min_selling_price: posMinOf(product),
             discount_type: 'percentage',
             discount_value: 0,
             discount_percent: 0,
@@ -1403,7 +1405,7 @@ function addToCart() {
             quantity: quantity,
             unit_label: unitLabel || undefined, // Phase 15 — resolved server-side, this is display + payload only
             tax_rate: saleVatRate, // cashier-selected VAT (0 or 18), not auto-applied from the product
-            min_selling_price: parseFloat(currentProduct.min_selling_price) || 0,
+            min_selling_price: posMinOf(currentProduct),
             discount_type: 'percentage', // Default to percentage
             discount_value: 0,
             discount_percent: 0,
@@ -3533,7 +3535,7 @@ function openDiscountModal() {
         const isChecked = item.discount_percent > 0 ? 'checked' : '';
         
         let minPriceInfo = '';
-        if (posDiscountType === 'percentage') {
+        if (posDiscountType === 'percentage' && !POS_MIN_PRICE_OFF) {
              const priceDiff = item.price - item.min_selling_price;
              const maxDiscount = priceDiff > 0 ? Math.floor((priceDiff / item.price) * 100) : 0;
              minPriceInfo = `<small class="text-muted">
@@ -3795,7 +3797,7 @@ function updateCashBalanceUI() {
                 price:             price,
                 quantity:          1,
                 tax_rate:          saleVatRate,
-                min_selling_price: parseFloat(product.min_selling_price) || 0,
+                min_selling_price: posMinOf(product),
                 discount_type:     'percentage',
                 discount_value:    0,
                 discount_percent:  0,
