@@ -531,45 +531,41 @@ global $company_logo, $company_name;
                     <?php endif; ?>
                 </div>
 
-                <!-- Mobile Actions (Dropdown) -->
+                <!-- Mobile Actions: one gear menu with every option on this page (desktop keeps its buttons) -->
                 <div class="d-flex d-md-none ms-auto pt-1 flex-shrink-0">
                     <div class="dropdown">
-                        <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-gear-fill me-1"></i> <?= t('Actions') ?>
+                        <button class="btn btn-primary btn-sm dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="<?= t('Actions') ?>">
+                            <i class="bi bi-gear-fill"></i>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="z-index: 1060;">
-                            <li>
-                                <a class="dropdown-item py-2" href="<?= $product['is_service'] == 1 ? getUrl('services') : getUrl('products') ?>">
-                                    <i class="bi bi-arrow-left text-secondary me-2"></i> <?= $product['is_service'] == 1 ? t('Back to Services') : t('Back to Products') ?>
-                                </a>
-                            </li>
-                            <li>
-                                <button class="dropdown-item py-2" onclick="printProductDetails()">
-                                    <i class="bi bi-printer text-info me-2"></i> <?= t('Print Details') ?>
-                                </button>
-                            </li>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="z-index: 1060;">
+                            <li><a class="dropdown-item py-2 rounded" href="<?= $product['is_service'] == 1 ? getUrl('services') : getUrl('products') ?>"><i class="bi bi-arrow-left text-secondary me-2"></i><?= $product['is_service'] == 1 ? t('Back to Services') : t('Back to Products') ?></a></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="printProductDetails()"><i class="bi bi-printer text-info me-2"></i><?= t('Print Details') ?></button></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="printBarcode(<?= $product_id ?>)"><i class="bi bi-upc-scan text-info me-2"></i><?= t('Print Barcode') ?></button></li>
                             <?php if ($can_edit_products): ?>
                             <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item py-2 text-primary" href="<?= getUrl('product_edit') ?>?id=<?= $product_id ?>">
-                                    <i class="bi bi-pencil me-2"></i> <?= t('Edit Product') ?>
-                                </a>
-                            </li>
+                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('product_edit') ?>?id=<?= $product_id ?>&type=<?= $product['is_service'] == 1 ? 'service' : 'inventory' ?>"><i class="bi bi-pencil text-primary me-2"></i><?= $product['is_service'] == 1 ? t('Edit Service') : t('Edit Product') ?></a></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="duplicateProduct(<?= $product_id ?>)"><i class="bi bi-copy text-primary me-2"></i><?= t('Duplicate Product') ?></button></li>
+                            <?php if ($product['status'] == 'active'): ?>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="toggleProductStatus(<?= $product_id ?>, 'inactive')"><i class="bi bi-pause text-secondary me-2"></i><?= t('Deactivate Product') ?></button></li>
+                            <?php else: ?>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="toggleProductStatus(<?= $product_id ?>, 'active')"><i class="bi bi-play text-success me-2"></i><?= t('Activate Product') ?></button></li>
+                            <?php endif; ?>
                             <?php endif; ?>
                             <?php if ($can_adjust_stock): ?>
-                            <li>
-                                <button class="dropdown-item py-2 text-info" onclick="adjustStock(<?= $product_id ?>)">
-                                    <i class="bi bi-arrow-left-right me-2"></i> <?= t('Adjust Stock') ?>
-                                </button>
-                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="adjustStock(<?= $product_id ?>)"><i class="bi bi-arrow-left-right text-primary me-2"></i><?= t('Adjust Stock') ?></button></li>
+                            <?php if ($product['track_inventory']): ?>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="transferStock(<?= $product_id ?>)"><i class="bi bi-truck text-dark me-2"></i><?= t('Transfer Stock') ?></button></li>
+                            <?php endif; ?>
+                            <?php endif; ?>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('stock_movements') ?>?product_id=<?= $product_id ?>"><i class="bi bi-file-earmark-text text-info me-2"></i><?= t('Generate Movement Report') ?></a></li>
+                            <?php if ($can_sales_report_link): ?>
+                            <li><a class="dropdown-item py-2 rounded" href="<?= getUrl('product_analysis') ?>?product_id=<?= $product_id ?>"><i class="bi bi-graph-up text-success me-2"></i><?= t('Generate Sales Report') ?></a></li>
                             <?php endif; ?>
                             <?php if ($can_delete_products && $product['status'] == 'inactive'): ?>
                             <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <button class="dropdown-item py-2 text-danger" onclick="deleteProduct(<?= $product_id ?>)">
-                                    <i class="bi bi-trash me-2"></i> Delete <?= $product['is_service'] == 1 ? 'Service' : 'Product' ?>
-                                </button>
-                            </li>
+                            <li><button type="button" class="dropdown-item py-2 rounded text-danger" onclick="deleteProduct(<?= $product_id ?>)"><i class="bi bi-trash me-2"></i><?= $product['is_service'] == 1 ? t('Delete Service') : t('Delete Product') ?></button></li>
                             <?php endif; ?>
                         </ul>
                     </div>

@@ -16,6 +16,23 @@
 - **Tests:** order flow 93/93 (61 in-process scenarios: both modes, every role, waste + ledger balanced, split bill, move, void, retail; 32 schema/gate/page/settings); tenant migration run twice on an old-shape DB (11/11); browser click-through as waiter, cashier, cook and owner. Restaurant phase2 updated behaviour passes 39/39. Already failing on `develop` and unchanged here: `test_restaurant_focus_cli` (2), `test_restaurant_phase0_cli` (2), `test_pos_phase8_registers_cli` (3, reported through `test_restaurant_pos_cli`).
 - **After merge:** republish the mobile API doc — `api/pos/hold_sale.php` (`cancel_reason`, error codes) and `api/pos/process_sale.php` (`kitchen_served_ok`, `cancel_reason`, HTTP 409 `kitchen_not_served` / `cancel_needs_reason`) changed.
 
+## 2026-11-07 — feat(ui): phone gear menu on the Products and Shops lists
+
+**Changed:** `app/bms/product/products.php`, `app/bms/stock/warehouses.php`
+
+- **Products list (phone):** each product card's View / Edit / Hide / Delete button row is now one full-width gear **Actions** menu holding the same options (same permission checks). The button row stays on desktop, including desktop card view.
+- **Shops / Warehouses list (phone):** the table now opts into the shared `data-actions-dropdown` card mode, so each card shows one gear **Actions** menu with the full desktop menu (View Details, Edit, Manage Storage Areas, Transfer Stock, Delete) instead of only the first three icon buttons. Desktop unchanged.
+- **Checked:** PHP syntax on both files; not yet clicked through on a phone.
+
+## 2026-11-07 — feat(ui): phone gear menu on product + warehouse view; expiry banner closes until the day count changes
+
+**Changed:** `app/bms/product/product_view.php`, `app/bms/stock/warehouse_view.php`, `header.php`
+**Created:** `tests/test_view_gear_and_expiry_banner_cli.php`
+
+- **Product view (phone):** the "Actions" menu is now a gear icon with the triangle only, and holds every option on the page: Back, Print Details, Print Barcode, Edit, Duplicate, Activate/Deactivate, Adjust Stock, Transfer Stock, Movement Report, Sales Report, Delete (inactive only). Same permission checks as before. Desktop unchanged.
+- **Warehouse / shop view (phone):** new gear menu (icon + triangle) with Back, Transfer Stock, Manage Storage Areas, Share shop (when the online shop applies, edit permission), Print, Excel, Copy. Desktop unchanged. The online-shop lookup moved above the header so the menu can use it.
+- **Expiry / grace banner:** the ✕ often did nothing, and even when it closed, the banner came back on the next page. Now the ✕ closes it with its own handler and remembers it for that day count (per company, this browser): it stays hidden on every page until the days left change (e.g. 6 → 5), then shows once more. Hidden before the page paints, so no flash. Same for the grace-period banner after expiry.
+- **Checked:** in Chrome — desktop keeps its buttons, phone width (390 px) shows the gear with all options on both pages; banner closed at 6 days stays hidden across pages and returns at 5. Tests 27/27.
 ## 2026-11-07 — feat(billing): BJP documents on the company's own Billing page — real templates, payments + proof, EFD receipts, emails
 
 **Created:** `core/customer_documents.php`, `app/constant/settings/billing_document.php`, `api/account/upload_efd_receipt.php`, `api/account/delete_efd_receipt.php`, `api/account/view_efd_receipt.php`, `migrations/2026_11_07_invoice_efd_receipts.php`, `tests/test_billing_customer_documents_cli.php`

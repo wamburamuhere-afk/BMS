@@ -2282,10 +2282,33 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
     }
     ?>
 
+    <script>
+    // Expiry / grace banners: once closed they stay hidden on every page until the day count
+    // changes (their key holds the days left), then show once more. Per company, this browser.
+    function bmsBannerHideIfDismissed(el) {
+        try { if (el && localStorage.getItem(el.getAttribute('data-bms-banner-key'))) el.remove(); } catch (e) {}
+    }
+    function bmsBannerDismiss(btn) {
+        var el = btn.closest('[data-bms-banner-key]');
+        if (!el) return;
+        try {
+            var key = el.getAttribute('data-bms-banner-key'), prefix = key.split(':').slice(0, 3).join(':') + ':';
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf(prefix) === 0 && k !== key) localStorage.removeItem(k);
+            }
+            localStorage.setItem(key, '1');
+        } catch (e) {}
+        el.remove();
+    }
+    </script>
+
     <!-- Grace-period warning banner — shown when the tenant is past expiry but still within the grace window -->
     <?php if (!empty($_SESSION['_bms_grace_warning'])): ?>
-    <?php $__gw = $_SESSION['_bms_grace_warning']; ?>
-    <div id="bmsGraceBanner" class="alert alert-warning alert-dismissible fade show mb-0 rounded-0 border-0 border-bottom border-warning" role="alert" style="font-size:.88rem">
+    <?php $__gw = $_SESSION['_bms_grace_warning'];
+    // Closing hides it on every page until the day count changes (bmsBannerDismissed below).
+    $__gwKey = 'bmsBanner:' . (function_exists('bmsCurrentTenantId') ? (int)bmsCurrentTenantId() : 0) . ':grace:' . ($__gw['type'] ?? '') . ':' . (int)($__gw['days_left'] ?? 0) . ':' . (string)($__gw['grace_until'] ?? ''); ?>
+    <div id="bmsGraceBanner" class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom border-warning" role="alert" style="font-size:.88rem" data-bms-banner-key="<?= htmlspecialchars($__gwKey, ENT_QUOTES) ?>">
         <div class="container-fluid d-flex align-items-center gap-2 px-4">
             <?php if (($__gw['type'] ?? '') === 'trial'): ?>
                 <i class="bi bi-hourglass-split flex-shrink-0"></i>
@@ -2310,9 +2333,10 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                     Please contact your service provider to renew.
                 </span>
             <?php endif; ?>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close ms-auto" aria-label="Close" onclick="bmsBannerDismiss(this)"></button>
         </div>
     </div>
+    <script>bmsBannerHideIfDismissed(document.currentScript.previousElementSibling);</script>
     <?php endif; ?>
 
     <!-- Advance warning — shown in the last week BEFORE expiry, so the first
@@ -2325,7 +2349,8 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
     $__days = (int)($__ew['days_left'] ?? 0);
     $__when = $__days === 0 ? 'today' : ($__days === 1 ? 'tomorrow' : 'in ' . $__days . ' days');
     ?>
-    <div id="bmsExpiryBanner" class="alert alert-info alert-dismissible fade show mb-0 rounded-0 border-0 border-bottom" role="alert" style="font-size:.88rem">
+    <?php $__ewKey = 'bmsBanner:' . (function_exists('bmsCurrentTenantId') ? (int)bmsCurrentTenantId() : 0) . ':expiry:' . ($__ew['type'] ?? '') . ':' . $__days . ':' . (string)($__ew['ends_at'] ?? ''); ?>
+    <div id="bmsExpiryBanner" class="alert alert-info alert-dismissible mb-0 rounded-0 border-0 border-bottom" role="alert" style="font-size:.88rem" data-bms-banner-key="<?= htmlspecialchars($__ewKey, ENT_QUOTES) ?>">
         <div class="container-fluid d-flex align-items-center gap-2 px-4">
             <i class="bi bi-<?= ($__ew['type'] ?? '') === 'trial' ? 'hourglass-split' : 'calendar-event' ?> flex-shrink-0"></i>
             <span>
@@ -2339,9 +2364,10 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php endif; ?>
                 Contact your service provider to continue without interruption.
             </span>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close ms-auto" aria-label="Close" onclick="bmsBannerDismiss(this)"></button>
         </div>
     </div>
+    <script>bmsBannerHideIfDismissed(document.currentScript.previousElementSibling);</script>
     <?php endif; ?>
 
     <!-- Main Content Area -->
