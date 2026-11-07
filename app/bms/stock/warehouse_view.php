@@ -142,6 +142,18 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
         <div style="border-bottom: 3px solid #0d6efd; margin-top: 10px; margin-bottom: 20px;"></div>
     </div>
 
+    <?php
+    // Online shop (retail_online_shop_plan.md) — Smart POS retail / hybrid shops only.
+    $rsOnline = null;
+    if ($pos_simple_mode) {
+        require_once __DIR__ . '/../../../core/retail_online.php';
+        if (rsSchemaReady($pdo)) {
+            $rsOnline = rsShopSettings($pdo, (int)$warehouse_id);
+            if (!$rsOnline || !$rsOnline['eligible']) $rsOnline = null;
+        }
+    }
+    ?>
+
     <!-- Breadcrumb & Header -->
     <div class="row mb-4 d-print-none">
         <div class="col-12">
@@ -160,26 +172,32 @@ $recent_movements = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
                     <h2 class="fw-bold"><i class="bi bi-house-door text-success"></i> <?= caseFormat($warehouse['warehouse_name'] ?? '') ?></h2>
                     <p class="text-muted mb-0"><?= htmlspecialchars(t('Code:')) ?> <span class="badge bg-light text-dark"><?= htmlspecialchars($warehouse['warehouse_code'] ?? '') ?></span></p>
                 </div>
-                <div class="d-flex gap-2">
-                    <a href="<?= $project_id > 0 ? getUrl('project_view') . '?id=' . $project_id . '#procurements' : getUrl('warehouses') ?>" class="btn btn-outline-secondary">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="<?= $project_id > 0 ? getUrl('project_view') . '?id=' . $project_id . '#procurements' : getUrl('warehouses') ?>" class="btn btn-outline-secondary d-none d-md-inline-block">
                         <i class="bi bi-arrow-left"></i> <?= htmlspecialchars($project_id > 0 ? t('Back to Project') : wLabel('Back to Warehouses', 'Back to Shops')) ?>
                     </a>
+                    <!-- Phone: one gear menu with every option on this page (desktop keeps its buttons) -->
+                    <div class="dropdown d-md-none">
+                        <button class="btn btn-primary dropdown-toggle shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="<?= htmlspecialchars(t('Actions')) ?>" title="<?= htmlspecialchars(t('Actions')) ?>">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="z-index: 1060;">
+                            <li><a class="dropdown-item py-2 rounded" href="<?= $project_id > 0 ? getUrl('project_view') . '?id=' . $project_id . '#procurements' : getUrl('warehouses') ?>"><i class="bi bi-arrow-left text-secondary me-2"></i><?= htmlspecialchars($project_id > 0 ? t('Back to Project') : wLabel('Back to Warehouses', 'Back to Shops')) ?></a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="transferStock(<?= (int)$warehouse_id ?>)"><i class="bi bi-truck text-success me-2"></i><?= htmlspecialchars(t('Transfer Stock')) ?></button></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="manageLocations(<?= (int)$warehouse_id ?>)"><i class="bi bi-grid-3x3-gap text-primary me-2"></i><?= htmlspecialchars(t('Manage Storage Areas')) ?></button></li>
+                            <?php if ($rsOnline && $can_edit_warehouse): ?><li><button type="button" class="dropdown-item py-2 rounded" onclick="openShareShop(<?= (int)$warehouse_id ?>)"><i class="bi bi-share text-primary me-2"></i><?= htmlspecialchars(t('Share shop')) ?></button></li><?php endif; ?>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="window.print()"><i class="bi bi-printer text-primary me-2"></i><?= htmlspecialchars(t('Print')) ?></button></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="exportTable()"><i class="bi bi-file-earmark-spreadsheet text-success me-2"></i>Excel</button></li>
+                            <li><button type="button" class="dropdown-item py-2 rounded" onclick="copyTable()"><i class="bi bi-clipboard text-info me-2"></i><?= htmlspecialchars(t('Copy')) ?></button></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <?php
-    // Online shop (retail_online_shop_plan.md) — Smart POS retail / hybrid shops only.
-    $rsOnline = null;
-    if ($pos_simple_mode) {
-        require_once __DIR__ . '/../../../core/retail_online.php';
-        if (rsSchemaReady($pdo)) {
-            $rsOnline = rsShopSettings($pdo, (int)$warehouse_id);
-            if (!$rsOnline || !$rsOnline['eligible']) $rsOnline = null;
-        }
-    }
-    ?>
     <?php if ($rsOnline): ?>
     <div class="row mb-4">
         <div class="col-12">
