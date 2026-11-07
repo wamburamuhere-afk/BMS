@@ -1075,7 +1075,7 @@ function get_primary_badge($is_primary) {
             <div class="card-body">
                 <?php if (count($warehouses) > 0): ?>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle" id="warehousesTable">
+                        <table class="table table-hover align-middle" id="warehousesTable" data-actions-dropdown>
                             <thead class="table-light">
                                 <tr>
                                     <th><?= t('S/NO') ?></th>

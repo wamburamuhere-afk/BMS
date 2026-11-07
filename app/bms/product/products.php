@@ -1095,7 +1095,27 @@ function get_quick_actions($product) {
                                     <?= $available_stock ?> <?= caseFormat($product['unit'] ?? 'pcs') ?>
                                 </span>
                             </div>
-                            <div class="d-flex gap-1 mt-auto">
+                            <!-- Phone: one gear menu with every action (desktop keeps the button row below) -->
+                            <div class="dropdown d-md-none mt-auto">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 shadow-sm" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" style="min-height:36px;">
+                                    <i class="bi bi-gear me-1"></i><?= t('Actions') ?>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                    <li><a class="dropdown-item" href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-eye text-primary"></i> <?= t('View') ?></a></li>
+                                    <?php if ($can_edit_products): ?>
+                                    <li><a class="dropdown-item" href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-pencil text-warning"></i> <?= t('Edit') ?></a></li>
+                                    <?php endif; ?>
+                                    <?php if ($canShareShop && empty($product['is_service'])): ?>
+                                    <li><a class="dropdown-item" href="#" onclick="setOnlineVisibility(<?= (int)$product['product_id'] ?>, <?= !empty($product['online_hidden']) ? 0 : 1 ?>); return false;">
+                                        <i class="bi <?= !empty($product['online_hidden']) ? 'bi-eye' : 'bi-eye-slash' ?> text-secondary"></i> <?= htmlspecialchars(!empty($product['online_hidden']) ? t('Show in online shop') : t('Hide from online shop')) ?></a></li>
+                                    <?php endif; ?>
+                                    <?php if ($can_delete_products): ?>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteProduct(<?= $product['product_id'] ?>); return false;"><i class="bi bi-trash"></i> <?= t('Delete Product') ?></a></li>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                            <div class="d-none d-md-flex gap-1 mt-auto">
                                 <a href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-primary flex-grow-1 shadow-sm"><i class="bi bi-eye"></i> <?= t('View') ?></a>
                                 <?php if ($can_edit_products): ?>
                                 <a href="<?= getUrl('product_edit') ?>?id=<?= $product['product_id'] ?>" class="btn btn-sm btn-outline-warning flex-grow-1 shadow-sm"><i class="bi bi-pencil"></i> <?= t('Edit') ?></a>
