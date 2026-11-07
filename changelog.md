@@ -1,6 +1,14 @@
 # BMS Changelog
 
-## 2026-11-07 — feat(billing): BJP documents on the company's own Billing page — real templates, payments + proof, EFD receipts, emails
+## 2026-11-07 — feat(ui): phone gear menu on product + warehouse view; expiry banner closes until the day count changes
+
+**Changed:** `app/bms/product/product_view.php`, `app/bms/stock/warehouse_view.php`, `header.php`
+**Created:** `tests/test_view_gear_and_expiry_banner_cli.php`
+
+- **Product view (phone):** the "Actions" menu is now a gear icon with the triangle only, and holds every option on the page: Back, Print Details, Print Barcode, Edit, Duplicate, Activate/Deactivate, Adjust Stock, Transfer Stock, Movement Report, Sales Report, Delete (inactive only). Same permission checks as before. Desktop unchanged.
+- **Warehouse / shop view (phone):** new gear menu (icon + triangle) with Back, Transfer Stock, Manage Storage Areas, Share shop (when the online shop applies, edit permission), Print, Excel, Copy. Desktop unchanged. The online-shop lookup moved above the header so the menu can use it.
+- **Expiry / grace banner:** the ✕ often did nothing, and even when it closed, the banner came back on the next page. Now the ✕ closes it with its own handler and remembers it for that day count (per company, this browser): it stays hidden on every page until the days left change (e.g. 6 → 5), then shows once more. Hidden before the page paints, so no flash. Same for the grace-period banner after expiry.
+- **Checked:** in Chrome — desktop keeps its buttons, phone width (390 px) shows the gear with all options on both pages; banner closed at 6 days stays hidden across pages and returns at 5. Tests 27/27.
 
 **Created:** `core/customer_documents.php`, `app/constant/settings/billing_document.php`, `api/account/upload_efd_receipt.php`, `api/account/delete_efd_receipt.php`, `api/account/view_efd_receipt.php`, `migrations/2026_11_07_invoice_efd_receipts.php`, `tests/test_billing_customer_documents_cli.php`
 **Changed:** `api/account/record_payment.php`, `app/bms/invoice/payment_create.php`, `core/platform_gateway.php`, `core/platform_link.php`, `api/my_subscription.php`, `roots.php`, `app/constant/settings/billing.php`, `app/constant/settings/color_settings.php`, `app/bms/invoice/invoice_view.php`, `api/account/approve_invoice.php`, `api/account/approve_quotation.php`, the 8 invoice/quotation print templates, `lang/sw.php`, 3 older tests
