@@ -1096,9 +1096,9 @@ function get_quick_actions($product) {
                                 </span>
                             </div>
                             <!-- Phone: one gear menu with every action (desktop keeps the button row below) -->
-                            <div class="dropdown d-md-none mt-auto">
-                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 shadow-sm" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" style="min-height:36px;">
-                                    <i class="bi bi-gear me-1"></i><?= t('Actions') ?>
+                            <div class="dropdown d-md-none mt-auto d-flex justify-content-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="<?= t('Actions') ?>">
+                                    <i class="bi bi-gear"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                     <li><a class="dropdown-item" href="<?= getUrl('products/view') ?>?id=<?= $product['product_id'] ?>"><i class="bi bi-eye text-primary"></i> <?= t('View') ?></a></li>

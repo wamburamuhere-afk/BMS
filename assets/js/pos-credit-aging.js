@@ -95,8 +95,8 @@
         var id = cfg._id, sid = row.sale_id;
         // Small button on the right; the menu is a compact floating panel under it (not full-width).
         var html = '<div class="dropdown d-flex justify-content-end">' +
-            '<button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle px-3" data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false">' +
-            '<i class="bi bi-gear me-1"></i>' + esc(cfg.i18n.actions || 'Actions') + '</button>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false" aria-label="' + esc(cfg.i18n.actions || 'Actions') + '">' +
+            '<i class="bi bi-gear"></i></button>' +
             '<ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width:200px;border-radius:12px;">' +
             '<li><a class="dropdown-item py-2 px-3 rounded d-flex align-items-center" href="#" onclick="PosCreditAging.view(\'' + id + '\',' + sid + ');return false;"><i class="bi bi-eye text-info me-3" style="width:1.1rem;"></i>' + esc(cfg.i18n.view) + '</a></li>';
         if (cfg.canEdit) {

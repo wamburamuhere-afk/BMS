@@ -425,7 +425,22 @@ function generate_svc_barcode() { return '69' . (rand(1000000000, 9999999999)); 
                             </div>
 
                             <!-- Actions Row: Smaller Buttons -->
-                            <div class="d-flex gap-1 pt-3 mt-auto border-top">
+                            <div class="dropdown d-md-none pt-3 mt-auto border-top d-flex justify-content-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="<?= t('Actions') ?>">
+                                    <i class="bi bi-gear"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                    <li><a class="dropdown-item py-2" href="<?= getUrl('service_view') ?>?id=<?= $svc['product_id'] ?>"><i class="bi bi-layout-text-window text-primary me-2"></i> <?= t('View Details') ?></a></li>
+                                    <?php if ($can_edit): ?>
+                                    <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openEditSvcModal(<?= htmlspecialchars(json_encode($svc)) ?>)"><i class="bi bi-pencil text-warning me-2"></i> <?= t('Edit Service') ?></a></li>
+                                    <?php endif; ?>
+                                    <?php if ($can_delete): ?>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item py-2 text-danger" href="javascript:void(0)" onclick="deleteSvc(<?= $svc['product_id'] ?>, '<?= addslashes($svc['product_name']) ?>')"><i class="bi bi-trash me-2"></i> <?= t('Delete Service') ?></a></li>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                            <div class="d-none d-md-flex gap-1 pt-3 mt-auto border-top">
                                 <a class="btn btn-sm btn-outline-primary flex-grow-1 py-1"
                                    href="<?= getUrl('service_view') ?>?id=<?= $svc['product_id'] ?>"
                                    style="font-size: 0.7rem; border-radius: 6px;">
