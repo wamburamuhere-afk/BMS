@@ -349,6 +349,73 @@ function fx_cleanup_sales(PDO $pdo, array $ids): void {
     }
 }
 
+// ─── 2b. Page dressing: banner, Popular, labels, footer (from data BMS already holds) ──
+echo "\n── 2b. Shop page look (banner, Popular, footer) ──\n";
+ok(roDisplayName('PAMPERS') === 'Pampers' && roDisplayName('apple punch 300ml') === 'Apple Punch 300ml'
+   && roDisplayName('UGALI NYAMA CHOMA') === 'Ugali Nyama Choma' && roDisplayName('Maji ya Afya') === 'Maji ya Afya',
+   'names typed all-caps / all-small show in Title Case; a word with a digit and a mixed-case name stay as typed');
+ok(roWhatsAppNumber('0755 000 111') === '255755000111' && roWhatsAppNumber('+255 755 000 111') === '255755000111' && roWhatsAppNumber('12') === '',
+   'WhatsApp uses the shop phone (07.. → 2557..); a non-phone gives no WhatsApp button');
+ok(roPublicDescription('<b>Bar</b> soap   200 g') === 'Bar soap 200 g' && mb_strlen(roPublicDescription(str_repeat('a', 500))) === 238,
+   'description: tags stripped, spaces folded, long text shortened');
+
+$pdo->prepare("UPDATE warehouses SET location = ?, address = ? WHERE warehouse_id = ?")->execute(['Mbezi Msakuzi', 'Plot 12, Mbezi Msakuzi, Dar es Salaam', $wid]);
+$pdo->prepare("UPDATE products SET description = ? WHERE product_id = ?")->execute(['<b>Bar</b> soap   200 g', $pSoap]);
+$pdo->exec("UPDATE products SET created_at = NOW() - INTERVAL 40 DAY WHERE product_id = $pSugar");
+$ctxD = rsResolveToken($pdo, $tok);
+ok($ctxD['warehouse']['location'] === 'Mbezi Msakuzi' && $ctxD['warehouse']['address'] === 'Plot 12, Mbezi Msakuzi, Dar es Salaam', 'the shop link carries the shop\'s location and address');
+$catD = array_column(rsPublicCatalog($pdo, $ctxD['warehouse'])['items'], null, 'id');
+ok($catD[$pSoap]['desc'] === 'Bar soap 200 g' && $catD[$pSugar]['desc'] === '', 'product description reaches the page (empty when none)');
+ok($catD[$pSoap]['is_new'] === true && $catD[$pSugar]['is_new'] === false, '"New" = added in the last 14 days');
+
+// Popular: completed POS sales of THIS shop, last 30 days, returns/cancelled/old/other shop ignored.
+$popSales = [];
+$popSale = function (int $w, array $lines, string $status = 'completed', int $daysAgo = 1, int $isReturn = 0) use ($pdo, $admin, &$popSales): void {
+    $pdo->prepare("INSERT INTO pos_sales (shift_id, customer_id, customer_name, warehouse_id, receipt_number, grand_total, payment_method, payment_status, sale_status, sale_date, is_return_sale, user_id, created_at)
+                   VALUES (0, NULL, ?, ?, ?, 0, 'cash', 'paid', ?, NOW() - INTERVAL $daysAgo DAY, ?, ?, NOW())")
+        ->execute([FX . ' popular', $w, 'ZZRSP-' . random_int(100000, 999999), $status, $isReturn, $admin]);
+    $sid = (int)$pdo->lastInsertId(); $popSales[] = $sid;
+    foreach ($lines as [$pid, $q, $ret]) {
+        $pdo->prepare("INSERT INTO pos_sale_items (sale_id, product_id, product_name, quantity, returned_quantity, unit_price, tax_rate, tax_amount, discount_rate, discount_amount, line_total)
+                       VALUES (?, ?, 'x', ?, ?, 1, 0, 0, 0, 0, ?)")->execute([$sid, $pid, $q, $ret, $q]);
+    }
+};
+$visible = array_keys(array_filter($catD, fn($i) => !$i['sold_out']));
+$popSale($wid, [[$pSoap, 5, 0], [$pSugar, 2, 0]]);
+ok(roPopularIds($pdo, $wid, $visible) === [], 'Popular hides while fewer than 3 products have sold');
+$popSale($wid, [[$pNoTrack, 9, 0], [$pOut, 50, 0]]);
+$popSale($wid, [[$pSugar, 40, 0]], 'cancelled');            // cancelled: ignored
+$popSale($wid, [[$pSugar, 40, 0]], 'completed', 45);       // older than 30 days: ignored
+$popSale($wid, [[$pSugar, 40, 0]], 'completed', 1, 1);     // a return sale: ignored
+$popSale($wid2, [[$pSugar, 40, 0]]);                       // another shop: ignored
+$popSale($wid, [[$pSoap, 6, 4]]);                          // 4 of 6 returned → counts 2
+$pop = roPopularIds($pdo, $wid, $visible);
+ok($pop === [$pNoTrack, $pSoap, $pSugar], 'Popular = this shop\'s best sellers of the last 30 days, returned units taken off, best first');
+ok(!in_array($pOut, $pop, true), 'a sold-out product never shows in Popular');
+
+// The real page through the real router.
+$pdo->exec("UPDATE warehouses SET online_show_payment = 0 WHERE warehouse_id = $wid");
+[$c, $h] = http('GET', "/s/$tok");
+$h = (string)$h;
+ok($c === 200 && str_contains($h, 'class="banner"') && str_contains($h, 'Mbezi Msakuzi') && str_contains($h, 'Plot 12, Mbezi Msakuzi, Dar es Salaam'),
+   'page: banner with the shop\'s place, address in the footer');
+ok(str_contains($h, 'var POPULAR = ' . json_encode($pop) . ';'), 'page: the Popular list is sent as product ids only (no numbers)');
+ok(str_contains($h, 'https://wa.me/255755000111') && str_contains($h, 'tel:0755000111'), 'page: WhatsApp and Call use the shop phone');
+ok(str_contains($h, 'Powered by BJP Technologies © ' . date('Y') . ', All Rights Reserved.') && preg_match('#Online shop by</span>|Online shop by <b>#', $h) === 1,
+   'page: footer says "Online shop by <company>" and "Powered by BJP Technologies © year, All Rights Reserved."');
+ok(!str_contains($h, 'Nothing is charged online') && !str_contains($h, 'Open in Maps') && !preg_match('/opens at|closes at|Open now/i', $h),
+   'page: old one-line footer gone; no map button and no opening hours');
+ok(!str_contains($h, 'class="sf-pay"'), 'page: no payment names while "show payment" is off');
+$pdo->exec("UPDATE warehouses SET online_show_payment = 1 WHERE warehouse_id = $wid");
+$names = roPaymentMethodNames($pdo);
+[, $h2] = http('GET', "/s/$tok");
+$h2 = (string)$h2;
+ok(!$names || (str_contains($h2, 'class="sf-pay"') && array_reduce($names, fn($a, $n) => $a && str_contains($h2, '<span>' . htmlspecialchars($n, ENT_QUOTES, 'UTF-8') . '</span>'), true)),
+   'page: with "show payment" on, the footer lists the method names from Payment Settings' . ($names ? '' : ' (none set here — skipped)'));
+ok(!preg_match('/"(available|stock|stock_quantity)"\s*:/', $h2), 'page: still no stock number anywhere');
+$pdo->exec("UPDATE warehouses SET online_show_payment = 0 WHERE warehouse_id = $wid");
+fx_cleanup_sales($pdo, $popSales);
+
 // ─── 3. The record: accept → held → receipt → void → not collected (restaurant + shared) ──
 echo "\n── 3. Online order record (restaurant pickup + shared rules) ──\n";
 $mkUser = fn(string $tag) => $ins("INSERT INTO users (username, password, email, role, role_id, is_admin, first_name, last_name, is_active) VALUES (?, 'x', '', 'admin', 1, 1, 'Zz', ?, 1)",
