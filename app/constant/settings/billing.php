@@ -118,6 +118,7 @@ require_once __DIR__ . '/../../../header.php';
             <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabInvoices" type="button" data-tab="invoices"><?= t('Invoices') ?> <span class="badge rounded-pill bl-new d-none" id="newInv">0</span></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabQuotes" type="button" data-tab="quotations"><?= t('Quotations') ?> <span class="badge rounded-pill bl-new d-none" id="newQt">0</span></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPayments" type="button" data-tab="payments"><?= t('Payments') ?></button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabReceipts" type="button" data-tab="receipts"><?= t('Receipts') ?> <span class="badge rounded-pill bl-new d-none" id="newRc">0</span></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabContracts" type="button" data-tab="contracts"><?= t('Contracts') ?> <span class="badge rounded-pill bl-new d-none" id="contractsToSign">0</span></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabRequests" type="button" data-tab="requests"><?= t('Requests') ?> <span class="badge rounded-pill bl-new d-none" id="reqWaiting">0</span></button></li>
         </ul>
@@ -148,9 +149,18 @@ require_once __DIR__ . '/../../../header.php';
             <div class="tab-pane fade" id="tabPayments">
                 <div class="sb-wrap" data-for="pay">
                     <div class="d-none d-md-block table-responsive"><table id="tblPayments" class="table table-hover align-middle w-100" data-bms-cards="off">
-                        <thead class="table-light"><tr><th>S/NO</th><th><?= t('Recorded') ?></th><th class="text-end"><?= t('Amount (TZS)') ?></th><th><?= t('Months') ?></th><th><?= t('From') ?></th><th><?= t('To') ?></th><th><?= t('Reference') ?></th></tr></thead>
+                        <thead class="table-light"><tr><th>S/NO</th><th><?= t('Date') ?></th><th><?= t('Payment') ?></th><th><?= t('Invoice') ?></th><th><?= t('Method') ?></th><th><?= t('Reference') ?></th><th class="text-end"><?= t('Amount (TZS)') ?></th><th class="text-end"><?= t('Proof of payment') ?></th></tr></thead>
                         <tbody></tbody></table></div>
                     <div class="d-md-none row g-2" id="cardsPayments"></div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tabReceipts">
+                <div class="alert alert-light border small mb-3"><i class="bi bi-info-circle text-primary me-1"></i><?= t('EFD / VFD receipts BJP issued for your paid invoices. Open or download them any time.') ?></div>
+                <div class="sb-wrap" data-for="rc">
+                    <div class="d-none d-md-block table-responsive"><table id="tblReceipts" class="table table-hover align-middle w-100" data-bms-cards="off">
+                        <thead class="table-light"><tr><th>S/NO</th><th><?= t('Receipt') ?></th><th><?= t('Invoice') ?></th><th><?= t('Receipt date') ?></th><th><?= t('Added') ?></th><th class="text-end"><?= t('Actions') ?></th></tr></thead>
+                        <tbody></tbody></table></div>
+                    <div class="d-md-none row g-2" id="cardsReceipts"></div>
                 </div>
             </div>
             <div class="tab-pane fade" id="tabContracts">
@@ -252,7 +262,7 @@ $(function () {
         'choosePlan' => t('Choose a plan'), 'renewNow' => t('Renew now'), 'renewX' => t('Renew %n'), 'renew' => t('Renew'),
         'allPaid' => t('All paid'), 'toPay' => t('%s TZS to pay'), 'nothingSign' => t('Nothing to sign'), 'signNow' => t('Open to sign'),
         'noReq' => t('No open requests'), 'sinceX' => t('%n · waiting since %d'),
-        'eInv' => t('No invoices yet.'), 'eQt' => t('No quotations yet.'), 'ePay' => t('No payments recorded yet.'), 'eCon' => t('No contracts yet.'), 'eReq' => t('No requests yet. Choose a plan under Plans to send one.'),
+        'eInv' => t('No invoices yet.'), 'eQt' => t('No quotations yet.'), 'ePay' => t('No payments recorded yet.'), 'eRc' => t('No receipts yet.'), 'invoiceLbl' => t('Invoice'), 'eCon' => t('No contracts yet.'), 'eReq' => t('No requests yet. Choose a plan under Plans to send one.'),
         'subscription' => t('Subscription'), 'billing' => t('Billing details'), 'balance' => t('Balance'),
         'plansTrialDesc' => t('During your free trial you can change plan yourself, below. When you are ready to pay, choose a period and send the request to BJP — the quotation appears here once approved.'),
         'plansPaidDesc'  => t('Your current plan is shown below. To upgrade or change your plan, contact BJP Technologies (T) Ltd — they will prepare a quotation and your new plan applies when you pay.'),
@@ -288,7 +298,7 @@ $(function () {
     // An empty list shows one short line instead of an empty table with paging.
     const dt = (id, cols, right) => $(id).DataTable({ responsive: false, scrollX: false, autoWidth: false, pageLength: 25, order: [], dom: 'rtip',
         columnDefs: [$.extend({ targets: 0 }, BMSSerial.column()), { targets: cols, orderable: false }, { targets: right, className: 'text-end' }] });
-    const tInv = dt('#tblInvoices', [8], [5, 6, 8]), tQt = dt('#tblQuotes', [7], [5, 7]), tPay = dt('#tblPayments', [], [2]), tCon = dt('#tblContracts', [7], [7]);
+    const tInv = dt('#tblInvoices', [8], [5, 6, 8]), tQt = dt('#tblQuotes', [7], [5, 7]), tPay = dt('#tblPayments', [7], [6, 7]), tRc = dt('#tblReceipts', [5], [5]), tCon = dt('#tblContracts', [7], [7]);
     const fill = (key, table, rows, emptyTxt) => {
         const wrap = $(`.sb-wrap[data-for="${key}"]`);
         wrap.find('.sb-empty').remove();
@@ -311,7 +321,7 @@ $(function () {
         $('#toPlan').toggleClass('d-none', !details);
         $('#pageTitle').text(details ? L.billing : L.subscription);
         if (details && tab) bootstrap.Tab.getOrCreateInstance($(`.sb-tabs [data-tab="${tab}"]`)[0]).show();
-        if (details) setTimeout(() => [tInv, tQt, tPay, tCon].forEach(t => t.columns.adjust()), 200);
+        if (details) setTimeout(() => [tInv, tQt, tPay, tRc, tCon].forEach(t => t.columns.adjust()), 200);
         history.replaceState(null, '', details ? '#billing' + (tab ? '-' + tab : '') : location.pathname + location.search);
         window.scrollTo(0, 0);
     }
@@ -320,7 +330,7 @@ $(function () {
     $(document).on('click', '[data-go]', function () { showView(true, $(this).data('go')); });
     $('.sb-tabs [data-tab]').on('shown.bs.tab', function () {
         history.replaceState(null, '', '#billing-' + $(this).data('tab'));
-        [tInv, tQt, tPay, tCon].forEach(t => t.columns.adjust());
+        [tInv, tQt, tPay, tRc, tCon].forEach(t => t.columns.adjust());
     });
     const hm = location.hash.match(/^#billing(?:-(\w+))?$/);
     if (hm) showView(true, hm[1] || null);
@@ -417,13 +427,6 @@ $(function () {
         return $.getJSON(API, { action: 'status' }).done(r => {
             if (!r.success) return;
             renderPlan(r);
-            const pays = r.payments || [];
-            fill('pay', tPay, pays.map((p, i) => [i + 1, dmy(p.recorded_at), money(p.amount_tzs), p.duration_months, dmy(p.starts_at), dmy(p.ends_at),
-                p.source === 'vendor_invoice' ? `${L.auto} ${esc(p.source_ref)}` : L.manual]), L.ePay);
-            cards('#cardsPayments', pays, p => `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
-                <div class="d-flex justify-content-between"><span class="fw-bold">${money(p.amount_tzs)} TZS</span><small class="text-muted">${dmy(p.recorded_at)}</small></div>
-                <div class="small">${p.duration_months} ${L.months} · ${dmy(p.starts_at)} → ${dmy(p.ends_at)}</div>
-                <div class="small text-muted">${p.source === 'vendor_invoice' ? `${L.auto} ${esc(p.source_ref)}` : L.manual}</div></div></div></div>`);
         });
     }
 
@@ -648,6 +651,26 @@ $(function () {
                 <div class="d-flex justify-content-between"><span class="fw-bold">${esc(d.number)}${newChip(d)}</span>${badge(d.status)}</div>
                 <div class="bl-lines">${lines(d)}</div>
                 <div class="small">${dmy(d.date)} · ${money(d.total)} TZS</div></div>${cardBtn(d.view_url)}</div></div>`);
+
+            // Payments BJP recorded on your invoices, with the proof of payment it attached.
+            const pays = r.payments || [], rcs = r.receipts || [];
+            const method = m => m ? String(m).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()) : '—';
+            const invLink = (num, url) => url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(num)}</a>` : esc(num);
+            const proofs = p => (p.proofs || []).length ? (p.proofs || []).map(f => `<a class="btn btn-sm btn-outline-primary ms-1" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}"><i class="bi bi-paperclip"></i></a>`).join('') : `<span class="text-muted small">—</span>`;
+            fill('pay', tPay, pays.map((p, i) => [i + 1, dmy(p.date), esc(p.number || '—'), invLink(p.invoice_number, p.invoice_url), esc(method(p.method)), esc(p.reference || '—'), money(p.amount), proofs(p)]), L.ePay);
+            cards('#cardsPayments', pays, p => `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+                <div class="d-flex justify-content-between"><span class="fw-bold">${money(p.amount)} TZS</span><small class="text-muted">${dmy(p.date)}</small></div>
+                <div class="small">${esc(p.number || '')} · ${invLink(p.invoice_number, p.invoice_url)}</div>
+                <div class="small text-muted">${esc(method(p.method))}${p.reference ? ' · ' + esc(p.reference) : ''}</div>
+                ${(p.proofs || []).length ? `<div class="mt-2">${proofs(p)}</div>` : ''}</div></div></div>`);
+
+            // EFD / VFD receipts.
+            const nRc = rcs.filter(d => d.is_new).length;
+            $('#newRc').text(nRc).toggleClass('d-none', !nRc);
+            fill('rc', tRc, rcs.map((d, i) => [i + 1, esc(d.number || d.name) + newChip(d), invLink(d.invoice_number, d.invoice_url), dmy(d.date), dmy(d.uploaded_at), gear(d.url)]), L.eRc);
+            cards('#cardsReceipts', rcs, d => `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
+                <div class="d-flex justify-content-between"><span class="fw-bold">${esc(d.number || d.name)}${newChip(d)}</span><small class="text-muted">${dmy(d.date || d.uploaded_at)}</small></div>
+                <div class="small">${esc(L.invoiceLbl)} ${invLink(d.invoice_number, d.invoice_url)}</div></div>${cardBtn(d.url)}</div></div>`);
         });
     }
 

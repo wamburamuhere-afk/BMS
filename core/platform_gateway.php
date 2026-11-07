@@ -42,6 +42,26 @@ if (!function_exists('pgHandle')) {
                                   : ['success' => true, 'linked' => false, 'quotations' => [], 'invoices' => [], 'requests' => srForTenant($pdo, (int)$tenant['id']), 'latest' => null]];
             case 'contracts':
                 return [200, $cid > 0 ? pgContracts($pdo, $cid) : ['success' => true, 'linked' => false, 'contracts' => []]];
+            case 'document':
+                // BJP's print template of one invoice / quotation, for the company's own address.
+                if ($cid <= 0) return [404, ['success' => false, 'message' => 'Not found.']];
+                require_once __DIR__ . '/customer_documents.php';
+                $type = (string)($req['type'] ?? '');
+                $doc = cdFindDocument($pdo, $type, (int)($req['id'] ?? 0), $cid);
+                if (!$doc) return [404, ['success' => false, 'message' => 'Not found.']];
+                try {
+                    return [200, ['success' => true, 'number' => $doc['number'], 'html' => cdRenderDocument($pdo, $type, (int)$doc['id'])]];
+                } catch (Throwable $e) {
+                    error_log('gateway document: ' . $e->getMessage());
+                    return [500, ['success' => false, 'message' => 'The document could not be prepared. Please try again.']];
+                }
+            case 'file':
+                // A proof of payment, an EFD receipt or a contract PDF of this customer's.
+                if ($cid <= 0) return [404, ['success' => false, 'message' => 'Not found.']];
+                require_once __DIR__ . '/customer_documents.php';
+                $f = cdCustomerFile($pdo, (string)($req['kind'] ?? ''), (int)($req['id'] ?? 0), $cid);
+                if (!$f) return [404, ['success' => false, 'message' => 'Not found.']];
+                return [200, ['success' => true, 'name' => $f['name'], 'mime' => $f['mime'], 'data' => base64_encode((string)file_get_contents($f['path']))]];
             case 'contract_sign_link':
                 if ($cid <= 0) return [200, ['success' => false, 'message' => 'Your company is not linked to a customer account at BJP yet.']];
                 return [200, pgContractSignLink($pdo, $tenant, $cid, (int)($req['contract_id'] ?? 0))];
@@ -166,10 +186,9 @@ if (!function_exists('pgDocuments')) {
         $qRows = $q->fetchAll(PDO::FETCH_ASSOC);
         $qLines = pgLineSummaries($pdo, 'quotation_items', 'order_id', array_column($qRows, 'id'));
         $quotes = array_map(fn($r) => [
-            'number' => $r['number'], 'date' => $r['date'], 'total' => (float)$r['total'],
+            'id' => (int)$r['id'], 'number' => $r['number'], 'date' => $r['date'], 'total' => (float)$r['total'],
             'status' => $r['status'] === 'cancelled' ? 'cancelled' : ($r['converted_to_so_id'] || $r['status'] !== 'approved' ? 'accepted' : 'approved'),
             'valid_until' => $r['quote_valid_until'], 'visible_at' => $r['visible_at'], 'lines' => $qLines[(int)$r['id']] ?? [],
-            'view_token' => plDocToken('quotation', (int)$r['id'], $cid),
         ], $qRows);
 
         $i = $pdo->prepare("SELECT invoice_id AS id, invoice_number AS number, invoice_date AS date, due_date, grand_total AS total,
@@ -182,13 +201,15 @@ if (!function_exists('pgDocuments')) {
         $iRows = $i->fetchAll(PDO::FETCH_ASSOC);
         $iLines = pgLineSummaries($pdo, 'invoice_items', 'invoice_id', array_column($iRows, 'id'));
         $invoices = array_map(fn($r) => [
-            'number' => $r['number'], 'date' => $r['date'], 'due_date' => $r['due_date'], 'total' => (float)$r['total'],
+            'id' => (int)$r['id'], 'number' => $r['number'], 'date' => $r['date'], 'due_date' => $r['due_date'], 'total' => (float)$r['total'],
             'paid' => (float)$r['paid_amount'], 'balance' => (float)$r['balance_due'],
             'status' => $r['status'] === 'cancelled' ? 'cancelled'
                       : ((float)$r['balance_due'] <= 0.01 ? 'paid' : ((float)$r['paid_amount'] > 0.01 ? 'partial' : 'unpaid')),
             'visible_at' => $r['visible_at'], 'lines' => $iLines[(int)$r['id']] ?? [],
-            'view_token' => plDocToken('invoice', (int)$r['id'], $cid),
         ], $iRows);
+        require_once __DIR__ . '/customer_documents.php';
+        $payments = cdPayments($pdo, $cid);
+        $receipts = cdEfdForCustomer($pdo, $cid);
 
         $requests = [];
         if ($tenantId !== null) {
@@ -206,7 +227,9 @@ if (!function_exists('pgDocuments')) {
         }
         $latest = null;
         foreach (array_merge($quotes, $invoices) as $d) if ($d['visible_at'] !== null && ($latest === null || $d['visible_at'] > $latest)) $latest = $d['visible_at'];
-        return ['success' => true, 'linked' => true, 'quotations' => $quotes, 'invoices' => $invoices, 'requests' => $requests, 'latest' => $latest];
+        foreach ($receipts as $r) if ($latest === null || $r['uploaded_at'] > $latest) $latest = $r['uploaded_at'];
+        return ['success' => true, 'linked' => true, 'quotations' => $quotes, 'invoices' => $invoices, 'payments' => $payments,
+                'receipts' => $receipts, 'requests' => $requests, 'latest' => $latest];
     }
 }
 
@@ -239,7 +262,7 @@ if (!function_exists('pgContracts')) {
                 'contract_id' => (int)$c['contract_id'], 'code' => $c['document_code'], 'service' => $c['product_name'],
                 'period' => $c['period_label'], 'period_start' => $c['period_start'], 'period_end' => $c['period_end'],
                 'invoice' => $c['invoice_ref'], 'state' => $c['state'], 'date' => substr((string)$c['created_at'], 0, 10),
-                'view_token' => $viewDoc ? plDocToken('contract', (int)$c['contract_id'], $cid) : null,
+                'has_file' => (bool)$viewDoc,
             ];
         }
         return ['success' => true, 'linked' => true, 'contracts' => $out];

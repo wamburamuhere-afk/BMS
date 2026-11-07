@@ -13,9 +13,23 @@ require_once __DIR__ . '/../../../header.php';
 $success_msg = '';
 $error_msg = '';
 
+// On BJP's own install: which print template a company sees on its Billing page.
+require_once __DIR__ . '/../../../core/vendor_context.php';
+$__vendor = isPlatformVendorContext();
+if ($__vendor) require_once __DIR__ . '/../../../core/customer_documents.php';
+
+$__csrfOk = $_SERVER['REQUEST_METHOD'] !== 'POST' || hash_equals((string)($_SESSION['csrf_token'] ?? ''), (string)($_POST['_csrf'] ?? ''));
+if (!$__csrfOk) $error_msg = t('Your session expired. Reload the page and save again.');
+
 // Color Settings (print template accent colors — Sales Side + Purchase Side)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $__csrfOk) {
     try {
+        if ($__vendor) {
+            foreach (['invoice', 'quotation'] as $__t) {
+                $__v = (string)($_POST['customer_copy_template_' . $__t] ?? '');
+                if (isset(cdTemplates($__t)[$__v])) save_setting('customer_copy_template_' . $__t, $__v);
+            }
+        }
         $color_defaults = [
             // Purchase Side — Purchase Order's own Navy/Corporate/Banded family
             'print_template_color_po_navy'      => '#0f1f3d',
@@ -109,6 +123,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="card border-0 shadow-sm rounded-4">
         <div class="card-body p-4">
             <form method="POST">
+                <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                <?php if ($__vendor): ?>
+                <h6 class="fw-bold text-uppercase small text-muted mb-1"><i class="bi bi-building me-1"></i> <?= t('Customer Billing Page') ?></h6>
+                <p class="text-muted small mb-3"><?= t('The template your customers see when they open a quotation or invoice on their own Billing page. Default unless you choose another.') ?></p>
+                <div class="row g-3 mb-4">
+                    <?php foreach (['quotation' => t('Quotation template'), 'invoice' => t('Invoice template')] as $__t => $__lbl): $__cur = cdTemplateKey($__t); ?>
+                    <div class="col-md-4">
+                        <label for="customer_copy_template_<?= $__t ?>" class="form-label"><?= $__lbl ?></label>
+                        <select class="form-select" id="customer_copy_template_<?= $__t ?>" name="customer_copy_template_<?= $__t ?>">
+                            <?php foreach (cdTemplates($__t) as $__k => [$__name]): ?>
+                            <option value="<?= $__k ?>" <?= $__k === $__cur ? 'selected' : '' ?>><?= t($__name) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <hr class="mb-4">
+                <?php endif; ?>
                 <?php if (tenantFeatureEnabled('sales')): ?>
                 <h6 class="fw-bold text-uppercase small text-muted mb-3"><i class="bi bi-cart-check me-1"></i> <?= t('Sales Side') ?></h6>
 

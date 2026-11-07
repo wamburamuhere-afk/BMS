@@ -9,16 +9,16 @@ require_once __DIR__ . '/../../../../roots.php';
 require_once __DIR__ . '/../../../../core/workflow.php';
 require_once __DIR__ . '/../../../../core/permissions.php';
 
-if (!isAuthenticated()) die("Unauthorized");
+if (!defined('BMS_CUSTOMER_COPY') && !isAuthenticated()) die("Unauthorized");
 
 // Phase 5a — print pages get a canView gate (admin auto-bypass)
-if (!canView('sales_orders')) die("Access Denied");
+if (!defined('BMS_CUSTOMER_COPY') && !canView('sales_orders')) die("Access Denied");
 
 $quotation_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($quotation_id <= 0) die("Invalid Quotation ID");
 
 // Phase C — block printing quotations on projects not in user scope (HTML-safe)
-assertScopeForRecordHtml('quotations', 'sales_order_id', $quotation_id);
+if (!defined('BMS_CUSTOMER_COPY')) assertScopeForRecordHtml('quotations', 'sales_order_id', $quotation_id);
 
 global $pdo;
 
@@ -59,7 +59,7 @@ try {
 
     if (!$order) die("Quotation not found");
 
-    logActivity($pdo, $_SESSION['user_id'], 'Print Quotation',
+    if (!defined('BMS_CUSTOMER_COPY')) logActivity($pdo, $_SESSION['user_id'], 'Print Quotation',
         ($_SESSION['username'] ?? 'User') . " printed Quotation #{$order['order_number']}");
 
     $stmtItems = $pdo->prepare("
