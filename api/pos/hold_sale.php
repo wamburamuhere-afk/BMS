@@ -20,7 +20,16 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-if (!canCreate('pos')) {
+// The client sends this as a raw JSON body (contentType: 'application/json'),
+// which PHP never populates $_POST for — every field below was silently null/0
+// regardless of what was actually sent, not just 'items'.
+$body = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+
+// restaurant_order_flow_plan.md — a waiter (Restaurant Orders create, no POS sell right) may save a
+// TABLE's order; every other hold still needs canCreate('pos'), exactly as before.
+require_once __DIR__ . '/../../core/restaurant_order_flow.php';
+$__holdAllowed = canCreate('pos') || (!empty($body['table_id']) && rofCanTake($pdo));
+if (!$__holdAllowed) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => wLabel('Access Denied: you do not have permission to hold POS sales', 'Access Denied: you do not have permission to hold sales')]);
     exit();
@@ -29,10 +38,6 @@ if (!canCreate('pos')) {
 try {
     global $pdo;
 
-    // The client sends this as a raw JSON body (contentType: 'application/json'),
-    // which PHP never populates $_POST for — every field below was silently null/0
-    // regardless of what was actually sent, not just 'items'.
-    $body = json_decode(file_get_contents('php://input'), true) ?: $_POST;
     if (isset($body['items']) && is_string($body['items'])) {
         $body['items'] = json_decode($body['items'], true) ?: [];
     }
@@ -125,6 +130,12 @@ try {
             }
         }
 
+        // restaurant_order_flow_plan.md — a dish the kitchen already has that is no longer on the saved
+        // order is taken off the kitchen. Cooked food needs the cashier + a reason in the team flow
+        // (RofException → error_code cancel_needs_reason / cancel_needs_approval / cancel_not_allowed).
+        rofReconcile($pdo, ['warehouse_id' => $warehouse_id, 'table_id' => $table_id, 'items' => $items,
+                            'user_id' => (int)$user_id, 'reason' => trim((string)($body['cancel_reason'] ?? '')), 'source' => 'removed']);
+
         $pdo->prepare("UPDATE pos_held_sales SET status = 'cancelled' WHERE table_id = ? AND status = 'held'")
             ->execute([$table_id]);
     }
@@ -174,6 +185,9 @@ try {
         'reference' => $hold_reference
     ]);
     
+} catch (RofException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    echo json_encode($e->toArray());
 } catch (Exception $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     echo json_encode([

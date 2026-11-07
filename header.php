@@ -1724,6 +1724,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Business Reports') ?></h6></li>
                                 <?php if ($__rf && !empty($__rest_on)): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
+                                <?php if ($__rf && !empty($__rest_on) && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
                                 <?php if(canView('sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> <?= t('Sales Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('purchase_report')): ?><li><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> <?= t('Purchase Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('inventory_report')): ?><li><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> <?= t('Inventory Report') ?></a></li><?php endif; ?>
@@ -1732,6 +1733,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <?php if(canView('pos') && canView('pos_profit_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Profit Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('product_analysis')): ?><li><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>?view=profit"><i class="bi bi-trophy"></i> <?= t('Most Profitable Products') ?></a></li><?php endif; ?>
                                 <?php if (!empty($__rest_on) && !$__rf): // restaurant_plan.md Phase 6 ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__rest_on) && !$__rf && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
                             </ul>
                             <?php else: ?>
                             <div class="dropdown-menu mega-dropdown-menu" aria-labelledby="reportsDropdown">
@@ -2064,6 +2066,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('pos') && canView('pos_user_sales_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i><?= t('Sales by User Report') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_profit_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i><?= t('Profit Report') ?></a><?php endif; ?>
                 <?php if (!empty($__rest_on)): // restaurant_plan.md Phase 6 ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant Sales') ?></a><?php endif; ?>
+                <?php if (!empty($__rest_on) && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i><?= t('Waste & cancellations') ?></a><?php endif; ?>
             </div>
         </div>
     </div>

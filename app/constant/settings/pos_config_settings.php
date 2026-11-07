@@ -49,11 +49,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_setting('pos_loyalty_redeem_value', max(0, (float)($_POST['pos_loyalty_redeem_value'] ?? 50)));
         }
         if ($restaurant_on) {
-            save_setting('restaurant_kitchen_mode', in_array($_POST['restaurant_kitchen_mode'] ?? '', ['none', 'screen', 'printer'], true) ? $_POST['restaurant_kitchen_mode'] : 'none');
+            $rk_new = in_array($_POST['restaurant_kitchen_mode'] ?? '', ['none', 'screen', 'printer'], true) ? $_POST['restaurant_kitchen_mode'] : 'none';
+            save_setting('restaurant_kitchen_mode', $rk_new);
             save_setting('restaurant_order_take_away', isset($_POST['restaurant_order_take_away']) ? '1' : '0');
             save_setting('restaurant_order_delivery', isset($_POST['restaurant_order_delivery']) ? '1' : '0');
+            // restaurant_order_flow_plan.md — "Cashier must confirm orders before the kitchen" (only with a kitchen screen / printer).
+            require_once __DIR__ . '/../../../core/restaurant_order_flow.php';
+            $rof_old = rofSetting($pdo, 'restaurant_confirm_orders', '0') === '1';
+            $rof_new = isset($_POST['restaurant_confirm_orders']) && $rk_new !== 'none';
+            save_setting('restaurant_confirm_orders', $rof_new ? '1' : '0');
+            $rof_note = '';
+            if ($rof_new && !$rof_old) {
+                $made = rofEnsureRolesForCompany($pdo);
+                logActivity($pdo, (int)$_SESSION['user_id'], 'Restaurant: cashier confirmation turned on' . ($made ? ' (roles created: ' . implode(', ', $made) . ')' : ''));
+                if ($made) $rof_note = ' ' . sprintf(t('Ready-made roles added: %s. Give each staff member their role in Users.'), implode(', ', $made));
+            } elseif (!$rof_new && $rof_old) {
+                $n = rofPromotePending($pdo, (int)$_SESSION['user_id']);
+                logActivity($pdo, (int)$_SESSION['user_id'], "Restaurant: cashier confirmation turned off ($n waiting order(s) sent to the kitchen)");
+            }
         }
-        $success_msg = wLabel('POS settings updated successfully', 'Selling settings updated successfully');
+        $success_msg = wLabel('POS settings updated successfully', 'Selling settings updated successfully') . ($rof_note ?? '');
     } catch (Exception $e) {
         $error_msg = sprintf(wLabel('Error updating POS settings: %s', 'Error updating selling settings: %s'), $e->getMessage());
     }
@@ -96,6 +111,26 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                             </div>
                             <?php endforeach; ?>
                         </div>
+                        <?php require_once __DIR__ . '/../../../core/restaurant_order_flow.php';
+                              $rof_on = rofSetting($pdo, 'restaurant_confirm_orders', '0') === '1';   // direct read: get_setting() is cached from before the save ?>
+                        <div class="mb-3 border rounded p-2 ps-5 form-check form-switch" id="rofConfirmWrap">
+                            <input class="form-check-input" type="checkbox" role="switch" name="restaurant_confirm_orders" id="rof_confirm" value="1" <?= $rof_on ? 'checked' : '' ?>>
+                            <label class="form-check-label fw-semibold" for="rof_confirm"><?= t('Cashier must confirm orders before the kitchen') ?></label>
+                            <div class="form-text mt-0"><?= t('For a team: the waiter sends the order, the cashier confirms it, the kitchen cooks, the waiter marks it received, then the cashier closes the bill. Leave it off when one person does everything. Works with Kitchen screen or Printer.') ?></div>
+                        </div>
+                        <script>
+                        // The switch means nothing "by mouth" (no kitchen step): greyed out then.
+                        (function () {
+                            function rofSync() {
+                                const byMouth = (document.querySelector('input[name="restaurant_kitchen_mode"]:checked') || {}).value === 'none';
+                                const sw = document.getElementById('rof_confirm');
+                                sw.disabled = byMouth; if (byMouth) sw.checked = false;
+                                document.getElementById('rofConfirmWrap').style.opacity = byMouth ? .55 : 1;
+                            }
+                            document.querySelectorAll('input[name="restaurant_kitchen_mode"]').forEach(r => r.addEventListener('change', rofSync));
+                            rofSync();
+                        })();
+                        </script>
                         <div class="mb-3">
                             <label class="form-label fw-semibold"><?= t('Order types on the Sell screen') ?></label>
                             <div class="form-check"><input class="form-check-input" type="checkbox" checked disabled id="rt_dine"><label class="form-check-label" for="rt_dine"><?= t('Dine in') ?> <span class="text-muted small">(<?= t('always on') ?>)</span></label></div>

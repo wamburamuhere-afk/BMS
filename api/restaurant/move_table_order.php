@@ -11,12 +11,12 @@ require_once __DIR__ . '/../../roots.php';
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
-require_once __DIR__ . '/../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../core/restaurant_order_flow.php';
 
 if (!isAuthenticated())         { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
 if (!restaurantSchemaReady($pdo)) { echo json_encode(['success' => false, 'message' => t('Restaurant module is being set up for your account — please check back shortly.')]); exit; }
-if (!canCreate('pos'))          { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
+if (!rofCanTake($pdo))          { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => t('Method not allowed')]); exit; }
 csrf_check();
 
@@ -54,7 +54,7 @@ try {
     $pdo->beginTransaction();
     $ref = t('Table') . ' ' . $toRow['table_number'];
     $pdo->prepare("UPDATE pos_held_sales SET table_id = ?, hold_reference = ? WHERE table_id = ? AND status = 'held'")->execute([$to, $ref, $from]);
-    $pdo->prepare("UPDATE kitchen_tickets SET table_id = ?, updated_at = NOW() WHERE table_id = ? AND status IN ('queued','preparing','ready')")->execute([$to, $from]);
+    rofMoveOrder($pdo, $from, $to);   // every open ticket of the order follows it (restaurant_order_flow_plan.md)
     $pdo->prepare("UPDATE restaurant_tables SET status = 'available', updated_at = NOW() WHERE table_id = ?")->execute([$from]);
     $pdo->prepare("UPDATE restaurant_tables SET status = 'occupied', updated_at = NOW() WHERE table_id = ?")->execute([$to]);
     $pdo->commit();

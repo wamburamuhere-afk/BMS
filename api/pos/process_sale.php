@@ -263,6 +263,18 @@ try {
         if (!$tblChk->fetchColumn()) {
             throw new Exception(wLabel('The selected table does not belong to this warehouse.', 'The selected table does not belong to this shop.', true), 422);
         }
+        // restaurant_order_flow_plan.md — the kitchen and the bill agree before the sale is written:
+        // dishes sent to the kitchen but no longer on a full bill are cancelled (cooked food needs the
+        // cashier + a reason in the team flow), and in the team flow every dish paid for must have been
+        // served (a payer who also works the kitchen may confirm "mark all served": kitchen_served_ok).
+        require_once __DIR__ . '/../../core/restaurant_order_flow.php';
+        if (!$is_old_sale && restaurantShopActive($pdo, (int)$warehouse_id)) {
+            rofGuardBill($pdo, [
+                'warehouse_id' => (int)$warehouse_id, 'table_id' => (int)$table_id, 'items' => $items,
+                'keep_table' => $keep_table, 'user_id' => (int)$user_id,
+                'served_ok' => !empty($input['kitchen_served_ok']), 'reason' => trim((string)($input['cancel_reason'] ?? '')),
+            ]);
+        }
     }
 
     // Check for active shift — pos_sales.shift_id is NOT NULL, so this must be
@@ -1015,6 +1027,21 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     require_once __DIR__ . '/../../core/online_order_record.php';
     $online_order_codes = oorAttachSale($pdo, $items, (int)$sale_id, (int)$warehouse_id, (bool)$keep_table);
 
+    // restaurant_order_flow_plan.md — the bill is closed: the table's open kitchen tickets belong to
+    // this sale now (ready food → served; food still cooking stays on the kitchen screen). A paid
+    // table-less online pickup's tickets likewise. Same transaction as the sale.
+    require_once __DIR__ . '/../../core/restaurant_order_flow.php';
+    if (rofReady($pdo)) {
+        if ($table_id && !$keep_table) {
+            rofCloseOnBill($pdo, (int)$warehouse_id, (int)$table_id, (int)$sale_id, (int)$user_id);
+        }
+        if ($online_order_codes && !$table_id) {
+            $ohs = $pdo->prepare("SELECT hold_id FROM restaurant_online_orders WHERE sale_id = ? AND hold_id IS NOT NULL");
+            $ohs->execute([(int)$sale_id]);
+            foreach ($ohs->fetchAll(PDO::FETCH_COLUMN) as $ohid) rofCloseHoldOnSale($pdo, (int)$ohid, (int)$sale_id);
+        }
+    }
+
     $pdo->commit();
 
     if ($online_order_codes) {
@@ -1084,6 +1111,11 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
         'online_orders' => $online_order_codes,
     ]);
 
+} catch (RofException $e) {
+    // restaurant_order_flow_plan.md — kitchen not served yet / cooked food removed: the till acts on error_code.
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    http_response_code(409);
+    echo json_encode($e->toArray());
 } catch (PosCreditLimitExceededException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(409);

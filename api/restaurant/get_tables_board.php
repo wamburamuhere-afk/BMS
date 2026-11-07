@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../roots.php';
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
-require_once __DIR__ . '/../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../core/restaurant_order_flow.php';
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
@@ -51,6 +51,8 @@ try {
       ORDER BY COALESCE(f.sort_order, 0), f.floor_id, LENGTH(t.table_number), t.table_number
     ");
     $st->execute([$warehouse_id]);
+    // restaurant_order_flow_plan.md — each table's food: waiting for the cashier / cooking / ready to serve.
+    $kitchen = rofTableKitchenSummary($pdo, $warehouse_id);
     $rows = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $items = $r['hold_id'] ? (json_decode((string)$r['items_data'], true) ?: []) : [];
@@ -74,6 +76,7 @@ try {
             'served_by'    => $r['hold_id'] ? $r['served_by'] : null,
             'opened_today' => $r['hold_id'] ? (bool)$r['opened_today'] : null,
             'reservation'  => $res,
+            'kitchen'      => $r['hold_id'] ? ($kitchen[(int)$r['table_id']] ?? null) : null,
         ];
     }
     echo json_encode(['success' => true, 'data' => $rows]);

@@ -181,6 +181,14 @@ const POS_OPEN_ORDER_TYPE = <?= json_encode(($restaurant_pos_enabled && in_array
 <?php require_once ROOT_DIR . '/core/restaurant_scope.php'; $_rest_mod = $restaurant_pos_enabled && restaurantModuleOn($pdo); ?>
 const POS_KITCHEN_MODE = <?= json_encode($_rest_mod ? restaurantKitchenMode() : 'screen') ?>;
 const POS_ORDER_TYPES = <?= json_encode($_rest_mod ? restaurantOrderTypes() : ['dine_in', 'take_away', 'delivery']) ?>;
+<?php
+// restaurant_order_flow_plan.md — Waiter → Cashier → Kitchen → Waiter → Bill: what this user may do.
+// Off (retail, module off): {on:false} and nothing below changes the till.
+require_once ROOT_DIR . '/core/restaurant_order_flow.php';
+$_rof = ($_rest_mod && rofReady($pdo)) ? (['on' => true] + rofRights($pdo)) : ['on' => false];
+$_rof_no_pay = $_rof['on'] && empty($_rof['pay']);   // a waiter: takes orders, never takes money
+?>
+const POS_FLOW = <?= json_encode($_rof) ?>;
 // Shop scope (2026-09-16) — non-null when the active shift was opened on a
 // shop-assigned register; the Shop dropdown gets locked to this value so a
 // cashier can never sell against a different shop mid-shift (see the lock
@@ -640,6 +648,19 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                             <button type="button" class="btn btn-link btn-sm p-0 text-nowrap" onclick="cancelSplitBill()"><?= t('Cancel split') ?></button>
                         </div>
                     </div>
+                    <?php if ($_rof['on']): ?>
+                    <!-- restaurant_order_flow_plan.md — the cashier's waiting orders, and the open table's kitchen lines. -->
+                    <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2 d-none" id="rofConfirmBtn" onclick="rofOpenConfirm()">
+                        <i class="bi bi-bell me-1"></i><?= t('Orders to confirm') ?> <span class="badge bg-primary ms-1" id="rofConfirmCount">0</span>
+                    </button>
+                    <div class="rof-strip mt-2 d-none" id="rofStrip">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-semibold text-muted"><i class="ri ri-chef-hat me-1"></i><?= t('In the kitchen') ?></span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-danger text-decoration-none d-none" id="rofCancelOrderBtn" onclick="rofCancelOrder()"><?= t('Cancel order') ?></button>
+                        </div>
+                        <div id="rofStripLines"></div>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
                 <div class="row g-2 small">
@@ -811,6 +832,12 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 </div>
                 <?php endif; ?>
                 <!-- Action Buttons -->
+                <?php if ($_rof_no_pay): ?>
+                <!-- restaurant_order_flow_plan.md — a waiter saves the order to its table and sends it; the cashier takes payment. -->
+                <div class="alert alert-primary py-2 px-3 small mb-0" id="rofNoPayNote">
+                    <i class="bi bi-info-circle me-1"></i><?= t('Save the order to its table and send it. The cashier takes payment.') ?>
+                </div>
+                <?php else: ?>
                 <div class="d-grid gap-2">
                     <button class="btn btn-success btn-lg" onclick="processPayment()" id="processPaymentBtn">
                         <i class="bi bi-check-circle"></i> <?= t('PROCESS PAYMENT') ?>
@@ -819,6 +846,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                         <i class="bi bi-columns-gap"></i> <?= t('SPLIT PAYMENT') ?>
                     </button>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -875,14 +903,51 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             <span class="fw-semibold text-muted small"><?= t('Total:') ?></span>
             <span class="fw-bold fs-6 text-success" id="mobileCartOffcanvasTotal"><?= htmlspecialchars($currency) ?> 0.00</span>
         </div>
+        <?php if (!$_rof_no_pay): ?>
         <button class="btn btn-success w-100 fw-bold"
                 data-bs-dismiss="offcanvas"
                 onclick="processPayment()" id="mobilePayBtn">
             <i class="bi bi-check-circle me-1"></i><?= t('PROCESS PAYMENT') ?>
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
+<?php if ($_rof['on']): ?>
+<!-- restaurant_order_flow_plan.md — orders waiting for the cashier to confirm before the kitchen starts. -->
+<div class="modal fade" id="rofConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-bell me-1"></i><?= t('Orders to confirm') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="rofConfirmBody"></div>
+        </div>
+    </div>
+</div>
+<style>
+.rof-strip { border:1px solid #cfe2ff; border-radius:10px; padding:8px 10px; background:#f8fbff; }
+.rof-line { display:flex; align-items:center; gap:6px; padding:5px 0; border-top:1px solid #e7f0ff; font-size:13px; }
+.rof-line:first-child { border-top:0; }
+.rof-line .rof-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rof-line .rof-note { font-size:11px; color:#6c757d; }
+.rof-chip { font-size:11px; font-weight:700; border-radius:20px; padding:2px 8px; white-space:nowrap; }
+.rof-chip-pending { background:#e9ecef; color:#495057; }
+.rof-chip-queued, .rof-chip-preparing { background:#cfe2ff; color:#084298; }
+.rof-chip-ready { background:#0d6efd; color:#fff; }
+.rof-chip-served { background:#052c65; color:#fff; }
+.rof-btn { border:1px solid #b6ccfe; background:#fff; color:#0d6efd; border-radius:8px; font-size:12px; font-weight:600; padding:2px 8px; white-space:nowrap; }
+.rof-btn:hover { background:#e7f0ff; }
+.rof-btn-x { border-color:#f1aeb5; color:#dc3545; padding:2px 7px; }
+.rof-btn-x:hover { background:#fdecee; }
+.rof-order { border:1px solid #cfe2ff; border-radius:12px; padding:10px 12px; margin-bottom:10px; }
+<?php if ($_rof_no_pay): ?>
+/* A waiter never takes money: payment method, cash tendered and split bill are the cashier's. */
+.mb-2:has(> #paymentMethodGroup), #cashPaymentSection, #rsSplitRow { display:none !important; }
+<?php endif; ?>
+</style>
+<?php endif; ?>
 <?php include 'pos_modals_new.php'; ?>
 <?php include 'pos_scripts_new.php'; ?>
 <script>

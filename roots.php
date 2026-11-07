@@ -1186,6 +1186,7 @@ $routes = [
     'online_orders'                 => RESTAURANT_DIR . '/online_orders.php',  // restaurant_online_menu_plan.md Phase 5
     'restaurant/tables-board'       => RESTAURANT_DIR . '/tables_board.php', // restaurant_plan.md Phase 2
     'restaurant/sales-report'       => RESTAURANT_DIR . '/sales_report.php', // restaurant_plan.md Phase 6
+    'restaurant/waste-report'       => RESTAURANT_DIR . '/waste_report.php', // restaurant_order_flow_plan.md
     'restaurant/purchases'          => RESTAURANT_DIR . '/purchases.php',  // restaurant focus pass: buy stock & ingredients
 
 
