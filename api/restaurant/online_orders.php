@@ -29,6 +29,7 @@ if (isset($_SESSION['user_lang'])) loadLanguage($_SESSION['user_lang']);
 require_once __DIR__ . '/../../core/project_scope.php';
 require_once __DIR__ . '/../../core/restaurant_online.php';
 require_once __DIR__ . '/../../core/online_order_record.php';
+require_once __DIR__ . '/../../core/restaurant_order_flow.php';
 
 const RO_STAFF_TYPES = "('table','pickup')";   // restaurant orders only — retail shop orders have their own screen
 
@@ -36,7 +37,8 @@ $out = function (int $code, array $b) { http_response_code($code); echo json_enc
 
 if (!isAuthenticated())         $out(401, ['success' => false, 'message' => t('Unauthorized')]);
 if (!canView('restaurant_pos')) $out(403, ['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]);
-if (!canCreate('pos'))          $out(403, ['success' => false, 'message' => t('Permission denied')]);
+// restaurant_order_flow_plan.md — accepting an order is taking an order: the waiter may too.
+if (!rofCanTake($pdo))          $out(403, ['success' => false, 'message' => t('Permission denied')]);
 if (!restaurantSchemaReady($pdo) || !restaurantModuleOn($pdo) || !roSchemaReady($pdo)) $out(200, ['success' => false, 'message' => t('Restaurant module is being set up for your account — please check back shortly.')]);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -187,6 +189,8 @@ try {
         if ($reason === '') $reason = t('Not collected.');
         try {
             oorCancelNotCollected($pdo, $o, $reason, $uid);
+            // Its food stops in the kitchen (cooked already → recorded as waste).
+            rofOnPickupCancelled($pdo, (int)($o['hold_id'] ?? 0), $uid, $reason);
         } catch (RuntimeException $e) {
             $pdo->rollBack();
             $out(422, ['success' => false, 'message' => $e->getMessage()]);

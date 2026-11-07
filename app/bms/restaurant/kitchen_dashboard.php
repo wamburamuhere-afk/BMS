@@ -11,15 +11,18 @@
 ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
-require_once __DIR__ . '/../../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../../core/restaurant_order_flow.php';
 
 $page_title = 'Kitchen Display';
 require_once 'header.php';
 
-if (!canView('restaurant_pos')) {
+// restaurant_order_flow_plan.md — the Kitchen Screen right (cooks, cashier to watch, manager).
+if (!canView('restaurant_pos') || !rofCanSeeKitchen($pdo)) {
     header('Location: ' . getUrl('unauthorized'));
     exit();
 }
+$kdsCanCook   = rofCanKitchen($pdo);
+$kdsTeamFlow  = rofConfirmRequired($pdo);   // the waiter marks food received, not the cook
 
 $warehouses = restaurantWarehousesForSelect($pdo);
 // Opened from a notification: kitchen-dashboard?ticket=N — that ticket's shop, the ticket highlighted.
@@ -110,7 +113,10 @@ if ($focusTicket > 0 && $warehouses) {
 </div>
 
 <script>
-const STAGES = ['queued', 'preparing', 'ready', 'served'];
+// restaurant_order_flow_plan.md — team flow: the kitchen stops at Ready; the waiter taps Received on the till.
+const KDS_CAN_COOK = <?= json_encode($kdsCanCook) ?>;
+const KDS_TEAM = <?= json_encode($kdsTeamFlow) ?>;
+const STAGES = KDS_TEAM ? ['queued', 'preparing', 'ready'] : ['queued', 'preparing', 'ready', 'served'];
 const STAGE_LABELS = {
     queued: <?= json_encode(t('Queued')) ?>, preparing: <?= json_encode(t('Preparing')) ?>,
     ready: <?= json_encode(t('Ready')) ?>, served: <?= json_encode(t('Served')) ?>,
@@ -120,6 +126,7 @@ const STRINGS = {
     noTickets: <?= json_encode(t('No active kitchen tickets.')) ?>,
     table: <?= json_encode(t('Table')) ?>,
     advance: <?= json_encode(t('Advance')) ?>,
+    waitWaiter: <?= json_encode(t('Waiting for the waiter to collect')) ?>,
     error: <?= json_encode(t('Error')) ?>,
     qty: <?= json_encode(t('x')) ?>,
 };
@@ -189,7 +196,8 @@ function loadTickets() {
                         </div>
                         ${t.order_label ? `<div class="fw-bold mb-1">${safeOutput(t.order_label)}</div>` : (t.table_number ? `<div class="small text-muted mb-1">${STRINGS.table}: ${safeOutput(t.table_number)}</div>` : '')}
                         <div class="small">${items}</div>
-                        ${nextStage ? `<button class="btn btn-sm btn-primary w-100 mt-2" onclick="advance(${t.ticket_id}, '${nextStage}')">${STRINGS.advance} → ${STAGE_LABELS[nextStage]}</button>` : ''}
+                        ${nextStage && KDS_CAN_COOK ? `<button class="btn btn-sm btn-primary w-100 mt-2" onclick="advance(${t.ticket_id}, '${nextStage}')">${STRINGS.advance} → ${STAGE_LABELS[nextStage]}</button>` : ''}
+                        ${!nextStage && KDS_TEAM && t.status === 'ready' ? `<div class="small text-primary fw-semibold mt-2"><i class="bi bi-person-check me-1"></i>${STRINGS.waitWaiter}</div>` : ''}
                     </div>
                 </div>
             </div>`;
