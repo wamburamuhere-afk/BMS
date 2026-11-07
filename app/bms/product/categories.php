@@ -97,7 +97,7 @@ $category_tree = get_category_tree($all_categories);
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="categoriesTable" class="table table-hover align-middle mb-0 w-100">
+                        <table id="categoriesTable" class="table table-hover align-middle mb-0 w-100" data-actions-dropdown>
                             <thead class="bg-light text-uppercase small fw-bold">
                                 <tr>
                                     <th style="width:50px;" class="ps-4"><?= t('S/NO') ?></th>
@@ -125,8 +125,8 @@ $category_tree = get_category_tree($all_categories);
                                         <td class="text-end pe-3">
                                             <?php if ($can_edit || $can_delete): ?>
                                             <div class="btn-group">
-                                                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-                                                    <i class="bi bi-gear"></i> <span class="d-none d-sm-inline"><?= t('Actions') ?></span>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown" aria-label="<?= t('Actions') ?>">
+                                                    <i class="bi bi-gear"></i>
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end shadow">
                                                     <?php if ($can_edit): ?>

@@ -114,10 +114,10 @@ if (typeof window.safeOutput !== 'function') {
     function buildActionDropdown(actionCell, label) {
         var menu = actionCell.querySelector('.dropdown-menu');
         if (!menu) return actionCell.innerHTML;
-        return '<div class="dropdown w-100">' +
-            '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" ' +
-            'data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false" style="min-height:36px;">' +
-            '<i class="bi bi-gear me-1"></i>' + (label || '') + '</button>' +
+        return '<div class="dropdown d-flex justify-content-end">' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" ' +
+            'data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false" aria-label="' + (label || 'Actions') + '">' +
+            '<i class="bi bi-gear"></i></button>' +
             '<ul class="dropdown-menu dropdown-menu-end shadow-sm">' + menu.innerHTML + '</ul>' +
             '</div>';
     }
