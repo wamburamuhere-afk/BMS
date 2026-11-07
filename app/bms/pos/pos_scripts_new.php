@@ -2773,7 +2773,7 @@ function rofReturnOrder(k) {
 
 /** Payment refused by the kitchen rules (HTTP 409). Returns true when handled here. */
 function rofHandlePayError(resp, paymentData) {
-    const restore = () => $('#processPaymentBtn').prop('disabled', false).html(payButtonHtml());
+    const restore = () => $('#processPaymentBtn').html(payButtonHtml()).prop('disabled', false);   // keeps the mode's label
     if (resp.error_code === 'kitchen_not_served') {
         if (resp.can_mark_served) {
             Swal.fire({ icon: 'warning', title: ROF_T.notServed, text: resp.message, showCancelButton: true,
