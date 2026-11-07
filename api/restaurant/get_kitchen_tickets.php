@@ -11,11 +11,13 @@ if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
 require_once __DIR__ . '/../../core/project_scope.php';
-require_once __DIR__ . '/../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../core/restaurant_order_flow.php';
 
 if (!isAuthenticated())         { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
 if (!restaurantSchemaReady($pdo)) { echo json_encode(['success' => false, 'message' => t('Restaurant module is being set up for your account — please check back shortly.')]); exit; }
+// restaurant_order_flow_plan.md — the kitchen screen is for the Kitchen Screen right (cooks, cashier, manager).
+if (!rofCanSeeKitchen($pdo))    { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 
 global $pdo;
 
@@ -25,6 +27,9 @@ if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id)) {
     echo json_encode(['success' => false, 'message' => wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.')]);
     exit;
 }
+// Forgotten tickets (12 h+) leave the screen; orders waiting for the cashier or cancelled are never listed
+// (only queued/preparing/ready/served are accepted below).
+rofExpireOld($pdo, $warehouse_id);
 $station_id = (int)($_GET['station_id'] ?? 0);
 $statusList = array_filter(array_map('trim', explode(',', $_GET['status'] ?? 'queued,preparing')));
 $statusList = array_values(array_intersect($statusList, ['queued', 'preparing', 'ready', 'served']));

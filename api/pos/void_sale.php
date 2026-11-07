@@ -186,6 +186,11 @@ try {
     require_once __DIR__ . '/../../core/online_order_record.php';
     $reopenedOnline = oorOnVoid($pdo, $sale_id, (int)$_SESSION['user_id']);
 
+    // restaurant_order_flow_plan.md — food of this sale still in the kitchen stops: not started →
+    // cancelled; already cooking → cancelled and recorded as waste.
+    require_once __DIR__ . '/../../core/restaurant_order_flow.php';
+    rofOnVoid($pdo, $sale_id, (int)$_SESSION['user_id']);
+
     $pdo->commit();
 
     if ($reopenedOnline) {
