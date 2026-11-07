@@ -307,8 +307,10 @@ if (!$uid || !$wh) {
         ((int)$after['warranty_period'] === 12 && $after['warranty_unit'] === 'months') ? pass('warranty period+unit preserved') : fail('warranty lost');
         ((int)$after['guarantee_period'] === 30 && $after['guarantee_unit'] === 'days') ? pass('guarantee period+unit preserved') : fail('guarantee lost');
         ((int)$after['expiry_days'] === 90) ? pass('expiry_days preserved') : fail('expiry_days lost');
-        (abs((float)$after['min_selling_price'] - 1200.00) < 0.01 || abs((float)$after['min_selling_price'] - (1600 - 1600 * 0.125)) < 0.01)
-            ? pass('min_selling_price stayed consistent with the real discount rate (not silently zeroed)')
+        // Smart POS has no minimum selling price (core/pos_min_price.php): a simple-form save sets
+        // it to the BUYING PRICE (1000 here) — never the selling price, never zero by accident.
+        (abs((float)$after['min_selling_price'] - 1000.00) < 0.01)
+            ? pass('min_selling_price = the buying price on a Smart POS save (not the selling price, not zeroed)')
             : fail('min_selling_price corrupted: ' . $after['min_selling_price']);
     }
 

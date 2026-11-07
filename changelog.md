@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-11-07 — fix(smart-pos): no "Minimum selling price" in Smart POS (discounts and wholesale prices were blocked)
+
+**Changed:** `core/pos_min_price.php` (new), `api/pos/process_sale.php`, `api/create_product.php`, `api/update_product.php`, `core/product_import.php`, `app/bms/pos/pos_scripts_new.php`, `migrations/tenant/2026_11_07_smart_pos_min_price.php` (new), `migrations/2026_11_07_smart_pos_min_price_legacy_db.php` (new), `tests/test_smart_pos_min_price_cli.php` (new), `tests/test_product_edit_simple_pos_cli.php`
+
+- **Bug:** the Smart POS product form hides "Min Selling Price" and "Max Discount %", but saving still filled the minimum with the selling price. The till then refused any discount or wholesale price: "Price for 'Bl25kalam' is below minimum selling price." (seen at Michael Electronics).
+- **Fix:** on a Smart POS shop (Simple Mode on, Advanced product form off) the till never refuses a price because of the minimum, and a saved or imported product's minimum is its buying price. Full BMS is unchanged and still enforces the minimum.
+- The till screen (cart, edit price, discount) uses the same rule, so the screen and the server agree.
+- **Data:** the migration sets every product's minimum to its buying price on Smart POS databases only (criteria-based, safe to run twice); other databases are untouched.
+- **Checked:** new test (34 checks, real sales over HTTP on a throwaway company: full BMS still refuses 5000, Smart POS sells at 5000 and 7000, Advanced form brings the check back, ledger balanced); product import, create/edit/list simple-POS, old-sale UI, i18n and clean-URL suites pass.
+
 ## 2026-11-07 — feat(online): professional look for the public online shop (/s/) and restaurant menu (/m/)
 
 **Changed:** `public_shop.php`, `public_menu.php`, `core/retail_online.php`, `core/restaurant_online.php`, `lang/sw.php`, `tests/test_retail_online_shop_cli.php`, `tests/test_restaurant_online_menu_cli.php`
