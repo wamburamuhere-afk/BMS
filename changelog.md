@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-11-07 — feat(ui): one small gear + triangle Actions button on all list pages (no text, right side)
+
+**Changed:** `assets/js/bms-mobile-cards.js`, `assets/js/pos-credit-aging.js`, `app/bms/product/products.php`, `app/bms/product/services.php`, `app/bms/product/categories.php`, `app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`
+
+- The Actions button is now the same everywhere: small outlined box on the right with the gear icon and triangle, no "Actions" text. Applied to Products, Shops/Warehouses and Expenses (shared phone cards), Services, Categories, Customers, Suppliers and the "who owes me" credit customers list.
+- Products and Services phone cards: the button row became the gear menu (View, Edit, Hide/Delete as before, same permissions); desktop card view keeps its buttons.
+- Categories: phone cards now use the gear menu with all its options; the desktop gear lost its "Actions" text and uses the same outline style.
+- **Checked:** PHP/JS syntax; credit aging, customer and supplier CRUD tests pass. Not yet clicked through on a phone.
+
 ## 2026-11-07 — feat(restaurant): Waiter → Cashier → Kitchen → Waiter → Bill order flow
 
 **Created:** `core/restaurant_order_flow.php`, `core/restaurant_order_flow_schema.php`, `api/restaurant/order_flow.php`, `app/bms/restaurant/waste_report.php`, `migrations/tenant/2026_11_06_restaurant_order_flow.php`, `migrations/2026_11_06_restaurant_order_flow_legacy_db.php`, `tests/test_restaurant_order_flow_cli.php`, `restaurant_order_flow_plan.md`
