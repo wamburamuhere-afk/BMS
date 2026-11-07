@@ -34,12 +34,7 @@ ok(!plVerify(8, $ts, $body, $sig), 'another tenant id does not verify (cannot as
 ok(!plVerify(7, $ts, '{"action":"documents"}', $sig), 'a changed body does not verify');
 ok(!plVerify(7, $ts - 300, $body, plSignature(7, $ts - 300, $body)), 'a stale request (5 min) is refused');
 ok(!plVerify(7, $ts, $body, ''), 'no signature → refused');
-$tok = plDocToken('invoice', 42, 9);
-ok(plDocTokenRead((string)$tok) === ['type' => 'invoice', 'id' => 42, 'customer_id' => 9], 'document token round-trips');
-ok(plDocTokenRead(str_replace('.', 'x.', (string)$tok)) === null, 'a tampered token is refused');
-ok(plDocTokenRead((string)plDocToken('invoice', 42, 9, -10)) === null, 'an expired token is refused');
-ok(plDocTokenRead('') === null && plDocTokenRead('a.b') === null, 'garbage refused');
-foreach (['api/my_subscription.php' => 'bmsCurrentTenantId()', 'api/platform/tenant_gateway.php' => 'pgHandle(', 'api/platform/customer_document.php' => 'plDocTokenRead('] as $f => $needle) {
+foreach (['api/my_subscription.php' => 'bmsCurrentTenantId()', 'api/platform/tenant_gateway.php' => 'pgHandle(', 'app/constant/settings/billing_document.php' => 'plCall($tenantId'] as $f => $needle) {
     ok(strpos(file_get_contents("$root/$f"), $needle) !== false, "$f wired");
 }
 ok(strpos(file_get_contents("$root/api/my_subscription.php"), "if (!isAdmin())") !== false, 'company side is admin-only');
@@ -198,20 +193,17 @@ $qid = (int)($q['sales_order_id'] ?? 0);
 $qnum = (string)($q['order_number'] ?? '');
 $r = gateway($t1, ['action' => 'documents']);
 ok(count($r['quotations']) === 0 && count($r['requests']) === 1 && $r['requests'][0]['status'] === 'waiting', 'quotation not approved yet → still "waiting for BJP"');
-$view = function (string $token, bool $vendor = true) use ($root) {
-    return runPhp("\$_SERVER['REQUEST_METHOD'] = 'GET'; \$_SERVER['HTTP_HOST'] = 'localhost'; require '$root/roots.php'; " . ENV_KEY . ($vendor ? ENV_VENDOR : '') . "
-        \$_GET = ['t' => " . var_export($token, true) . "]; ob_start(); include '$root/api/platform/customer_document.php'; echo ob_get_clean();");
-};
-ok($qnum !== '' && strpos($view((string)plDocToken('quotation', $qid, $cust)), $qnum) === false, 'even a valid link cannot open a pending quotation');
+// The company's copy comes through the signed gateway ('document'), rendered from BJP's print template.
+$view = fn(int $tenant, int $id, bool $vendor = true) => (string)(gateway($tenant, ['action' => 'document', 'type' => 'quotation', 'id' => $id], $vendor)['html'] ?? '');
+ok($qnum !== '' && strpos($view($t1, $qid), $qnum) === false, 'a pending quotation cannot be opened');
 $pdo->exec("UPDATE quotations SET status = 'approved', approved_at = NOW() WHERE sales_order_id = $qid");   // BJP approves it
 $r = gateway($t1, ['action' => 'documents']);
-ok(!empty($r['success']) && count($r['quotations']) === 1 && !empty($r['quotations'][0]['view_token']) && $r['quotations'][0]['status'] === 'approved'
-   && count($r['requests']) === 0, "once approved: this company's quotation, with a view link; no longer waiting");
-$html = $view((string)($r['quotations'][0]['view_token'] ?? ''));
-ok(strpos($html, $qnum) !== false && strpos($html, 'QUOTATION') !== false && strpos($html, 'Term: 1 Month') !== false, 'customer copy shows the quotation with its term');
-ok(strpos($view((string)plDocToken('quotation', $qid, $cust + 1)), $qnum) === false, "a token for another customer cannot open it");
-ok(strpos($view((string)plDocToken('quotation', $qid, $cust, -5)), 'expired') !== false, 'an expired link says so');
-ok(strpos($view((string)($r['quotations'][0]['view_token'] ?? ''), false), $qnum) === false, 'customer copies are served only by the platform root');
+ok(!empty($r['success']) && count($r['quotations']) === 1 && (int)($r['quotations'][0]['id'] ?? 0) === $qid && !isset($r['quotations'][0]['view_token'])
+   && $r['quotations'][0]['status'] === 'approved' && count($r['requests']) === 0, "once approved: this company's quotation, by id (no token); no longer waiting");
+$html = $view($t1, $qid);
+ok(strpos($html, $qnum) !== false && strpos($html, 'QUOTATION') !== false && strpos($html, '1 Month') !== false, "customer copy is BJP's quotation template, with its term");
+ok(strpos($view($t2, $qid), $qnum) === false, 'another company cannot open it');
+ok(strpos($view($t1, $qid, false), $qnum) === false, 'customer copies are served only by the platform root');
 
 section('B5. company side');
 $asTenant = fn(int $tid) => "\$GLOBALS['__bms_tenant'] = ['id' => $tid];";

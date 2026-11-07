@@ -44,7 +44,7 @@ ok(strpos($src('roots.php'), "'billing' => SETTINGS_DIR . '/billing.php'") !== f
 ok(strpos($src('app/constant/settings/my_subscription.php'), "getUrl('subscription')") !== false, 'old My Subscription redirects to Subscription');
 ok(strpos($src('app/constant/settings/billing.php'), "\$page_title = 'Subscription';") !== false, 'page title is Subscription');
 ok(strpos($src('app/constant/settings/billing.php'), 'settingsAdminShellOpen') === false, 'Billing stands on its own (not inside the Settings shell)');
-ok(strpos($src('api/platform/customer_document.php'), "['draft', 'pending', 'reviewed']") !== false, 'customer copy refuses documents BJP has not approved');
+ok(strpos($src('core/customer_documents.php'), "function cdVisibleStatuses") !== false, 'customer copy refuses documents BJP has not approved');
 
 if (!$hasConfig) { echo "\nSKIP B: no includes/config.php (CI)\n"; exit; }
 
@@ -269,10 +269,8 @@ section('B4. quotations: shown only once BJP approves (D7)');
 $d = company($tid, ['action' => 'documents']);
 ok(count($d['quotations'] ?? []) === 0 && count($d['requests'] ?? []) === 1 && count($d['requests'][0]['lines'] ?? []) === 2 && ($d['requests'][0]['status'] ?? '') === 'waiting',
    'pending → hidden; listed as a request waiting for BJP, with its two lines');
-$view = function (string $type, int $id) use ($root, $cust) {
-    return runPhp("\$_SERVER['REQUEST_METHOD'] = 'GET'; \$_SERVER['HTTP_HOST'] = 'localhost'; require '$root/roots.php'; " . VENDOR_ENV . "
-        \$_GET = ['t' => " . var_export((string)plDocToken($type, $id, $cust), true) . "]; ob_start(); include '$root/api/platform/customer_document.php'; echo ob_get_clean();");
-};
+// The company's copy: BJP's print template through the signed gateway.
+$view = fn(string $type, int $id) => (string)(company($tid, ['action' => 'document', 'type' => $type, 'id' => $id])['html'] ?? '');
 $qNum = (string)$q['order_number'];
 ok(strpos($view('quotation', $firstQ), $qNum) === false, 'a valid link still cannot open the pending quotation');
 $rv = call('api/account/review_quotation.php', ['quotation_id' => $firstQ, 'id' => $firstQ]);
@@ -282,7 +280,7 @@ ok(strpos($view('quotation', $firstQ), $qNum) === false, 'customer copy of a rev
 $ap = call('api/account/approve_quotation.php', ['quotation_id' => $firstQ, 'id' => $firstQ]);
 $d = company($tid, ['action' => 'documents']);
 $dq = $d['quotations'][0] ?? [];
-ok(!empty($ap['success']) && count($d['quotations'] ?? []) === 1 && ($dq['status'] ?? '') === 'approved' && !empty($dq['view_token']) && count($d['requests'] ?? []) === 0,
+ok(!empty($ap['success']) && count($d['quotations'] ?? []) === 1 && ($dq['status'] ?? '') === 'approved' && (int)($dq['id'] ?? 0) === $firstQ && count($d['requests'] ?? []) === 0,
    'approved (real endpoints) → shown with a link; no longer waiting');
 ok(count($dq['lines'] ?? []) === 2 && strpos((string)$dq['lines'][0]['term'], 'Pro') !== false && (int)$dq['lines'][1]['qty'] === 2 && !empty($dq['visible_at']) && $d['latest'] === $dq['visible_at'],
    'each document says what it is for (plan + term, extra × 2) and when it became visible');
@@ -321,7 +319,7 @@ ok($st($inv) === 'reviewed' && count($d['invoices']) === 0, 'reviewed → still 
 $ap = call('api/account/approve_invoice.php', ['invoice_id' => $inv]);
 $d = company($tid, ['action' => 'documents']);
 $di = $d['invoices'][0] ?? [];
-ok(!empty($ap['success']) && count($d['invoices']) === 1 && $di['status'] === 'unpaid' && !empty($di['view_token']) && strpos((string)($di['lines'][0]['term'] ?? ''), 'Pro') !== false,
+ok(!empty($ap['success']) && count($d['invoices']) === 1 && $di['status'] === 'unpaid' && (int)($di['id'] ?? 0) > 0 && strpos((string)($di['lines'][0]['term'] ?? ''), 'Pro') !== false,
    'approved → shown as unpaid, with a link and what it is for');
 ok(strpos($view('invoice', $inv), $invNum) !== false, 'customer copy opens once approved');
 // Cancelled before approval → never shown; cancelled after approval → shown as cancelled.

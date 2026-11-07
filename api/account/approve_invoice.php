@@ -77,6 +77,10 @@ try {
 
     $pdo->commit();
 
+    // BJP's install: the customer's company now sees it on its Billing page — tell them.
+    require_once __DIR__ . '/../../core/customer_documents.php';
+    cdNotifyIfLinked($pdo, 'invoice', (int)$invoice_id);
+
     $response = ['success' => true, 'message' => 'Invoice approved.'];
     if (!$sigResult['has_signature']) {
         $response['sig_warning'] = 'Your electronic signature was not captured because you have no signature on file. Please set one up in E-Signatures.';

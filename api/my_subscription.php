@@ -121,12 +121,12 @@ function msCountNew(array $r, ?string $seen): int
     foreach (['quotations', 'invoices'] as $k) foreach ($r[$k] ?? [] as $d) {
         if (!empty($d['visible_at']) && ($seen === null || $d['visible_at'] > $seen)) $n++;
     }
+    foreach ($r['receipts'] ?? [] as $d) if ($seen === null || $d['uploaded_at'] > $seen) $n++;
     return $n;
 }
-$docUrl = function (?string $token): ?string {
-    $root = plRootUrl();
-    return ($token && $root) ? $root . '/api/platform/customer_document.php?t=' . rawurlencode($token) : null;
-};
+// Documents open on the company's own address (/subscription/invoice/231); billing_document.php
+// fetches them from BJP over the signed link, so no BJP address is ever handed to the browser.
+$docUrl = fn(string $kind, int $id): ?string => $id > 0 ? getUrl('subscription/' . $kind . '/' . $id) : null;
 
 if ($action === 'status') {
     try {
@@ -174,12 +174,20 @@ if ($action === 'documents') {
     $r = plCall($tenantId, 'documents', [], $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) {
         $seen = msSeenAt($pdo);
-        foreach (['quotations', 'invoices'] as $k) {
+        foreach (['quotations' => 'quotation', 'invoices' => 'invoice'] as $k => $kind) {
             foreach ($r[$k] ?? [] as $i => $d) {
-                $r[$k][$i]['view_url'] = $docUrl($d['view_token'] ?? null);
+                $r[$k][$i]['view_url'] = $docUrl($kind, (int)($d['id'] ?? 0));
                 $r[$k][$i]['is_new'] = !empty($d['visible_at']) && $seen !== null && $d['visible_at'] > $seen;
-                unset($r[$k][$i]['view_token']);
             }
+        }
+        foreach ($r['payments'] ?? [] as $i => $p) {
+            $r['payments'][$i]['invoice_url'] = $docUrl('invoice', (int)$p['invoice_id']);
+            foreach ($p['proofs'] ?? [] as $j => $f) $r['payments'][$i]['proofs'][$j]['url'] = $docUrl('payment-proof', (int)$f['id']);
+        }
+        foreach ($r['receipts'] ?? [] as $i => $rc) {
+            $r['receipts'][$i]['url'] = $docUrl('receipt', (int)$rc['id']);
+            $r['receipts'][$i]['invoice_url'] = $docUrl('invoice', (int)$rc['invoice_id']);
+            $r['receipts'][$i]['is_new'] = $seen !== null && $rc['uploaded_at'] > $seen;
         }
         // Opening Billing = the company has seen them; the header badge clears.
         if (!empty($r['latest']) && ($seen === null || $r['latest'] > $seen)) $saveSeen((string)$r['latest']);
@@ -209,8 +217,7 @@ if ($action === 'contracts') {
     $r = plCall($tenantId, 'contracts', [], $GLOBALS['__pl_transport'] ?? null);
     if (!empty($r['success'])) {
         foreach ($r['contracts'] ?? [] as $i => $c) {
-            $r['contracts'][$i]['view_url'] = $docUrl($c['view_token'] ?? null);
-            unset($r['contracts'][$i]['view_token']);
+            $r['contracts'][$i]['view_url'] = !empty($c['has_file']) ? $docUrl('contract', (int)$c['contract_id']) : null;
         }
     }
     $out($r, !empty($r['success']) ? 200 : 502);

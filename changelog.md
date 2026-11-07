@@ -1,5 +1,19 @@
 # BMS Changelog
 
+## 2026-11-07 — feat(billing): BJP documents on the company's own Billing page — real templates, payments + proof, EFD receipts, emails
+
+**Created:** `core/customer_documents.php`, `app/constant/settings/billing_document.php`, `api/account/upload_efd_receipt.php`, `api/account/delete_efd_receipt.php`, `api/account/view_efd_receipt.php`, `migrations/2026_11_07_invoice_efd_receipts.php`, `tests/test_billing_customer_documents_cli.php`
+**Changed:** `api/account/record_payment.php`, `app/bms/invoice/payment_create.php`, `core/platform_gateway.php`, `core/platform_link.php`, `api/my_subscription.php`, `roots.php`, `app/constant/settings/billing.php`, `app/constant/settings/color_settings.php`, `app/bms/invoice/invoice_view.php`, `api/account/approve_invoice.php`, `api/account/approve_quotation.php`, the 8 invoice/quotation print templates, `lang/sw.php`, 3 older tests
+**Removed:** `api/platform/customer_document.php` and `plDocToken()` / `plDocTokenRead()` (replaced)
+
+- **Real templates:** a company opening a BJP quotation or invoice now gets BJP's actual print template (logo, TIN/VRN, signatures, PAID stamp), not a simplified copy. BJP chooses which template customers see under **Color Setting → Customer Billing Page** (Default unless changed; BJP's install only). Rendered on BJP's side, images embedded (fitted to 360 px so pages stay light), no print dialog on open.
+- **Clean, own address:** documents open at `/subscription/invoice/231`, `/subscription/quotation/N`, `/subscription/payment-proof/N`, `/subscription/receipt/N`, `/subscription/contract/N` on the company's own domain. Its server fetches them over the existing signed link; the browser never sees a BJP address or token. Company admins only.
+- **Payments tab:** now the real completed payments BJP recorded on the company's invoices (date, payment no., invoice, method, reference, amount) with each **proof of payment** to open. Subscription periods stay on My plan.
+- **Receipts tab (new):** EFD/VFD receipts. BJP staff upload them on the invoice page (EFD / VFD Receipts card) for approved invoices of customers linked to a company; soft delete, audit log, staff viewer behind a permission gate. The header badge counts new receipts.
+- **Emails:** the company is emailed when an invoice or quotation is approved and when an EFD receipt is added — a link to its Billing page, no PDF attached. Only for a customer linked to exactly one company; never from a company's own system.
+- **Security:** every document/file is checked against the customer and BJP's workflow (approved or later); files must be real PDF/JPG/PNG inside `uploads/`; proof-of-payment upload now checks real content, caps 10 MB, uses unguessable names and validates all files before saving any; Color Setting form now CSRF-protected.
+- **Tests:** customer documents 48/48 (new); my subscription 40/40, billing page 66/66, contracts 28/28 (moved to the gateway); trial switch 24, redesign 46, service plans billing 82, e2e 34, customer subscription e2e 21, detail URLs 29, clean URLs 33 all pass. `test_subscription_requests_cli` has 1 failure that already exists on `develop` (it looks for an old `?error=` redirect in `quotation_form.php`).
+
 ## 2026-11-06 — feat(subscription): change plan yourself during the free trial
 
 **Changed:** `api/my_subscription.php`, `app/constant/settings/billing.php`, `lang/sw.php`

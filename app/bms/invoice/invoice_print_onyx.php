@@ -10,13 +10,13 @@ require_once __DIR__ . '/../../../core/permissions.php';
 require_once __DIR__ . '/../../../core/workflow.php';
 require_once __DIR__ . '/../../../core/warehouse_scope.php';
 
-if (!isAuthenticated()) die("Unauthorized");
-if (!canView('invoices')) die("Access Denied");
+if (!defined('BMS_CUSTOMER_COPY') && !isAuthenticated()) die("Unauthorized");
+if (!defined('BMS_CUSTOMER_COPY') && !canView('invoices')) die("Access Denied");
 
 $invoice_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($invoice_id <= 0) die("Invalid Invoice ID");
 
-assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
+if (!defined('BMS_CUSTOMER_COPY')) assertScopeForRecordHtml('invoices', 'invoice_id', $invoice_id);
 
 global $pdo;
 
@@ -56,7 +56,7 @@ try {
     // Phase 6 (pos_upgrade_plan.md): gate directly on warehouse scope, not
     // just project — a user granted only some of a project's warehouses
     // shouldn't be able to print an invoice drawn from a different one.
-    if (!empty($invoice['warehouse_id']) && !userCan('warehouse', (int)$invoice['warehouse_id'])) {
+    if (!defined('BMS_CUSTOMER_COPY') && !empty($invoice['warehouse_id']) && !userCan('warehouse', (int)$invoice['warehouse_id'])) {
         http_response_code(403);
         die('Access denied: this warehouse is not in your assigned scope.');
     }

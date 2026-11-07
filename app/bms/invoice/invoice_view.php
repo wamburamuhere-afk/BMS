@@ -126,6 +126,17 @@ $stmtAtt = $pdo->prepare("
 $stmtAtt->execute([$invoice_id]);
 $paymentAttachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
 
+// BJP's install only: EFD / VFD receipts for a customer that has a company on the system
+// (they appear on that company's Billing page → Receipts).
+require_once __DIR__ . '/../../../core/customer_documents.php';
+$efdShow = false; $efdReceipts = []; $efdCanAdd = false;
+if (isPlatformVendorContext() && vlTenantsOfCustomer((int)$invoice['customer_id'])) {
+    $efdShow = true;
+    $efdReceipts = cdEfdForInvoice($pdo, $invoice_id);
+    $efdCanAdd = canEdit('invoices') && cdFindDocument($pdo, 'invoice', $invoice_id, (int)$invoice['customer_id']) !== null;
+}
+$efdCanDelete = canDelete('invoices');
+
 // Fetch linked SO order number for sidebar
 $so_order_number = null;
 if (!empty($invoice['order_id'])) {
@@ -671,11 +682,100 @@ includeHeader();
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php if ($efdShow): ?>
+            <div class="card shadow-sm mt-4 border-0 d-print-none" id="efdCard">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-receipt"></i> <?= t('EFD / VFD Receipts') ?></h6>
+                    <?php if ($efdCanAdd): ?>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#efdModal"><i class="bi bi-upload me-1"></i><?= t('Upload') ?></button>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body p-2">
+                    <p class="small text-muted px-1 mb-2"><?= t('The customer sees these on their Billing page (Receipts) and is emailed when one is added.') ?></p>
+                    <?php if (!$efdReceipts): ?>
+                        <div class="small text-muted text-center py-2"><?= $efdCanAdd ? t('No receipt yet.') : t('No receipt yet. Approve the invoice to add one.') ?></div>
+                    <?php endif; ?>
+                    <div class="d-grid gap-2">
+                        <?php foreach ($efdReceipts as $rc): ?>
+                        <div class="d-flex align-items-center justify-content-between border rounded p-2">
+                            <a href="<?= buildUrl('api/account/view_efd_receipt.php') ?>?id=<?= (int)$rc['receipt_id'] ?>" target="_blank" rel="noopener" class="text-decoration-none text-truncate me-2">
+                                <i class="bi bi-file-earmark-text me-1"></i>
+                                <span class="fw-bold small"><?= safe_output($rc['receipt_number'] ?: $rc['file_name']) ?></span>
+                                <div class="text-muted" style="font-size:.7rem"><?= safe_output($rc['receipt_date'] ? date('d/m/Y', strtotime($rc['receipt_date'])) : '') ?> · <?= safe_output(date('d/m/Y H:i', strtotime($rc['uploaded_at']))) ?></div>
+                            </a>
+                            <?php if ($efdCanDelete): ?>
+                            <button type="button" class="btn btn-sm btn-outline-danger efd-del" data-id="<?= (int)$rc['receipt_id'] ?>" title="<?= t('Remove') ?>"><i class="bi bi-trash"></i></button>
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
+<?php if ($efdShow && $efdCanAdd): ?>
+<div class="modal fade" id="efdModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-receipt me-1"></i> <?= t('Upload EFD / VFD receipt') ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="efdForm" autocomplete="off" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="invoice_id" value="<?= (int)$invoice['invoice_id'] ?>">
+                    <div class="mb-3">
+                        <label class="form-label"><?= t('Receipt file') ?> <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
+                        <div class="form-text"><?= t('PDF, JPG or PNG, up to 10 MB.') ?></div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-sm-6"><label class="form-label"><?= t('Receipt number') ?></label><input type="text" class="form-control" name="receipt_number" maxlength="100"></div>
+                        <div class="col-sm-6"><label class="form-label"><?= t('Receipt date') ?></label><input type="date" class="form-control" name="receipt_date" value="<?= date('Y-m-d') ?>"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i><?= t('Upload') ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
+<?php if ($efdShow): ?>
+$(function () {
+    $('#efdForm').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('[type="submit"]'), orig = btn.html();
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>');
+        $.ajax({ url: '<?= buildUrl('api/account/upload_efd_receipt.php') ?>', type: 'POST', data: new FormData(this),
+                 contentType: false, processData: false, dataType: 'json' })
+            .done(r => r.success ? Swal.fire({ icon: 'success', text: r.message, timer: 2500, showConfirmButton: false }).then(() => location.reload())
+                                 : Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: r.message }))
+            .fail(x => Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: (x.responseJSON || {}).message || <?= json_encode(t('Server error.')) ?> }))
+            .always(() => btn.prop('disabled', false).html(orig));
+    });
+    $(document).on('click', '.efd-del', function () {
+        const id = $(this).data('id');
+        Swal.fire({ title: <?= json_encode(t('Remove this receipt?')) ?>, text: <?= json_encode(t('The customer will no longer see it.')) ?>, icon: 'warning',
+                    showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: <?= json_encode(t('Yes, remove')) ?>, cancelButtonText: <?= json_encode(t('Cancel')) ?> })
+        .then(x => {
+            if (!x.isConfirmed) return;
+            $.ajax({ url: '<?= buildUrl('api/account/delete_efd_receipt.php') ?>', type: 'POST', dataType: 'json', data: { _csrf: <?= json_encode(csrf_token()) ?>, receipt_id: id } })
+                .done(r => r.success ? location.reload() : Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: r.message }))
+                .fail(x => Swal.fire({ icon: 'error', title: <?= json_encode(t('Error')) ?>, text: (x.responseJSON || {}).message || <?= json_encode(t('Server error.')) ?> }));
+        });
+    });
+});
+<?php endif; ?>
 $(document).ready(function() {
     // Log page view
     logReportAction('Viewed Invoice Details', 'User viewed invoice #<?= $invoice['invoice_number'] ?> for customer <?= addslashes($invoice['customer_name']) ?>');
