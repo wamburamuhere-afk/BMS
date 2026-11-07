@@ -226,7 +226,7 @@ $pay_wht_rates = $pdo->query("SELECT rate_id, rate_name, rate_percentage
                                                 <label class="input-group input-group-sm mb-0 cursor-pointer">
                                                     <span class="input-group-text bg-light border-end-0">Choose File</span>
                                                     <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
-                                                    <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                                                    <input type="file" class="d-none actual-file-input" name="attachments[]" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this)">
                                                 </label>
                                             </div>
                                         </div>
@@ -424,7 +424,7 @@ $(document).ready(function() {
                             <label class="input-group input-group-sm mb-0 cursor-pointer">
                                 <span class="input-group-text bg-light border-end-0">Choose File</span>
                                 <div class="form-control form-control-sm file-display-name text-truncate small text-muted bg-white border-start-0">No file chosen</div>
-                                <input type="file" class="d-none actual-file-input" name="attachments[]" onchange="handleFileSelect(this)">
+                                <input type="file" class="d-none actual-file-input" name="attachments[]" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this)">
                             </label>
                         </div>
                     </div>
