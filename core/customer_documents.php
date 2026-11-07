@@ -93,6 +93,10 @@ if (!function_exists('cdTemplates')) {
         } finally {
             $_GET = $savedGet; $_REQUEST = $savedReq; error_reporting($level);
         }
+        // A customer opens the document to read it: no print dialog on load (staff prints keep it);
+        // the Print button still fits the page first.
+        $html = preg_replace('/(<body\b[^>]*?)\s+onload\s*=\s*"[^"]*"/i', '$1', $html) ?? $html;
+        $html = str_replace('onclick="window.print()"', 'onclick="(window.bmsAutoFitPrint || window.print)()"', $html);
         return cdInlineImages($html, dirname($tpl));
     }
 
