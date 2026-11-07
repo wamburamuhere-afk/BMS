@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-11-07 — feat(online): professional look for the public online shop (/s/) and restaurant menu (/m/)
+
+**Changed:** `public_shop.php`, `public_menu.php`, `core/retail_online.php`, `core/restaurant_online.php`, `lang/sw.php`, `tests/test_retail_online_shop_cli.php`, `tests/test_restaurant_online_menu_cli.php`
+
+- **Banner:** company logo and name once, the shop's name (when it differs) and location, pick-up / delivery or table chips, on the brand colour (blue for shops, warm orange for restaurants).
+- **Header:** WhatsApp and Call buttons (both use the shop's existing phone number), cart button with count.
+- **Popular / Most ordered:** worked out automatically from this shop's completed POS sales of the last 30 days (returned units taken off, returns/cancelled/other shops ignored, sold-out items left out); hidden when fewer than 3 products sold. Sent as product ids only, never a number.
+- **Cards:** price first in bold, names typed all-caps or all-small shown in Title Case (mixed-case names left as typed), description or category under the name, labels only when true (New = added in the last 14 days, Sold out). The "Available" badge on every card is gone. − n + stepper once added.
+- **Restaurant menu:** menu-style rows (name, description, price, photo on the right) in sections per category; two columns on desktop. Dish description shown in the dish window.
+- **Footer** (replaces the one grey line): shop name and address, Share this shop / Share menu (a table QR shares the restaurant's own menu link, never the table's), phone with WhatsApp and Call, how ordering works, payment method names from Payment Settings (only when "show payment" is on), "Online shop/menu by <company>" and "Powered by BJP Technologies © year, All Rights Reserved."
+- **Not added (by request):** opening hours / open-closed, map button, tagline, cover photo, wait time. No database change, no new settings; ordering, prices, security rules and order pages unchanged. Stock numbers are still never sent.
+- **Tests:** retail online shop 161/161 (17 new: Popular rules, Title Case, WhatsApp number, description, New label, page banner/footer, payment names, no stock numbers), restaurant online menu 117/117 (4 new), restaurant notifications 64/64, shop/POS i18n coverage pass. Checked in Chrome on desktop and at a true 390 px phone width (nothing wider than the screen).
+
 ## 2026-11-07 — feat(ui): one small gear + triangle Actions button on all list pages (no text, right side)
 
 **Changed:** `assets/js/bms-mobile-cards.js`, `assets/js/pos-credit-aging.js`, `app/bms/product/products.php`, `app/bms/product/services.php`, `app/bms/product/categories.php`, `app/bms/customer/customers.php`, `app/bms/Suppliers/suppliers.php`

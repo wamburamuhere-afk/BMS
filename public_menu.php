@@ -127,6 +127,27 @@ if ($ctx && $action === 'menu') {
 }
 $canOrder = $ctx && $action === 'menu' && roCanOrder($ctx);
 $title = $ctx ? $ctx['warehouse']['warehouse_name'] : t('Menu');
+// Page dressing — all from data BMS already holds (nothing typed in for the page itself).
+$wh = $ctx['warehouse'] ?? null;
+$popular = [];
+$payNames = [];
+if ($ctx && $action === 'menu') {
+    foreach ($menu['items'] as &$it) $it['name'] = roDisplayName($it['name']);
+    unset($it);
+    foreach ($menu['categories'] as $k => $v) $menu['categories'][$k] = roDisplayName($v);
+    $cand = [];
+    foreach ($menu['items'] as $it) if (!$it['sold_out']) $cand[] = $it['id'];
+    $popular = roPopularIds($pdo, $wh['warehouse_id'], $cand);
+    if (!empty($wh['show_payment'])) $payNames = roPaymentMethodNames($pdo);
+}
+$branch   = ($wh && mb_strtolower(trim($wh['warehouse_name'])) !== mb_strtolower(trim($companyName))) ? $wh['warehouse_name'] : '';
+$place    = $wh ? $wh['location'] : '';
+$addrLine = $wh ? ($wh['address'] !== '' ? $wh['address'] : $wh['location']) : '';
+$phone    = $wh ? $wh['phone'] : '';
+$waNumber = roWhatsAppNumber($phone);
+$telHref  = preg_replace('/[^0-9+]/', '', $phone);
+// Share = the restaurant's own menu link, never a table QR (that would let anyone order to that table).
+$shareUrl = ($wh && $wh['menu_token'] !== '') ? getUrl('m/' . $wh['menu_token']) : '';
 ?>
 <!DOCTYPE html>
 <html lang="<?= $e($lang) ?>">
@@ -142,7 +163,7 @@ $title = $ctx ? $ctx['warehouse']['warehouse_name'] : t('Menu');
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" crossorigin="anonymous">
 <style nonce="<?= $e($nonce) ?>">
-:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--soft:#f3f4f6;--bg:#ffffff;--brand:#111827;--accent:#16a34a;--warn:#b45309;--danger:#dc2626;--r:16px}
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--soft:#f3f4f6;--bg:#ffffff;--brand:#c2410c;--brand-dark:#7c2d12;--brand-soft:#fff1e8;--accent:#16a34a;--warn:#b45309;--danger:#dc2626;--r:16px;--wa:#16a34a}
 *{-webkit-tap-highlight-color:transparent}
 html{font-size:16px}
 body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:1rem;-webkit-font-smoothing:antialiased}
@@ -154,10 +175,69 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .brand small{color:var(--muted);font-size:.8rem}
 .lang{margin-left:auto;font-size:.8rem;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
 .lang:hover{color:var(--ink);border-color:#d1d5db}
-.hero{padding:20px 0 8px}
-.hero h2{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;border-radius:999px;padding:6px 12px;background:var(--soft);color:var(--ink)}
-.pill.ok{background:#ecfdf5;color:#047857}
+.tb-btn.wa{color:var(--wa);border-color:#c6ecd4;background:#f0fbf4}
+a.tb-btn{text-decoration:none}
+#cartBtn{background:var(--brand);border-color:var(--brand);color:#fff}
+#cartBtn .tb-badge{background:#fff;color:var(--brand);border-color:var(--brand)}
+/* Banner: the restaurant's own logo, name and place on a warm colour */
+.banner{position:relative;overflow:hidden;color:#fff;background:radial-gradient(120% 90% at 100% 0%,rgba(255,255,255,.18),transparent 55%),linear-gradient(135deg,var(--brand),var(--brand-dark))}
+.banner::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.4px);background-size:16px 16px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 70%);mask-image:linear-gradient(90deg,transparent,#000 70%);pointer-events:none}
+.banner .wrap{position:relative;z-index:1;padding-top:22px;padding-bottom:20px}
+.bn-row{display:flex;align-items:center;gap:14px}
+.bn-logo{width:60px;height:60px;border-radius:16px;background:#fff;object-fit:cover;flex:0 0 auto;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;color:var(--brand)}
+.banner h2{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.15}
+.bn-sub{margin:4px 0 0;font-size:.88rem;opacity:.92;display:flex;flex-wrap:wrap;gap:4px 12px}
+.bn-sub i{margin-right:4px}
+.bn-facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+@media(min-width:768px){.banner .wrap{padding-top:36px;padding-bottom:32px}.bn-logo{width:84px;height:84px;border-radius:20px;font-size:2.2rem}.banner h2{font-size:2rem}.bn-sub{font-size:.95rem}}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);color:#fff}
+.pill.ok{background:#ecfdf5;border-color:#ecfdf5;color:#047857}
+.banner .notice.info{background:rgba(255,255,255,.16);color:#fff;margin-top:14px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin:18px 0 6px}
+.sec-h h3{font-size:1.1rem;font-weight:800;letter-spacing:-.01em;margin:0}
+.pop-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.pop-row::-webkit-scrollbar{display:none}
+.pop-row .card-x{flex:0 0 150px}
+@media(min-width:768px){.pop-row .card-x{flex-basis:200px}}
+.pop-row .ph{aspect-ratio:4/3}
+.pop-row .card-x .pr{color:var(--brand);font-weight:800;margin-top:8px}
+.rank{position:absolute;z-index:2;top:10px;left:10px;background:rgba(17,24,39,.78);color:#fff;border-radius:999px;font-size:.72rem;font-weight:700;padding:3px 8px}
+/* Menu rows: name, description and price on the left, the photo on the right */
+.dishes{display:grid;grid-template-columns:minmax(0,1fr)}
+@media(min-width:768px){.dishes{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px}}
+.dish{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);cursor:pointer;min-width:0}
+@media(min-width:768px){.dish{grid-template-columns:minmax(0,1fr) 128px}}
+.dish .dn{font-size:1rem;font-weight:700;line-height:1.3}
+.dish .dd{font-size:.84rem;color:var(--muted);margin:4px 0 8px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.dish .dp{font-weight:800;color:var(--brand);font-variant-numeric:tabular-nums}
+.dish .ph{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:var(--soft)}
+.dish .ph img{width:100%;height:100%;object-fit:cover}
+.dish .add{right:8px;bottom:8px;width:34px;height:34px}
+.dish.out{cursor:default}
+.dish.out .ph img{filter:grayscale(.85)}
+.dish.out .ph::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.55)}
+.dish .so{display:inline-block;font-size:.72rem;font-weight:700;color:#991b1b;background:#fef2f2;border-radius:999px;padding:2px 8px;margin-bottom:6px}
+.stepper{position:absolute;z-index:3;right:8px;bottom:8px;height:34px;display:flex;align-items:center;gap:2px;border-radius:999px;background:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);padding:0 3px}
+.stepper button{border:0;background:transparent;color:#fff;width:28px;height:28px;border-radius:999px;font-size:1rem;display:flex;align-items:center;justify-content:center}
+.stepper span{min-width:18px;text-align:center;font-weight:800;font-size:.85rem}
+/* Footer */
+.sfoot{background:#0f172a;color:#cbd5e1;font-size:.88rem;margin-top:32px}
+.sfoot .wrap{padding-top:28px;padding-bottom:24px}
+.sfoot.with-bar .wrap{padding-bottom:96px}
+.sf-cols{display:grid;gap:22px}
+@media(min-width:768px){.sf-cols{grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}}
+.sfoot h4{color:#fff;font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+.sfoot p{margin:0 0 4px}
+.sfoot ol{margin:0;padding-left:18px}.sfoot ol li{margin-bottom:4px}
+.sf-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sf-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:7px 13px;font-size:.82rem;font-weight:600;text-decoration:none}
+.sf-btn:hover{color:#fff;background:rgba(255,255,255,.14)}
+.sf-btn.wa{background:var(--wa);border-color:var(--wa)}
+.sf-pay{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.sf-pay small{color:#94a3b8;margin-right:2px}
+.sf-pay span{background:#fff;color:#0f172a;border-radius:7px;padding:3px 9px;font-weight:800;font-size:.75rem}
+.sf-base{margin-top:22px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;color:#94a3b8;font-size:.78rem}
+.sf-base b{color:#fff}
 .tools{position:sticky;top:69px;z-index:20;background:var(--bg);padding:12px 0 10px}
 .search{position:relative}
 .search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9ca3af}
@@ -165,7 +245,7 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .search input:focus{background:#fff;border-color:#9ca3af;box-shadow:0 0 0 4px rgba(17,24,39,.06)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 2px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:8px 14px;font-size:.85rem;font-weight:500;cursor:pointer;white-space:nowrap}
+.chip{flex:0 0 auto;border:1px solid var(--soft);background:var(--soft);color:#374151;border-radius:12px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap}
 .chip.active{background:var(--brand);border-color:var(--brand);color:#fff}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px;padding:8px 0 120px}
 @media(min-width:640px){.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 16px}}
@@ -176,9 +256,9 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .card-x:hover .ph img{transform:scale(1.04)}
 .ph .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.4rem;font-weight:800;color:rgba(17,24,39,.35)}
 .badge-x{position:absolute;z-index:2;top:10px;left:10px;background:#fff;border-radius:999px;font-size:.72rem;font-weight:600;padding:4px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.add{position:absolute;z-index:3;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:#fff;color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
+.add{position:absolute;z-index:3;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
 .add .n{font-size:.85rem;font-weight:700}
-.card-x.has .add{background:var(--brand);color:#fff}
+.card-x.has .add,.dish.has .add{background:var(--brand-dark);color:#fff}
 .card-x .nm{font-size:.95rem;font-weight:600;margin:10px 0 2px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card-x .ct{font-size:.8rem;color:var(--muted)}
 .card-x .pr{font-size:.95rem;font-weight:700;margin-top:2px}
@@ -268,7 +348,6 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 .ord-row .os.s-rejected,.ord-row .os.s-cancelled{background:#fef2f2;color:#991b1b}
 .ord-row .bi-chevron-right{color:#9ca3af}
 .notice.info{background:#f3f4f6;color:#374151;margin-top:12px}
-.foot{color:var(--muted);font-size:.75rem;text-align:center;padding:24px 0 100px}
 .pay{background:var(--soft);border-radius:16px;padding:14px 16px;margin-top:14px}
 .pay-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
 .pay-row:last-of-type{border-bottom:0}
@@ -288,9 +367,15 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     <?php endif; ?>
     <div class="min-w-0">
       <h1><?= $e($companyName) ?></h1>
-      <?php if ($ctx): ?><small><?= $e($ctx['warehouse']['warehouse_name']) ?></small><?php endif; ?>
+      <?php if ($action === 'track' && $branch !== ''): ?><small><?= $e($branch) ?></small><?php endif; ?>
     </div>
     <div class="tb-actions">
+      <?php if ($ctx && $waNumber !== ''): ?>
+      <a class="tb-btn wa" href="https://wa.me/<?= $e($waNumber) ?>" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+      <?php endif; ?>
+      <?php if ($ctx && $phone !== ''): ?>
+      <a class="tb-btn" href="tel:<?= $e($telHref) ?>" aria-label="<?= $e(t('Call the restaurant')) ?>" title="<?= $e(t('Call the restaurant')) ?>"><i class="bi bi-telephone"></i></a>
+      <?php endif; ?>
       <?php if (!$notFound): ?>
       <button type="button" class="tb-btn d-none" id="myOrdersBtn" aria-label="<?= $e(t('My orders')) ?>" title="<?= $e(t('My orders')) ?>"><i class="bi bi-receipt"></i><span class="tb-badge d-none" id="myOrdersCnt">0</span></button>
       <?php endif; ?>
@@ -393,29 +478,96 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 </main>
 
 <?php else: ?>
-<main class="wrap">
-  <section class="hero">
-    <h2><?= $e(t('Menu')) ?></h2>
-    <?php if ($ctx['table']): ?>
-      <span class="pill<?= $canOrder ? ' ok' : '' ?>"><i class="bi bi-geo-alt"></i><?= $e(sprintf(t('Table %s'), $ctx['table']['table_number'])) ?><?= $canOrder ? ' · ' . $e(t('Order from your table')) : '' ?></span>
-    <?php elseif ($canOrder): ?>
-      <span class="pill ok"><i class="bi bi-bag"></i><?= $e(t('Order now, pick up when ready')) ?></span>
+<section class="banner">
+  <div class="wrap">
+    <div class="bn-row">
+      <?php if ($logoUrl !== ''): ?>
+        <img class="bn-logo" src="<?= $e($logoUrl) ?>" alt="">
+      <?php else: ?>
+        <div class="bn-logo"><?= $e(mb_strtoupper(mb_substr($companyName, 0, 1))) ?></div>
+      <?php endif; ?>
+      <div class="min-w-0">
+        <h2><?= $e($companyName) ?></h2>
+        <?php if ($branch !== '' || $place !== ''): ?>
+        <p class="bn-sub">
+          <?php if ($branch !== ''): ?><span><i class="bi bi-shop"></i><?= $e($branch) ?></span><?php endif; ?>
+          <?php if ($place !== ''): ?><span><i class="bi bi-geo-alt"></i><?= $e($place) ?></span><?php endif; ?>
+        </p>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php if ($ctx['table'] || $canOrder): ?>
+    <div class="bn-facts">
+      <?php if ($ctx['table']): ?>
+        <span class="pill<?= $canOrder ? ' ok' : '' ?>"><i class="bi bi-geo-alt"></i><?= $e(sprintf(t('Table %s'), $ctx['table']['table_number'])) ?><?= $canOrder ? ' · ' . $e(t('Order from your table')) : '' ?></span>
+      <?php else: ?>
+        <span class="pill"><i class="bi bi-bag"></i><?= $e(t('Order now, pick up when ready')) ?></span>
+      <?php endif; ?>
+    </div>
     <?php endif; ?>
     <?php if (!$canOrder): ?>
       <div class="notice info"><i class="bi bi-info-circle me-1"></i><?= $e(t('Online ordering is not available right now. Please order with a waiter or at the counter.')) ?></div>
     <?php endif; ?>
-  </section>
-
+  </div>
+</section>
+<main class="wrap">
   <div class="tools">
     <div class="search"><i class="bi bi-search"></i><input id="q" type="search" autocomplete="off" maxlength="60" placeholder="<?= $e(t('Search dishes and drinks…')) ?>" aria-label="<?= $e(t('Search')) ?>"></div>
     <div class="chips" id="chips" role="tablist"></div>
   </div>
 
-  <div id="grid" class="grid" aria-live="polite"></div>
+  <section id="popWrap" class="d-none" aria-labelledby="popTitle">
+    <div class="sec-h"><h3 id="popTitle"><?= $e(t('Most ordered')) ?></h3></div>
+    <div class="pop-row" id="popRow"></div>
+  </section>
+  <div id="grid" aria-live="polite"></div>
   <div id="none" class="empty d-none"><i class="bi bi-search"></i><?= $e(t('Nothing matches your search.')) ?></div>
   <?php if (!$menu['items']): ?><div class="empty"><i class="bi bi-journal-x"></i><?= $e(t('The menu is empty right now.')) ?></div><?php endif; ?>
-  <div class="foot"><?= $e(t('Prices include everything shown. You pay the waiter or the cashier.')) ?></div>
 </main>
+
+<footer class="sfoot<?= $canOrder ? ' with-bar' : '' ?>">
+  <div class="wrap">
+    <div class="sf-cols">
+      <div>
+        <h4><?= $e(t('Find us')) ?></h4>
+        <p><?= $e($wh['warehouse_name']) ?></p>
+        <?php if ($addrLine !== ''): ?><p><?= $e($addrLine) ?></p><?php endif; ?>
+        <?php if ($shareUrl !== ''): ?><div class="sf-btns"><button type="button" class="sf-btn" id="shareBtn"><i class="bi bi-share"></i><span><?= $e(t('Share menu')) ?></span></button></div><?php endif; ?>
+      </div>
+      <div>
+        <h4><?= $e(t('Need help?')) ?></h4>
+        <?php if ($phone !== ''): ?>
+          <p><?= $e($ctx['table'] ? sprintf(t('Ask your waiter, or call %s'), $phone) : sprintf(t('Phone: %s'), $phone)) ?></p>
+          <div class="sf-btns">
+            <?php if ($waNumber !== ''): ?><a class="sf-btn wa" href="https://wa.me/<?= $e($waNumber) ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i>WhatsApp</a><?php endif; ?>
+            <a class="sf-btn" href="tel:<?= $e($telHref) ?>"><i class="bi bi-telephone"></i><?= $e(t('Call')) ?></a>
+          </div>
+        <?php else: ?>
+          <p><?= $e(t('Please ask a member of staff for help.')) ?></p>
+        <?php endif; ?>
+      </div>
+      <div>
+        <h4><?= $e(t('How it works')) ?></h4>
+        <?php if ($canOrder): ?>
+        <ol>
+          <li><?= $e(t('Choose your food and send the order.')) ?></li>
+          <li><?= $e(t('Staff confirm it and the kitchen starts cooking.')) ?></li>
+          <li><?= $e($ctx['table'] ? t('Pay your waiter or at the cashier.') : t('Pay when you collect your order.')) ?></li>
+        </ol>
+        <?php else: ?>
+        <p><?= $e(t('Order with a waiter or at the counter. Pay your waiter or at the cashier.')) ?></p>
+        <?php endif; ?>
+        <?php if ($payNames): ?>
+        <div class="sf-pay"><small><?= $e(t('Pay with')) ?></small><?php foreach ($payNames as $pn): ?><span><?= $e($pn) ?></span><?php endforeach; ?></div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="sf-base">
+      <span><?= $e(t('Online menu by')) ?> <b><?= $e($companyName) ?></b></span>
+      <span>Powered by BJP Technologies © <?= date('Y') ?>, All Rights Reserved.</span>
+    </div>
+  </div>
+</footer>
 
 <?php if ($canOrder): ?>
 <div class="bar d-none" id="bar"><button type="button" id="barBtn"><span class="cnt" id="barCnt">0</span><span><?= $e(t('View order')) ?></span><span class="tot" id="barTot"></span></button></div>
@@ -569,6 +721,8 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
   var CATS  = <?= json_encode((object)$menu['categories'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
   var MODS  = <?= json_encode((object)array_map('array_values', array_map(fn($gs) => array_map(fn($g) => array_merge($g, ['options' => array_values($g['options'])]), $gs), roModifiersFor($pdo, array_column(array_filter($menu['items'], fn($i) => $i['has_options']), 'id')))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
   var CAN_ORDER = <?= $canOrder ? 'true' : 'false' ?>;
+  var POPULAR = <?= json_encode(array_values($popular)) ?>;
+  var SHARE_URL = <?= json_encode($shareUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
   var IS_TABLE  = <?= $ctx['table'] ? 'true' : 'false' ?>;
   var ORDER_URL = <?= json_encode(getUrl('m/' . $ctx['token'] . '/order') . ($lang !== 'en' ? '?lang=' . $lang : ''), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
   var FORM_TOKEN = <?= json_encode($canOrder ? roFormToken($pdo, $ctx['token']) : '') ?>;
@@ -579,6 +733,7 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
       'pickRequired' => t('Please choose %s.'), 'tooMany' => t('You can choose up to %d for %s.'),
       'remove' => t('Remove'), 'sending' => t('Sending…'), 'send' => t('Send order'), 'offline' => t('No connection. Please check your internet and try again.'),
       'empty' => t('Your order is empty.'), 'name' => t('Please enter your name.'), 'phone' => t('Please enter a valid phone number.'),
+      'other' => t('More'), 'copied' => t('Link copied'),
   ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
 
   var byId = {}; ITEMS.forEach(function (it) { byId[it.id] = it; });
@@ -607,33 +762,80 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     Object.keys(CATS).forEach(function (k) { if (ITEMS.some(function (i) { return i.category_id === Number(k); })) chip(Number(k), CATS[k]); });
   }
   var grid = document.getElementById('grid');
-  function renderGrid() {
-    grid.textContent = '';
-    var q = state.q.toLowerCase(), shown = 0;
-    ITEMS.forEach(function (it) {
-      if (state.cat && it.category_id !== state.cat) return;
-      if (q && it.name.toLowerCase().indexOf(q) < 0 && String(CATS[it.category_id] || '').toLowerCase().indexOf(q) < 0) return;
-      shown++;
-      var c = el('div', 'card-x' + (it.sold_out ? ' out' : '') + (qtyOf(it.id) ? ' has' : ''));
-      var ph = el('div', 'ph');
-      if (it.image) { var img = el('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.addEventListener('error', function () { img.remove(); ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }); ph.appendChild(img); }
-      else { ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }
-      if (it.sold_out) ph.appendChild(el('span', 'badge-x', T.soldOut));
-      if (CAN_ORDER && !it.sold_out) {
+  // Photo box with its label and its add / − n + control — shared by menu rows and the Most ordered cards.
+  function photoBox(it, rank) {
+    var ph = el('div', 'ph');
+    if (it.image) { var img = el('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.addEventListener('error', function () { img.remove(); ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }); ph.appendChild(img); }
+    else { ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }
+    if (rank) ph.appendChild(el('span', 'rank', '#' + rank));
+    if (CAN_ORDER && !it.sold_out) {
+      var n = qtyOf(it.id);
+      if (n && !it.has_options) {
+        var sp = el('div', 'stepper');
+        var mi = el('button'); mi.type = 'button'; mi.setAttribute('aria-label', T.remove + ' ' + it.name); mi.appendChild(el('i', 'bi ' + (n <= 1 ? 'bi-trash3' : 'bi-dash')));
+        var pl = el('button'); pl.type = 'button'; pl.setAttribute('aria-label', T.add + ' ' + it.name); pl.appendChild(el('i', 'bi bi-plus'));
+        mi.addEventListener('click', function (ev) { ev.stopPropagation(); lessOf(it.id); });
+        pl.addEventListener('click', function (ev) { ev.stopPropagation(); addLine(it.id, 1, [], ''); });
+        sp.appendChild(mi); sp.appendChild(el('span', '', String(n))); sp.appendChild(pl);
+        sp.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        ph.appendChild(sp);
+      } else {
         var a = el('button', 'add'); a.type = 'button'; a.setAttribute('aria-label', T.add + ' ' + it.name);
-        var n = qtyOf(it.id);
-        if (n) a.appendChild(el('span', 'n', String(n))); else { var ic = el('i', 'bi bi-plus-lg'); a.appendChild(ic); }
+        if (n) a.appendChild(el('span', 'n', String(n))); else a.appendChild(el('i', 'bi bi-plus-lg'));
         a.addEventListener('click', function (ev) { ev.stopPropagation(); if (it.has_options) openDish(it); else addLine(it.id, 1, [], ''); });
         ph.appendChild(a);
       }
-      c.appendChild(ph);
-      c.appendChild(el('div', 'nm', it.name));
-      if (CATS[it.category_id]) c.appendChild(el('div', 'ct', CATS[it.category_id]));
+    }
+    return ph;
+  }
+  function dishRow(it) {
+    var r = el('div', 'dish' + (it.sold_out ? ' out' : '') + (qtyOf(it.id) ? ' has' : ''));
+    var t = el('div', 'min-w-0');
+    t.appendChild(el('div', 'dn', it.name));
+    if (it.desc) t.appendChild(el('div', 'dd', it.desc)); else t.appendChild(el('div', 'dd', ''));
+    if (it.sold_out) t.appendChild(el('span', 'so', T.soldOut));
+    t.appendChild(el('div', 'dp', money(it.price)));
+    r.appendChild(t); r.appendChild(photoBox(it, 0));
+    if (!it.sold_out) r.addEventListener('click', function () { openDish(it); });
+    return r;
+  }
+  var popWrap = document.getElementById('popWrap'), popRow = document.getElementById('popRow');
+  function renderPopular() {
+    if (!popWrap) return;
+    var list = POPULAR.map(function (id) { return byId[id]; }).filter(function (it) { return it && !it.sold_out; });
+    var on = list.length >= 3 && !state.cat && !state.q;
+    popWrap.classList.toggle('d-none', !on);
+    popRow.textContent = '';
+    if (!on) return;
+    list.forEach(function (it, i) {
+      var c = el('div', 'card-x' + (qtyOf(it.id) ? ' has' : ''));
+      c.appendChild(photoBox(it, i + 1));
       c.appendChild(el('div', 'pr', money(it.price)));
-      if (!it.sold_out) c.addEventListener('click', function () { openDish(it); });
-      grid.appendChild(c);
+      c.appendChild(el('div', 'nm', it.name));
+      c.addEventListener('click', function () { openDish(it); });
+      popRow.appendChild(c);
+    });
+  }
+  // The menu in sections, one per category (in the restaurant's own category order).
+  function renderGrid() {
+    grid.textContent = '';
+    var q = state.q.toLowerCase(), shown = 0, groups = [], byCat = {};
+    ITEMS.forEach(function (it) {
+      if (state.cat && it.category_id !== state.cat) return;
+      if (q && it.name.toLowerCase().indexOf(q) < 0 && String(CATS[it.category_id] || '').toLowerCase().indexOf(q) < 0 && String(it.desc || '').toLowerCase().indexOf(q) < 0) return;
+      shown++;
+      var k = String(it.category_id || 0);
+      if (!byCat[k]) { byCat[k] = []; groups.push(k); }
+      byCat[k].push(it);
+    });
+    groups.forEach(function (k) {
+      var h = el('div', 'sec-h'); h.appendChild(el('h3', '', CATS[k] || T.other)); grid.appendChild(h);
+      var box = el('div', 'dishes');
+      byCat[k].forEach(function (it) { box.appendChild(dishRow(it)); });
+      grid.appendChild(box);
     });
     document.getElementById('none').classList.toggle('d-none', shown > 0 || !ITEMS.length);
+    renderPopular();
   }
   var qIn = document.getElementById('q');
   qIn.addEventListener('input', function () { state.q = qIn.value.trim(); renderGrid(); });
@@ -656,6 +858,7 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     top.appendChild(el('div', 'hint', CATS[it.category_id] || ''));
     top.appendChild(el('div', 'fw-bold fs-5', money(it.price)));
     body.appendChild(top);
+    if (it.desc) body.appendChild(el('p', 'mt-2 mb-0', it.desc));
     (MODS[it.id] || []).forEach(function (g) {
       var box = el('div', 'grp'), gh = el('div', 'gh');
       gh.appendChild(el('b', '', g.name));
@@ -708,6 +911,16 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     var same = cart.filter(function (l) { return l.id === id && (l.note || '') === note && JSON.stringify(l.options || []) === JSON.stringify(opts); })[0];
     if (same) same.qty = Math.min(20, same.qty + qty); else cart.push({ id: id, qty: qty, options: opts, note: note });
     if (cart.length > 30) cart.pop();
+    save(); renderGrid(); paintBar();
+  }
+  // The row's − button (dishes without options only): one less of the plain line.
+  function lessOf(id) {
+    for (var i = cart.length - 1; i >= 0; i--) {
+      var l = cart[i];
+      if (l.id !== id || (l.options && l.options.length) || l.note) continue;
+      if (l.qty > 1) l.qty--; else cart.splice(i, 1);
+      break;
+    }
     save(); renderGrid(); paintBar();
   }
 
@@ -789,6 +1002,15 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
         .then(function () { sending = false; btn.disabled = false; btn.textContent = T.send; });
     });
   }
+
+  // Share menu: the phone's share sheet when there is one, otherwise copy the link.
+  var shareBtn = document.getElementById('shareBtn');
+  if (shareBtn && SHARE_URL) shareBtn.addEventListener('click', function () {
+    var url = new URL(SHARE_URL, window.location.href).href, label = shareBtn.querySelector('span');
+    if (navigator.share) { navigator.share({ title: document.title, url: url }).catch(function () {}); return; }
+    var done = function () { var old = label.textContent; label.textContent = T.copied; setTimeout(function () { label.textContent = old; }, 2000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(function () {});
+  });
 
   renderChips(); renderGrid(); paintBar();
 <?php endif; ?>

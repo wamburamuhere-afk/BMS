@@ -133,6 +133,23 @@ if ($ctx && $action === 'shop') {
     catch (Throwable $ex) { error_log('public_shop catalog: ' . $ex->getMessage()); }
 }
 $canOrder = $ctx && $action === 'shop' && $shop['ordering'];
+// Page dressing — all from data BMS already holds (nothing typed in for the page itself).
+$popular = [];
+$payNames = [];
+if ($ctx && $action === 'shop') {
+    foreach ($catalog['items'] as &$it) $it['name'] = roDisplayName($it['name']);
+    unset($it);
+    foreach ($catalog['categories'] as $k => $v) $catalog['categories'][$k] = roDisplayName($v);
+    $cand = [];
+    foreach ($catalog['items'] as $it) if (!$it['sold_out']) $cand[] = $it['id'];
+    $popular = roPopularIds($pdo, $shop['warehouse_id'], $cand);
+    if ($shop['show_payment']) $payNames = roPaymentMethodNames($pdo);
+}
+$branch   = ($ctx && mb_strtolower(trim($shop['warehouse_name'])) !== mb_strtolower(trim($companyName))) ? $shop['warehouse_name'] : '';
+$place    = $ctx ? $shop['location'] : '';
+$addrLine = $ctx ? ($shop['address'] !== '' ? $shop['address'] : $shop['location']) : '';
+$waNumber = $ctx ? roWhatsAppNumber($shop['phone']) : '';
+$telHref  = $ctx ? preg_replace('/[^0-9+]/', '', $shop['phone']) : '';
 $payAccts = [];
 if ($ctx && $action === 'track' && $order && $shop['show_payment'] && in_array($order['status'], ['pending', 'accepted', 'ready'], true)) {
     require_once __DIR__ . '/core/payment_accounts.php';
@@ -156,7 +173,7 @@ $jsonOpts = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_U
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" crossorigin="anonymous">
 <style nonce="<?= $e($nonce) ?>">
-:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--soft:#f3f4f6;--bg:#ffffff;--brand:#111827;--accent:#16a34a;--warn:#b45309;--danger:#dc2626;--r:16px}
+:root{--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--soft:#f3f4f6;--bg:#ffffff;--brand:#1757d6;--brand-dark:#0e3a94;--brand-soft:#eaf1ff;--accent:#16a34a;--warn:#b45309;--danger:#dc2626;--r:16px;--wa:#16a34a}
 *{-webkit-tap-highlight-color:transparent}
 html{font-size:16px}
 body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:1rem;-webkit-font-smoothing:antialiased}
@@ -180,10 +197,56 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .lang-menu-x a{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:.85rem;color:#333;text-decoration:none;white-space:nowrap}
 .lang-menu-x a:hover{background:#f4f8ff}
 .lang-menu-x a.active{font-weight:700}
-.hero{padding:20px 0 8px}
-.hero h2{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;border-radius:999px;padding:6px 12px;background:var(--soft);color:var(--ink);margin:0 6px 6px 0}
-.pill.ok{background:#ecfdf5;color:#047857}
+.tb-btn.wa{color:var(--wa);border-color:#c6ecd4;background:#f0fbf4}
+#cartBtn{background:var(--brand);border-color:var(--brand);color:#fff}
+#cartBtn .tb-badge{background:#fff;color:var(--brand);border-color:var(--brand)}
+/* Banner: the shop's own logo, name and place on the brand colour */
+.banner{position:relative;overflow:hidden;color:#fff;background:radial-gradient(120% 90% at 100% 0%,rgba(255,255,255,.18),transparent 55%),linear-gradient(135deg,var(--brand),var(--brand-dark))}
+.banner::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.4px);background-size:16px 16px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 70%);mask-image:linear-gradient(90deg,transparent,#000 70%);pointer-events:none}
+.banner .wrap{position:relative;z-index:1;padding-top:22px;padding-bottom:20px}
+.bn-row{display:flex;align-items:center;gap:14px}
+.bn-logo{width:60px;height:60px;border-radius:16px;background:#fff;object-fit:cover;flex:0 0 auto;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;color:var(--brand)}
+.banner h2{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.15}
+.bn-sub{margin:4px 0 0;font-size:.88rem;opacity:.92;display:flex;flex-wrap:wrap;gap:4px 12px}
+.bn-sub i{margin-right:4px}
+.bn-facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+@media(min-width:768px){.banner .wrap{padding-top:36px;padding-bottom:32px}.bn-logo{width:84px;height:84px;border-radius:20px;font-size:2.2rem}.banner h2{font-size:2rem}.bn-sub{font-size:.95rem}}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);color:#fff}
+.banner .notice.info{background:rgba(255,255,255,.16);color:#fff;margin-top:14px}
+.banner .ptoggle{background:rgba(255,255,255,.16);margin-top:14px}
+.banner .ptoggle button{color:#fff}
+.banner .ptoggle button.on{background:#fff;color:var(--brand)}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin:14px 0 10px}
+.sec-h h3{font-size:1.1rem;font-weight:800;letter-spacing:-.01em;margin:0}
+.pop-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.pop-row::-webkit-scrollbar{display:none}
+.pop-row .card-x{flex:0 0 150px}
+@media(min-width:768px){.pop-row .card-x{flex-basis:200px}}
+.pop-row .ph{aspect-ratio:4/3}
+.rank{position:absolute;z-index:2;top:10px;left:10px;background:rgba(17,24,39,.78);color:#fff;border-radius:999px;font-size:.72rem;font-weight:700;padding:3px 8px}
+.stepper{position:absolute;z-index:3;right:10px;bottom:10px;height:38px;display:flex;align-items:center;gap:2px;border-radius:999px;background:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);padding:0 4px}
+.stepper button{border:0;background:transparent;color:#fff;width:30px;height:30px;border-radius:999px;font-size:1.05rem;display:flex;align-items:center;justify-content:center}
+.stepper span{min-width:20px;text-align:center;font-weight:800;font-size:.9rem}
+.badge-x.new{background:var(--brand);color:#fff}
+.card-x .ds{font-size:.8rem;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* Footer */
+.sfoot{background:#0f172a;color:#cbd5e1;font-size:.88rem;margin-top:32px}
+.sfoot .wrap{padding-top:28px;padding-bottom:24px}
+.sfoot.with-bar .wrap{padding-bottom:96px}
+.sf-cols{display:grid;gap:22px}
+@media(min-width:768px){.sf-cols{grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}}
+.sfoot h4{color:#fff;font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+.sfoot p{margin:0 0 4px}
+.sfoot ol{margin:0;padding-left:18px}.sfoot ol li{margin-bottom:4px}
+.sf-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sf-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:7px 13px;font-size:.82rem;font-weight:600;text-decoration:none}
+.sf-btn:hover{color:#fff;background:rgba(255,255,255,.14)}
+.sf-btn.wa{background:var(--wa);border-color:var(--wa)}
+.sf-pay{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.sf-pay small{color:#94a3b8;margin-right:2px}
+.sf-pay span{background:#fff;color:#0f172a;border-radius:7px;padding:3px 9px;font-weight:800;font-size:.75rem}
+.sf-base{margin-top:22px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;color:#94a3b8;font-size:.78rem}
+.sf-base b{color:#fff}
 .tools{position:sticky;top:69px;z-index:20;background:var(--bg);padding:12px 0 10px}
 .search{position:relative}
 .search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9ca3af}
@@ -191,12 +254,12 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .search input:focus{background:#fff;border-color:#9ca3af;box-shadow:0 0 0 4px rgba(17,24,39,.06)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 2px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:8px 14px;font-size:.85rem;font-weight:500;cursor:pointer;white-space:nowrap}
+.chip{flex:0 0 auto;border:1px solid var(--soft);background:var(--soft);color:#374151;border-radius:12px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap}
 .chip.active{background:var(--brand);border-color:var(--brand);color:#fff}
 .ptoggle{display:inline-flex;background:var(--soft);border-radius:999px;padding:4px;margin-top:10px}
 .ptoggle button{border:0;background:transparent;border-radius:999px;padding:7px 16px;font-size:.85rem;font-weight:700;color:var(--muted)}
 .ptoggle button.on{background:var(--brand);color:#fff}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px;padding:8px 0 120px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px;padding:0 0 8px}
 @media(min-width:640px){.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px 16px}}
 @media(min-width:960px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .card-x{position:relative;cursor:pointer;min-width:0}
@@ -206,14 +269,15 @@ body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,A
 .ph .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.4rem;font-weight:800;color:rgba(17,24,39,.35)}
 .badge-x{position:absolute;z-index:2;top:10px;left:10px;background:#fff;border-radius:999px;font-size:.72rem;font-weight:600;padding:4px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .badge-x.av{color:#047857}
-.add{position:absolute;z-index:3;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:#fff;color:var(--ink);box-shadow:0 4px 12px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
+.add{position:absolute;z-index:3;right:10px;bottom:10px;width:38px;height:38px;border-radius:999px;border:0;background:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-size:1.25rem}
 .add .n{font-size:.8rem;font-weight:700}
-.card-x.has .add{background:var(--brand);color:#fff}
-.card-x .nm{font-size:.95rem;font-weight:600;margin:10px 0 2px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.card-x.has .add{background:var(--brand-dark);color:#fff}
+.card-x .pr{font-size:1.02rem;font-weight:800;margin-top:10px;color:var(--brand);font-variant-numeric:tabular-nums}
+.card-x .pr small{font-weight:600;color:var(--muted);font-size:.78rem}
+.card-x .nm{font-size:.92rem;font-weight:600;margin:1px 0 1px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .card-x .ct{font-size:.8rem;color:var(--muted)}
-.card-x .pr{font-size:.95rem;font-weight:700;margin-top:2px}
-.card-x .pr small{font-weight:500;color:var(--muted)}
 .card-x.out{cursor:default}
+.card-x.out .ph img{filter:grayscale(.85)}
 .card-x.out .ph::after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.55)}
 .card-x.out .badge-x{z-index:2;background:var(--ink);color:#fff}
 .empty{text-align:center;color:var(--muted);padding:60px 16px}
@@ -286,7 +350,6 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 .ord-row .os.s-ready,.ord-row .os.s-completed{background:#ecfdf5;color:#047857}
 .ord-row .os.s-rejected,.ord-row .os.s-cancelled{background:#fef2f2;color:#991b1b}
 .ord-row .bi-chevron-right{color:#9ca3af}
-.foot{color:var(--muted);font-size:.75rem;text-align:center;padding:24px 0 100px}
 </style>
 </head>
 <body>
@@ -299,11 +362,14 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     <?php endif; ?>
     <div class="min-w-0">
       <h1><?= $e($companyName) ?></h1>
-      <?php if ($ctx): ?><small><?= $e($shop['warehouse_name']) ?></small><?php endif; ?>
+      <?php if ($action === 'track' && $branch !== ''): ?><small><?= $e($branch) ?></small><?php endif; ?>
     </div>
     <div class="tb-actions">
+      <?php if ($waNumber !== ''): ?>
+      <a class="tb-btn wa" href="https://wa.me/<?= $e($waNumber) ?>" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+      <?php endif; ?>
       <?php if ($ctx && $shop['phone'] !== ''): ?>
-      <a class="tb-btn" href="tel:<?= $e(preg_replace('/[^0-9+]/', '', $shop['phone'])) ?>" aria-label="<?= $e(t('Call the shop')) ?>" title="<?= $e(t('Call the shop')) ?>"><i class="bi bi-telephone"></i></a>
+      <a class="tb-btn" href="tel:<?= $e($telHref) ?>" aria-label="<?= $e(t('Call the shop')) ?>" title="<?= $e(t('Call the shop')) ?>"><i class="bi bi-telephone"></i></a>
       <?php endif; ?>
       <?php if (!$notFound): ?>
       <button type="button" class="tb-btn d-none" id="myOrdersBtn" aria-label="<?= $e(t('My orders')) ?>" title="<?= $e(t('My orders')) ?>"><i class="bi bi-receipt"></i><span class="tb-badge d-none" id="myOrdersCnt">0</span></button>
@@ -394,12 +460,29 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
 </main>
 
 <?php else: ?>
-<main class="wrap">
-  <section class="hero">
-    <h2><?= $e(t('Our products')) ?></h2>
+<section class="banner">
+  <div class="wrap">
+    <div class="bn-row">
+      <?php if ($logoUrl !== ''): ?>
+        <img class="bn-logo" src="<?= $e($logoUrl) ?>" alt="">
+      <?php else: ?>
+        <div class="bn-logo"><?= $e(mb_strtoupper(mb_substr($companyName, 0, 1))) ?></div>
+      <?php endif; ?>
+      <div class="min-w-0">
+        <h2><?= $e($companyName) ?></h2>
+        <?php if ($branch !== '' || $place !== ''): ?>
+        <p class="bn-sub">
+          <?php if ($branch !== ''): ?><span><i class="bi bi-shop"></i><?= $e($branch) ?></span><?php endif; ?>
+          <?php if ($place !== ''): ?><span><i class="bi bi-geo-alt"></i><?= $e($place) ?></span><?php endif; ?>
+        </p>
+        <?php endif; ?>
+      </div>
+    </div>
     <?php if ($canOrder): ?>
-      <?php if ($shop['pickup']): ?><span class="pill ok"><i class="bi bi-bag"></i><?= $e(t('Order now, pick up at the shop')) ?></span><?php endif; ?>
-      <?php if ($shop['delivery']): ?><span class="pill ok"><i class="bi bi-truck"></i><?= $e(t('Delivery available')) ?></span><?php endif; ?>
+      <div class="bn-facts">
+        <?php if ($shop['pickup']): ?><span class="pill"><i class="bi bi-bag"></i><?= $e(t('Order now, pick up at the shop')) ?></span><?php endif; ?>
+        <?php if ($shop['delivery']): ?><span class="pill"><i class="bi bi-truck"></i><?= $e(t('Delivery available')) ?></span><?php endif; ?>
+      </div>
     <?php else: ?>
       <div class="notice info"><i class="bi bi-info-circle me-1"></i><?= $e(t('Online ordering is not available right now. Please call or visit the shop.')) ?></div>
     <?php endif; ?>
@@ -409,18 +492,65 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
         <button type="button" data-pt="wholesale"><?= $e(t('Wholesale')) ?></button>
       </div></div>
     <?php endif; ?>
-  </section>
-
+  </div>
+</section>
+<main class="wrap">
   <div class="tools">
     <div class="search"><i class="bi bi-search"></i><input id="q" type="search" autocomplete="off" maxlength="60" placeholder="<?= $e(t('Search products…')) ?>" aria-label="<?= $e(t('Search')) ?>"></div>
     <div class="chips" id="chips" role="tablist"></div>
   </div>
 
+  <section id="popWrap" class="d-none" aria-labelledby="popTitle">
+    <div class="sec-h"><h3 id="popTitle"><?= $e(t('Popular')) ?></h3></div>
+    <div class="pop-row" id="popRow"></div>
+  </section>
+  <?php if ($catalog['items']): ?><div class="sec-h" id="allHead"><h3><?= $e(t('All products')) ?></h3></div><?php endif; ?>
   <div id="grid" class="grid" aria-live="polite"></div>
   <div id="none" class="empty d-none"><i class="bi bi-search"></i><?= $e(t('Nothing matches your search.')) ?></div>
   <?php if (!$catalog['items']): ?><div class="empty"><i class="bi bi-box-seam"></i><?= $e(t('No products are online right now.')) ?></div><?php endif; ?>
-  <div class="foot"><?= $e(t('Prices are set by the shop. Nothing is charged online — you pay the shop.')) ?></div>
 </main>
+
+<footer class="sfoot<?= $canOrder ? ' with-bar' : '' ?>">
+  <div class="wrap">
+    <div class="sf-cols">
+      <div>
+        <h4><?= $e(t('Visit us')) ?></h4>
+        <p><?= $e($shop['warehouse_name']) ?></p>
+        <?php if ($addrLine !== ''): ?><p><?= $e($addrLine) ?></p><?php endif; ?>
+        <div class="sf-btns"><button type="button" class="sf-btn" id="shareBtn"><i class="bi bi-share"></i><span><?= $e(t('Share this shop')) ?></span></button></div>
+      </div>
+      <?php if ($shop['phone'] !== ''): ?>
+      <div>
+        <h4><?= $e(t('Talk to us')) ?></h4>
+        <p><?= $e(sprintf(t('Phone: %s'), $shop['phone'])) ?></p>
+        <div class="sf-btns">
+          <?php if ($waNumber !== ''): ?><a class="sf-btn wa" href="https://wa.me/<?= $e($waNumber) ?>" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i>WhatsApp</a><?php endif; ?>
+          <a class="sf-btn" href="tel:<?= $e($telHref) ?>"><i class="bi bi-telephone"></i><?= $e(t('Call')) ?></a>
+        </div>
+      </div>
+      <?php endif; ?>
+      <div>
+        <h4><?= $e(t('How ordering works')) ?></h4>
+        <?php if ($canOrder): ?>
+        <ol>
+          <li><?= $e(t('Add what you need to your order.')) ?></li>
+          <li><?= $e(t('Send it. The shop confirms your order.')) ?></li>
+          <li><?= $e($shop['pickup'] && $shop['delivery'] ? t('Collect it, or get it delivered, and pay then.') : ($shop['delivery'] ? t('Get it delivered and pay on delivery.') : t('Collect it at the shop and pay then.'))) ?></li>
+        </ol>
+        <?php else: ?>
+        <p><?= $e(t('Call or visit the shop to buy.')) ?></p>
+        <?php endif; ?>
+        <?php if ($payNames): ?>
+        <div class="sf-pay"><small><?= $e(t('Pay with')) ?></small><?php foreach ($payNames as $pn): ?><span><?= $e($pn) ?></span><?php endforeach; ?></div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="sf-base">
+      <span><?= $e(t('Online shop by')) ?> <b><?= $e($companyName) ?></b></span>
+      <span>Powered by BJP Technologies © <?= date('Y') ?>, All Rights Reserved.</span>
+    </div>
+  </div>
+</footer>
 
 <?php if ($canOrder): ?>
 <div class="bar d-none" id="bar"><button type="button" id="barBtn"><span class="cnt" id="barCnt">0</span><span><?= $e(t('View order')) ?></span><span class="tot" id="barTot"></span></button></div>
@@ -599,18 +729,21 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
   var ITEMS = <?= json_encode($catalog['items'], $jsonOpts) ?>;
   var CATS  = <?= json_encode((object)$catalog['categories'], $jsonOpts) ?>;
   var CAN_ORDER = <?= $canOrder ? 'true' : 'false' ?>;
+  var POPULAR = <?= json_encode(array_values($popular)) ?>;
+  var SHARE_URL = <?= json_encode($shopUrl, $jsonOpts) ?>;
   var HAS_WS = <?= $catalog['has_wholesale'] ? 'true' : 'false' ?>;
   var PICKUP = <?= $shop['pickup'] ? 'true' : 'false' ?>, DELIVERY = <?= $shop['delivery'] ? 'true' : 'false' ?>;
   var ORDER_URL = <?= json_encode(getUrl('s/' . $ctx['token'] . '/order') . ($lang !== 'en' ? '?lang=' . $lang : ''), $jsonOpts) ?>;
   var FORM_TOKEN = <?= json_encode($canOrder ? roFormToken($pdo, $ctx['token']) : '') ?>;
   var STORE_KEY = 'bms_shop_' + <?= json_encode(substr(hash('sha256', $ctx['token']), 0, 16)) ?>;
   var T = <?= json_encode([
-      'all' => t('All'), 'soldOut' => t('Sold out'), 'available' => t('Available'), 'add' => t('Add'), 'addFor' => t('Add · %s'),
+      'all' => t('All'), 'soldOut' => t('Sold out'), 'add' => t('Add'), 'addFor' => t('Add · %s'),
       'remove' => t('Remove'), 'sending' => t('Sending…'), 'send' => t('Send order'), 'offline' => t('No connection. Please check your internet and try again.'),
       'empty' => t('Your order is empty.'), 'name' => t('Please enter your name.'), 'phone' => t('Please enter a valid phone number.'),
       'addr' => t('Please enter the delivery address or area.'), 'whole' => t('%s is sold in whole numbers.'), 'qty' => t('Enter a quantity.'),
       'per' => t('per %s'), 'howPick' => t('The shop confirms your order. You pay when you collect it.'),
       'howDel' => t('The shop confirms your order and calls you about the delivery fee. You pay on delivery.'), 'ws' => t('Wholesale'),
+      'isNew' => t('New'), 'copied' => t('Link copied'),
   ], $jsonOpts) ?>;
 
   var byId = {}; ITEMS.forEach(function (it) { byId[it.id] = it; });
@@ -659,6 +792,53 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     Object.keys(CATS).forEach(function (k) { if (ITEMS.some(function (i) { return i.category_id === Number(k); })) chip(Number(k), CATS[k]); });
   }
   var grid = document.getElementById('grid');
+  // One product card — used by the grid and by the Popular row (rank = 1, 2, … or 0).
+  function buildCard(it, rank) {
+    var n = qtyOf(it.id);
+    var c = el('div', 'card-x' + (it.sold_out ? ' out' : '') + (n ? ' has' : ''));
+    var ph = el('div', 'ph');
+    if (it.image) { var img = el('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.addEventListener('error', function () { img.remove(); ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }); ph.appendChild(img); }
+    else { ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }
+    // A label only when it tells the buyer something: Sold out, or New. Never a stock number.
+    if (it.sold_out) ph.appendChild(el('span', 'badge-x', T.soldOut));
+    else if (rank) ph.appendChild(el('span', 'rank', '#' + rank));
+    else if (it.is_new) ph.appendChild(el('span', 'badge-x new', T.isNew));
+    if (CAN_ORDER && !it.sold_out) {
+      if (n && !it.decimal) {
+        var sp = el('div', 'stepper');
+        var mi = el('button'); mi.type = 'button'; mi.setAttribute('aria-label', T.remove + ' ' + it.name); mi.appendChild(el('i', 'bi ' + (n <= 1 ? 'bi-trash3' : 'bi-dash')));
+        var pl = el('button'); pl.type = 'button'; pl.setAttribute('aria-label', T.add + ' ' + it.name); pl.appendChild(el('i', 'bi bi-plus'));
+        mi.addEventListener('click', function (ev) { ev.stopPropagation(); changeLine(it.id, -1); });
+        pl.addEventListener('click', function (ev) { ev.stopPropagation(); addLine(it.id, 1); });
+        sp.appendChild(mi); sp.appendChild(el('span', '', qtyText(n))); sp.appendChild(pl);
+        sp.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        ph.appendChild(sp);
+      } else {
+        var a = el('button', 'add'); a.type = 'button'; a.setAttribute('aria-label', T.add + ' ' + it.name);
+        if (n) a.appendChild(el('span', 'n', qtyText(n))); else a.appendChild(el('i', 'bi bi-plus-lg'));
+        a.addEventListener('click', function (ev) { ev.stopPropagation(); if (it.decimal) openItem(it); else addLine(it.id, 1); });
+        ph.appendChild(a);
+      }
+    }
+    c.appendChild(ph);
+    var pr = el('div', 'pr', money(priceOf(it)));
+    if (it.decimal && it.unit) pr.appendChild(el('small', '', ' ' + fmt(T.per, it.unit)));
+    c.appendChild(pr);
+    c.appendChild(el('div', 'nm', it.name));
+    var sub = it.desc || CATS[it.category_id] || '';
+    if (sub) c.appendChild(el('div', 'ds', sub));
+    if (!it.sold_out) c.addEventListener('click', function () { openItem(it); });
+    return c;
+  }
+  var popWrap = document.getElementById('popWrap'), popRow = document.getElementById('popRow');
+  function renderPopular() {
+    if (!popWrap) return;
+    var list = POPULAR.map(function (id) { return byId[id]; }).filter(function (it) { return it && !it.sold_out; });
+    var on = list.length >= 3 && !state.cat && !state.q;
+    popWrap.classList.toggle('d-none', !on);
+    popRow.textContent = '';
+    if (on) list.forEach(function (it, i) { popRow.appendChild(buildCard(it, i + 1)); });
+  }
   function renderGrid() {
     grid.textContent = '';
     var q = state.q.toLowerCase(), shown = 0;
@@ -666,28 +846,10 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
       if (state.cat && it.category_id !== state.cat) return;
       if (q && it.name.toLowerCase().indexOf(q) < 0 && String(CATS[it.category_id] || '').toLowerCase().indexOf(q) < 0) return;
       shown++;
-      var c = el('div', 'card-x' + (it.sold_out ? ' out' : '') + (qtyOf(it.id) ? ' has' : ''));
-      var ph = el('div', 'ph');
-      if (it.image) { var img = el('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.addEventListener('error', function () { img.remove(); ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }); ph.appendChild(img); }
-      else { ph.appendChild(el('div', 'ini', it.name.charAt(0).toUpperCase())); }
-      ph.appendChild(el('span', 'badge-x' + (it.sold_out ? '' : ' av'), it.sold_out ? T.soldOut : T.available));
-      if (CAN_ORDER && !it.sold_out) {
-        var a = el('button', 'add'); a.type = 'button'; a.setAttribute('aria-label', T.add + ' ' + it.name);
-        var n = qtyOf(it.id);
-        if (n) a.appendChild(el('span', 'n', qtyText(n))); else a.appendChild(el('i', 'bi bi-plus-lg'));
-        a.addEventListener('click', function (ev) { ev.stopPropagation(); if (it.decimal) openItem(it); else addLine(it.id, 1); });
-        ph.appendChild(a);
-      }
-      c.appendChild(ph);
-      c.appendChild(el('div', 'nm', it.name));
-      if (CATS[it.category_id]) c.appendChild(el('div', 'ct', CATS[it.category_id]));
-      var pr = el('div', 'pr', money(priceOf(it)));
-      if (it.decimal && it.unit) pr.appendChild(el('small', '', ' ' + fmt(T.per, it.unit)));
-      c.appendChild(pr);
-      if (!it.sold_out) c.addEventListener('click', function () { openItem(it); });
-      grid.appendChild(c);
+      grid.appendChild(buildCard(it, 0));
     });
     document.getElementById('none').classList.toggle('d-none', shown > 0 || !ITEMS.length);
+    renderPopular();
   }
   var qIn = document.getElementById('q');
   qIn.addEventListener('input', function () { state.q = qIn.value.trim(); renderGrid(); });
@@ -710,8 +872,9 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     top.appendChild(el('div', 'hint', CATS[it.category_id] || ''));
     var p = el('div', 'fw-bold fs-5', money(priceOf(it))); if (it.decimal && it.unit) p.appendChild(el('small', 'hint', ' ' + fmt(T.per, it.unit)));
     top.appendChild(p); body.appendChild(top);
+    if (it.desc) body.appendChild(el('p', 'mt-2 mb-0', it.desc));
     if (it.wholesale) body.appendChild(el('div', 'hint mt-1', T.ws + ': ' + money(it.wholesale)));
-    body.appendChild(el('div', 'hint mt-2', it.sold_out ? T.soldOut : T.available));
+    if (it.sold_out) body.appendChild(el('div', 'hint mt-2', T.soldOut));
     if (CAN_ORDER) { document.getElementById('isQty').value = it.decimal ? '1' : '1'; isErr(''); paintAdd(); }
     show(document.getElementById('itemSheet'));
   }
@@ -739,6 +902,16 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
     var same = cart.filter(function (l) { return l.id === id; })[0];
     if (same) same.qty = Math.min(999, Math.round((Number(same.qty) + qty) * 1000) / 1000); else cart.push({ id: id, qty: qty });
     if (cart.length > 30) cart.pop();
+    save(); renderGrid(); paintBar();
+  }
+  // The card's − button: one less; the line goes when it reaches nothing.
+  function changeLine(id, delta) {
+    for (var i = 0; i < cart.length; i++) {
+      if (cart[i].id !== id) continue;
+      var q = Math.round((Number(cart[i].qty) + delta) * 1000) / 1000;
+      if (q <= 0) cart.splice(i, 1); else cart[i].qty = q;
+      break;
+    }
     save(); renderGrid(); paintBar();
   }
 
@@ -825,6 +998,15 @@ label.lb{font-size:.85rem;font-weight:600;margin:14px 0 6px;display:block}
         .then(function () { sending = false; btn.disabled = false; btn.textContent = T.send; });
     });
   }
+
+  // Share this shop: the phone's share sheet when there is one, otherwise copy the link.
+  var shareBtn = document.getElementById('shareBtn');
+  if (shareBtn) shareBtn.addEventListener('click', function () {
+    var url = new URL(SHARE_URL, window.location.href).href, label = shareBtn.querySelector('span');
+    if (navigator.share) { navigator.share({ title: document.title, url: url }).catch(function () {}); return; }
+    var done = function () { var old = label.textContent; label.textContent = T.copied; setTimeout(function () { label.textContent = old; }, 2000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(function () {});
+  });
 
   renderChips(); renderGrid(); paintBar();
 <?php endif; ?>
