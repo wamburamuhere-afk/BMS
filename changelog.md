@@ -7,6 +7,7 @@
 - The Actions button is now the same everywhere: small outlined box on the right with the gear icon and triangle, no "Actions" text. Applied to Products, Shops/Warehouses and Expenses (shared phone cards), Services, Categories, Customers, Suppliers and the "who owes me" credit customers list.
 - Products and Services phone cards: the button row became the gear menu (View, Edit, Hide/Delete as before, same permissions); desktop card view keeps its buttons.
 - Categories: phone cards now use the gear menu with all its options; the desktop gear lost its "Actions" text and uses the same outline style.
+- **Suppliers fix:** on phones the Actions menu opened underneath the cards below it (the card lifts on touch and becomes its own layer). While a menu is open the card no longer lifts and sits above its neighbours, so every option shows. Other pages with a gear menu were checked and don't lift cards.
 - **Checked:** PHP/JS syntax; credit aging, customer and supplier CRUD tests pass. Not yet clicked through on a phone.
 
 ## 2026-11-07 — feat(restaurant): Waiter → Cashier → Kitchen → Waiter → Bill order flow
