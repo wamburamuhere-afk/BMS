@@ -1694,6 +1694,11 @@ function calculateChange() {
 }
 
 function processPayment() {
+    // restaurant_order_flow_plan.md — a waiter never takes money (the server refuses too).
+    if (POS_FLOW.on && !POS_FLOW.pay) {
+        Swal.fire({ icon: 'info', title: ROF_T.cashierPays });
+        return;
+    }
     if (cart.length === 0) {
         Swal.fire({
             icon: 'warning',
@@ -2020,6 +2025,8 @@ function submitPayment(paymentData) {
                 resp = JSON.parse(xhr.responseText);
                 if (resp && resp.message) msg = resp.message;
             } catch (e) {}
+            // restaurant_order_flow_plan.md — food not served yet / cooked food left off the bill (HTTP 409).
+            if (resp && typeof rofHandlePayError === 'function' && rofHandlePayError(resp, paymentData)) return;
             // process_sale answers a blocked credit sale with HTTP 409, which lands
             // here rather than in success: — offer the manager override from here too.
             if (resp && resp.error_code === 'credit_limit_exceeded' && resp.can_override) {
@@ -2171,7 +2178,8 @@ function applyPosModeUi() {
         $('#sendToKitchenBtn').toggleClass('d-none', !currentTableId || POS_KITCHEN_MODE === 'none');
         // Order types switched off in Selling Settings are not offered.
         ['take_away', 'delivery'].forEach(function (t) {
-            const on = POS_ORDER_TYPES.indexOf(t) > -1;
+            // restaurant_order_flow_plan.md — take-away / delivery are paid first: not offered to a waiter (no Pay).
+            const on = POS_ORDER_TYPES.indexOf(t) > -1 && (!POS_FLOW.on || POS_FLOW.pay);
             $(`input[name="rsOrderType"][value="${t}"]`).toggleClass('d-none', !on).next('label').toggleClass('d-none', !on);
         });
     }
@@ -2190,6 +2198,7 @@ function clearTableSelection() {
     rsSplit = null;
     $('#rsSplitNote').addClass('d-none');
     $('#rsSplitBtn').removeClass('d-none');
+    if (typeof rofHideStrip === 'function') rofHideStrip();
 }
 
 // restaurant_plan.md Phase 2 — Dine in / Take away / Delivery.
@@ -2344,19 +2353,24 @@ function saveOrderToTable() {
     const btn = $('#rsSaveTableBtn'); const orig = btn.html();
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
     const label = currentTableLabel;
-    $.ajax({
+    const payload = {
+        reference: PT.tableLabel + ' ' + label,
+        customer_id: $('#customerSelect').val() || null,
+        items: cart,
+        subtotal: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
+        tax: cart.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
+        warehouse_id: parseInt($('#posWarehouseId').val(), 10),
+        table_id: currentTableId,
+        loaded_hold_id: currentHoldId || null   // online orders: lets the server keep lines accepted since this was loaded
+    };
+    const doSave = function () { $.ajax({
         url: '<?= buildUrl('/api/pos/hold_sale.php') ?>', type: 'POST', contentType: 'application/json', dataType: 'json',
-        data: JSON.stringify({
-            reference: PT.tableLabel + ' ' + label,
-            customer_id: $('#customerSelect').val() || null,
-            items: cart,
-            subtotal: cart.reduce((s, i) => s + (i.price * i.quantity), 0),
-            tax: cart.reduce((s, i) => s + (i.discounted_price * i.quantity) * ((parseFloat(i.tax_rate) || 0) / 100), 0),
-            warehouse_id: parseInt($('#posWarehouseId').val(), 10),
-            table_id: currentTableId,
-            loaded_hold_id: currentHoldId || null   // online orders: lets the server keep lines accepted since this was loaded
-        }),
+        data: JSON.stringify(payload),
         success: function (res) {
+            if (!res.success && res.error_code === 'cancel_needs_reason') {   // restaurant_order_flow_plan.md — cooked food removed
+                rofAskReason(res.message).then(r => { if (r) { payload.cancel_reason = r; btn.prop('disabled', true); doSave(); } });
+                return;
+            }
             if (!res.success) { Swal.fire({ icon: 'error', title: PT.error, text: res.message }); return; }
             cart = [];
             updateCartDisplay();
@@ -2367,7 +2381,8 @@ function saveOrderToTable() {
         },
         error: () => Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError }),
         complete: () => btn.prop('disabled', false).html(orig)
-    });
+    }); };
+    doSave();
 }
 
 function openTablePicker() {
@@ -2461,6 +2476,7 @@ function selectTable(tableId, warehouseId, tableNumber) {
         $('#rsSplitRow').removeClass('d-none');
         // A table becomes occupied when its order is saved (hold_sale.php) — not merely by being
         // opened, which left tables stuck "occupied" with no order and disagreeing with the board.
+        rofLoadStrip();   // restaurant_order_flow_plan.md — what the kitchen has for this table
     }).fail(function () {
         Swal.fire({ icon: 'error', title: PT.error, text: PT.serverError });
     });
@@ -2503,7 +2519,7 @@ function sendCurrentOrderToKitchen() {
         loaded_hold_id: currentHoldId || null   // online orders: lets the server keep lines accepted since this was loaded
     };
 
-    $.ajax({
+    const doHold = function () { $.ajax({
         url: '<?= buildUrl('/api/pos/hold_sale.php') ?>',
         type: 'POST',
         data: JSON.stringify(holdData),
@@ -2511,33 +2527,295 @@ function sendCurrentOrderToKitchen() {
         dataType: 'json',
         success: function (holdRes) {
             if (!holdRes.success) {
+                if (holdRes.error_code === 'cancel_needs_reason') {   // a cooked dish was removed: the cashier says why
+                    rofAskReason(holdRes.message).then(r => {
+                        if (r) { holdData.cancel_reason = r; doHold(); }
+                        else { if (slipWin) slipWin.close(); btn.prop('disabled', false).html(origHtml); }
+                    });
+                    return;
+                }
+                if (slipWin) slipWin.close();
                 Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: holdRes.message });
                 btn.prop('disabled', false).html(origHtml);
                 return;
             }
             currentHoldId = holdRes.hold_id;
-            $.post('<?= buildUrl('api/restaurant/send_to_kitchen.php') ?>', {
-                hold_id: currentHoldId, warehouse_id: wid, _csrf: <?= json_encode(csrf_token()) ?>
-            }, function (res) {
-                if (res.success) {
-                    if (POS_KITCHEN_MODE === 'printer') openKitchenSlip({ hold_id: currentHoldId, warehouse_id: wid }, slipWin);
-                    Swal.fire({ icon: 'success', title: PT.sentToKitchen, timer: 1500, showConfirmButton: false });
-                } else {
+            // restaurant_order_flow_plan.md — only what the kitchen does not have yet is sent; in the team
+            // flow a waiter's order waits for the cashier; removing cooked food asks the cashier for a reason.
+            const doSend = function (reason) {
+                $.post('<?= buildUrl('api/restaurant/send_to_kitchen.php') ?>', {
+                    hold_id: currentHoldId, warehouse_id: wid, reason: reason || '', _csrf: <?= json_encode(csrf_token()) ?>
+                }, function (res) {
+                    if (res.success) {
+                        const printNow = POS_KITCHEN_MODE === 'printer' && res.status === 'queued' && (res.ticket_ids || []).length;
+                        if (printNow) openKitchenSlip({ ticket_ids: res.ticket_ids.join(','), warehouse_id: wid }, slipWin);
+                        else if (slipWin) slipWin.close();
+                        if (res.nothing_new) Swal.fire({ icon: 'info', title: res.message, timer: 1800, showConfirmButton: false });
+                        else Swal.fire({ icon: 'success', title: res.status === 'pending' ? ROF_T.sentToCashier : PT.sentToKitchen, timer: 1600, showConfirmButton: false });
+                        rofLoadStrip();
+                    } else if (res.error_code === 'cancel_needs_reason') {
+                        if (slipWin) slipWin.close();
+                        rofAskReason(res.message).then(r => { if (r) doSend(r); });
+                    } else {
+                        if (slipWin) slipWin.close();
+                        Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: res.message });
+                        rofLoadStrip();
+                    }
+                }, 'json').fail(function () {
                     if (slipWin) slipWin.close();
-                    Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: res.message });
-                }
-            }, 'json').fail(function () {
-                Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: PT.serverError });
-            }).always(function () {
-                btn.prop('disabled', false).html(origHtml);
-            });
+                    Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: PT.serverError });
+                }).always(function () {
+                    btn.prop('disabled', false).html(origHtml);
+                });
+            };
+            doSend('');
         },
         error: function () {
+            if (slipWin) slipWin.close();
             Swal.fire({ icon: 'error', title: PT.sendToKitchenFailed, text: PT.serverError });
             btn.prop('disabled', false).html(origHtml);
         }
+    }); };
+    doHold();
+}
+
+// ───────────── restaurant_order_flow_plan.md — Waiter → Cashier → Kitchen → Waiter → Bill ─────────────
+const ROF_T = {
+    cashierPays: <?= json_encode(t('The cashier takes payment. Save the order to its table and send it.')) ?>,
+    sentToCashier: <?= json_encode(t('Sent to the cashier to confirm.')) ?>,
+    reasonTitle: <?= json_encode(t('Why is it cancelled?')) ?>,
+    reasonPh: <?= json_encode(t('e.g. customer changed their mind')) ?>,
+    reasonNeeded: <?= json_encode(t('Write a short reason.')) ?>,
+    ok: <?= json_encode(t('OK')) ?>, cancel: <?= json_encode(t('Cancel')) ?>, error: <?= json_encode(t('Error')) ?>,
+    status: {
+        pending: <?= json_encode(t('Waiting for cashier')) ?>, queued: <?= json_encode(t('In the kitchen')) ?>,
+        preparing: <?= json_encode(t('Cooking')) ?>, ready: <?= json_encode(t('Ready')) ?>, served: <?= json_encode(t('Served')) ?>
+    },
+    received: <?= json_encode(t('Received')) ?>,
+    cancelLineQ: <?= json_encode(t('Cancel %s?')) ?>,
+    cancelLineStarted: <?= json_encode(t('The kitchen has already started. It will be recorded as waste.')) ?>,
+    cancelOrderQ: <?= json_encode(t('Cancel this table\'s whole order?')) ?>,
+    cancelOrderNote: <?= json_encode(t('Food not started is simply cancelled. Food already cooked is recorded as waste. The table becomes free.')) ?>,
+    yesCancel: <?= json_encode(t('Yes, cancel')) ?>,
+    noOrders: <?= json_encode(t('No orders are waiting.')) ?>,
+    confirm: <?= json_encode(t('Confirm to kitchen')) ?>,
+    giveBack: <?= json_encode(t('Return to waiter')) ?>,
+    returnTitle: <?= json_encode(t('Why are you returning this order?')) ?>,
+    returnPh: <?= json_encode(t('e.g. out of chips today')) ?>,
+    by: <?= json_encode(t('by')) ?>, min: <?= json_encode(t('min')) ?>,
+    notServed: <?= json_encode(t('Food not served yet')) ?>,
+    markServedPay: <?= json_encode(t('Mark all served and pay')) ?>,
+};
+let rofStripTimer = null;
+const rofUrl = <?= json_encode(buildUrl('api/restaurant/order_flow.php')) ?>;
+const rofCsrf = <?= json_encode(csrf_token()) ?>;
+const rofWid = () => parseInt($('#posWarehouseId').val() || 0, 10);
+const rofQty = q => (Math.round(parseFloat(q) * 1000) / 1000).toString();
+
+/** A short reason, asked with SweetAlert. Resolves the reason, or null when backed out. */
+function rofAskReason(text, title, placeholder) {
+    return Swal.fire({
+        icon: 'warning', title: title || ROF_T.reasonTitle, text: text || '', input: 'text',
+        inputPlaceholder: placeholder || ROF_T.reasonPh, inputAttributes: { maxlength: 200 },
+        showCancelButton: true, confirmButtonText: ROF_T.ok, cancelButtonText: ROF_T.cancel, confirmButtonColor: '#0d6efd',
+        inputValidator: v => (!v || !v.trim()) ? ROF_T.reasonNeeded : null
+    }).then(r => (r.isConfirmed ? r.value.trim() : null));
+}
+
+function rofHideStrip() {
+    if (rofStripTimer) { clearInterval(rofStripTimer); rofStripTimer = null; }
+    $('#rofStrip').addClass('d-none'); $('#rofStripLines').empty(); $('#rofCancelOrderBtn').addClass('d-none');
+}
+
+function rofMayCancel(l, R) {
+    const started = ['preparing', 'ready', 'served'].indexOf(l.status) > -1;
+    if (!R.confirm_required) return R.take;
+    if (started) return R.approve_cancel;
+    return R.cancel_unstarted || (l.status === 'pending' && l.mine);
+}
+
+/** The open table's kitchen lines: status, Received (ready food), ✕ cancel. Refreshes every 15 s. */
+function rofLoadStrip() {
+    if (!POS_FLOW.on || POS_FLOW.kitchen_mode === 'none' || !currentTableId) { rofHideStrip(); return; }
+    const tid = currentTableId;
+    $.getJSON(rofUrl, { action: 'view', warehouse_id: rofWid(), table_id: tid }, function (res) {
+        if (currentTableId !== tid) return;
+        if (!res.success) { rofHideStrip(); return; }
+        const R = res.rights || POS_FLOW;
+        let html = '';
+        (res.lines || []).forEach(l => {
+            const recv = (l.status === 'ready' && R.take)
+                ? `<button type="button" class="rof-btn" onclick="rofReceived(${l.ticket_id})"><i class="bi bi-check2 me-1"></i>${ROF_T.received}</button>` : '';
+            const x = rofMayCancel(l, R)
+                ? `<button type="button" class="rof-btn rof-btn-x" title="${safeOutput(ROF_T.cancel)}" onclick='rofCancelLine(${l.item_id}, ${JSON.stringify(l.name)}, ${l.qty}, ${JSON.stringify(l.status)})'><i class="bi bi-x-lg"></i></button>` : '';
+            html += `<div class="rof-line"><div class="rof-name"><b>${rofQty(l.qty)} ×</b> ${safeOutput(caseFormatJs(l.name))}${l.note ? `<div class="rof-note">${safeOutput(l.note)}</div>` : ''}</div>
+                <span class="rof-chip rof-chip-${l.status}">${ROF_T.status[l.status] || l.status}</span>${recv}${x}</div>`;
+        });
+        const canCancelOrder = !!currentHoldId && (R.confirm_required ? R.cancel_unstarted : R.take);
+        $('#rofCancelOrderBtn').toggleClass('d-none', !canCancelOrder);
+        $('#rofStripLines').html(html);
+        $('#rofStrip').toggleClass('d-none', !html && !canCancelOrder);
+    });
+    if (!rofStripTimer) rofStripTimer = setInterval(function () { if (!document.hidden && currentTableId) rofLoadStrip(); }, 15000);
+}
+
+function rofPost(data, done) {
+    $.post(rofUrl, Object.assign({ _csrf: rofCsrf }, data), function (res) { done(res); }, 'json')
+        .fail(() => Swal.fire({ icon: 'error', title: ROF_T.error, text: PT.serverError }));
+}
+
+function rofReceived(ticketId) {
+    rofPost({ action: 'received', ticket_id: ticketId }, function (res) {
+        if (res.success) Swal.fire({ toast: true, position: 'top', icon: 'success', title: res.message, timer: 1500, showConfirmButton: false });
+        else Swal.fire({ icon: 'error', title: ROF_T.error, text: res.message });
+        rofLoadStrip();
     });
 }
+
+/** Reload the table's saved order into the cart (the server changed it). */
+function rofReloadTable() {
+    if (!currentTableId) return;
+    selectTable(currentTableId, rofWid(), currentTableLabel);
+}
+
+function rofCancelLine(itemId, name, qty, status) {
+    const started = ['preparing', 'ready', 'served'].indexOf(status) > -1;
+    const go = function (reason) {
+        rofPost({ action: 'cancel_line', item_id: itemId, qty: qty, reason: reason || '' }, function (res) {
+            if (res.success) {
+                Swal.fire({ toast: true, position: 'top', icon: 'success', title: res.message, timer: 1800, showConfirmButton: false });
+                rofReloadTable();
+            } else if (res.error_code === 'cancel_needs_reason') {
+                rofAskReason(res.message).then(r => { if (r) go(r); });
+            } else {
+                Swal.fire({ icon: 'error', title: ROF_T.error, text: res.message });
+            }
+        });
+    };
+    const q = ROF_T.cancelLineQ.replace('%s', rofQty(qty) + ' × ' + caseFormatJs(name));
+    if (started && POS_FLOW.confirm_required) { rofAskReason(ROF_T.cancelLineStarted, q).then(r => { if (r) go(r); }); return; }
+    Swal.fire({ icon: 'warning', title: q, text: started ? ROF_T.cancelLineStarted : '', showCancelButton: true,
+        confirmButtonText: ROF_T.yesCancel, cancelButtonText: ROF_T.cancel, confirmButtonColor: '#dc3545' })
+        .then(r => { if (r.isConfirmed) go(''); });
+}
+
+function rofCancelOrder() {
+    if (!currentTableId) return;
+    const tid = currentTableId;
+    rofAskReason(ROF_T.cancelOrderNote, ROF_T.cancelOrderQ, ROF_T.reasonPh).then(reason => {
+        if (!reason) return;
+        rofPost({ action: 'cancel_order', warehouse_id: rofWid(), table_id: tid, reason: reason }, function (res) {
+            if (!res.success) { Swal.fire({ icon: 'error', title: ROF_T.error, text: res.message }); return; }
+            cart = []; updateCartDisplay(); clearCartStorage(); clearTableSelection(); setCustomerSelection('', '');
+            Swal.fire({ icon: 'success', title: res.message, timer: 1800, showConfirmButton: false });
+        });
+    });
+}
+
+// ── The cashier's waiting orders ──
+function rofPollCount() {
+    if (!(POS_FLOW.on && POS_FLOW.confirm_required && POS_FLOW.confirm)) return;
+    $.getJSON(rofUrl, { action: 'count' }, function (res) {
+        const n = res.success ? (res.count || 0) : 0;
+        $('#rofConfirmCount').text(n);
+        $('#rofConfirmBtn').toggleClass('d-none', n === 0 || !posRestaurantActive());
+    });
+}
+
+function rofOpenConfirm() {
+    if (!rofWid()) return;
+    $('#rofConfirmBody').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+    const m = bootstrap.Modal.getOrCreateInstance(document.getElementById('rofConfirmModal'));
+    m.show();
+    $.getJSON(rofUrl, { action: 'pending', warehouse_id: rofWid() }, function (res) {
+        if (!res.success) { $('#rofConfirmBody').html(`<div class="alert alert-danger mb-0">${safeOutput(res.message)}</div>`); return; }
+        if (!res.data.length) { $('#rofConfirmBody').html(`<div class="text-center text-muted py-4">${ROF_T.noOrders}</div>`); return; }
+        let html = '';
+        res.data.forEach(o => {
+            const items = o.items.map(i => `<div class="small"><b>${rofQty(i.qty)} ×</b> ${safeOutput(caseFormatJs(i.name))}${i.note ? ` <span class="text-muted">— ${safeOutput(i.note)}</span>` : ''}</div>`).join('');
+            const key = JSON.stringify({ table_id: o.table_id, hold_id: o.hold_id });
+            html += `<div class="rof-order">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                    <div><div class="fw-bold">${safeOutput(o.label)}</div>
+                    <div class="small text-muted">${o.waiter ? ROF_T.by + ' ' + safeOutput(o.waiter) + ' · ' : ''}${o.minutes} ${ROF_T.min}</div></div>
+                    <div class="fw-bold text-primary text-nowrap">${POS_CURRENCY} ${Number(o.value).toLocaleString()}</div>
+                </div>
+                ${items}
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-primary flex-fill" onclick='rofConfirmOrder(${key})'><i class="bi bi-check2-circle me-1"></i>${ROF_T.confirm}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick='rofReturnOrder(${key})'><i class="bi bi-arrow-return-left me-1"></i>${ROF_T.giveBack}</button>
+                </div></div>`;
+        });
+        $('#rofConfirmBody').html(html);
+    });
+}
+
+function rofConfirmOrder(k) {
+    const slipWin = POS_KITCHEN_MODE === 'printer' ? window.open('', '_blank', 'width=420,height=640') : null;
+    rofPost(Object.assign({ action: 'confirm', warehouse_id: rofWid() }, k.table_id ? { table_id: k.table_id } : { hold_id: k.hold_id }), function (res) {
+        if (res.success && slipWin && (res.ticket_ids || []).length) openKitchenSlip({ ticket_ids: res.ticket_ids.join(','), warehouse_id: rofWid() }, slipWin);
+        else if (slipWin) slipWin.close();
+        if (!res.success) Swal.fire({ icon: 'error', title: ROF_T.error, text: res.message });
+        else Swal.fire({ toast: true, position: 'top', icon: 'success', title: res.message, timer: 1600, showConfirmButton: false });
+        rofOpenConfirm(); rofPollCount(); rofLoadStrip();
+    });
+}
+
+function rofReturnOrder(k) {
+    rofAskReason('', ROF_T.returnTitle, ROF_T.returnPh).then(reason => {
+        if (!reason) return;
+        rofPost(Object.assign({ action: 'return', warehouse_id: rofWid(), reason: reason }, k.table_id ? { table_id: k.table_id } : { hold_id: k.hold_id }), function (res) {
+            if (!res.success) Swal.fire({ icon: 'error', title: ROF_T.error, text: res.message });
+            rofOpenConfirm(); rofPollCount(); rofLoadStrip();
+        });
+    });
+}
+
+/** Payment refused by the kitchen rules (HTTP 409). Returns true when handled here. */
+function rofHandlePayError(resp, paymentData) {
+    const restore = () => $('#processPaymentBtn').html(payButtonHtml()).prop('disabled', false);   // keeps the mode's label
+    if (resp.error_code === 'kitchen_not_served') {
+        if (resp.can_mark_served) {
+            Swal.fire({ icon: 'warning', title: ROF_T.notServed, text: resp.message, showCancelButton: true,
+                confirmButtonText: ROF_T.markServedPay, cancelButtonText: ROF_T.cancel, confirmButtonColor: '#0d6efd' })
+                .then(r => { if (r.isConfirmed) { paymentData.kitchen_served_ok = 1; submitPayment(paymentData); } else restore(); });
+        } else {
+            Swal.fire({ icon: 'info', title: ROF_T.notServed, text: resp.message });
+            restore();
+        }
+        return true;
+    }
+    if (resp.error_code === 'cancel_needs_reason') {
+        rofAskReason(resp.message).then(r => { if (r) { paymentData.cancel_reason = r; submitPayment(paymentData); } else restore(); });
+        return true;
+    }
+    if (resp.error_code === 'cancel_needs_approval' || resp.error_code === 'cancel_not_allowed') {
+        Swal.fire({ icon: 'error', title: ROF_T.error, text: resp.message });
+        restore();
+        return true;
+    }
+    return false;
+}
+
+$(function () {
+    if (!POS_FLOW.on) return;
+    // A waiter cannot take take-away / delivery money: those order types are the cashier's.
+    if (!POS_FLOW.pay) {
+        ['take_away', 'delivery'].forEach(function (t) {
+            $(`input[name="rsOrderType"][value="${t}"]`).addClass('d-none').next('label').addClass('d-none');
+        });
+    }
+    if (POS_FLOW.confirm_required && POS_FLOW.confirm) {
+        setTimeout(rofPollCount, 800);
+        setInterval(function () { if (!document.hidden) rofPollCount(); }, 20000);
+        // From the "order waiting for the cashier" notification: pos?confirm_orders=1
+        if (new URLSearchParams(location.search).get('confirm_orders') === '1') {
+            const open = function (n) { if (!rofWid() && n < 20) { setTimeout(function () { open(n + 1); }, 250); return; } rofOpenConfirm(); };
+            setTimeout(function () { open(0); }, 500);
+            if (typeof bmsCleanQuery === 'function') bmsCleanQuery(['confirm_orders']);
+        }
+    }
+});
 
 // ─────────────────────────── Modifier groups ───────────────────────────
 // Fetched once per page load (a small, company-wide catalog, same "load once,

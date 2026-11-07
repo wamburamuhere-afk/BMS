@@ -11,9 +11,9 @@ require_once __DIR__ . '/../../roots.php';
 if (isset($_SESSION['user_lang'])) {
     loadLanguage($_SESSION['user_lang']);
 }
-require_once __DIR__ . '/../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../core/restaurant_order_flow.php';
 
-if (!isAuthenticated() || !canView('restaurant_pos') || !canCreate('pos')) { http_response_code(403); exit(t('Permission denied')); }
+if (!isAuthenticated() || !canView('restaurant_pos') || !rofCanTake($pdo)) { http_response_code(403); exit(t('Permission denied')); }
 if (!restaurantSchemaReady($pdo)) { exit(t('Restaurant module is being set up for your account — please check back shortly.')); }
 
 global $pdo;
@@ -25,7 +25,25 @@ if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id) || !restaurantSho
 }
 
 $items = []; $label = ''; $by = '';
-if ($hold_id > 0) {
+// restaurant_order_flow_plan.md — ticket_ids=1,2: exactly the tickets just sent / confirmed (a second
+// round prints only the new dishes, never the whole order again).
+$ticketIds = array_values(array_filter(array_map('intval', explode(',', (string)($_GET['ticket_ids'] ?? '')))));
+if ($ticketIds) {
+    $ph = implode(',', array_fill(0, count($ticketIds), '?'));
+    $st = $pdo->prepare("SELECT kt.ticket_id, kt.order_label, kt.table_id, rt.table_number, TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS by_name
+                           FROM kitchen_tickets kt LEFT JOIN restaurant_tables rt ON rt.table_id = kt.table_id LEFT JOIN users u ON u.user_id = kt.sent_by
+                          WHERE kt.ticket_id IN ($ph) AND kt.warehouse_id = ? AND kt.status NOT IN ('pending','cancelled')");
+    $st->execute(array_merge($ticketIds, [$warehouse_id]));
+    $tks = $st->fetchAll(PDO::FETCH_ASSOC);
+    if (!$tks) { http_response_code(404); exit(t('Nothing to print.')); }
+    $li = $pdo->prepare("SELECT product_id, quantity, modifiers_summary FROM kitchen_ticket_items WHERE ticket_id = ? AND quantity > 0 ORDER BY id");
+    foreach ($tks as $tk) {
+        $li->execute([(int)$tk['ticket_id']]);
+        foreach ($li->fetchAll(PDO::FETCH_ASSOC) as $l) $items[] = ['product_id' => (int)$l['product_id'], 'qty' => (float)$l['quantity'], 'extra' => (string)($l['modifiers_summary'] ?? '')];
+    }
+    $label = $tks[0]['table_number'] !== null ? t('Table') . ' ' . $tks[0]['table_number'] : (string)$tks[0]['order_label'];
+    $by = (string)$tks[0]['by_name'];
+} elseif ($hold_id > 0) {
     $st = $pdo->prepare("SELECT h.items_data, h.hold_reference, rt.table_number, TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS by_name
                            FROM pos_held_sales h LEFT JOIN restaurant_tables rt ON rt.table_id = h.table_id LEFT JOIN users u ON u.user_id = h.user_id
                           WHERE h.hold_id = ? AND h.warehouse_id = ?");

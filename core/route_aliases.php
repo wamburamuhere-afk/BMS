@@ -41,6 +41,7 @@ return [
     'restaurant/menu'              => 'menu',
     'restaurant/tables-board'      => 'tables-board',
     'restaurant/sales-report'      => 'restaurant-sales',
+    'restaurant/waste-report'      => 'waste-report',
     'restaurant/purchases'         => 'purchases',
 
     // ── POS ────────────────────────────────────────────────────────────────

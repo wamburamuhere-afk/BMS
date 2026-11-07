@@ -75,7 +75,7 @@ if (!function_exists('rolePermissionWorkflowPageKeys')) {
             'employee_contracts', 'employee_lifecycle', 'employee_trips', 'expenses', 'grn',
             'hr_performance', 'invoices', 'leaves', 'lpo', 'payment_vouchers',
             'payroll', 'projects', 'purchase_orders', 'purchase_returns', 'received_invoices',
-            'revenue', 'rfq', 'sales_orders', 'sales_returns',
+            'restaurant_orders', 'revenue', 'rfq', 'sales_orders', 'sales_returns',
         ];
     }
 }

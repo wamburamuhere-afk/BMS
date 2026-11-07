@@ -14,7 +14,7 @@
 ob_start();
 
 require_once __DIR__ . '/../../../roots.php';
-require_once __DIR__ . '/../../../core/restaurant_scope.php';
+require_once __DIR__ . '/../../../core/restaurant_order_flow.php';
 
 $page_title = 'Tables';
 require_once 'header.php';
@@ -34,7 +34,8 @@ if ($focusTable > 0 && $warehouses) {
     $fw = (int)$ft->fetchColumn();
     if (in_array($fw, array_map(fn($w) => (int)$w['warehouse_id'], $warehouses), true)) $focusWh = $fw; else $focusTable = 0;
 }
-$can_sell   = canCreate('pos');
+$can_sell   = canCreate('pos');      // Take away (paid first) — the cashier
+$can_take   = rofCanTake($pdo);      // open a table's order, Move / Join — the waiter too (restaurant_order_flow_plan.md)
 $cur        = getSetting('currency', 'TZS');
 ?>
 
@@ -181,6 +182,12 @@ $cur        = getSetting('currency', 'TZS');
 .tb-page .tb-mv:hover { background:#e7f0ff; border-color:#0d6efd; }
 .tb-page .tb-mv small { display:block; font-size:12px; font-weight:600; color:#6c757d; }
 .tb-page .tb-mv-join { color:#0b3d91; background:#f4f8ff; }
+/* restaurant_order_flow_plan.md — the table's food state */
+.tb-page .tb-kline { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.tb-page .tb-k { font-size:11px; font-weight:700; border-radius:20px; padding:2px 8px; background:rgba(255,255,255,.22); color:#fff; white-space:nowrap; }
+.tb-page .tb-k-ready { background:#fff; color:#0b3d91; }
+.tb-page .tb-late .tb-k { background:#e7f0ff; color:#0b3d91; }
+.tb-page .tb-late .tb-k-ready { background:#0d6efd; color:#fff; }
 @media (max-width: 575.98px) {
     .tb-page .tb-card { min-height:118px; padding:10px 11px; }
     .tb-page .tb-num, .tb-page .tb-amt { font-size:19px; }
@@ -191,7 +198,10 @@ $cur        = getSetting('currency', 'TZS');
 
 <script>
 const TB = {
-    canSell: <?= json_encode($can_sell) ?>,
+    canSell: <?= json_encode($can_take) ?>,
+    kPending: <?= json_encode(t('Waiting for cashier')) ?>,
+    kCooking: <?= json_encode(t('Cooking')) ?>,
+    kReady: <?= json_encode(t('Food ready')) ?>,
     csrf: <?= json_encode(csrf_token()) ?>,
     posUrl: <?= json_encode(getUrl('pos')) ?>,
     cur: <?= json_encode($cur) ?>,
@@ -275,6 +285,16 @@ function tbResLine(t) {
     return `<div class="tb-res"><span><i class="bi bi-calendar-check me-1"></i>${TB.reservedAt.replace('%s', safeOutput(r.time))}${who ? ' · ' + safeOutput(who) : ''}</span></div>`;
 }
 
+/** restaurant_order_flow_plan.md — the table's food: Food ready / Cooking / Waiting for cashier (most urgent first). */
+function tbKitchen(t) {
+    const k = t.kitchen; if (!k) return '';
+    const bits = [];
+    if (k.ready)   bits.push(`<span class="tb-k tb-k-ready"><i class="bi bi-bell-fill me-1"></i>${TB.kReady} · ${tbFmt(k.ready)}</span>`);
+    if (k.cooking) bits.push(`<span class="tb-k"><i class="ri ri-chef-hat me-1"></i>${TB.kCooking} · ${tbFmt(k.cooking)}</span>`);
+    if (k.pending) bits.push(`<span class="tb-k"><i class="bi bi-hourglass-split me-1"></i>${TB.kPending} · ${tbFmt(k.pending)}</span>`);
+    return bits.length ? `<div class="tb-kline">${bits.join('')}</div>` : '';
+}
+
 function tbCard(t) {
     const isBusy = !!t.hold_id, late = tbIsLate(t);
     const open = `onclick='openTable(${JSON.stringify({ table_id: t.table_id, table_number: t.table_number })})'`;
@@ -294,6 +314,7 @@ function tbCard(t) {
         <div class="tb-amt">${tbFmt(t.total)} <small>${safeOutput(TB.cur)}</small></div>
         <div class="tb-line">${meta}</div>
         ${t.served_by ? `<div class="tb-line"><i class="bi bi-person"></i>${safeOutput(t.served_by)}</div>` : ''}
+        ${tbKitchen(t)}
         ${note}
         ${tbResLine(t)}
         ${TB.canSell ? `<div class="tb-grow"></div><button type="button" class="tb-move" onclick='event.stopPropagation(); openMove(${t.table_id})'><i class="bi bi-arrow-left-right me-1"></i>${TB.moveJoin}</button>` : ''}

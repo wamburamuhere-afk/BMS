@@ -226,7 +226,8 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'description' => 'Floors/Tables, Kitchen Display, Modifier Groups and table Reservations for a restaurant/hybrid warehouse.',
                 'default'     => false,
                 'sort_order'  => 22,
-                'page_keys'   => ['restaurant_pos'],
+                // restaurant_order_flow_plan.md — Waiter/Cashier/Kitchen rights (Restaurant Orders, Kitchen Screen).
+                'page_keys'   => ['restaurant_pos', 'restaurant_orders', 'kitchen_display'],
                 'depends_on'  => ['pos'],
                 'paths'       => [
                     'api/restaurant/',
