@@ -88,7 +88,7 @@ if (!function_exists('rsResolveToken')) {
     function rsResolveToken(PDO $pdo, string $token): ?array
     {
         if (!roTokenLooksValid($token) || !rsModuleOnForPublic($pdo)) return null;
-        $st = $pdo->prepare("SELECT warehouse_id, warehouse_name, phone, status, pos_mode, online_shop_token, online_shop_enabled,
+        $st = $pdo->prepare("SELECT warehouse_id, warehouse_name, phone, location, address, status, pos_mode, online_shop_token, online_shop_enabled,
                                     online_shop_ordering, online_shop_pickup, online_shop_delivery, online_shop_wholesale, online_show_payment
                                FROM warehouses WHERE online_shop_token = ? LIMIT 1");
         $st->execute([$token]);
@@ -112,6 +112,8 @@ if (!function_exists('rsShopFlags')) {
             'warehouse_id'   => (int)$w['warehouse_id'],
             'warehouse_name' => (string)$w['warehouse_name'],
             'phone'          => trim((string)($w['phone'] ?? '')),
+            'location'       => trim((string)($w['location'] ?? '')),
+            'address'        => trim((string)($w['address'] ?? '')),
             'ordering'       => (int)($w['online_shop_ordering'] ?? 0) === 1 && ($pickup || $delivery),
             'pickup'         => $pickup,
             'delivery'       => $delivery,
@@ -191,7 +193,7 @@ if (!function_exists('rsCatalogRows')) {
             $args = array_merge($args, $onlyIds);
         }
         $st = $pdo->prepare("
-            SELECT p.product_id, p.product_name, p.sku, p.unit, p.category_id, c.category_name, p.image_url,
+            SELECT p.product_id, p.product_name, p.sku, p.unit, p.category_id, c.category_name, p.image_url, p.description, p.created_at,
                    p.selling_price, COALESCE(pgp.price, p.selling_price) AS wholesale_price,
                    p.track_inventory, COALESCE(ps.available_quantity, 0) AS available
               FROM products p
@@ -237,6 +239,9 @@ if (!function_exists('rsPublicCatalog')) {
                 'sold_out'    => rsIsSoldOut($r),            // yes/no only — never the number
                 'decimal'     => posUnitAllowsDecimal((string)$r['unit']),
                 'unit'        => (string)($r['unit'] ?? ''),
+                'desc'        => roPublicDescription($r['description'] ?? ''),
+                // "New" = added in the last 14 days (a date, never a stock figure)
+                'is_new'      => !empty($r['created_at']) && strtotime((string)$r['created_at']) >= time() - 14 * 86400,
             ];
             if ($shop['wholesale'] && $whole > 0 && abs($whole - $retail) > 0.001) {
                 $item['wholesale'] = $whole;

@@ -121,7 +121,7 @@ if (!function_exists('roResolveToken')) {
     {
         if (!roTokenLooksValid($token) || !roModuleOnForPublic($pdo)) return null;
 
-        $cols = "w.warehouse_id, w.warehouse_name, w.pos_mode, w.status, w.online_menu_token,
+        $cols = "w.warehouse_id, w.warehouse_name, w.phone, w.location, w.address, w.pos_mode, w.status, w.online_menu_token,
                  w.online_menu_enabled, w.online_order_table, w.online_order_pickup"
               . (roPaymentSwitchReady($pdo) ? ", w.online_show_payment" : ", 0 AS online_show_payment");
         $st = $pdo->prepare("SELECT $cols FROM warehouses w WHERE w.online_menu_token = ? LIMIT 1");
@@ -158,6 +158,9 @@ if (!function_exists('roResolveToken')) {
                 'order_pickup'   => (int)$wh['online_order_pickup'] === 1,
                 'menu_token'     => (string)$wh['online_menu_token'],
                 'show_payment'   => (int)$wh['online_show_payment'] === 1,
+                'phone'          => trim((string)($wh['phone'] ?? '')),
+                'location'       => trim((string)($wh['location'] ?? '')),
+                'address'        => trim((string)($wh['address'] ?? '')),
             ],
             'table' => $table,
             'token' => $token,
@@ -253,7 +256,7 @@ if (!function_exists('roPublicMenu')) {
     {
         $st = $pdo->prepare("
             SELECT p.product_id, p.product_name, p.category_id, c.category_name, c.sort_order AS cat_sort,
-                   p.selling_price, p.image_url, p.is_service, p.track_inventory, p.is_available,
+                   p.selling_price, p.image_url, p.description, p.is_service, p.track_inventory, p.is_available,
                    COALESCE((SELECT SUM(ps.stock_quantity) FROM product_stocks ps
                               WHERE ps.product_id = p.product_id AND ps.warehouse_id = :w_qty), 0) AS stock,
                    (SELECT COUNT(*) FROM product_modifier_groups pmg JOIN modifier_groups mg ON mg.group_id = pmg.group_id
@@ -279,9 +282,117 @@ if (!function_exists('roPublicMenu')) {
                 'image'       => !empty($r['image_url']) ? getUrl((string)$r['image_url']) : '',
                 'sold_out'    => $tracksStock && (float)$r['stock'] <= 0,   // a yes/no only — never the number
                 'has_options' => (int)$r['option_groups'] > 0,
+                'desc'        => roPublicDescription($r['description'] ?? ''),
             ];
         }
         return ['items' => $items, 'categories' => $categories];
+    }
+}
+
+if (!function_exists('roDisplayName')) {
+    /**
+     * A product / category name as the PUBLIC page shows it. A name typed all in
+     * capitals or all in small letters ("PAMPERS", "apple punch 300ml") becomes Title
+     * Case; a word holding a digit ("300ml") is left as typed. A name already in mixed
+     * case ("Maji ya Afya") is the owner's choice and is left alone.
+     */
+    function roDisplayName(string $name): string
+    {
+        $name = trim($name);
+        $letters = preg_replace('/[^\p{L}]/u', '', $name) ?? '';
+        if ($letters === '' || ($letters !== mb_strtoupper($letters, 'UTF-8') && $letters !== mb_strtolower($letters, 'UTF-8'))) return $name;
+        $words = preg_split('/(\s+)/u', $name, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$name];
+        foreach ($words as $i => $w) {
+            if ($w === '' || preg_match('/^\s+$/u', $w) || preg_match('/\d/u', $w)) continue;
+            $low = mb_strtolower($w, 'UTF-8');
+            $words[$i] = mb_strtoupper(mb_substr($low, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($low, 1, null, 'UTF-8');
+        }
+        return implode('', $words);
+    }
+}
+
+if (!function_exists('roPublicDescription')) {
+    /** A product description safe and short enough for the public page ('' when none). */
+    function roPublicDescription($text): string
+    {
+        $t = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$text)) ?? '');
+        return mb_strlen($t, 'UTF-8') > 240 ? rtrim(mb_substr($t, 0, 237, 'UTF-8')) . '…' : $t;
+    }
+}
+
+if (!function_exists('roPopularIds')) {
+    /**
+     * "Popular" on the public shop / menu: the products THIS shop sold most (by quantity,
+     * returned units taken off) in completed POS sales of the last $days days, limited to
+     * $candidateIds (what the page shows and can still be ordered), best first. Fewer than
+     * 3 -> [] so the row hides instead of showing a lonely card. Never a number.
+     * @param int[] $candidateIds
+     * @return int[]
+     */
+    function roPopularIds(PDO $pdo, int $warehouseId, array $candidateIds, int $limit = 6, int $days = 30): array
+    {
+        $allowed = array_flip(array_map('intval', $candidateIds));
+        if (count($allowed) < 3) return [];
+        try {
+            $st = $pdo->prepare("
+                SELECT psi.product_id, SUM(psi.quantity - COALESCE(psi.returned_quantity, 0)) AS qty
+                  FROM pos_sale_items psi
+                  JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                 WHERE ps.warehouse_id = ? AND ps.sale_status IN ('completed', 'partially_refunded')
+                   AND ps.is_return_sale = 0 AND ps.sale_date >= (NOW() - INTERVAL " . max(1, $days) . " DAY)
+              GROUP BY psi.product_id
+                HAVING qty > 0
+              ORDER BY qty DESC, psi.product_id
+                 LIMIT 60");
+            $st->execute([$warehouseId]);
+            $ids = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $id = (int)$r['product_id'];
+                if (isset($allowed[$id])) $ids[] = $id;
+                if (count($ids) >= $limit) break;
+            }
+            return count($ids) >= 3 ? $ids : [];
+        } catch (Throwable $e) {
+            error_log('roPopularIds: ' . $e->getMessage());
+            return [];
+        }
+    }
+}
+
+if (!function_exists('roPaymentMethodNames')) {
+    /**
+     * The NAMES of the payment methods in Payment Settings that are flagged to show
+     * (e.g. "M-Pesa", "CRDB Bank") - for the public footer. Never a number.
+     * @return string[]
+     */
+    function roPaymentMethodNames(PDO $pdo): array
+    {
+        try {
+            require_once __DIR__ . '/payment_accounts.php';
+            $names = [];
+            $seen = [];
+            foreach (paymentAccountsForBuyer($pdo) as $a) {
+                $l = trim((string)($a['label'] ?? ''));
+                $k = mb_strtolower($l, 'UTF-8');
+                if ($l === '' || isset($seen[$k])) continue;
+                $seen[$k] = true;
+                $names[] = $l;
+            }
+            return array_slice($names, 0, 8);
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+}
+
+if (!function_exists('roWhatsAppNumber')) {
+    /** A shop phone -> the digits wa.me needs (Tanzania: 07xx / 06xx -> 2557xx), or '' when it is not a phone. */
+    function roWhatsAppNumber(string $phone): string
+    {
+        $d = preg_replace('/\D/', '', $phone) ?? '';
+        if (strlen($d) === 10 && $d[0] === '0') $d = '255' . substr($d, 1);
+        elseif (strlen($d) === 9 && in_array($d[0], ['6', '7'], true)) $d = '255' . $d;
+        return (strlen($d) >= 10 && strlen($d) <= 15) ? $d : '';
     }
 }
 

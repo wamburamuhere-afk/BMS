@@ -219,7 +219,7 @@ ok(str_contains($b, 'Table 5') || str_contains($b, 'Meza 5'), 'the page says whi
 // The menu data the page carries (random nonces/hashes elsewhere could contain any digits).
 $items = preg_match('/var ITEMS = (\[.*?\]);/s', $b, $im) ? json_decode($im[1], true) : null;
 $keys = []; foreach ((array)$items as $i) $keys += array_flip(array_keys((array)$i));
-ok(is_array($items) && array_keys($keys) == ['id', 'name', 'category_id', 'price', 'image', 'sold_out', 'has_options'], 'menu data carries only id/name/category/price/image/sold_out/has_options');
+ok(is_array($items) && array_keys($keys) == ['id', 'name', 'category_id', 'price', 'image', 'sold_out', 'has_options', 'desc'], 'menu data carries only id/name/category/price/image/sold_out/has_options/description');
 $soda = array_values(array_filter((array)$items, fn($i) => $i['name'] === FX . ' Soda'))[0] ?? [];
 ok(!preg_match('/cost_price|purchase_price|"stock"|3100\.00|"3100"/', $b) && !in_array(37, $soda, false) && !in_array(600, $soda, false), 'no cost price or stock number in the page');
 ok(preg_match('/"sold_out":true/', $b) === 1, 'water (0 in stock) is marked sold out — as yes/no only');
@@ -235,6 +235,12 @@ ok(str_contains($b, 'id="cartBtn"') && str_contains($b, 'id="cartCnt"') && str_c
 ok(str_contains($b, 'id="myOrdersBtn"') && str_contains($b, 'id="ordSheet"') && str_contains($b, 'window.roRememberOrder'), '"My orders" icon + panel are on the menu (orders remembered on this phone)');
 ok(str_contains($b, 'window.location.assign(d.status_url)') && !str_contains($b, 'window.location.replace(d.status_url)'), 'after sending, Back returns to the menu (assign, not replace)');
 ok(!str_contains($b, 'Online ordering is not available right now'), 'no "ordering off" note while ordering is on');
+// Page look: banner, menu sections, footer (all from data BMS already holds).
+ok(str_contains($b, 'class="banner"') && str_contains($b, 'var POPULAR = ') && str_contains($b, "el('div', 'dishes')"), 'menu page: banner, Most ordered list and menu-style rows');
+ok(str_contains($b, 'Powered by BJP Technologies © ' . date('Y') . ', All Rights Reserved.') && str_contains($b, 'Online menu by'), 'menu page: footer says "Online menu by <company>" and "Powered by BJP Technologies"');
+ok(!str_contains($b, 'Prices include everything shown') && !str_contains($b, 'Open in Maps') && !preg_match('/Open now|kitchen until/i', $b), 'menu page: old one-line footer gone; no map button and no opening hours');
+ok(preg_match('#var SHARE_URL = "[^"]*\\\\?/m\\\\?/' . $shopTok . '";#', $b2) === 1 && !preg_match('#var SHARE_URL = "[^"]*' . $t5Tok . '#', $b2),
+   'Share menu on a table QR shares the restaurant\'s menu link, never the table\'s');
 
 echo "\n── 3. Links that must not work (all look the same) ──\n";
 $generic = function (string $path) { [$c, , $b] = http('GET', $path); return [$c, str_contains($b, 'This menu is not available') || str_contains($b, 'Menyu hii haipatikani')]; };
