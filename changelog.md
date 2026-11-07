@@ -9,6 +9,7 @@
 - The till screen (cart, edit price, discount) uses the same rule, so the screen and the server agree.
 - **Data:** the migration sets every product's minimum to its buying price on Smart POS databases only (criteria-based, safe to run twice); other databases are untouched.
 - **Checked:** new test (34 checks, real sales over HTTP on a throwaway company: full BMS still refuses 5000, Smart POS sells at 5000 and 7000, Advanced form brings the check back, ledger balanced); product import, create/edit/list simple-POS, old-sale UI, i18n and clean-URL suites pass.
+
 ## 2026-11-07 — feat(online): professional look for the public online shop (/s/) and restaurant menu (/m/)
 
 **Changed:** `public_shop.php`, `public_menu.php`, `core/retail_online.php`, `core/restaurant_online.php`, `lang/sw.php`, `tests/test_retail_online_shop_cli.php`, `tests/test_restaurant_online_menu_cli.php`
