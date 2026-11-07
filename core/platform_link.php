@@ -62,7 +62,7 @@ if (!function_exists('plCall')) {
      * Ask the platform root. Returns the decoded JSON, or ['success'=>false,'message'=>…].
      * $transport lets tests hand the request to the gateway in-process.
      */
-    function plCall(int $tenantId, string $action, array $params = [], ?callable $transport = null): array
+    function plCall(int $tenantId, string $action, array $params = [], ?callable $transport = null, int $timeout = 12): array
     {
         $fail = fn(string $m) => ['success' => false, 'message' => $m];
         $body = json_encode(['action' => $action] + $params);
@@ -82,7 +82,7 @@ if (!function_exists('plCall')) {
         $h = ['Content-Type: application/json'];
         foreach ($headers as $k => $v) $h[] = "$k: $v";
         curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_HTTPHEADER => $h,
-            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 5]);
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => max(1, $timeout), CURLOPT_CONNECTTIMEOUT => 5]);
         $raw = curl_exec($ch);
         $err = curl_error($ch);
         curl_close($ch);
@@ -92,31 +92,5 @@ if (!function_exists('plCall')) {
         }
         $j = json_decode((string)$raw, true);
         return is_array($j) ? $j : $fail('The subscription service did not answer properly.');
-    }
-}
-
-/* ── Short-lived links to a customer copy of a document ─────────────────────── */
-
-if (!function_exists('plDocToken')) {
-    function plDocToken(string $type, int $id, int $customerId, int $ttl = 1800): ?string
-    {
-        $k = plKey();
-        if ($k === null) return null;
-        $payload = rtrim(strtr(base64_encode($type . '|' . $id . '|' . $customerId . '|' . (time() + $ttl)), '+/', '-_'), '=');
-        return $payload . '.' . hash_hmac('sha256', 'doc|' . $payload, $k);
-    }
-}
-
-if (!function_exists('plDocTokenRead')) {
-    /** @return array{type:string, id:int, customer_id:int}|null */
-    function plDocTokenRead(string $token): ?array
-    {
-        $k = plKey();
-        if ($k === null || substr_count($token, '.') !== 1) return null;
-        [$payload, $sig] = explode('.', $token);
-        if (!hash_equals(hash_hmac('sha256', 'doc|' . $payload, $k), $sig)) return null;
-        $parts = explode('|', (string)base64_decode(strtr($payload, '-_', '+/')));
-        if (count($parts) !== 4 || (int)$parts[3] < time() || !in_array($parts[0], ['quotation', 'invoice', 'contract'], true)) return null;
-        return ['type' => $parts[0], 'id' => (int)$parts[1], 'customer_id' => (int)$parts[2]];
     }
 }

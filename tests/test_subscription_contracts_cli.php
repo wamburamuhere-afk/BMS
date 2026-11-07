@@ -189,7 +189,7 @@ ok((int)$pdo->query("SELECT COUNT(*) FROM customer_contracts WHERE invoice_id = 
 
 section('B3. customer cannot sign before BJP');
 $r = gateway($t1, ['action' => 'contracts']);
-ok(!empty($r['success']) && count($r['contracts']) === 1 && $r['contracts'][0]['state'] === 'awaiting_bjp' && $r['contracts'][0]['view_token'] === null,
+ok(!empty($r['success']) && count($r['contracts']) === 1 && $r['contracts'][0]['state'] === 'awaiting_bjp' && $r['contracts'][0]['has_file'] === false,
    'My Subscription lists it as being prepared, with nothing to open yet');
 ok(empty(gateway($t1, ['action' => 'contract_sign_link', 'contract_id' => (int)$k['contract_id']])['success']), 'no signing link until BJP has signed');
 
@@ -204,7 +204,7 @@ $pdo->prepare("INSERT INTO document_signatures (document_id, requested_by, signe
                VALUES (?, ?, ?, 'internal', 'signed', ?, NOW())")->execute([(int)$k['document_id'], $uid, $uid, $bjpDoc]);
 ok(scState($pdo, $k)['state'] === 'awaiting_customer', 'now waiting for the customer');
 $r = gateway($t1, ['action' => 'contracts']);
-ok(!empty($r['contracts'][0]['view_token']), 'the customer can open BJP\'s signed copy');
+ok(!empty($r['contracts'][0]['has_file']), 'the customer can open BJP\'s signed copy');
 $l1 = gateway($t1, ['action' => 'contract_sign_link', 'contract_id' => (int)$k['contract_id']]);
 ok(!empty($l1['success']) && preg_match('/sign-document\?token=([0-9a-f]{64})$/', (string)$l1['sign_url'], $m1), 'signing link issued for the existing signing page');
 $sig = $pdo->query("SELECT * FROM document_signatures WHERE document_id = $bjpDoc AND signer_type = 'external'")->fetch(PDO::FETCH_ASSOC);
@@ -232,12 +232,11 @@ $st = scState($pdo, $k);
 ok($st['state'] === 'signed' && $st['final_document_id'] === $finalDoc, 'contract signed by both');
 ok(empty(gateway($t1, ['action' => 'contract_sign_link', 'contract_id' => (int)$k['contract_id']])['success']), 'no more signing links once signed');
 $r = gateway($t1, ['action' => 'contracts']);
-$pdf = runPhp("\$_SERVER['REQUEST_METHOD'] = 'GET'; \$_SERVER['HTTP_HOST'] = 'localhost'; require '$root/roots.php'; " . SC_ENV . "
-    \$_GET = ['t' => " . var_export((string)$r['contracts'][0]['view_token'], true) . "]; ob_start(); include '$root/api/platform/customer_document.php'; echo ob_get_clean();");
-ok(strpos($pdf, '%PDF') === 0, 'the customer\'s copy opens as the final signed PDF');
-$bad = runPhp("\$_SERVER['REQUEST_METHOD'] = 'GET'; \$_SERVER['HTTP_HOST'] = 'localhost'; require '$root/roots.php'; " . SC_ENV . "
-    require_once '$root/core/platform_link.php'; \$_GET = ['t' => plDocToken('contract', " . (int)$k['contract_id'] . ", $other)]; ob_start(); include '$root/api/platform/customer_document.php'; echo ob_get_clean();");
-ok(strpos($bad, '%PDF') !== 0, "another customer's token cannot open it");
+// The file comes through the signed gateway ('file'), never a BJP address.
+$f = gateway($t1, ['action' => 'file', 'kind' => 'contract', 'id' => (int)$k['contract_id']]);
+ok(strpos((string)base64_decode((string)($f['data'] ?? '')), '%PDF') === 0 && ($f['mime'] ?? '') === 'application/pdf', 'the customer\'s copy opens as the final signed PDF');
+require_once "$root/core/customer_documents.php";
+ok(cdCustomerFile($pdo, 'contract', (int)$k['contract_id'], $other) === null, "another customer cannot open it");
 
 section('B6. BJP customer page');
 $r = call('api/platform/customer_platform_link.php', ['customer_id' => $cust]);

@@ -164,32 +164,47 @@ try {
 
         $attachment_names = $_POST['attachment_names'] ?? [];
 
+        // Proof of payment can be shown to the customer (Billing → Payments), so only a
+        // PDF or a photo is kept, checked by its real content (security.md §19).
+        $allowedProof = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png'];
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $checked = [];
+        // Every file is checked before any is saved: one bad file and none are kept.
         for ($i = 0; $i < count($_FILES['attachments']['name']); $i++) {
-            if ($_FILES['attachments']['error'][$i] === UPLOAD_ERR_OK) {
+            if ($_FILES['attachments']['error'][$i] !== UPLOAD_ERR_OK) continue;
+            $original_name = (string)$_FILES['attachments']['name'][$i];
+            $extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+            $real_mime = (string)$finfo->file($_FILES['attachments']['tmp_name'][$i]);
+            if (!isset($allowedProof[$extension]) || $allowedProof[$extension] !== $real_mime) {
+                throw new Exception(sprintf(t('"%s" is not allowed. Attach a PDF, JPG or PNG.'), $original_name));
+            }
+            if ((int)$_FILES['attachments']['size'][$i] > 10 * 1024 * 1024) {
+                throw new Exception(sprintf(t('"%s" is larger than 10 MB.'), $original_name));
+            }
+            $checked[$i] = [$extension, $real_mime];
+        }
+        for ($i = 0; $i < count($_FILES['attachments']['name']); $i++) {
+            if (isset($checked[$i])) {
+                [$extension, $real_mime] = $checked[$i];
                 $tmp_name = $_FILES['attachments']['tmp_name'][$i];
-                $original_name = $_FILES['attachments']['name'][$i];
-                $extension = pathinfo($original_name, PATHINFO_EXTENSION);
+                $original_name = (string)$_FILES['attachments']['name'][$i];
+                $size = (int)$_FILES['attachments']['size'][$i];
 
-                // Professional naming: PAY_{ID}_{TIMESTAMP}_{INDEX}.ext
-                $file_name = 'PAY_' . $payment_id . '_' . time() . '_' . $i . '.' . $extension;
+                $file_name = 'PAY_' . $payment_id . '_' . bin2hex(random_bytes(12)) . '.' . $extension;
                 $file_path = bmsUploadsRel('finance/invoices') . $file_name;
                 $dest_path = $upload_dir . $file_name;
 
-                assertUploadWithinQuota($pdo, (int)$_FILES['attachments']['size'][$i]);
+                assertUploadWithinQuota($pdo, $size);
                 if (move_uploaded_file($tmp_name, $dest_path)) {
-                    $doc_name = !empty($attachment_names[$i]) ? $attachment_names[$i] : $original_name;
-                    
+                    $doc_name = mb_substr(trim(!empty($attachment_names[$i]) ? (string)$attachment_names[$i] : $original_name), 0, 200);
+
                     $attStmt = $pdo->prepare("
                         INSERT INTO payment_attachments (
-                            payment_id, file_name, file_path, file_type, file_size, 
+                            payment_id, file_name, file_path, file_type, file_size,
                             uploaded_by, uploaded_at, description
                         ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)
                     ");
-                    $attStmt->execute([
-                        $payment_id, $doc_name, $file_path, 
-                        $_FILES['attachments']['type'][$i], $_FILES['attachments']['size'][$i],
-                        $user_id, $doc_name
-                    ]);
+                    $attStmt->execute([$payment_id, $doc_name, $file_path, $real_mime, $size, $user_id, $doc_name]);
                 }
             }
         }

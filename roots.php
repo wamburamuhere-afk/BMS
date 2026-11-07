@@ -1374,6 +1374,7 @@ $routes = [
     'my_subscription' => SETTINGS_DIR . '/my_subscription.php',      // old link → redirects to subscription
     'my_subscription.php' => SETTINGS_DIR . '/my_subscription.php',
     'subscription' => SETTINGS_DIR . '/billing.php',                 // the page is called "Subscription" (2026-10-18)
+    'subscription-document' => SETTINGS_DIR . '/billing_document.php',   // /subscription/<kind>/<id> (handleRoute)
     'billing' => SETTINGS_DIR . '/billing.php',                      // old link, same page
     'billing.php' => SETTINGS_DIR . '/billing.php',
     'backup_restore' => SETTINGS_DIR . '/backup_restore.php',
@@ -2212,6 +2213,13 @@ function handleRoute() {
     if (!isset($routes[$clean_uri]) && preg_match('#^([^/]+)/([1-9][0-9]{0,18})$#', $clean_uri, $__dm) && isDetailRoute($__dm[1])) {
         $_GET['id'] = $_REQUEST['id'] = $__dm[2];
         $clean_uri = $__dm[1];
+    }
+
+    // A company's BJP documents on its own address: /subscription/invoice/231, /quotation/N,
+    // /payment-proof/N, /receipt/N, /contract/N — fetched from BJP by billing_document.php.
+    if (preg_match('#^subscription/(invoice|quotation|payment-proof|receipt|contract)/([1-9][0-9]{0,18})$#', $clean_uri, $__sd)) {
+        $GLOBALS['__sd_route'] = ['kind' => $__sd[1], 'id' => (int)$__sd[2]];
+        $clean_uri = 'subscription-document';
     }
 
     // Public restaurant menu (restaurant_online_menu_plan.md): /m/<link> is the
