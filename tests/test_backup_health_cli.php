@@ -158,10 +158,20 @@ ok(str_contains($cron, "require_once __DIR__ . '/../core/backup_health.php'")
    && str_contains($cron, 'bmsBackupHealthAlert($health)'),
    'every scheduled all-company run ends with the health check (not a single --tenant retry)');
 ok(strpos($cron, 'bmsBackupHealth()') > strpos($cron, 'flock($lock, LOCK_UN)'), 'checked after the run lock is released');
-ok(str_ends_with(str_replace('\\', '/', superadminRouteMap()['backups'] ?? ''), 'app/superadmin/backups.php'), 'route /backups → app/superadmin/backups.php');
+ok(str_ends_with(str_replace('\\', '/', superadminRouteMap()['backup-health'] ?? ''), 'app/superadmin/backups.php'), 'route /backup-health → app/superadmin/backups.php');
+ok(!array_key_exists('backups', superadminRouteMap()), 'no /backups route (that URL is the real backups/ folder)');
+// A short URL whose first segment is a real top-level folder never reaches PHP
+// on production: Apache serves (or blocks) the folder first. /backups was 403.
+$clash = [];
+foreach (array_keys(superadminRouteMap()) as $key) {
+    $first = explode('/', $key)[0];
+    if ($first !== '' && is_dir("$root/$first")) $clash[] = $key;
+}
+ok($clash === [], 'no superadmin route equals a top-level folder' . ($clash ? ' — clashes: ' . implode(', ', $clash) : ''));
+ok(superadminShortUrlFor('app/superadmin/backups.php') === '/backup-health', 'old /app/superadmin/backups.php link redirects to /backup-health');
 $ui = file_get_contents("$root/core/superadmin_ui.php");
-ok(str_contains($ui, "\$navItem('backups',   saUrl('backups')"), 'nav item "Backups" in the panel header');
-ok(str_contains($ui, "if (\$nType === 'backup_problem') { \$tenantUrl = saUrl('backups');"), 'bell notification opens the Backups page');
+ok(str_contains($ui, "\$navItem('backups',   saUrl('backup-health')"), 'nav item "Backups" in the panel header');
+ok(str_contains($ui, "if (\$nType === 'backup_problem') { \$tenantUrl = saUrl('backup-health');"), 'bell notification opens the Backups page');
 $setup = file_get_contents("$root/scripts/setup_control_db.php");
 ok(str_contains($setup, "'first_login','first_product','first_sale','inactive','backup_problem') NOT NULL"), 'setup_control_db.php adds backup_problem to the notification types');
 $enum = (string)$cpdo->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = " . $cpdo->quote(controlDbName())
@@ -176,13 +186,13 @@ section('6. The page, through the real router');
 $base   = getenv('TENANT_BASE_DOMAIN') ?: 'dev.bms.local';
 $saHost = superadminHostLabel() . '.' . $base;
 $render = fn(string $auth) => (string)shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' --route '
-          . escapeshellarg($saHost) . ' /backups ' . $auth . ' 2>&1');
+          . escapeshellarg($saHost) . ' /backup-health ' . $auth . ' 2>&1');
 $html = $render('1');
 ok(str_contains($html, '<title>Backups | Platform Administration</title>'), 'renders for a signed-in superadmin');
 ok(!preg_match('/(Warning|Notice|Fatal error|Deprecated|Uncaught)/', $html), 'no PHP warnings or errors in the page');
 ok(str_contains($html, 'healthtest_a.zip') && str_contains($html, 'HEALTHTEST disk full'), 'shows each database\'s last backup and the failure reason');
 ok(substr_count($html, '<tr>') >= count($runKeys) + 1, 'one row per database');
 ok(str_contains($html, 'Off-site copy (Google Drive, encrypted)') && str_contains($html, 'Failures in the last 30 days'), 'off-site and failure sections present');
-ok(str_contains($html, 'nav-link active" href="/backups"'), 'Backups is the active nav item');
+ok(str_contains($html, 'nav-link active" href="/backup-health"'), 'Backups is the active nav item');
 $anon = $render('0');
 ok(!str_contains($anon, 'healthtest_a.zip') && !str_contains($anon, '<title>Backups'), 'not signed in → no backup data shown');

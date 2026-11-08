@@ -422,7 +422,10 @@ if (!function_exists('superadminRouteMap')) {
             'support/article' => $d . 'support_article.php',
             'support/request' => $d . 'support_request.php',
             'ai'           => $d . 'ai.php',
-            'backups'      => $d . 'backups.php',
+            // Not 'backups': /backups is the real backups/ folder, which Apache
+            // blocks (backups/.htaccess), so that URL never reached PHP — 403.
+            // A key must never equal a top-level folder name (see the test).
+            'backup-health' => $d . 'backups.php',
             'tenants'      => $d . 'tenants.php',
             'tenants/new'  => $d . 'tenant_new.php',
             'tenants/view' => $d . 'tenant_view.php',
