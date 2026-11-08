@@ -133,7 +133,9 @@ is available). Needs the one-time server setup in §4 before the first upload; u
 nightly job logs `NOT CONFIGURED` and changes nothing.
 
 ### PR 3 — Monitoring ✅
-- Superadmin **Backups** page (`app/superadmin/backups.php`, nav "Backups"): every database's
+- Superadmin **Backups** page (`app/superadmin/backups.php`, nav "Backups", URL **`/backup-health`**
+  — not `/backups`, which is the real `backups/` folder and is blocked by Apache → 403; fixed
+  2026-11-08): every database's
   last good full backup, size, last snapshot, state (Healthy / Failed / Overdue / Never /
   Pending for companies created < 26 h ago), last error; the off-site copy; failures of the
   last 30 days. Data: `core/backup_health.php` over `tenant_backup_log` + `offsite_status.json`.
@@ -155,7 +157,23 @@ nightly job logs `NOT CONFIGURED` and changes nothing.
 - [ ] 6-hourly DB snapshots OK, or more frequent?
 - [ ] Whether to clean the ~325 MB of old `uploaded_*` / `pre_restore_*` clutter in `backups/t29/` once PR 1 ships.
 
-## 7. Google Drive setup — progress (updated 2026-11-01)
+## 7. Google Drive setup — progress (updated 2026-11-08) ✅ DONE
+
+**Server setup completed 2026-11-08**
+- [x] rclone remote `gdrive` (Google Drive, scope `drive.file`, own OAuth client) — `rclone lsd gdrive:` OK.
+- [x] rclone remote `bms-offsite` (type `crypt` over `gdrive:BMS-Backups`, standard filename + directory-name encryption, two generated passwords stored offline).
+- [x] `cron/offsite_backup.php --check` → "OK — off-site is ready … (encrypted)".
+- [x] First upload: 206 files, 224.5 MB, 0 errors (`offsite_status.json` status `ok`).
+- [x] Restore test: `t64/auto_backup_2026-11-08_00-45-15.zip` copied back from Drive — `unzip -t` clean, sha256 identical to the server copy.
+- [x] Nightly job present: `30 22 * * *` UTC (= 01:30 EAT) in `/etc/cron.d/bms-backup-bms-bjptechnologies-co-tz` (cron file names use dashes, not dots).
+- Note: root's rclone.conf also has a remote `drive:` that this setup did not create — left untouched.
+- Tip that worked: Google's consent page opened in the normal (already signed-in) Chrome without the Pixel 7 passkey; Incognito demanded the passkey.
+
+**Still open**
+- Merge PR #2678, deploy, check `/privacy` on the BJP host and on one tenant.
+- Add a second sign-in method to `bjptechnologieslimited@gmail.com` (backup codes / phone) so it does not depend on the Pixel 7.
+
+### History (2026-11-01)
 
 **Done**
 - [x] Google Cloud project `bms-backups-513409`, OAuth app "BMS Backups" (External), **published: In production** (so the Drive token no longer expires after 7 days; no verification requested).

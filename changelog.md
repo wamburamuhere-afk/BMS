@@ -1,5 +1,15 @@
 # BMS Changelog
 
+## 2026-11-08 — fix(superadmin): Backups page moved to /backup-health (was 403 Forbidden on production)
+
+**Changed:** `core/superadmin_auth.php`, `core/superadmin_ui.php`, `tests/test_backup_health_cli.php`, `backup_plan.md`
+
+- **Bug:** the superadmin Backups page lived at `/backups`, which is also the real `backups/` folder. Apache blocks that folder (`backups/.htaccess`), so the request never reached PHP and every visit — menu link, bell notification, old `/app/superadmin/backups.php` link — ended in **403 Forbidden**.
+- **Fix:** the page's short URL is now `/backup-health`. The menu item "Backups" and the `backup_problem` bell link use it; the old `/app/superadmin/backups.php` link redirects there. The `backups/` folder and its protection are unchanged.
+- **Guard:** new test check — no superadmin route may equal a top-level folder name, so this cannot happen again for another page.
+- **Docs:** `backup_plan.md` §7 — Google Drive off-site setup marked done (server remotes, first upload 206 files / 224.5 MB, restore test with matching sha256, nightly 01:30 EAT job confirmed).
+- **Checked:** backup health suite 48/48; superadmin URL, platform settings, platform AI, support center phase 1/5 suites pass; the 3 other failures seen (account recovery, plans, support phase 2) fail identically on develop without this change.
+
 ## 2026-11-07 — fix(smart-pos): no "Minimum selling price" in Smart POS (discounts and wholesale prices were blocked)
 
 **Changed:** `core/pos_min_price.php` (new), `api/pos/process_sale.php`, `api/create_product.php`, `api/update_product.php`, `core/product_import.php`, `app/bms/pos/pos_scripts_new.php`, `migrations/tenant/2026_11_07_smart_pos_min_price.php` (new), `migrations/2026_11_07_smart_pos_min_price_legacy_db.php` (new), `tests/test_smart_pos_min_price_cli.php` (new), `tests/test_product_edit_simple_pos_cli.php`
