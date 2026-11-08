@@ -299,6 +299,16 @@ jobs:
           # transient staleness issue, not a correctness break, and must not be
           # able to veto a release the same way tenant migrations must not.
           #
+          # PHP-FPM RELOAD, RIGHT AFTER EVERY APACHE RELOAD (2026-11-08).
+          # Since the 2026-11-08 server upgrade the BMS vhosts run PHP 8.5 through
+          # php8.5-fpm, not Apache's mod_php. FPM keeps its OWN opcode cache, so an
+          # Apache reload alone no longer refreshes BMS's code — the same "half-
+          # applied deploy" as above, one layer down. reload_fpm reloads every
+          # *active* php*-fpm service (graceful: in-flight requests finish), so it
+          # keeps working after a future PHP version bump and is a no-op on a host
+          # with no FPM. Guarded with || echo — like the Apache reload, it can
+          # never abort the deploy.
+          #
           # BACKUP SCHEDULE, LAST PER HOST, AND MAY NEVER ABORT THE DEPLOY.
           # `scripts/install_backup_cron.php` (re)writes /etc/cron.d/bms-backup-<host>:
           # full backup 00:30, DB snapshots 06:30/12:30/18:30 Africa/Dar_es_Salaam,
@@ -311,9 +321,11 @@ jobs:
             set -e
             HOSTS="bms.bjptechnologies.co.tz demo.bjptechnologies.co.tz"
             BACKUP_OFFSET=0
+            reload_fpm() { for s in $(systemctl list-units --type=service --state=active --plain --no-legend 'php*-fpm.service' | awk '{print $1}'); do sudo systemctl reload "$s" || echo "⚠️  $s reload failed — BMS may serve pre-deploy PHP (stale opcache). Run: sudo systemctl reload $s"; done; }
             UPLOAD_DIRS="parties/customers parties/suppliers parties/sub_contractors system/backups hr/employees hr/leaves procurement/purchase_returns procurement/delivery_notes products projects/inspections projects/scopes projects/contracts projects/reports finance/grn finance/vouchers finance/purchase_orders finance/invoices finance/petty_cash finance/customer_lpos loans signatures documents document_library document_templates compliance inspections tenders/submissions tenders/evaluation tenders/awards petty_cash purchase_orders"
-            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; { sudo chown "$(id -un):www-data" backups && sudo chgrp -R www-data backups && sudo chmod 2770 backups && sudo find backups -mindepth 1 -type d -exec chmod 2770 {} + && sudo find backups -mindepth 1 -type f -exec chmod 0660 {} + ; } || echo "⚠️  Could not tighten backups/ permissions on $h — backups still work; re-run by hand: sudo chown \$(id -un):www-data backups && sudo chmod 2770 backups"; php migrations/runner.php; sudo systemctl reload apache2 || echo "⚠️  Apache reload failed on $h"; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; sudo php scripts/install_backup_cron.php --host="$h" --offset="$BACKUP_OFFSET" || echo "⚠️  BACKUP SCHEDULE NOT INSTALLED on $h — the app deploy still succeeded. Re-run by hand: sudo php scripts/install_backup_cron.php --host=$h --offset=$BACKUP_OFFSET"; BACKUP_OFFSET=$((BACKUP_OFFSET + 30)); done
+            for h in $HOSTS; do echo "────── Deploying to $h ──────"; cd "/var/www/$h/public_html"; git fetch origin main; git reset --hard origin/main; for d in $UPLOAD_DIRS; do sudo mkdir -p "uploads/$d"; done; sudo chmod -R 777 uploads/ 2>/dev/null || true; { sudo chown "$(id -un):www-data" backups && sudo chgrp -R www-data backups && sudo chmod 2770 backups && sudo find backups -mindepth 1 -type d -exec chmod 2770 {} + && sudo find backups -mindepth 1 -type f -exec chmod 0660 {} + ; } || echo "⚠️  Could not tighten backups/ permissions on $h — backups still work; re-run by hand: sudo chown \$(id -un):www-data backups && sudo chmod 2770 backups"; php migrations/runner.php; sudo systemctl reload apache2 || echo "⚠️  Apache reload failed on $h"; reload_fpm; php scripts/setup_control_db.php || echo "⚠️  CONTROL DB SETUP REPORTED FAILURES on $h — the app deploy still succeeded. Inspect the log above, then re-run by hand: php scripts/setup_control_db.php"; php core/tenant_migration_runner.php || echo "⚠️  TENANT MIGRATIONS REPORTED FAILURES on $h — the app deploy still succeeded. Inspect migrations/tenant_deploy.log and the tenant_migration_log table, then re-run: php core/tenant_migration_runner.php --tenant=<id>"; sudo php scripts/install_backup_cron.php --host="$h" --offset="$BACKUP_OFFSET" || echo "⚠️  BACKUP SCHEDULE NOT INSTALLED on $h — the app deploy still succeeded. Re-run by hand: sudo php scripts/install_backup_cron.php --host=$h --offset=$BACKUP_OFFSET"; BACKUP_OFFSET=$((BACKUP_OFFSET + 30)); done
             sudo systemctl reload apache2 || echo "⚠️  Apache reload failed — some workers may keep serving pre-deploy PHP (stale opcache) until the next manual reload or worker recycle. Run: sudo systemctl reload apache2"
+            reload_fpm
             echo "BMS deployed at $(date)"
             echo "Deploy check: OK"
 
