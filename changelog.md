@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-08 — fix(deploy): reload PHP-FPM after Apache so BMS never serves old code after a deploy
+
+**Changed:** `.github/workflows/deploy.yml`, `tests/test_deploy_fpm_reload_cli.php` (new)
+
+- **Why:** on 2026-11-08 the production BMS sites (all companies + superadmin) moved to PHP 8.5.12 through `php8.5-fpm`; other systems on the server stay on PHP 8.3. FPM keeps its own code cache, so the deploy's Apache reload alone no longer refreshed BMS — visitors could get old pages after a deploy (the same "works, then doesn't" seen 2026-09-05).
+- **Fix:** new `reload_fpm` step reloads every active `php*-fpm` service right after each Apache reload (per host after migrations, and the final one). Graceful reload, any PHP version, does nothing where no FPM runs, and a failure only prints a warning with the fix command — it can never stop a deploy. The existing Apache reloads are unchanged.
+- **Checked:** new test 15/15 (wiring + the real `reload_fpm` line run in bash with stubbed systemctl: reloads all, warns without aborting under `set -e`, no-op with no FPM); tenant backups 62/62 and plan-line deploy 6/6 suites pass; deploy.yml parses as YAML.
+
 ## 2026-11-08 — fix(superadmin): Backups page moved to /backup-health (was 403 Forbidden on production)
 
 **Changed:** `core/superadmin_auth.php`, `core/superadmin_ui.php`, `tests/test_backup_health_cli.php`, `backup_plan.md`
