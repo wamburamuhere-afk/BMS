@@ -372,6 +372,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
 .rcp-amt .rcp-unit { max-width:64px; flex:0 0 64px; padding-right:1.4rem; }
 .rcp-no { width:24px; flex:0 0 24px; text-align:center; color:#6c757d; font-size:.85rem; }
 .rm-pot { background:#f5f9ff; border:1px dashed #9ec5fe; }   /* the pot: an expectation, not a booked figure */
+.swal2-popup .rm-swal-in { width:100%; max-width:100%; margin:8px 0 0; box-sizing:border-box; }   /* hints never cut off */
 </style>
 
 <script>
@@ -699,10 +700,12 @@ function openRecipe(id) {
 function rcpAdd(d) {
     if (!d || !d.id || RCP.lines.some(l => l.product_id === d.id)) return;
     const unit = d.unit || 'pcs', sm = rcpSmall(unit);
-    // kg / litre ingredients start in g / ml, empty, ready to type (e.g. 250 g); pieces start at 1.
-    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: unit, qty: sm ? 0 : 1, du: sm ? sm.u : unit, cost: parseFloat(d.cost_price) || null, stock: null });
+    // One plate: kg / litre ingredients start in g / ml (250 g). A pot (2026-11-10): they start in kg / litre — a pot
+    // of 20 plates takes "5 kg" of rice, not "5000 g". Empty, ready to type; pieces start at 1.
+    const small = sm && RCP.yield <= 1;
+    RCP.lines.push({ product_id: d.id, name: String(d.text || '').replace(/\s*\([^)]*\)$/, ''), unit: unit, qty: sm ? 0 : 1, du: small ? sm.u : unit, cost: parseFloat(d.cost_price) || null, stock: null });
     rcpRender();
-    if (sm) setTimeout(() => $('#rcpLines .rcp-qty').last().focus(), 50);
+    setTimeout(() => $('#rcpLines .rcp-qty').last().focus(), 50);
 }
 function rcpSetQty(i, v) {
     const l = RCP.lines[i]; if (!l) return;
@@ -779,8 +782,8 @@ function rcpTotals() {
 }
 function rcpNewIngredient() {
     Swal.fire({ title: RM.newIngredient, confirmButtonText: RM.save || 'OK', showCancelButton: true, cancelButtonText: RM.cancel, confirmButtonColor: '#0d6efd',
-        html: `<input id="ingN" class="swal2-input" placeholder="${RM.ingName}"><input id="ingU" class="swal2-input" placeholder="${RM.ingUnit}" value="kg">`
-            + (CAN_COST ? `<input id="ingC" type="number" min="0" step="any" class="swal2-input" placeholder="${RM.ingCost}">` : ''),
+        html: `<input id="ingN" class="swal2-input rm-swal-in" placeholder="${RM.ingName}"><input id="ingU" class="swal2-input rm-swal-in" placeholder="${RM.ingUnit}" value="kg">`
+            + (CAN_COST ? `<input id="ingC" type="number" min="0" step="any" class="swal2-input rm-swal-in" placeholder="${RM.ingCost}">` : ''),
         preConfirm: () => Object.assign({ name: $('#ingN').val().trim(), unit: $('#ingU').val().trim() }, CAN_COST ? { cost_price: $('#ingC').val() } : {})
     }).then(r => {
         if (!r.isConfirmed) return;

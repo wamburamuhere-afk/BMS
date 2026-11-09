@@ -69,6 +69,20 @@ if ($ids && rcpReady($pdo)) {
     $spoil = $sp->fetchAll(PDO::FETCH_ASSOC);
 }
 $spoilCost = array_sum(array_map(fn($r) => (float)$r['amount'], $spoil));
+// Phase 5 — plates cooked by the pot but not sold: their recipe ingredients left stock as waste at the day's close.
+$unsold = [];
+if ($ids && rcpUnsoldReady($pdo)) {
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $us = $pdo->prepare("SELECT u.plan_date, u.plates, u.kept_left, u.amount, p.product_name, w.warehouse_name
+                           FROM restaurant_cook_unsold u
+                      LEFT JOIN products p ON p.product_id = u.product_id
+                      LEFT JOIN warehouses w ON w.warehouse_id = u.warehouse_id
+                          WHERE u.status = 'posted' AND u.plates > 0 AND u.warehouse_id IN ($ph) AND u.plan_date BETWEEN ? AND ?
+                       ORDER BY u.plan_date DESC, u.id DESC");
+    $us->execute(array_merge($ids, [$from, $to]));
+    $unsold = $us->fetchAll(PDO::FETCH_ASSOC);
+}
+$unsoldCost = array_sum(array_map(fn($r) => (float)$r['amount'], $unsold));
 $waste   = array_values(array_filter($rows, fn($r) => $r['stage'] === 'after_kitchen'));
 $posted  = array_sum(array_map(fn($r) => (float)$r['posted_cost'], $rows));
 $estOnly = array_sum(array_map(fn($r) => (float)$r['posted_cost'] > 0 ? 0 : (float)$r['est_cost'], $waste));
@@ -123,6 +137,27 @@ $fmtQ = fn($q) => rtrim(rtrim(number_format((float)$q, 3, '.', ''), '0'), '.');
             <div class="fs-4 fw-bold text-danger" id="stSpoil"><?= htmlspecialchars($cur) ?> <?= $fmt($spoilCost) ?></div><div class="small text-muted"><?= t('Spoiled stock') ?> (<?= count($spoil) ?>)</div></div></div>
         <?php endif; ?>
     </div>
+
+    <?php if ($unsold): ?>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white d-flex justify-content-between flex-wrap gap-1">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-fire me-1"></i><?= t('Cooked, not sold') ?></h6><span class="fw-bold text-danger"><?= htmlspecialchars($cur) ?> <?= $fmt($unsoldCost) ?></span></div>
+        <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th><?= t('S/No.') ?></th><th><?= t('Date') ?></th><th><?= t('Dish') ?></th><th class="text-end"><?= t('Plates') ?></th><th class="text-end"><?= t('Cost') ?></th></tr></thead>
+            <tbody>
+            <?php foreach ($unsold as $i => $u): ?>
+                <tr>
+                    <td><?= $i + 1 ?></td>
+                    <td><?= date('d/m/Y', strtotime($u['plan_date'])) ?><?= count($warehouses) > 1 ? '<div class="small text-muted">' . caseFormat($u['warehouse_name']) . '</div>' : '' ?></td>
+                    <td><?= safe_output(caseFormat((string)$u['product_name'])) ?><?= (float)$u['kept_left'] > 0 ? '<div class="small text-muted">' . sprintf(t('%s plate(s) kept to sell later'), $fmtQ($u['kept_left'])) . '</div>' : '' ?></td>
+                    <td class="text-end"><?= $fmtQ($u['plates']) ?></td>
+                    <td class="text-end"><?= $fmt($u['amount']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div>
+        <div class="small text-muted p-2"><?= t('A pot is cooked all at once: the ingredients of the plates that did not sell left stock when the day was closed on the Cooking plan.') ?></div></div>
+    </div>
+    <?php endif; ?>
 
     <?php if ($spoil): ?>
     <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-box-seam me-1"></i><?= t('Spoiled stock') ?></h6></div>

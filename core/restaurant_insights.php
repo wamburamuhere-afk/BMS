@@ -615,7 +615,8 @@ if (!function_exists('rdCompareSeries')) {
         // The three cost parts still add up to the same Cost-of-goods total.
         $parts = function (string $a, string $b) use ($pdo, $jeScope, $pos, $n): array {
             $out = ['stock' => array_fill(0, $n, 0.0), 'food' => array_fill(0, $n, 0.0), 'waste' => array_fill(0, $n, 0.0), 'exp' => array_fill(0, $n, 0.0)];
-            $isWaste = "je.entity_type IN ('kitchen_waste','restaurant_spoilage')";
+            // Phase 5: plates cooked by the pot but not sold (and a re-close's reversal) are waste too.
+            $isWaste = "je.entity_type IN ('kitchen_waste','restaurant_spoilage','restaurant_cook_unsold','restaurant_cook_unsold_void')";
             try {
                 $st = $pdo->prepare("
                     SELECT " . $pos('je.entry_date', 'je.created_at', $a) . " AS p,
