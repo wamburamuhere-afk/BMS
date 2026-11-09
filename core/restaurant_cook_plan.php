@@ -46,6 +46,18 @@ if (!function_exists('rcpReady')) {
     }
 }
 
+if (!function_exists('rcpRequestsReady')) {
+    /** Phase 4 — restaurant_cook_plan_items.status exists: a cook without the stock right can ASK for stock. */
+    function rcpRequestsReady(PDO $pdo): bool
+    {
+        static $ok = null;
+        if ($ok !== null) return $ok;
+        try { $ok = rcpReady($pdo) && (bool)$pdo->query("SHOW COLUMNS FROM restaurant_cook_plan_items LIKE 'status'")->fetch(); }
+        catch (Throwable $e) { $ok = false; }
+        return $ok;
+    }
+}
+
 if (!function_exists('rcpCanMoveStock')) {
     /** Taking from stock / spoiling: the same right that changes stock in Purchases. */
     function rcpCanMoveStock(): bool
@@ -94,10 +106,18 @@ if (!function_exists('rcpDish')) {
         }
         $yield = max(1, (int)$d['yield']);
         $extra = (float)$d['extra'];
+        // Phase 4 — how many plates this shop's stock allows: the ingredient that runs out first decides.
+        $max = null; $limiting = null;
+        foreach ($comps as $cp) {
+            if ($cp['qty_per_plate'] <= 0) continue;
+            $n = (int)floor(max(0, $cp['stock']) / $cp['qty_per_plate'] + 1e-9);
+            if ($max === null || $n < $max) { $max = $n; $limiting = $cp['name']; }
+        }
         return [
             'product_id' => (int)$d['product_id'], 'name' => $d['product_name'], 'selling_price' => (float)$d['selling_price'],
             'yield' => $yield, 'extra' => $extra, 'is_combo' => (int)$d['is_combo'] === 1,
             'plate_cost' => round($ing + $extra / $yield, 4), 'has_recipe' => $comps || $extra > 0, 'components' => $comps,
+            'max_plates' => $max, 'limiting' => $limiting,
         ];
     }
 }
@@ -149,7 +169,8 @@ if (!function_exists('rcpLastLines')) {
         $st->execute([$warehouseId, $productId]);
         $p = $st->fetch(PDO::FETCH_ASSOC);
         if (!$p || (float)$p['pots'] <= 0) return [];
-        $it = $pdo->prepare("SELECT product_id, quantity FROM restaurant_cook_plan_items WHERE plan_id = ?");
+        $it = $pdo->prepare("SELECT product_id, quantity FROM restaurant_cook_plan_items WHERE plan_id = ?"
+                            . (rcpRequestsReady($pdo) ? " AND status <> 'rejected'" : ''));
         $it->execute([(int)$p['id']]);
         return array_map(fn($r) => ['product_id' => (int)$r['product_id'], 'qty_per_pot' => round((float)$r['quantity'] / (float)$p['pots'], 3)],
                          $it->fetchAll(PDO::FETCH_ASSOC));
@@ -229,7 +250,9 @@ if (!function_exists('rcpCreate')) {
             if ($lp <= 0 || $lq <= 0) continue;
             $clean[$lp] = round(($clean[$lp] ?? 0) + $lq, 3);
         }
-        if ($clean && !rcpCanMoveStock()) throw new Exception(t('Only someone who may change stock (Purchases) can take items from stock.'));
+        // Phase 4: without the stock right the lines become a REQUEST for the storekeeper (nothing leaves stock yet).
+        $request = $clean && !rcpCanMoveStock();
+        if ($request && !rcpRequestsReady($pdo)) throw new Exception(t('Only someone who may change stock (Purchases) can take items from stock.'));
         $items = [];
         foreach ($clean as $lp => $lq) {
             $item = rcpCountedItem($pdo, $lp);
@@ -244,8 +267,9 @@ if (!function_exists('rcpCreate')) {
             $items[] = $item + ['qty' => $lq];
         }
         $recipeCost = round($dish['plate_cost'] * $plates, 2);   // ingredients' share × plates + other costs × pots — an estimate
-        $accounts = $items ? rcpCostAccounts($pdo) : null;
+        $accounts = ($items && !$request) ? rcpCostAccounts($pdo) : null;
         $date = date('Y-m-d');
+        $withStatus = rcpRequestsReady($pdo);
 
         $pdo->beginTransaction();
         try {
@@ -255,11 +279,18 @@ if (!function_exists('rcpCreate')) {
             $id = (int)$pdo->lastInsertId();
             $ref = 'COOK-' . $id;
             $stockCost = 0.0;
-            $ins = $pdo->prepare("INSERT INTO restaurant_cook_plan_items (plan_id, product_id, quantity, unit, unit_cost, amount, movement_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins = $withStatus
+                ? $pdo->prepare("INSERT INTO restaurant_cook_plan_items (plan_id, product_id, quantity, unit, unit_cost, amount, movement_id, status, requested_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                : $pdo->prepare("INSERT INTO restaurant_cook_plan_items (plan_id, product_id, quantity, unit, unit_cost, amount, movement_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
             foreach ($items as $it) {
                 $uc = (float)$it['cost_price']; $amt = round($it['qty'] * $uc, 2);
+                if ($request) {                    // asked for, not given: no movement, no cost yet
+                    $ins->execute([$id, (int)$it['product_id'], $it['qty'], $it['unit'], $uc, $amt, null, 'requested', $uid]);
+                    continue;
+                }
                 $mv = rcpStockOut($pdo, $wh, (int)$it['product_id'], $it['qty'], $uc, 'issue_out', $ref, $id, "Cooking: {$dish['name']} — taken from stock", $uid, $it['unit']);
-                $ins->execute([$id, (int)$it['product_id'], $it['qty'], $it['unit'], $uc, $amt, $mv]);
+                $withStatus ? $ins->execute([$id, (int)$it['product_id'], $it['qty'], $it['unit'], $uc, $amt, $mv, 'issued', $uid])
+                            : $ins->execute([$id, (int)$it['product_id'], $it['qty'], $it['unit'], $uc, $amt, $mv]);
                 $stockCost += $amt;
             }
             $stockCost = round($stockCost, 2);
@@ -272,13 +303,14 @@ if (!function_exists('rcpCreate')) {
                 ], null, $id, 'restaurant_cook_cogs', $date, $uid, $wh);
             }
             $pdo->prepare("UPDATE restaurant_cook_plans SET stock_cost = ?, journal_entry_id = ? WHERE id = ?")->execute([$stockCost, $entry, $id]);
-            logActivity($pdo, $uid, "Cooking plan $ref: {$dish['name']} × $pots pot(s) = $plates plate(s)" . ($stockCost > 0 ? ", stock used $stockCost" : ''));
+            logActivity($pdo, $uid, "Cooking plan $ref: {$dish['name']} × $pots pot(s) = $plates plate(s)" . ($stockCost > 0 ? ", stock used $stockCost" : '')
+                . ($request ? ', stock requested (' . count($items) . ' line(s))' : ''));
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
-        return ['id' => $id, 'plates' => $plates, 'recipe_cost' => $recipeCost, 'stock_cost' => $stockCost];
+        return ['id' => $id, 'plates' => $plates, 'recipe_cost' => $recipeCost, 'stock_cost' => $stockCost, 'requested' => $request ? count($items) : 0];
     }
 }
 
@@ -317,7 +349,10 @@ if (!function_exists('rcpCancel')) {
         if (!$p || $p['status'] === 'cancelled') throw new Exception(t('This cooking plan was not found.'));
         if (!userCan('warehouse', (int)$p['warehouse_id'])) throw new Exception(wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.'));
         if ($p['status'] !== 'open' || $p['plan_date'] !== date('Y-m-d')) throw new Exception(t('Only today\'s cooking that is still open can be cancelled.'));
-        $it = $pdo->prepare("SELECT i.*, p.product_name FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id WHERE i.plan_id = ?");
+        // Only lines that really left stock come back (Phase 4: a request never moved stock).
+        $withStatus = rcpRequestsReady($pdo);
+        $it = $pdo->prepare("SELECT i.*, p.product_name FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id WHERE i.plan_id = ?"
+                            . ($withStatus ? " AND i.status = 'issued'" : ''));
         $it->execute([$planId]);
         $items = $it->fetchAll(PDO::FETCH_ASSOC);
         if ($items && !rcpCanMoveStock()) throw new Exception(t('Only someone who may change stock (Purchases) can cancel cooking that took items from stock.'));
@@ -342,6 +377,7 @@ if (!function_exists('rcpCancel')) {
                     ['account_id' => $cogs, 'type' => 'credit', 'amount' => $amt, 'description' => 'Cooking cancelled'],
                 ], null, $planId, 'restaurant_cook_cogs_void', date('Y-m-d'), $uid, $wh);
             }
+            if ($withStatus) $pdo->prepare("UPDATE restaurant_cook_plan_items SET status = 'rejected', decided_by = ?, decided_at = NOW() WHERE plan_id = ? AND status = 'requested'")->execute([$uid, $planId]);
             $pdo->prepare("UPDATE restaurant_cook_plans SET status = 'cancelled', cancelled_by = ?, cancelled_at = NOW() WHERE id = ?")->execute([$uid, $planId]);
             logActivity($pdo, $uid, "Cooking plan $ref cancelled" . ($items ? ' — stock returned' : ''));
             $pdo->commit();
@@ -408,7 +444,8 @@ if (!function_exists('rcpDay')) {
         $st->execute([$warehouseId, $date]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         $sold = [];
-        $items = $pdo->prepare("SELECT i.product_id, p.product_name, i.quantity, i.unit, i.amount FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id WHERE i.plan_id = ?");
+        $items = $pdo->prepare("SELECT i.product_id, p.product_name, i.quantity, i.unit, i.amount, " . (rcpRequestsReady($pdo) ? 'i.status' : "'issued'") . " AS status
+                                  FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id WHERE i.plan_id = ?");
         foreach ($rows as &$r) {
             $pid = (int)$r['product_id'];
             if (!isset($sold[$pid])) $sold[$pid] = rcpSoldOn($pdo, $warehouseId, $pid, $date);
@@ -419,10 +456,157 @@ if (!function_exists('rcpDay')) {
                 'recipe_cost' => (float)$r['recipe_cost'], 'stock_cost' => (float)$r['stock_cost'],
                 'sold' => $sold[$pid], 'plates_left' => $r['plates_left'] === null ? null : (float)$r['plates_left'],
                 'status' => $r['status'], 'created_at' => $r['created_at'],
-                'items' => array_map(fn($i) => ['name' => $i['product_name'], 'qty' => (float)$i['quantity'], 'unit' => $i['unit'], 'amount' => (float)$i['amount']], $items->fetchAll(PDO::FETCH_ASSOC)),
+                'items' => array_map(fn($i) => ['name' => $i['product_name'], 'qty' => (float)$i['quantity'], 'unit' => $i['unit'], 'amount' => (float)$i['amount'], 'status' => $i['status']], $items->fetchAll(PDO::FETCH_ASSOC)),
             ];
         }
         unset($r);
         return $rows;
+    }
+}
+
+if (!function_exists('rcpRequests')) {
+    /** Phase 4 — stock the cooks asked for in this shop, still waiting (open cooks), oldest first. */
+    function rcpRequests(PDO $pdo, int $warehouseId): array
+    {
+        if (!rcpRequestsReady($pdo)) return [];
+        $st = $pdo->prepare("SELECT c.id AS plan_id, c.plan_date, c.pots, d.product_name AS dish, i.product_id, p.product_name, i.quantity, i.unit,
+                                    COALESCE(p.cost_price, 0) AS cost_price, i.requested_by, c.created_at,
+                                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS by_name, u.username
+                               FROM restaurant_cook_plan_items i
+                               JOIN restaurant_cook_plans c ON c.id = i.plan_id AND c.status = 'open'
+                               JOIN products d ON d.product_id = c.product_id
+                               JOIN products p ON p.product_id = i.product_id
+                          LEFT JOIN users u ON u.user_id = i.requested_by
+                              WHERE c.warehouse_id = ? AND i.status = 'requested'
+                           ORDER BY c.id, p.product_name");
+        $st->execute([$warehouseId]);
+        $by = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $pid = (int)$r['plan_id'];
+            $by[$pid] = $by[$pid] ?? ['plan_id' => $pid, 'plan_date' => $r['plan_date'], 'dish' => $r['dish'], 'pots' => (float)$r['pots'],
+                                       'by' => trim((string)$r['by_name']) ?: (string)$r['username'], 'requested_by' => (int)$r['requested_by'], 'lines' => []];
+            $by[$pid]['lines'][] = ['product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => (float)$r['quantity'], 'unit' => $r['unit'],
+                                    'stock' => rcpShopStock($pdo, $warehouseId, (int)$r['product_id']), 'cost_price' => (float)$r['cost_price']];
+        }
+        return array_values($by);
+    }
+}
+
+if (!function_exists('rcpDecide')) {
+    /**
+     * Phase 4 — the storekeeper's answer to a cook's stock request (all waiting lines of one cook):
+     *   approve → each line leaves stock now (issue_out) at today's cost; one entry Dr Cost of Sales / Cr Inventory
+     *             (entity 'restaurant_cook_cogs', like stock taken straight away); the cook's stock cost grows.
+     *   reject  → nothing moves; the lines are marked rejected.
+     * Only someone with the stock right, and never the person who asked (separation of duties) unless an admin.
+     */
+    function rcpDecide(PDO $pdo, int $planId, bool $approve, int $uid): array
+    {
+        if (!rcpRequestsReady($pdo)) throw new Exception(t('Something went wrong.'));
+        if (!rcpCanMoveStock()) throw new Exception(t('Only someone who may change stock (Purchases) can give out stock.'));
+        $p = rcpGet($pdo, $planId);
+        if (!$p || $p['status'] !== 'open') throw new Exception(t('This cooking is no longer open.'));
+        $wh = (int)$p['warehouse_id'];
+        if (!userCan('warehouse', $wh)) throw new Exception(wLabel('Access denied: this warehouse is not in your assigned scope.', 'Access denied: this shop is not in your assigned scope.'));
+        $st = $pdo->prepare("SELECT i.*, p.product_name, COALESCE(p.cost_price, 0) AS cost_now FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id
+                              WHERE i.plan_id = ? AND i.status = 'requested'");
+        $st->execute([$planId]);
+        $lines = $st->fetchAll(PDO::FETCH_ASSOC);
+        if (!$lines) throw new Exception(t('There is no stock request on this cooking.'));
+        if (!isAdmin() && (int)$lines[0]['requested_by'] === $uid) throw new Exception(t('Someone else must give out the stock you asked for.'));
+        $dish = (string)$pdo->query("SELECT product_name FROM products WHERE product_id = " . (int)$p['product_id'])->fetchColumn();
+        $ref = 'COOK-' . $planId;
+
+        if (!$approve) {
+            $pdo->prepare("UPDATE restaurant_cook_plan_items SET status = 'rejected', decided_by = ?, decided_at = NOW() WHERE plan_id = ? AND status = 'requested'")->execute([$uid, $planId]);
+            logActivity($pdo, $uid, "Stock request $ref rejected (" . count($lines) . ' line(s))');
+            return ['approved' => false, 'lines' => count($lines), 'amount' => 0.0];
+        }
+        foreach ($lines as $l) {                       // all or nothing: check every line first
+            $have = rcpShopStock($pdo, $wh, (int)$l['product_id']);
+            if ((float)$l['quantity'] > $have + 0.0005) {
+                throw new Exception(sprintf(t('Only %1$s %2$s of %3$s left in stock.'), rtrim(rtrim(number_format($have, 3, '.', ''), '0'), '.'), $l['unit'], $l['product_name']));
+            }
+        }
+        [$cogs, $inv] = rcpCostAccounts($pdo);
+        $pdo->beginTransaction();
+        try {
+            $total = 0.0;
+            $up = $pdo->prepare("UPDATE restaurant_cook_plan_items SET status = 'issued', unit_cost = ?, amount = ?, movement_id = ?, decided_by = ?, decided_at = NOW() WHERE id = ?");
+            foreach ($lines as $l) {
+                $q = (float)$l['quantity']; $uc = (float)$l['cost_now']; $amt = round($q * $uc, 2);
+                $mv = rcpStockOut($pdo, $wh, (int)$l['product_id'], $q, $uc, 'issue_out', $ref, $planId, "Cooking: $dish — given out on request", $uid, $l['unit'] ?: 'pcs');
+                $up->execute([$uc, $amt, $mv, $uid, (int)$l['id']]);
+                $total += $amt;
+            }
+            $total = round($total, 2);
+            $entry = null;
+            if ($total > 0) {
+                $entry = postLedgerEntry($pdo, "Cooking $ref — $dish: stock given out on request", [
+                    ['account_id' => $cogs, 'type' => 'debit',  'amount' => $total, 'description' => 'Stock used for cooking'],
+                    ['account_id' => $inv,  'type' => 'credit', 'amount' => $total, 'description' => 'Stock used for cooking'],
+                ], null, $planId, 'restaurant_cook_cogs', date('Y-m-d'), $uid, $wh);
+            }
+            $pdo->prepare("UPDATE restaurant_cook_plans SET stock_cost = stock_cost + ?, journal_entry_id = COALESCE(journal_entry_id, ?) WHERE id = ?")->execute([$total, $entry, $planId]);
+            logActivity($pdo, $uid, "Stock request $ref given out: " . count($lines) . " line(s), cost $total");
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+        return ['approved' => true, 'lines' => count($lines), 'amount' => $total];
+    }
+}
+
+if (!function_exists('rcpReport')) {
+    /**
+     * Phase 4 — planned vs actual, per dish and day, for a date range (cancelled cooks left out).
+     * Sold and sales come from the till per dish and day (counted once even when the dish was cooked twice).
+     * A day with a cook still open has no "left" yet: its left / not-accounted / lost stay empty.
+     * @return array{rows: array, totals: array}
+     */
+    function rcpReport(PDO $pdo, array $warehouseIds, string $from, string $to): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $warehouseIds)));
+        if (!$ids) return ['rows' => [], 'totals' => []];
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $st = $pdo->prepare("SELECT c.warehouse_id, c.plan_date, c.product_id, p.product_name, w.warehouse_name,
+                                    SUM(c.pots) AS pots, SUM(c.plates_planned) AS planned, MAX(c.selling_price) AS price,
+                                    SUM(c.recipe_cost) AS recipe_cost, SUM(c.stock_cost) AS stock_cost,
+                                    SUM(CASE WHEN c.status = 'closed' THEN c.plates_left ELSE 0 END) AS left_plates,
+                                    SUM(c.status = 'open') AS open_count, COUNT(*) AS cooks
+                               FROM restaurant_cook_plans c JOIN products p ON p.product_id = c.product_id LEFT JOIN warehouses w ON w.warehouse_id = c.warehouse_id
+                              WHERE c.status <> 'cancelled' AND c.warehouse_id IN ($ph) AND c.plan_date BETWEEN ? AND ?
+                           GROUP BY c.warehouse_id, c.plan_date, c.product_id, p.product_name, w.warehouse_name
+                           ORDER BY c.plan_date DESC, p.product_name");
+        $st->execute(array_merge($ids, [$from, $to]));
+        $rev = $pdo->prepare("SELECT COALESCE(SUM(psi.quantity), 0) AS qty, COALESCE(SUM(psi.line_total), 0) AS sales
+                                FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id
+                               WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
+                                 AND ps.warehouse_id = ? AND psi.product_id = ? AND DATE(ps.sale_date) = ?");
+        $rows = [];
+        $T = ['planned' => 0, 'sold' => 0, 'left' => 0, 'unaccounted' => 0, 'expected_sales' => 0, 'sales' => 0, 'cost' => 0, 'expected_gp' => 0, 'actual_gp' => 0, 'lost' => 0];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $rev->execute([(int)$r['warehouse_id'], (int)$r['product_id'], $r['plan_date']]);
+            $s = $rev->fetch(PDO::FETCH_ASSOC);
+            $planned = (float)$r['planned']; $sold = round((float)$s['qty'], 2); $closed = (int)$r['open_count'] === 0;
+            $left = $closed ? (float)$r['left_plates'] : null;
+            $unacc = $closed ? round(max(0, $planned - $sold - $left), 2) : null;
+            $price = (float)$r['price']; $cost = round((float)$r['recipe_cost'] + (float)$r['stock_cost'], 2);
+            $expSales = round($planned * $price, 2); $sales = round((float)$s['sales'], 2);
+            $row = [
+                'date' => $r['plan_date'], 'shop' => $r['warehouse_name'], 'dish' => $r['product_name'], 'cooks' => (int)$r['cooks'],
+                'pots' => (float)$r['pots'], 'planned' => $planned, 'sold' => $sold, 'left' => $left, 'unaccounted' => $unacc, 'closed' => $closed,
+                'price' => $price, 'cost' => $cost, 'expected_sales' => $expSales, 'sales' => $sales,
+                'expected_gp' => round($expSales - $cost, 2), 'actual_gp' => round($sales - $cost, 2),
+                // plates not sold (left + not accounted for) at the selling price: the sales the day did not get
+                'lost' => $closed ? round(($left + $unacc) * $price, 2) : null,
+            ];
+            $rows[] = $row;
+            foreach (['planned', 'sold', 'expected_sales', 'sales', 'cost', 'expected_gp', 'actual_gp'] as $k) $T[$k] += $row[$k];
+            if ($closed) { $T['left'] += $left; $T['unaccounted'] += $unacc; $T['lost'] += $row['lost']; }
+        }
+        foreach ($T as $k => $v) $T[$k] = round($v, 2);
+        return ['rows' => $rows, 'totals' => $T];
     }
 }

@@ -26,6 +26,9 @@ $can_edit   = canEdit('restaurant_pos');
 $can_move   = rcpCanMoveStock();
 $can_cost   = restaurantCanSeeCost();
 $module_on  = restaurantModuleOn($pdo) && rcpReady($pdo);
+// Phase 4: a cook without the stock right may ASK for stock; the storekeeper gives it out (Stock requests).
+$can_ask    = $module_on && $can_edit && !$can_move && rcpRequestsReady($pdo);
+$can_report = canView('restaurant_pos') && ($can_edit || $can_cost || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess()));
 $warehouses = $module_on ? restaurantWarehousesForSelect($pdo) : [];
 require_once __DIR__ . '/../../../includes/restaurant/form_kit.php';
 rfKitAssets();
@@ -37,6 +40,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
         <h4 class="mb-0 text-truncate"><i class="ri ri-cooking-pot text-primary me-2"></i><?= t('Cooking plan') ?></h4>
         <div class="d-flex gap-2 align-items-center">
             <input type="date" id="cpDate" class="form-control form-control-sm" style="width:auto;" value="<?= date('Y-m-d') ?>" max="<?= date('Y-m-d') ?>" aria-label="<?= htmlspecialchars(t('Date')) ?>">
+            <?php if ($can_report): ?><a href="<?= getUrl('restaurant/cooking-report') ?>" class="btn btn-outline-primary btn-sm"><i class="bi bi-clipboard-data"></i><span class="d-none d-md-inline ms-1"><?= t('Planned vs actual') ?></span></a><?php endif; ?>
             <a href="<?= getUrl('restaurant/menu') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-journal-richtext"></i><span class="d-none d-md-inline ms-1"><?= t('Menu') ?></span></a>
         </div>
     </div>
@@ -88,10 +92,14 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
 
                     <div id="cpComps" class="cp-note mb-3 d-none"></div>
 
-                    <?php if ($can_move): ?>
+                    <div id="cpCheck" class="small mb-3 d-none"></div>
+
+                    <?php if ($can_move || $can_ask): ?>
                     <div class="rf-sec mb-0">
-                        <div class="rf-sec-title"><i class="bi bi-box-seam"></i><?= t('Taken from stock') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></div>
-                        <div class="rf-help mt-0 mb-2"><?= t('Rice, oil or flour kept from an earlier purchase. It leaves stock now and its cost counts today.') ?></div>
+                        <div class="rf-sec-title"><i class="bi bi-box-seam"></i><?= $can_move ? t('Taken from stock') : t('Ask for stock') ?> <span class="rf-opt">(<?= t('optional') ?>)</span></div>
+                        <div class="rf-help mt-0 mb-2"><?= $can_move
+                            ? t('Rice, oil or flour kept from an earlier purchase. It leaves stock now and its cost counts today.')
+                            : t('Ask for rice, oil or flour from stock. The storekeeper gives it out — only then does it leave stock.') ?></div>
                         <div id="cpLines"></div>
                         <select id="cpPick" class="form-select mt-2" style="width:100%"></select>
                     </div>
@@ -115,6 +123,12 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
                 <div id="cpPlans" class="p-2"></div>
                 <?php if ($can_cost): ?><div class="small text-muted px-3 pb-3"><i class="bi bi-info-circle me-1"></i><?= t('Expected only, before you sell: gas or charcoal, staff, rent and plates that do not sell are not included. Your real profit is in the Profit Report.') ?></div><?php endif; ?>
             </div>
+            <?php if ($can_move && rcpRequestsReady($pdo)): ?>
+            <div class="cp-card mb-3 d-none" id="cpReqCard">
+                <div class="cp-card-h d-flex justify-content-between align-items-center"><h6><i class="bi bi-inbox me-1"></i><?= t('Stock requests') ?> <span class="badge bg-warning text-dark ms-1" id="cpReqCount"></span></h6></div>
+                <div id="cpReqs" class="p-2"></div>
+            </div>
+            <?php endif; ?>
             <?php if ($can_move): ?>
             <div class="cp-card">
                 <div class="cp-card-h"><h6><i class="bi bi-box-seam me-1"></i><?= t('Kitchen stock') ?></h6></div>
@@ -151,6 +165,7 @@ const CP = {
     api: <?= json_encode(buildUrl('api/restaurant/cook_plan.php')) ?>,
     csrf: <?= json_encode(csrf_token()) ?>,
     canEdit: <?= json_encode($can_edit) ?>, canMove: <?= json_encode($can_move) ?>, canCost: <?= json_encode($can_cost) ?>,
+    canAsk: <?= json_encode($can_ask) ?>,   // Phase 4: lines become a request for the storekeeper
     cur: <?= json_encode(getSetting('currency', 'TZS')) ?>,
     s: {
         pickDish: <?= json_encode(t('Choose a dish...')) ?>, pickStock: <?= json_encode(t('+ Take an item from stock (type to search)...')) ?>,
@@ -182,8 +197,15 @@ const CP = {
         saving: <?= json_encode(t('Saving...')) ?>, chooseDish: <?= json_encode(t('Choose a dish from the Menu.')) ?>,
         enterPots: <?= json_encode(t('Enter how many pots you cook (more than 0, up to 100).')) ?>,
         remove: <?= json_encode(t('Remove')) ?>,
+        enoughFor: <?= json_encode(t('Your stock is enough for %1$s plates — %2$s runs out first.')) ?>,
+        onlyFor: <?= json_encode(t('Not enough stock: only %1$s plates — %2$s runs out first. Buy more, or cook less.')) ?>,
+        requested: <?= json_encode(t('asked for')) ?>, rejected: <?= json_encode(t('rejected')) ?>,
+        reqBy: <?= json_encode(t('Asked by %s')) ?>, give: <?= json_encode(t('Give out')) ?>, reject: <?= json_encode(t('Reject')) ?>,
+        giveQ: <?= json_encode(t('Give out this stock?')) ?>, giveTxt: <?= json_encode(t('It leaves stock now and its cost counts today.')) ?>,
+        rejectQ: <?= json_encode(t('Reject this request?')) ?>, yes: <?= json_encode(t('Yes')) ?>,
     }
 };
+CP.canTake = CP.canMove || CP.canAsk;   // the "from stock" lines: taken straight away, or asked for
 const cpFmt = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const cpQty = n => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 3 });
 const nm = s => safeOutput(caseFormatJs(String(s || '')));
@@ -201,7 +223,7 @@ $(function () {
         $('#cpDish').select2({ theme: 'bootstrap-5', width: '100%', placeholder: CP.s.pickDish }).on('change', cpPickDish);
         $('#cpPots').on('input change', function () { cpScaleLast(); cpRender(); });
         $('#cpSave').on('click', cpSave);
-        if (CP.canMove) {
+        if (CP.canTake) {
             $('#cpPick').select2({ theme: 'bootstrap-5', width: '100%', placeholder: CP.s.pickStock, allowClear: true })
                 .on('select2:select', function (e) { cpAddLine(parseInt(e.params.data.id, 10)); $(this).val(null).trigger('change'); });
         }
@@ -221,12 +243,12 @@ function cpInit() {
             cpFillPick(r.stock); cpRender();
         }
         $('#cpDate').val(r.today).attr('max', r.today);
-        cpRenderPlans(r.plans); cpRenderStock(r.stock);
+        cpRenderPlans(r.plans); cpRenderStock(r.stock); cpRenderRequests(r.requests || []);
     }).fail(() => Swal.fire({ icon: 'error', title: CP.s.error, text: CP.s.serverError }));
 }
 
 function cpFillPick(stock) {
-    if (!CP.canMove) return;
+    if (!CP.canTake) return;
     const sel = $('#cpPick').empty().append(new Option('', '', true, true));
     stock.forEach(s => sel.append(new Option(`${caseFormatJs(s.name)} — ${cpQty(s.stock)} ${s.unit}`, s.product_id, false, false)));
     sel.trigger('change.select2');
@@ -241,7 +263,7 @@ function cpPickDish() {
         cpFillPick(r.stock);
         // What was taken per pot the last time this dish was cooked, scaled to the pots now.
         const pots = parseFloat($('#cpPots').val()) || 1;
-        CPX.lines = CP.canMove ? r.last.map(l => { const s = r.stock.find(x => x.product_id === l.product_id); return s ? { ...s, qty: Math.round(l.qty_per_pot * pots * 1000) / 1000, perPot: l.qty_per_pot } : null; }).filter(Boolean) : [];
+        CPX.lines = CP.canTake ? r.last.map(l => { const s = r.stock.find(x => x.product_id === l.product_id); return s ? { ...s, qty: Math.round(l.qty_per_pot * pots * 1000) / 1000, perPot: l.qty_per_pot } : null; }).filter(Boolean) : [];
         CPX.fromLast = CPX.lines.length > 0;
         cpRender();
     });
@@ -272,8 +294,15 @@ function cpRender(keepInputs) {
         $('#cpComps').removeClass('d-none').html(`<div class="small fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>${CP.s.comps}</div>`
             + d.components.map(c => `<div class="small">• ${nm(c.name)} — ${CP.s.perPlate.replace('%s', cpQty(c.qty_per_plate) + ' ' + safeOutput(c.unit))} · ${CP.s.left.replace('%s', cpQty(c.stock) + ' ' + safeOutput(c.unit))}</div>`).join(''));
     } else $('#cpComps').addClass('d-none').empty();
-    // Lines taken from stock.
-    if (CP.canMove && !keepInputs) {
+    // Phase 4 — stock check: the recipe's ingredient that runs out first decides how many plates the stock allows.
+    if (d && d.max_plates !== null && d.max_plates !== undefined && plates > 0) {
+        const short = plates > d.max_plates;
+        $('#cpCheck').removeClass('d-none').toggleClass('cp-loss fw-semibold', short).toggleClass('text-muted', !short)
+            .html(`<i class="bi ${short ? 'bi-exclamation-triangle' : 'bi-check2-circle'} me-1"></i>`
+                + (short ? CP.s.onlyFor : CP.s.enoughFor).replace('%1$s', cpFmt(d.max_plates)).replace('%2$s', nm(d.limiting)));
+    } else $('#cpCheck').addClass('d-none').empty();
+    // Lines taken from stock (or asked for).
+    if (CP.canTake && !keepInputs) {
         $('#cpLines').html(CPX.lines.map((l, i) => `
             <div class="cp-line">
                 <div class="flex-grow-1 min-w-0"><div class="fw-semibold text-truncate">${nm(l.name)}</div>
@@ -314,7 +343,7 @@ function cpSave() {
         data: { _csrf: CP.csrf, action: 'create', warehouse_id: cpWh(), product_id: d.product_id, pots: pots, lines: JSON.stringify(lines) },
         success: function (r) {
             if (!r.success) return fail(r.message || CP.s.error);
-            Swal.fire({ icon: 'success', title: r.message, timer: 1600, showConfirmButton: false });
+            Swal.fire({ icon: 'success', title: r.message, timer: r.requested ? 3200 : 1600, showConfirmButton: false });
             $('#cpDish').val('').trigger('change'); $('#cpPots').val(1);
             cpInit();
         },
@@ -358,7 +387,8 @@ function cpRenderPlans(plans) {
         h += row(CP.s.sold, cpFmt(p.sold));
         if (p.plates_left !== null) h += row(CP.s.leftL, cpFmt(p.plates_left));
         if (unacc !== null && Math.abs(unacc) > 0.004) h += row(`${CP.s.unacc} <small class="text-muted">(${CP.s.unaccHelp})</small>`, `<span class="cp-loss fw-semibold">${cpFmt(unacc)}</span>`);
-        if (p.items.length) h += `<div class="small text-muted mt-1"><i class="bi bi-box-seam me-1"></i>${p.items.map(i => `${nm(i.name)} ${cpQty(i.qty)} ${safeOutput(i.unit)}`).join(' · ')}</div>`;
+        if (p.items.length) h += `<div class="small text-muted mt-1"><i class="bi bi-box-seam me-1"></i>${p.items.map(i => `${nm(i.name)} ${cpQty(i.qty)} ${safeOutput(i.unit)}`
+            + (i.status === 'requested' ? ` <span class="cp-badge">${CP.s.requested}</span>` : i.status === 'rejected' ? ` <span class="cp-badge cp-done"><s>${CP.s.rejected}</s></span>` : '')).join(' · ')}</div>`;
         if (CP.canCost) {
             const cost = p.recipe_cost + p.stock_cost, gpv = Math.round(p.plates_planned * p.selling_price - cost);
             h += row(CP.s.cost, cpFmt(Math.round(cost))) + row(CP.s.gp, `<span class="${gpv < 0 ? 'cp-loss' : 'text-primary'} fw-semibold">${cpFmt(gpv)}</span>`);
@@ -393,6 +423,34 @@ function cpCancel(id) {
     .then(r => {
         if (!r.isConfirmed) return;
         $.post(CP.api, { _csrf: CP.csrf, action: 'cancel', plan_id: id }, function (res) {
+            if (!res.success) { Swal.fire({ icon: 'error', title: CP.s.error, text: res.message }); return; }
+            Swal.fire({ icon: 'success', title: res.message, timer: 1500, showConfirmButton: false });
+            cpInit();
+        }, 'json').fail(() => Swal.fire({ icon: 'error', title: CP.s.error, text: CP.s.serverError }));
+    });
+}
+
+/** Phase 4 — the cooks' stock requests, for whoever may give stock out: Give out / Reject. */
+function cpRenderRequests(reqs) {
+    if (!$('#cpReqCard').length) return;
+    $('#cpReqCard').toggleClass('d-none', !reqs.length); $('#cpReqCount').text(reqs.length || '');
+    $('#cpReqs').html(reqs.map(q => `<div class="cp-plan">
+            <div class="d-flex justify-content-between gap-2"><div class="min-w-0"><div class="fw-bold text-truncate">${nm(q.dish)} · ${cpFmt(q.pots)} ${CP.s.potsShort}</div>
+                <div class="small text-muted">${CP.s.reqBy.replace('%s', safeOutput(q.by || '—'))}</div></div></div>
+            ${q.lines.map(l => { const short = l.qty > l.stock + 0.0005;
+                return `<div class="cp-row small"><span>${nm(l.name)}: <strong>${cpQty(l.qty)} ${safeOutput(l.unit)}</strong></span><span class="${short ? 'cp-loss fw-semibold' : 'text-muted'}">${CP.s.inStock}: ${cpQty(l.stock)} ${safeOutput(l.unit)}</span></div>`; }).join('')}
+            <div class="d-flex gap-2 mt-2">
+                <button class="btn btn-sm btn-primary flex-fill" onclick="cpDecide(${q.plan_id}, 'approve')"><i class="bi bi-box-arrow-right me-1"></i>${CP.s.give}</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="cpDecide(${q.plan_id}, 'reject')"><i class="bi bi-x-circle me-1"></i>${CP.s.reject}</button>
+            </div></div>`).join(''));
+}
+function cpDecide(planId, decision) {
+    const give = decision === 'approve';
+    Swal.fire({ icon: 'question', title: give ? CP.s.giveQ : CP.s.rejectQ, text: give ? CP.s.giveTxt : '', showCancelButton: true,
+                confirmButtonText: CP.s.yes, cancelButtonText: CP.s.no, confirmButtonColor: give ? '#0d6efd' : '#6c757d' })
+    .then(r => {
+        if (!r.isConfirmed) return;
+        $.post(CP.api, { _csrf: CP.csrf, action: 'decide', plan_id: planId, decision: decision }, function (res) {
             if (!res.success) { Swal.fire({ icon: 'error', title: CP.s.error, text: res.message }); return; }
             Swal.fire({ icon: 'success', title: res.message, timer: 1500, showConfirmButton: false });
             cpInit();

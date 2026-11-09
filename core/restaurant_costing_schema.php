@@ -22,6 +22,11 @@
  *   restaurant_cook_plan_items  the stock taken for that cook (each line = one stock movement).
  *   restaurant_spoilage         stock thrown away (spoiled): its movement and its journal entry.
  *
+ * Phase 4 — "the cook asks, the storekeeper gives": restaurant_cook_plan_items.status
+ *   ENUM('issued','requested','rejected') DEFAULT 'issued' (+ requested_by, decided_by, decided_at). A cook without
+ *   the stock right records a REQUEST; someone with it approves (stock leaves, cost posted) or rejects. Lines from
+ *   before this phase were issued straight away, so they keep 'issued'.
+ *
  * Dependency-free (only PDO): shared by the tenant and legacy migrations. Reuses the permission
  * helpers of core/restaurant_order_flow_schema.php (rofsHasTable / rofsPermissionId / rofsGrant).
  */
@@ -126,6 +131,24 @@ if (!function_exists('rcsEnsureCookPlanTables')) {
             if (rofsHasTable($pdo, $name)) { $log("  ~ $name already exists."); continue; }
             $pdo->exec($sql);
             $log("  + $name created.");
+        }
+    }
+}
+
+if (!function_exists('rcsEnsureCookRequests')) {
+    function rcsEnsureCookRequests(PDO $pdo, callable $log): void
+    {
+        if (!rofsHasTable($pdo, 'restaurant_cook_plan_items')) { $log('  ~ restaurant_cook_plan_items absent (Phase 3 not run yet) — skipped.'); return; }
+        $cols = [
+            'status'       => "ENUM('issued','requested','rejected') NOT NULL DEFAULT 'issued'",
+            'requested_by' => 'INT NULL',
+            'decided_by'   => 'INT NULL',
+            'decided_at'   => 'DATETIME NULL',
+        ];
+        foreach ($cols as $c => $def) {
+            if (rofsHasColumn($pdo, 'restaurant_cook_plan_items', $c)) { $log("  ~ restaurant_cook_plan_items.$c already exists."); continue; }
+            $pdo->exec("ALTER TABLE restaurant_cook_plan_items ADD COLUMN `$c` $def");
+            $log("  + restaurant_cook_plan_items.$c added.");
         }
     }
 }

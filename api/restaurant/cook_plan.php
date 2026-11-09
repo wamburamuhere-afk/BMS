@@ -11,6 +11,8 @@
  * POST action=close  plan_id, plates_left                                              (Restaurant POS edit)
  * POST action=cancel plan_id                                                           (Restaurant POS edit)
  * POST action=spoil  warehouse_id, product_id, qty, [reason]           (adjust_stock / pos_restock, admins)
+ * POST action=decide plan_id, decision=approve|reject — a cook's stock request (Phase 4; same stock right, not the asker)
+ *   init also returns 'requests' (waiting, for the stock right) and dish returns max_plates / limiting (stock check).
  *
  * Money (costs, expected profit) only for restaurant_costing — everyone else gets plates and amounts.
  * Gate: Restaurant POS + Smart POS on, a Restaurant/Hybrid shop in the user's scope.
@@ -56,7 +58,17 @@ $dayOut = function (int $wh, string $date) use ($pdo, $seeCost, $strip): array {
     unset($r);
     return $rows;
 };
-$rights = fn() => ['can_edit' => canEdit('restaurant_pos'), 'can_move_stock' => rcpCanMoveStock(), 'can_see_cost' => $seeCost];
+$rights = fn() => ['can_edit' => canEdit('restaurant_pos'), 'can_move_stock' => rcpCanMoveStock(), 'can_see_cost' => $seeCost,
+                    // Phase 4: someone who may cook, without the stock right, may ask for stock
+                    'can_request' => canEdit('restaurant_pos') && !rcpCanMoveStock() && rcpRequestsReady($pdo)];
+/** Phase 4 — waiting stock requests, only for whoever may give stock out. */
+$requests = function (int $wh) use ($pdo, $seeCost, $strip): array {
+    if (!rcpCanMoveStock()) return [];
+    $r = rcpRequests($pdo, $wh);
+    if (!$seeCost) foreach ($r as &$q) $q['lines'] = $strip($q['lines'], ['cost_price']);
+    unset($q);
+    return $r;
+};
 
 try {
     if ($method === 'GET') {
@@ -66,7 +78,7 @@ try {
             echo json_encode(['success' => true, 'today' => date('Y-m-d'),
                 'dishes' => $strip(rcpDishes($pdo, $wh), ['plate_cost']),
                 'stock'  => $strip(rcpStockItems($pdo, $wh), ['cost_price']),
-                'plans'  => $dayOut($wh, date('Y-m-d'))] + $rights());
+                'plans'  => $dayOut($wh, date('Y-m-d')), 'requests' => $requests($wh)] + $rights());
             return;
         }
         if ($action === 'dish') {
@@ -100,6 +112,17 @@ try {
         return;
     }
 
+    if ($action === 'decide') {                  // Phase 4 — the stock right answers a cook's request (checked in rcpDecide)
+        $p = rcpGet($pdo, (int)($src['plan_id'] ?? 0));
+        if ($p) $shop((int)$p['warehouse_id']);
+        $approve = (string)($src['decision'] ?? '') === 'approve';
+        if (!$approve && (string)($src['decision'] ?? '') !== 'reject') throw new Exception(t('Unknown action.'));
+        $r = rcpDecide($pdo, (int)($src['plan_id'] ?? 0), $approve, $uid);
+        if (!$seeCost) unset($r['amount']);
+        echo json_encode(['success' => true, 'message' => $approve ? t('Stock given out.') : t('Request rejected.')] + $r);
+        return;
+    }
+
     if (!canEdit('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 
     if ($action === 'create') {
@@ -109,7 +132,7 @@ try {
         if (!is_array($lines)) throw new Exception(t('Something went wrong.'));
         $r = rcpCreate($pdo, ['warehouse_id' => $wh, 'product_id' => $src['product_id'] ?? 0, 'pots' => $src['pots'] ?? 0, 'lines' => $lines, 'notes' => $src['notes'] ?? ''], $uid);
         if (!$seeCost) unset($r['recipe_cost'], $r['stock_cost']);
-        echo json_encode(['success' => true, 'message' => t('Cooking started.')] + $r);
+        echo json_encode(['success' => true, 'message' => !empty($r['requested']) ? t('Cooking started. The stock you asked for waits for the storekeeper.') : t('Cooking started.')] + $r);
         return;
     }
     if ($action === 'close') {

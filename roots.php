@@ -1189,6 +1189,7 @@ $routes = [
     'restaurant/waste-report'       => RESTAURANT_DIR . '/waste_report.php', // restaurant_order_flow_plan.md
     'restaurant/purchases'          => RESTAURANT_DIR . '/purchases.php',  // restaurant focus pass: buy stock & ingredients
     'restaurant/cooking'            => RESTAURANT_DIR . '/cook_plan.php',  // restaurant costing plan, Phase 3: "Pika Leo"
+    'restaurant/cooking-report'     => RESTAURANT_DIR . '/cook_plan_report.php', // restaurant costing plan, Phase 4: planned vs actual
 
 
     // ========================================================================
