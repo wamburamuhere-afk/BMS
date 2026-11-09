@@ -31,7 +31,7 @@ ok(substr_count($dp, "t('Drinks & stock used')") >= 3 && substr_count($dp, "t('F
 ok(substr_count($dp, "t('Spoiled & waste')") >= 3 && str_contains($dp, "if (\$PT['waste'] > 0)"), '"Spoiled & waste" in the legend, tooltip and Money panel — only when there is any');
 ok(!str_contains($dp, "<span><?= t('Cost of Goods') ?></span><b>− <?= \$rdFmt(\$cur['cost']) ?></b>"), 'Money panel: "Cost of goods" is now its two parts');
 ok(str_contains($dp, "\$PT['food'] = round((float)\$cur['cost'] - \$PT['stock'] - \$PT['waste'], 2)"), 'the parts (stock, food, waste) always add up to the Cost of goods figure');
-ok(str_contains($ri, "je.entity_type IN ('kitchen_waste','restaurant_spoilage')"), 'waste = kitchen waste + spoiled stock entries');
+ok(str_contains($ri, "je.entity_type IN ('kitchen_waste','restaurant_spoilage','restaurant_cook_unsold','restaurant_cook_unsold_void')"), 'waste = kitchen waste + spoiled stock + plates cooked but not sold (and their re-count)');
 ok(str_contains($dp, "\$k !== 'today'") && str_contains($dp, 'Profit is not shown by hour'), 'Today: no hourly profit (it would mislead), a plain breakdown instead');
 ok(str_contains($dp, "#dc3545") && str_contains($dp, 'Loss so far'), 'the line is red while still at a loss');
 ok(str_contains($ri, "je.entity_type LIKE '%\\\\_cogs%'"), 'drinks & stock sold = cost posted with the sale (*_cogs entries)');

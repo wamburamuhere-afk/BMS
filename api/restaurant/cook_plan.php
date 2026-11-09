@@ -8,7 +8,9 @@
  *                                                the counted items that may be taken (the recipe's ingredients left out)
  * GET  action=day   warehouse_id, date         → the cooks of that day
  * POST action=create warehouse_id, product_id, pots, lines=JSON [{product_id, qty}]   (Restaurant POS edit)
- * POST action=close  plan_id, plates_left                                              (Restaurant POS edit)
+ * POST action=close  plan_id, plates_left, [keep_left=1]                              (Restaurant POS edit)
+ *        Phase 5: when every cook of the dish that day is closed, the recipe ingredients of the plates not sold
+ *        (not accounted for + left, unless kept to sell later) leave stock as waste — see rcpPostUnsold().
  * POST action=cancel plan_id                                                           (Restaurant POS edit)
  * POST action=spoil  warehouse_id, product_id, qty, [reason]           (adjust_stock / pos_restock, admins)
  * POST action=decide plan_id, decision=approve|reject — a cook's stock request (Phase 4; same stock right, not the asker)
@@ -54,7 +56,7 @@ $strip = function (array $rows, array $keys) use ($seeCost): array {
 };
 $dayOut = function (int $wh, string $date) use ($pdo, $seeCost, $strip): array {
     $rows = rcpDay($pdo, $wh, $date);
-    if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost']); $r['items'] = $strip($r['items'], ['amount']); }
+    if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost']); $r['items'] = $strip($r['items'], ['amount']); if ($r['unsold']) unset($r['unsold']['amount']); }
     unset($r);
     return $rows;
 };
@@ -138,7 +140,9 @@ try {
     if ($action === 'close') {
         $p = rcpGet($pdo, (int)($src['plan_id'] ?? 0));
         if ($p) $shop((int)$p['warehouse_id']);
-        $r = rcpClose($pdo, (int)($src['plan_id'] ?? 0), (float)($src['plates_left'] ?? -1), $uid);
+        // keep_left=1 (Phase 5): the plates left are kept to sell later — their ingredients stay in stock
+        $r = rcpClose($pdo, (int)($src['plan_id'] ?? 0), (float)($src['plates_left'] ?? -1), $uid, (string)($src['keep_left'] ?? '') === '1');
+        if (!$seeCost) unset($r['waste_cost']);
         echo json_encode(['success' => true, 'message' => t('Plates left saved.')] + $r);
         return;
     }

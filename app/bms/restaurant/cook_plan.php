@@ -159,6 +159,8 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
 .cp-page .cp-badge.cp-done { background:#e9ecef; color:#495057; }
 .cp-page .cp-stock-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border-bottom:1px solid #eef3fd; }
 .cp-page .cp-empty { text-align:center; color:#6c757d; padding:24px 8px; }
+/* Pop-up boxes the full width of the pop-up, so their hints are never cut off (on a phone too) */
+.swal2-popup .cp-swal-in { width:100%; max-width:100%; margin:8px 0 0; box-sizing:border-box; }
 </style>
 
 <script>
@@ -180,6 +182,17 @@ const CP = {
         totalCost: <?= json_encode(t('Total cost')) ?>, sales: <?= json_encode(t('Expected sales')) ?>, gp: <?= json_encode(t('Expected gross profit')) ?>,
         foodPct: <?= json_encode(t('Food cost (share of the selling price)')) ?>, ifAll: <?= json_encode(t('If all %s plates sell')) ?>,
         noCost: <?= json_encode(t('This dish has no cost yet: add a recipe on the Menu (or take items from stock), or the profit will look too high.')) ?>,
+        partCost: <?= json_encode(t('This dish has no recipe: only what you take from stock is counted. Meat, spices or anything bought at the market are missing, so the profit looks too high. Add a recipe (other costs) on the Menu.')) ?>,
+        lowCost: <?= json_encode(t('Food cost is only %s — very low for a cooked dish. Is something missing from the recipe?')) ?>,
+        loading: <?= json_encode(t('Loading…')) ?>, noDishes: <?= json_encode(t('No dishes on the Menu yet — add them on the Menu first.')) ?>,
+        ingredients: <?= json_encode(t('Ingredients')) ?>, forSale: <?= json_encode(t('Drinks & items for sale')) ?>,
+        platesOnly: <?= json_encode(t('%s plates')) ?>, platesLeftOf: <?= json_encode(t('How many plates of %s are left?')) ?>,
+        keepLeft: <?= json_encode(t('Keep the plates left to sell later (tomorrow)')) ?>,
+        keepHelp: <?= json_encode(t('Not ticked: the plates left are thrown away — their ingredients leave stock as waste today.')) ?>,
+        wasteDone: <?= json_encode(t('%1$s plate(s) not sold: their ingredients left stock as waste (%2$s).')) ?>,
+        wasteDoneNoCost: <?= json_encode(t('%s plate(s) not sold: their ingredients left stock as waste.')) ?>,
+        unsoldLine: <?= json_encode(t('Cooked, not sold')) ?>, keptLine: <?= json_encode(t('kept to sell later')) ?>,
+        showDrinks: <?= json_encode(t('Show drinks & items for sale (%d)')) ?>,
         noPlans: <?= json_encode(t('Nothing cooked yet. Choose a dish and how many pots, then Start cooking.')) ?>,
         noPlansDay: <?= json_encode(t('Nothing was cooked on this day.')) ?>,
         today: <?= json_encode(t('Today\'s cooking')) ?>, dayOf: <?= json_encode(t('Cooking on %s')) ?>,
@@ -222,7 +235,8 @@ $(function () {
     if ($('#cpShop').is('select')) $('#cpShop').on('change', cpInit);
     $('#cpDate').on('change', cpLoadDay);
     if (CP.canEdit) {
-        $('#cpDish').select2({ theme: 'bootstrap-5', width: '100%', placeholder: CP.s.pickDish }).on('change', cpPickDish);
+        // "Loading…" and disabled until the dishes arrive — never an empty "No results found" on a slow phone
+        $('#cpDish').prop('disabled', true).select2({ theme: 'bootstrap-5', width: '100%', placeholder: CP.s.loading }).on('change', cpPickDish);
         $('#cpPots').on('input change', function () { cpScaleLast(); cpRender(); });
         $('#cpSave').on('click', cpSave);
         if (CP.canTake) {
@@ -240,7 +254,8 @@ function cpInit() {
         if (CP.canEdit) {
             const sel = $('#cpDish').empty().append(new Option('', '', true, true));
             r.dishes.forEach(d => sel.append(new Option(caseFormatJs(d.name) + (d.yield > 1 ? ' · ' + CP.s.platesPot.replace('%d', d.yield) : ''), d.product_id, false, false)));
-            sel.trigger('change.select2');
+            if (sel.hasClass('select2-hidden-accessible')) sel.select2('destroy');
+            sel.prop('disabled', false).select2({ theme: 'bootstrap-5', width: '100%', placeholder: r.dishes.length ? CP.s.pickDish : CP.s.noDishes });
             CPX = { dish: null, lines: [], fromLast: false };
             cpFillPick(r.stock); cpRender();
         }
@@ -251,8 +266,12 @@ function cpInit() {
 
 function cpFillPick(stock) {
     if (!CP.canTake) return;
+    // Ingredients first; drinks sold on the Menu (soda, bottled water) in their own group so they do not crowd cooking
     const sel = $('#cpPick').empty().append(new Option('', '', true, true));
-    stock.forEach(s => sel.append(new Option(`${caseFormatJs(s.name)} — ${cpQty(s.stock)} ${s.unit}`, s.product_id, false, false)));
+    const opt = s => new Option(`${caseFormatJs(s.name)} — ${cpQty(s.stock)} ${s.unit}`, s.product_id, false, false);
+    const ing = stock.filter(s => !s.for_sale), sale = stock.filter(s => s.for_sale);
+    if (ing.length) { const g = $('<optgroup>').attr('label', CP.s.ingredients); ing.forEach(s => g.append(opt(s))); sel.append(g); }
+    if (sale.length) { const g = $('<optgroup>').attr('label', CP.s.forSale); sale.forEach(s => g.append(opt(s))); sel.append(g); }
     sel.trigger('change.select2');
 }
 
@@ -328,7 +347,11 @@ function cpRender(keepInputs) {
     if (stock > 0) h += row(CP.s.stockCost, '− ' + cpFmt(stock));
     h += row(`<strong>${CP.s.gp}</strong>`, `<strong class="${gp < 0 ? 'cp-loss' : 'text-primary'}">${cpFmt(gp)} ${safeOutput(CP.cur)}</strong>`, 'cp-total');
     if (total > 0 && sales > 0) h += row(`<small class="text-muted">${CP.s.foodPct}</small>`, `<small class="text-muted">${Math.round(total / sales * 100)}%</small>`);
-    if (!d.has_recipe && stock <= 0) h += `<div class="small cp-loss mt-2"><i class="bi bi-exclamation-triangle me-1"></i>${CP.s.noCost}</div>`;
+    // Honest about what is missing: with no recipe only the stock taken is counted (meat, spices bought at the market
+    // are not), and a food cost far below normal usually means something was left out.
+    const warn = t => `<div class="small cp-loss mt-2"><i class="bi bi-exclamation-triangle me-1"></i>${t}</div>`;
+    if (!d.has_recipe) h += warn(stock > 0 ? CP.s.partCost : CP.s.noCost);
+    else if (total > 0 && sales > 0 && total / sales < 0.15) h += warn(CP.s.lowCost.replace('%s', Math.round(total / sales * 100) + '%'));
     $('#cpSum').html(h);
 }
 
@@ -381,6 +404,7 @@ function cpRenderPlans(plans) {
     const byDish = {};
     plans.forEach(p => { const g = byDish[p.product_id] = byDish[p.product_id] || { n: 0, planned: 0, left: 0, open: 0, last: null };
         g.n++; g.planned += p.plates_planned; g.left += p.plates_left || 0; if (p.status !== 'closed') g.open++; g.last = p.id; });
+    CPD.dayPlans = plans;   // for the "plates left" pop-up
     $('#cpPlans').html(plans.map(p => {
         const closed = p.status === 'closed', g = byDish[p.product_id];
         const unacc = (g.last === p.id && g.open === 0) ? Math.round((g.planned - p.sold - g.left) * 100) / 100 : null;
@@ -388,12 +412,19 @@ function cpRenderPlans(plans) {
         let h = `<div class="cp-plan ${closed ? 'cp-closed' : ''}">
             <div class="d-flex justify-content-between align-items-start gap-2">
                 <div class="min-w-0"><div class="fw-bold text-truncate">${nm(p.name)}</div>
-                    <div class="small text-muted">${cpFmt(p.pots)} ${CP.s.potsShort} → <strong>${cpFmt(p.plates_planned)}</strong> ${CP.s.plannedPlates.toLowerCase()}</div></div>
+                    <div class="small text-muted">${Math.abs(p.pots - p.plates_planned) < 0.005
+                        ? `<strong>${CP.s.platesOnly.replace('%s', cpFmt(p.plates_planned))}</strong>`   /* no recipe: plates were entered, not pots */
+                        : `${cpFmt(p.pots)} ${CP.s.potsShort} → <strong>${cpFmt(p.plates_planned)}</strong> ${CP.s.plannedPlates.toLowerCase()}`}</div></div>
                 <span class="cp-badge ${closed ? 'cp-done' : ''}">${closed ? CP.s.closed : CP.s.open}</span>
             </div>`;
         h += row(g.n > 1 ? `${CP.s.sold} <small class="text-muted">(${CP.s.allCooks.replace('%d', g.n)})</small>` : CP.s.sold, cpFmt(p.sold));
         if (p.plates_left !== null) h += row(CP.s.leftL, cpFmt(p.plates_left));
         if (unacc !== null && Math.abs(unacc) > 0.004) h += row(`${CP.s.unacc}${g.n > 1 ? ` <small class="text-muted">(${CP.s.allCooks.replace('%d', g.n)})</small>` : ''} <small class="text-muted">(${CP.s.unaccHelp})</small>`, `<span class="cp-loss fw-semibold">${cpFmt(unacc)}</span>`);
+        // Phase 5: on the dish's last card, what the day's close sent to waste (plates cooked, not sold)
+        if (g.last === p.id && p.unsold && (p.unsold.plates > 0 || p.unsold.kept_left > 0)) {
+            h += row(`${CP.s.unsoldLine}${p.unsold.kept_left > 0 ? ` <small class="text-muted">(${cpFmt(p.unsold.kept_left)} ${CP.s.keptLine})</small>` : ''}`,
+                     `<span class="cp-loss">${cpFmt(p.unsold.plates)}${CP.canCost && p.unsold.amount !== undefined ? ' · ' + cpFmt(p.unsold.amount) : ''}</span>`);
+        }
         if (p.items.length) h += `<div class="small text-muted mt-1"><i class="bi bi-box-seam me-1"></i>${p.items.map(i => `${nm(i.name)} ${cpQty(i.qty)} ${safeOutput(i.unit)}`
             + (i.status === 'requested' ? ` <span class="cp-badge">${CP.s.requested}</span>` : i.status === 'rejected' ? ` <span class="cp-badge cp-done"><s>${CP.s.rejected}</s></span>` : '')).join(' · ')}</div>`;
         if (CP.canCost) {
@@ -402,7 +433,7 @@ function cpRenderPlans(plans) {
         }
         if (CP.canEdit && today) {
             h += `<div class="d-flex gap-2 mt-2">
-                <button class="btn btn-sm btn-outline-primary flex-fill" onclick="cpClose(${p.id}, ${p.plates_planned}, ${p.plates_left === null ? 'null' : p.plates_left})"><i class="bi bi-check2-square me-1"></i>${CP.s.platesLeftBtn}</button>
+                <button class="btn btn-sm btn-outline-primary flex-fill" onclick="cpClose(${p.id})"><i class="bi bi-check2-square me-1"></i>${CP.s.platesLeftBtn}</button>
                 ${!closed ? `<button class="btn btn-sm btn-outline-secondary" onclick="cpCancel(${p.id})"><i class="bi bi-x-circle me-1"></i>${CP.s.cancel}</button>` : ''}
             </div>`;
         }
@@ -410,17 +441,33 @@ function cpRenderPlans(plans) {
     }).join(''));
 }
 
-function cpClose(id, planned, current) {
-    Swal.fire({ title: CP.s.platesLeftQ, text: CP.s.platesLeftHelp, input: 'number', inputValue: current === null ? '' : current,
-                inputAttributes: { min: 0, max: planned, step: 'any', inputmode: 'decimal' }, showCancelButton: true,
-                confirmButtonText: CP.s.save, cancelButtonText: CP.s.no, confirmButtonColor: '#0d6efd',
-                inputValidator: v => (v === '' || isNaN(parseFloat(v)) || parseFloat(v) < 0 || parseFloat(v) > planned) ? `0 – ${cpFmt(planned)}` : undefined })
+function cpClose(id) {
+    const p = (CPD.dayPlans || []).find(x => x.id === id); if (!p) return;
+    const planned = p.plates_planned, current = p.plates_left;
+    // The "keep to sell later" choice only matters when the dish's recipe takes ingredients from stock (Phase 5);
+    // a small restaurant without stock never sees it.
+    const keepBox = p.stock_recipe
+        ? `<label class="d-flex gap-2 align-items-start text-start mt-3 small" style="cursor:pointer"><input type="checkbox" id="cpKeep" class="form-check-input mt-1" ${p.keep_left ? 'checked' : ''}>
+             <span><strong>${CP.s.keepLeft}</strong><br><span class="text-muted">${CP.s.keepHelp}</span></span></label>` : '';
+    Swal.fire({ title: CP.s.platesLeftOf.replace('%s', caseFormatJs(p.name)),
+                html: `<div class="small text-muted mb-2">${CP.s.platesLeftHelp}</div>
+                       <input id="cpLeftIn" type="number" min="0" max="${planned}" step="any" inputmode="decimal" class="swal2-input" style="width:100%;max-width:100%;margin:0;box-sizing:border-box" value="${current === null ? '' : current}">${keepBox}`,
+                showCancelButton: true, confirmButtonText: CP.s.save, cancelButtonText: CP.s.no, confirmButtonColor: '#0d6efd',
+                didOpen: () => setTimeout(() => $('#cpLeftIn').trigger('focus'), 50),
+                preConfirm: () => {
+                    const v = $('#cpLeftIn').val();
+                    if (v === '' || isNaN(parseFloat(v)) || parseFloat(v) < 0 || parseFloat(v) > planned) { Swal.showValidationMessage(`0 – ${cpFmt(planned)}`); return false; }
+                    return { left: v, keep: $('#cpKeep').is(':checked') ? 1 : 0 };
+                } })
     .then(r => {
         if (!r.isConfirmed) return;
-        $.post(CP.api, { _csrf: CP.csrf, action: 'close', plan_id: id, plates_left: r.value }, function (res) {
+        $.post(CP.api, { _csrf: CP.csrf, action: 'close', plan_id: id, plates_left: r.value.left, keep_left: r.value.keep }, function (res) {
             if (!res.success) { Swal.fire({ icon: 'error', title: CP.s.error, text: res.message }); return; }
-            Swal.fire({ icon: 'success', title: res.message, timer: 1500, showConfirmButton: false });
-            cpLoadDay();
+            const waste = res.waste_plates > 0
+                ? (res.waste_cost !== undefined ? CP.s.wasteDone.replace('%1$s', cpFmt(res.waste_plates)).replace('%2$s', cpFmt(res.waste_cost) + ' ' + CP.cur)
+                                                : CP.s.wasteDoneNoCost.replace('%s', cpFmt(res.waste_plates))) : '';
+            Swal.fire({ icon: 'success', title: res.message, text: waste, timer: waste ? 3500 : 1500, showConfirmButton: false });
+            cpInit();
         }, 'json').fail(() => Swal.fire({ icon: 'error', title: CP.s.error, text: CP.s.serverError }));
     });
 }
@@ -469,17 +516,23 @@ function cpDecide(planId, decision) {
 function cpRenderStock(stock) {
     if (!CP.canMove) return;
     if (!stock.length) { $('#cpStock').html(`<div class="cp-empty">${CP.s.noStock}</div>`); return; }
-    $('#cpStock').html(stock.map(s => `<div class="cp-stock-row">
+    const rowOf = s => `<div class="cp-stock-row">
             <div class="min-w-0"><div class="fw-semibold text-truncate">${nm(s.name)}</div><div class="small text-muted">${CP.s.inStock}: ${cpQty(s.stock)} ${safeOutput(s.unit)}${CP.canCost && s.cost_price ? ' · ' + cpFmt(s.cost_price) + ' / ' + safeOutput(s.unit) : ''}</div></div>
             <button class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="cpSpoil(${s.product_id})"><i class="bi bi-trash3 me-1"></i>${CP.s.spoiled}</button>
-        </div>`).join(''));
+        </div>`;
+    // Ingredients in view; drinks sold on the Menu folded away (they are stocked for sale, rarely cooked or spoiled)
+    const ing = stock.filter(s => !s.for_sale), sale = stock.filter(s => s.for_sale);
+    let h = ing.map(rowOf).join('') || `<div class="cp-empty py-2">${CP.s.noStock}</div>`;
+    if (sale.length) h += `<a href="#" class="d-block small fw-semibold px-2 py-2" onclick="$(this).next().toggleClass('d-none');return false;"><i class="bi bi-cup-straw me-1"></i>${CP.s.showDrinks.replace('%d', sale.length)}</a>
+                           <div class="d-none">${sale.map(rowOf).join('')}</div>`;
+    $('#cpStock').html(h);
 }
 function cpSpoil(id) {
     const s = CPD.stock.find(x => x.product_id === id); if (!s) return;
     Swal.fire({ title: CP.s.spoiledQ.replace('%s', caseFormatJs(s.name)), confirmButtonText: CP.s.save, showCancelButton: true, cancelButtonText: CP.s.no, confirmButtonColor: '#dc3545',
         html: `<div class="small text-muted mb-2">${CP.s.inStock}: ${cpQty(s.stock)} ${safeOutput(s.unit)} · ${CP.s.spoilNote}</div>
-               <input id="spQ" type="number" min="0" step="any" class="swal2-input" placeholder="${safeOutput(CP.s.spoiledQty.replace('%s', s.unit))}" inputmode="decimal">
-               <input id="spR" class="swal2-input" maxlength="255" placeholder="${safeOutput(CP.s.reason)}">`,
+               <input id="spQ" type="number" min="0" step="any" class="swal2-input cp-swal-in" placeholder="${safeOutput(CP.s.spoiledQty.replace('%s', s.unit))}" inputmode="decimal">
+               <input id="spR" class="swal2-input cp-swal-in" maxlength="255" placeholder="${safeOutput(CP.s.reason)}">`,
         preConfirm: () => {
             const q = parseFloat($('#spQ').val());
             if (!(q > 0) || q > s.stock + 0.0005) { Swal.showValidationMessage(`0 – ${cpQty(s.stock)} ${s.unit}`); return false; }

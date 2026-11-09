@@ -148,16 +148,19 @@ if (!function_exists('rcpStockItems')) {
     {
         $ex = array_values(array_filter(array_map('intval', $exclude)));
         $not = $ex ? ' AND p.product_id NOT IN (' . implode(',', $ex) . ')' : '';
+        // Phase 5: ingredients first; drinks / items sold on the Menu (soda, bottled water) last, marked for_sale —
+        // they can still be taken (water for the pot), but they do not crowd the cooking list.
         $st = $pdo->prepare("SELECT p.product_id, p.product_name, COALESCE(NULLIF(p.unit,''), NULLIF(p.unit_of_measure,''), 'pcs') AS unit,
-                                    COALESCE(p.cost_price, 0) AS cost_price, COALESCE(SUM(ps.stock_quantity), 0) AS stock
+                                    COALESCE(p.cost_price, 0) AS cost_price, COALESCE(SUM(ps.stock_quantity), 0) AS stock, COALESCE(p.is_menu_item, 0) AS for_sale
                                FROM products p JOIN product_stocks ps ON ps.product_id = p.product_id AND ps.warehouse_id = ?
                               WHERE " . restaurantStockItemSql('p') . $not . "
-                           GROUP BY p.product_id, p.product_name, p.unit, p.unit_of_measure, p.cost_price
+                           GROUP BY p.product_id, p.product_name, p.unit, p.unit_of_measure, p.cost_price, p.is_menu_item
                              HAVING stock > 0
-                           ORDER BY p.product_name");
+                           ORDER BY COALESCE(p.is_menu_item, 0), p.product_name");
         $st->execute([$warehouseId]);
         return array_map(fn($r) => ['product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'unit' => $r['unit'],
-                                    'cost_price' => (float)$r['cost_price'], 'stock' => round((float)$r['stock'], 3)], $st->fetchAll(PDO::FETCH_ASSOC));
+                                    'cost_price' => (float)$r['cost_price'], 'stock' => round((float)$r['stock'], 3), 'for_sale' => (int)$r['for_sale'] === 1],
+                         $st->fetchAll(PDO::FETCH_ASSOC));
     }
 }
 
@@ -310,6 +313,14 @@ if (!function_exists('rcpCreate')) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
+        if ($request) {   // Phase 5: whoever may give stock out hears about it (in-app)
+            $what = implode(', ', array_map(fn($it) => $it['product_name'] . ' ' . rtrim(rtrim(number_format($it['qty'], 3, '.', ''), '0'), '.') . ' ' . $it['unit'], $items));
+            rcpNotify($pdo, 'restaurant.stock_request', [
+                'entity_type' => 'cook_plan', 'entity_id' => $id, 'warehouse_id' => $wh,
+                'title' => "Stock request: {$dish['name']}", 'message' => "The kitchen asks for $what to cook {$dish['name']}. Give it out or reject it on the Cooking plan.",
+                'action_url' => 'restaurant/cooking', 'severity' => 'medium', 'dedupe_suffix' => 'once',
+            ]);
+        }
         return ['id' => $id, 'plates' => $plates, 'recipe_cost' => $recipeCost, 'stock_cost' => $stockCost, 'requested' => $request ? count($items) : 0];
     }
 }
@@ -325,7 +336,11 @@ if (!function_exists('rcpGet')) {
 
 if (!function_exists('rcpClose')) {
     /** End of the day: plates left (can be corrected the same day). Sold is read from the till for that dish and day. */
-    function rcpClose(PDO $pdo, int $planId, float $left, int $uid): array
+    /**
+     * $keepLeft (Phase 5): the plates left are kept to sell later (tomorrow) — their ingredients stay in stock and
+     * leave it when they sell. Otherwise they are thrown away, like the plates not accounted for.
+     */
+    function rcpClose(PDO $pdo, int $planId, float $left, int $uid, bool $keepLeft = false): array
     {
         $p = rcpGet($pdo, $planId);
         if (!$p || $p['status'] === 'cancelled') throw new Exception(t('This cooking plan was not found.'));
@@ -333,18 +348,142 @@ if (!function_exists('rcpClose')) {
         if ($p['status'] === 'closed' && $p['plan_date'] !== date('Y-m-d')) throw new Exception(t('Only today\'s cooking can be changed.'));
         $left = round($left, 2);
         if ($left < 0 || $left > (float)$p['plates_planned'] + 0.004) throw new Exception(sprintf(t('Plates left must be between 0 and %s.'), rtrim(rtrim(number_format((float)$p['plates_planned'], 2, '.', ''), '0'), '.')));
-        $sold = rcpSoldOn($pdo, (int)$p['warehouse_id'], (int)$p['product_id'], (string)$p['plan_date']);
-        $pdo->prepare("UPDATE restaurant_cook_plans SET plates_left = ?, plates_sold = ?, status = 'closed', closed_by = ?, closed_at = NOW() WHERE id = ?")
-            ->execute([$left, $sold, $uid, $planId]);
-        logActivity($pdo, $uid, "Cooking plan COOK-$planId closed: planned {$p['plates_planned']}, sold $sold, left $left");
-        // Sold belongs to the dish and day: "not accounted for" is per dish (all its cooks), known once every cook is closed.
-        $g = $pdo->prepare("SELECT SUM(plates_planned) AS planned, SUM(COALESCE(plates_left, 0)) AS left_p, SUM(status = 'open') AS open_n
-                              FROM restaurant_cook_plans WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status <> 'cancelled'");
-        $g->execute([(int)$p['warehouse_id'], (int)$p['product_id'], (string)$p['plan_date']]);
-        $d = $g->fetch(PDO::FETCH_ASSOC);
-        $unacc = (int)$d['open_n'] === 0 ? round(max(0, (float)$d['planned'] - $sold - (float)$d['left_p']), 2) : null;
+        $wh = (int)$p['warehouse_id']; $pid = (int)$p['product_id']; $date = (string)$p['plan_date'];
+        $sold = rcpSoldOn($pdo, $wh, $pid, $date);
+        $unsold = null;
+        $pdo->beginTransaction();
+        $hasKeep = rcpUnsoldReady($pdo);
+        try {
+            if ($hasKeep) {   // each cook keeps its own "keep the plates left" choice
+                $pdo->prepare("UPDATE restaurant_cook_plans SET plates_left = ?, plates_sold = ?, keep_left = ?, status = 'closed', closed_by = ?, closed_at = NOW() WHERE id = ?")
+                    ->execute([$left, $sold, $keepLeft ? 1 : 0, $uid, $planId]);
+            } else {
+                $pdo->prepare("UPDATE restaurant_cook_plans SET plates_left = ?, plates_sold = ?, status = 'closed', closed_by = ?, closed_at = NOW() WHERE id = ?")
+                    ->execute([$left, $sold, $uid, $planId]);
+            }
+            // Sold belongs to the dish and day: "not accounted for" is per dish (all its cooks), known once every cook is closed.
+            $g = $pdo->prepare("SELECT SUM(plates_planned) AS planned, SUM(COALESCE(plates_left, 0)) AS left_p, SUM(status = 'open') AS open_n,
+                                       " . ($hasKeep ? "SUM(CASE WHEN keep_left = 1 THEN COALESCE(plates_left, 0) ELSE 0 END)" : '0') . " AS kept
+                                  FROM restaurant_cook_plans WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status <> 'cancelled'");
+            $g->execute([$wh, $pid, $date]);
+            $d = $g->fetch(PDO::FETCH_ASSOC);
+            $allClosed = (int)$d['open_n'] === 0;
+            $unacc = $allClosed ? round(max(0, (float)$d['planned'] - $sold - (float)$d['left_p']), 2) : null;
+            // Phase 5 — pot cooking: the ingredients of the plates that did not sell leave stock now (waste):
+            // not accounted for + the plates left that no cook kept to sell later.
+            if ($allClosed) {
+                $kept = (float)$d['kept'];
+                $wastePlates = round($unacc + (float)$d['left_p'] - $kept, 2);
+                $unsold = rcpPostUnsold($pdo, $wh, $pid, $date, $wastePlates, $kept, $uid);
+            }
+            logActivity($pdo, $uid, "Cooking plan COOK-$planId closed: planned {$p['plates_planned']}, sold $sold, left $left" . ($keepLeft ? ' (kept to sell later)' : '')
+                . ($unsold && $unsold['amount'] > 0 ? ", unsold plates' ingredients {$unsold['amount']} to waste" : ''));
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
         return ['planned' => (float)$p['plates_planned'], 'sold' => $sold, 'left' => $left, 'unaccounted' => $unacc,
-                'dish_planned' => (float)$d['planned'], 'dish_left' => (float)$d['left_p']];
+                'dish_planned' => (float)$d['planned'], 'dish_left' => (float)$d['left_p'], 'kept_left' => $keepLeft,
+                'waste_plates' => $unsold['plates'] ?? 0.0, 'waste_cost' => $unsold['amount'] ?? 0.0];
+    }
+}
+
+if (!function_exists('rcpNotify')) {
+    /** Phase 5 — an in-app notification through the restaurant engine; never blocks or breaks the save it follows. */
+    function rcpNotify(PDO $pdo, string $key, array $ctx): void
+    {
+        try {
+            require_once __DIR__ . '/restaurant_notify.php';
+            if (function_exists('rnModuleOn') && rnModuleOn($pdo)) rnDispatch($pdo, $key, $ctx);
+        } catch (Throwable $e) {
+            error_log("rcpNotify $key: " . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('rcpUnsoldReady')) {
+    /** Phase 5 table present (company migrated)? */
+    function rcpUnsoldReady(PDO $pdo): bool
+    {
+        static $ok = null;
+        if ($ok !== null) return $ok;
+        try {
+            $ok = (bool)$pdo->query("SHOW TABLES LIKE 'restaurant_cook_unsold'")->fetch()
+               && (bool)$pdo->query("SHOW COLUMNS FROM restaurant_cook_plans LIKE 'keep_left'")->fetch();
+        } catch (Throwable $e) { $ok = false; }
+        return $ok;
+    }
+}
+
+if (!function_exists('rcpPostUnsold')) {
+    /**
+     * Phase 5 — a dish cooked by the pot whose recipe takes ingredients from stock: the plates that were cooked but not
+     * sold used their ingredients too. Each recipe ingredient × plates leaves stock (movement 'damaged', ref COOKW-n) and
+     * Dr Cost of Sales / Cr Inventory (entity 'restaurant_cook_unsold' — the card's "Spoiled & waste"). One posting per
+     * dish and day: a re-close first reverses the earlier one (stock back, entry 'restaurant_cook_unsold_void').
+     * A dish with no stock ingredients (a small restaurant's "other costs" only) posts nothing.
+     * Inside the caller's transaction. Returns ['plates', 'amount'] or null when nothing applies.
+     */
+    function rcpPostUnsold(PDO $pdo, int $wh, int $pid, string $date, float $plates, float $keptLeft, int $uid): ?array
+    {
+        if (!rcpUnsoldReady($pdo)) return null;
+        $comps = $pdo->prepare("SELECT ac.component_product_id AS product_id, ac.qty_per_unit, p.product_name, COALESCE(p.cost_price, 0) AS cost_price,
+                                       COALESCE(NULLIF(ac.unit,''), NULLIF(p.unit,''), 'pcs') AS unit
+                                  FROM product_assembly_components ac JOIN products p ON p.product_id = ac.component_product_id
+                                  JOIN products d ON d.product_id = ac.parent_product_id AND COALESCE(d.is_combo, 0) = 1
+                                 WHERE ac.parent_product_id = ?");
+        $comps->execute([$pid]);
+        $lines = $comps->fetchAll(PDO::FETCH_ASSOC);
+        // An earlier posting for this dish and day is undone first (the figures changed).
+        $old = $pdo->prepare("SELECT * FROM restaurant_cook_unsold WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status = 'posted'");
+        $old->execute([$wh, $pid, $date]);
+        foreach ($old->fetchAll(PDO::FETCH_ASSOC) as $o) {
+            $mv = $pdo->prepare("SELECT product_id, quantity, unit, unit_cost FROM stock_movements WHERE reference_type = 'manual' AND reference_number = ? AND movement_type = 'damaged'");
+            $mv->execute(['COOKW-' . (int)$o['id']]);
+            foreach ($mv->fetchAll(PDO::FETCH_ASSOC) as $m) {
+                $q = (float)$m['quantity'];
+                $pdo->prepare("UPDATE products SET stock_quantity = stock_quantity + ?, current_stock = current_stock + ? WHERE product_id = ?")->execute([$q, $q, (int)$m['product_id']]);
+                $pdo->prepare("UPDATE product_stocks SET stock_quantity = IFNULL(stock_quantity, 0) + ? WHERE product_id = ? AND warehouse_id = ?")->execute([$q, (int)$m['product_id'], $wh]);
+                recordStockMovement($pdo, ['product_id' => (int)$m['product_id'], 'warehouse_id' => $wh, 'movement_type' => 'return_in', 'quantity' => $q, 'unit' => $m['unit'] ?: 'pcs',
+                    'unit_cost' => (float)$m['unit_cost'], 'reference_id' => (int)$o['id'], 'reference_type' => 'manual', 'reference_number' => 'COOKW-' . (int)$o['id'],
+                    'created_by' => $uid, 'notes' => 'Unsold plates re-counted — back to stock']);
+            }
+            if ((float)$o['amount'] > 0 && !empty($o['journal_entry_id'])) {
+                [$cogs, $inv] = rcpCostAccounts($pdo);
+                postLedgerEntry($pdo, 'Unsold plates COOKW-' . (int)$o['id'] . ' re-counted', [
+                    ['account_id' => $inv,  'type' => 'debit',  'amount' => (float)$o['amount'], 'description' => 'Unsold plates re-counted'],
+                    ['account_id' => $cogs, 'type' => 'credit', 'amount' => (float)$o['amount'], 'description' => 'Unsold plates re-counted'],
+                ], null, (int)$o['id'], 'restaurant_cook_unsold_void', date('Y-m-d'), $uid, $wh);
+            }
+            $pdo->prepare("UPDATE restaurant_cook_unsold SET status = 'reversed', reversed_at = NOW() WHERE id = ?")->execute([(int)$o['id']]);
+        }
+        if (!$lines) return null;                     // no stock ingredients: nothing ever left stock per plate
+        $plates = round(max(0, $plates), 2);
+        $pdo->prepare("INSERT INTO restaurant_cook_unsold (warehouse_id, product_id, plan_date, plates, kept_left, amount, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, 0, 'posted', ?, NOW())")
+            ->execute([$wh, $pid, $date, $plates, round($keptLeft, 2), $uid]);
+        $id = (int)$pdo->lastInsertId();
+        $amount = 0.0;
+        if ($plates > 0) {
+            $dish = (string)$pdo->query("SELECT product_name FROM products WHERE product_id = $pid")->fetchColumn();
+            foreach ($lines as $l) {
+                $q = round((float)$l['qty_per_unit'] * $plates, 3);
+                if ($q <= 0) continue;
+                $uc = (float)$l['cost_price'];
+                rcpStockOut($pdo, $wh, (int)$l['product_id'], $q, $uc, 'damaged', 'COOKW-' . $id, $id, "Cooked, not sold: $dish × $plates plate(s)", $uid, $l['unit']);
+                $amount += round($q * $uc, 2);
+            }
+            $amount = round($amount, 2);
+            if ($amount > 0) {
+                [$cogs, $inv] = rcpCostAccounts($pdo);
+                $entry = postLedgerEntry($pdo, "Cooked, not sold COOKW-$id — $dish × " . rtrim(rtrim(number_format($plates, 2, '.', ''), '0'), '.') . ' plate(s)', [
+                    ['account_id' => $cogs, 'type' => 'debit',  'amount' => $amount, 'description' => 'Cooked, not sold'],
+                    ['account_id' => $inv,  'type' => 'credit', 'amount' => $amount, 'description' => 'Cooked, not sold'],
+                ], null, $id, 'restaurant_cook_unsold', $date, $uid, $wh);
+                $pdo->prepare("UPDATE restaurant_cook_unsold SET amount = ?, journal_entry_id = ? WHERE id = ?")->execute([$amount, $entry, $id]);
+            }
+        }
+        return ['plates' => $plates, 'amount' => $amount];
     }
 }
 
@@ -446,7 +585,9 @@ if (!function_exists('rcpDay')) {
      */
     function rcpDay(PDO $pdo, int $warehouseId, string $date): array
     {
-        $st = $pdo->prepare("SELECT c.*, p.product_name FROM restaurant_cook_plans c JOIN products p ON p.product_id = c.product_id
+        // stock_recipe: the dish's recipe takes ingredients from stock (Phase 5: its unsold plates' share leaves stock at close)
+        $st = $pdo->prepare("SELECT c.*, p.product_name, (COALESCE(p.is_combo, 0) = 1 AND EXISTS (SELECT 1 FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id)) AS stock_recipe
+                               FROM restaurant_cook_plans c JOIN products p ON p.product_id = c.product_id
                               WHERE c.warehouse_id = ? AND c.plan_date = ? AND c.status <> 'cancelled' ORDER BY c.id");
         $st->execute([$warehouseId, $date]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -457,7 +598,16 @@ if (!function_exists('rcpDay')) {
             $pid = (int)$r['product_id'];
             if (!isset($sold[$pid])) $sold[$pid] = rcpSoldOn($pdo, $warehouseId, $pid, $date);
             $items->execute([(int)$r['id']]);
+            $un = null;
+            if (rcpUnsoldReady($pdo)) {
+                $u = $pdo->prepare("SELECT plates, kept_left, amount FROM restaurant_cook_unsold WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status = 'posted' ORDER BY id DESC LIMIT 1");
+                $u->execute([$warehouseId, $pid, $date]);
+                $un = $u->fetch(PDO::FETCH_ASSOC) ?: null;
+            }
             $r = [
+                'keep_left' => !empty($r['keep_left']),
+                'stock_recipe' => (bool)$r['stock_recipe'],
+                'unsold' => $un ? ['plates' => (float)$un['plates'], 'kept_left' => (float)$un['kept_left'], 'amount' => (float)$un['amount']] : null,
                 'id' => (int)$r['id'], 'product_id' => $pid, 'name' => $r['product_name'], 'pots' => (float)$r['pots'],
                 'plates_planned' => (float)$r['plates_planned'], 'selling_price' => (float)$r['selling_price'],
                 'recipe_cost' => (float)$r['recipe_cost'], 'stock_cost' => (float)$r['stock_cost'],
@@ -524,9 +674,18 @@ if (!function_exists('rcpDecide')) {
         $dish = (string)$pdo->query("SELECT product_name FROM products WHERE product_id = " . (int)$p['product_id'])->fetchColumn();
         $ref = 'COOK-' . $planId;
 
+        $tell = function (bool $given) use ($pdo, $planId, $wh, $dish, $lines) {   // Phase 5: the cook who asked hears the answer
+            rcpNotify($pdo, 'restaurant.stock_request_answered', [
+                'entity_type' => 'cook_plan', 'entity_id' => $planId, 'warehouse_id' => $wh, 'owner_user_ids' => [(int)$lines[0]['requested_by']],
+                'title' => ($given ? 'Stock given out: ' : 'Stock request rejected: ') . $dish,
+                'message' => $given ? "The stock you asked for to cook $dish was given out." : "The stock you asked for to cook $dish was not given out. Ask the storekeeper.",
+                'action_url' => 'restaurant/cooking', 'severity' => $given ? 'low' : 'medium', 'dedupe_suffix' => $given ? 'given' : 'rejected',
+            ]);
+        };
         if (!$approve) {
             $pdo->prepare("UPDATE restaurant_cook_plan_items SET status = 'rejected', decided_by = ?, decided_at = NOW() WHERE plan_id = ? AND status = 'requested'")->execute([$uid, $planId]);
             logActivity($pdo, $uid, "Stock request $ref rejected (" . count($lines) . ' line(s))');
+            $tell(false);
             return ['approved' => false, 'lines' => count($lines), 'amount' => 0.0];
         }
         foreach ($lines as $l) {                       // all or nothing: check every line first
@@ -561,6 +720,7 @@ if (!function_exists('rcpDecide')) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
+        $tell(true);
         return ['approved' => true, 'lines' => count($lines), 'amount' => $total];
     }
 }
