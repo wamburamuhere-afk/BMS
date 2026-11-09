@@ -207,6 +207,7 @@ if (!function_exists('restaurantSubHubCards')) {
         require_once __DIR__ . '/restaurant_scope.php';
         if (isset($GLOBALS['pdo']) && $GLOBALS['pdo'] instanceof PDO && restaurantModuleOn($GLOBALS['pdo'])) {
             $cards[] = ['icon' => 'bi-journal-richtext', 'label' => t('Menu'), 'description' => t('Dishes and drinks you sell, prices, and what is available today.'), 'url' => 'restaurant/menu'];
+            $cards[] = ['icon' => 'bi-fire', 'label' => t('Cooking plan'), 'description' => t('Plan today\'s pots: plates, cost and the profit to expect, before you sell.'), 'url' => 'restaurant/cooking'];
             $cards[] = ['icon' => 'bi-grid-3x3-gap', 'label' => t('Tables'), 'description' => t('Every table at a glance — open orders, amounts, move a table.'), 'url' => 'restaurant/tables-board'];
             $cards[] = ['icon' => 'bi-bar-chart', 'label' => t('Restaurant Sales'), 'description' => t('Sales by Dine in, Take away and Delivery, and dishes sold.'), 'url' => 'restaurant/sales-report'];
         }

@@ -16,6 +16,12 @@
  *   Only an estimate input: nothing is posted from it (real food cost stays what Purchases records), so
  *   it never counts twice in the books. One plate's cost = ingredients' share + extra ÷ plates.
  *
+ * Phase 3 — "Pika Leo" (cooking plan) and spoiled stock:
+ *   restaurant_cook_plans       one cook of one dish on one day: pots, plates planned, the price and recipe cost at
+ *                               the time (an expectation), what was taken from stock (posted), plates left at the end.
+ *   restaurant_cook_plan_items  the stock taken for that cook (each line = one stock movement).
+ *   restaurant_spoilage         stock thrown away (spoiled): its movement and its journal entry.
+ *
  * Dependency-free (only PDO): shared by the tenant and legacy migrations. Reuses the permission
  * helpers of core/restaurant_order_flow_schema.php (rofsHasTable / rofsPermissionId / rofsGrant).
  */
@@ -58,5 +64,68 @@ if (!function_exists('rcsEnsureExtraCostColumn')) {
         if (rofsHasColumn($pdo, 'products', 'recipe_extra_cost')) { $log('  ~ products.recipe_extra_cost already exists.'); return; }
         $pdo->exec("ALTER TABLE products ADD COLUMN `recipe_extra_cost` DECIMAL(15,2) NOT NULL DEFAULT 0");
         $log('  + products.recipe_extra_cost added (default 0).');
+    }
+}
+
+if (!function_exists('rcsEnsureCookPlanTables')) {
+    function rcsEnsureCookPlanTables(PDO $pdo, callable $log): void
+    {
+        $tables = [
+            'restaurant_cook_plans' => "CREATE TABLE IF NOT EXISTS restaurant_cook_plans (
+                id               INT AUTO_INCREMENT PRIMARY KEY,
+                warehouse_id     INT NOT NULL,
+                product_id       INT NOT NULL,
+                plan_date        DATE NOT NULL,
+                pots             DECIMAL(10,2) NOT NULL DEFAULT 1,
+                plates_planned   DECIMAL(10,2) NOT NULL DEFAULT 0,
+                selling_price    DECIMAL(15,2) NOT NULL DEFAULT 0,
+                recipe_cost      DECIMAL(15,2) NOT NULL DEFAULT 0,
+                stock_cost       DECIMAL(15,2) NOT NULL DEFAULT 0,
+                plates_left      DECIMAL(10,2) NULL,
+                plates_sold      DECIMAL(10,2) NULL,
+                status           ENUM('open','closed','cancelled') NOT NULL DEFAULT 'open',
+                journal_entry_id INT NULL,
+                notes            VARCHAR(255) NULL,
+                created_by       INT NULL,
+                created_at       DATETIME NOT NULL,
+                closed_by        INT NULL,
+                closed_at        DATETIME NULL,
+                cancelled_by     INT NULL,
+                cancelled_at     DATETIME NULL,
+                KEY idx_rcp_day (warehouse_id, plan_date),
+                KEY idx_rcp_dish (product_id, plan_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'restaurant_cook_plan_items' => "CREATE TABLE IF NOT EXISTS restaurant_cook_plan_items (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                plan_id     INT NOT NULL,
+                product_id  INT NOT NULL,
+                quantity    DECIMAL(15,3) NOT NULL,
+                unit        VARCHAR(20) NULL,
+                unit_cost   DECIMAL(15,4) NOT NULL DEFAULT 0,
+                amount      DECIMAL(15,2) NOT NULL DEFAULT 0,
+                movement_id INT NULL,
+                KEY idx_rcpi_plan (plan_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'restaurant_spoilage' => "CREATE TABLE IF NOT EXISTS restaurant_spoilage (
+                id               INT AUTO_INCREMENT PRIMARY KEY,
+                warehouse_id     INT NOT NULL,
+                product_id       INT NOT NULL,
+                quantity         DECIMAL(15,3) NOT NULL,
+                unit             VARCHAR(20) NULL,
+                unit_cost        DECIMAL(15,4) NOT NULL DEFAULT 0,
+                amount           DECIMAL(15,2) NOT NULL DEFAULT 0,
+                reason           VARCHAR(255) NULL,
+                movement_id      INT NULL,
+                journal_entry_id INT NULL,
+                created_by       INT NULL,
+                created_at       DATETIME NOT NULL,
+                KEY idx_rsp_day (warehouse_id, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ];
+        foreach ($tables as $name => $sql) {
+            if (rofsHasTable($pdo, $name)) { $log("  ~ $name already exists."); continue; }
+            $pdo->exec($sql);
+            $log("  + $name created.");
+        }
     }
 }

@@ -404,12 +404,14 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         // Profit view (2026-11-03): sales up, each slot's costs down in three parts (drinks & stock SOLD, food BOUGHT,
         // expenses), and profit SO FAR in the period as a line — red while still at a loss. Same slots as Sales/Orders;
         // ends at the Profit tile's figure. Not by hour: food is bought in the morning and sold all day.
-        $PT = ['stock' => (float)($S['p_tot']['stock'] ?? 0), 'food' => 0.0, 'exp' => (float)($cur['expenses'] ?? 0)];
-        $PT['food'] = round((float)$cur['cost'] - $PT['stock'], 2);           // the two always add up to the Cost of goods figure
+        // Restaurant costing plan, Phase 3: stock taken for cooking counts with stock ("used"), and spoiled stock /
+        // kitchen waste is its own line — the three still add up to the Cost of goods figure.
+        $PT = ['stock' => (float)($S['p_tot']['stock'] ?? 0), 'waste' => (float)($S['p_tot']['waste'] ?? 0), 'food' => 0.0, 'exp' => (float)($cur['expenses'] ?? 0)];
+        $PT['food'] = round((float)$cur['cost'] - $PT['stock'] - $PT['waste'], 2);
         $pSvg = '';
         if ($rdMoney && $k !== 'today' && !empty($S['labels'])) {
             $pn = count($S['labels']);
-            $pc = array_map(fn($i) => ($S['p_stock'][$i] ?? 0) + ($S['p_food'][$i] ?? 0) + ($S['p_exp'][$i] ?? 0), range(0, $pn - 1));
+            $pc = array_map(fn($i) => ($S['p_stock'][$i] ?? 0) + ($S['p_food'][$i] ?? 0) + ($S['p_waste'][$i] ?? 0) + ($S['p_exp'][$i] ?? 0), range(0, $pn - 1));
             $up = max(1, max(array_merge($S['sales'], $S['p_cum'], [0]))); $down = max(0, max(array_merge($pc, array_map(fn($v) => -$v, $S['p_cum']), [0])));
             $W = 1000; $H = 220; $top = 8; $span = ($up + $down) * 1.06; $z = $top + $up / $span * ($H - 2 * $top);
             $Y = fn($v) => round($z - $v / $span * ($H - 2 * $top), 2);
@@ -420,11 +422,12 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 $x = round($i * $slot + ($slot - $bw) / 2, 2); $sv = (float)($S['sales'][$i] ?? 0);
                 if ($sv > 0) $o[] = '<rect x="' . $x . '" y="' . $Y($sv) . '" width="' . $bw . '" height="' . round($z - $Y($sv), 2) . '" fill="#9ec5fe"/>';
                 $base = 0.0;
-                foreach ([['p_stock', '#f59e0b'], ['p_food', '#fdba74'], ['p_exp', '#94a3b8']] as [$key, $col]) {
+                foreach ([['p_stock', '#f59e0b'], ['p_food', '#fdba74'], ['p_waste', '#e57373'], ['p_exp', '#94a3b8']] as [$key, $col]) {
                     $v = max(0, (float)($S[$key][$i] ?? 0));
                     if ($v > 0) { $o[] = '<rect x="' . $x . '" y="' . $Y(-$base) . '" width="' . $bw . '" height="' . round($Y(-$base - $v) - $Y(-$base), 2) . '" fill="' . $col . '"/>'; $base += $v; }
                 }
-                $tip = $lb . ' — ' . t('Sales') . ': ' . $rdFmt($sv) . ' · ' . t('Drinks & stock sold') . ': ' . $rdFmt($S['p_stock'][$i] ?? 0) . ' · ' . t('Food bought') . ': ' . $rdFmt($S['p_food'][$i] ?? 0)
+                $tip = $lb . ' — ' . t('Sales') . ': ' . $rdFmt($sv) . ' · ' . t('Drinks & stock used') . ': ' . $rdFmt($S['p_stock'][$i] ?? 0) . ' · ' . t('Food bought') . ': ' . $rdFmt($S['p_food'][$i] ?? 0)
+                     . (($S['p_waste'][$i] ?? 0) > 0 ? ' · ' . t('Spoiled & waste') . ': ' . $rdFmt($S['p_waste'][$i]) : '')
                      . ' · ' . t('Expenses') . ': ' . $rdFmt($S['p_exp'][$i] ?? 0) . ' · ' . (($S['p_cum'][$i] ?? 0) < 0 ? t('Loss so far') : t('Profit so far')) . ': ' . $rdFmt($S['p_cum'][$i] ?? 0);
                 $o[] = '<rect x="' . round($i * $slot, 2) . '" y="0" width="' . round($slot, 2) . '" height="' . $H . '" fill="transparent"><title>' . htmlspecialchars($tip) . '</title></rect>';
                 $pts[] = [round($i * $slot + $slot / 2, 2), (float)($S['p_cum'][$i] ?? 0)];
@@ -550,8 +553,9 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     </div>
                     <?php if ($pSvg !== ''): ?><div class="rd2-pv-legend">
                         <span><i style="background:#9ec5fe"></i><?= t('Sales') ?></span>
-                        <span><i style="background:#f59e0b"></i><?= t('Drinks & stock sold') ?></span>
+                        <span><i style="background:#f59e0b"></i><?= t('Drinks & stock used') ?></span>
                         <span><i style="background:#fdba74"></i><?= t('Food bought') ?></span>
+                        <?php if ($PT['waste'] > 0): ?><span><i style="background:#e57373"></i><?= t('Spoiled & waste') ?></span><?php endif; ?>
                         <span><i style="background:#94a3b8"></i><?= t('Expenses') ?></span>
                         <span><i class="rd2-pv-ln" style="background:#052c65"></i><?= t('Profit so far') ?></span>
                         <span><i class="rd2-pv-ln" style="background:#dc3545"></i><?= t('Loss so far') ?></span>
@@ -561,8 +565,9 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <?php else: ?>
                     <div class="rd2-pv-today">
                         <div class="rd2-pv-row"><span><?= t('Sales') ?></span><b><?= $rdFmt($cur['sales']) ?></b></div>
-                        <div class="rd2-pv-row"><span>− <?= t('Drinks & stock sold') ?></span><b><?= $rdFmt($PT['stock']) ?></b></div>
+                        <div class="rd2-pv-row"><span>− <?= t('Drinks & stock used') ?></span><b><?= $rdFmt($PT['stock']) ?></b></div>
                         <div class="rd2-pv-row"><span>− <?= t('Food bought') ?></span><b><?= $rdFmt($PT['food']) ?></b></div>
+                        <?php if ($PT['waste'] > 0): ?><div class="rd2-pv-row"><span>− <?= t('Spoiled & waste') ?></span><b><?= $rdFmt($PT['waste']) ?></b></div><?php endif; ?>
                         <div class="rd2-pv-row"><span>− <?= t('Expenses') ?></span><b><?= $rdFmt($PT['exp']) ?></b></div>
                         <div class="rd2-muted small mt-2"><?= t('Profit is not shown by hour: food is bought in the morning and sold all day, so hours would mislead. Choose This week or longer to see profit day by day.') ?></div>
                     </div>
@@ -571,7 +576,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?php endif; ?>
                 <div class="rd2-bl" data-today="<?= $k === 'today' ? '1' : '0' ?>"><?php foreach ($S['labels'] as $i => $lb): ?><span><?= $i % $every === 0 ? htmlspecialchars($lb) : '' ?></span><?php endforeach; ?></div>
             </div>
-            <?php if ($rdMoney): ?><div class="rdp-foot d-none" data-ctv="profit"><?= t('Drinks and stock items count when they are sold; other food counts the day it is bought; expenses the day they are recorded.') ?><?= $pSvg !== '' ? ' ' . t('The line ends at the Profit figure above.') : '' ?></div><?php endif; ?>
+            <?php if ($rdMoney): ?><div class="rdp-foot d-none" data-ctv="profit"><?= t('Drinks and stock items count when they are sold or taken for cooking; other food counts the day it is bought; spoiled stock and waste the day they are recorded; expenses the day they are recorded.') ?><?= $pSvg !== '' ? ' ' . t('The line ends at the Profit figure above.') : '' ?></div><?php endif; ?>
             <div class="rdp-foot" data-ctv="sales orders">
                 <?php if ($S['peak'] !== null): ?><?= t('Busiest') ?>: <b><?= htmlspecialchars($k === 'today' ? $S['peak'] . ':00' : $S['peak']) ?></b> · <?php endif; ?>
                 <?= $nowWord ?> <b><?= $rdFmt(array_sum($S['sales'])) ?></b> · <?= $prevWord ?> <?= $rdFmt(array_sum($S['sales_prev'])) ?>
@@ -649,8 +654,9 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?php if ($unc > 0 || $rdWarn): ?><span class="rdp-pill rd2-pill-warn"><?= t('Estimated') ?></span><?php else: ?><span class="rdp-pill rdp-pill-ok"><?= t('Complete') ?></span><?php endif; ?></div>
             <div class="p-3">
                 <div class="rd2-ml"><span><?= t('Sales') ?></span><b><?= $rdFmt($cur['sales']) ?></b></div>
-                <div class="rd2-ml"><span><?= t('Drinks & stock sold') ?></span><b>− <?= $rdFmt($PT['stock']) ?></b></div>
+                <div class="rd2-ml"><span><?= t('Drinks & stock used') ?></span><b>− <?= $rdFmt($PT['stock']) ?></b></div>
                 <div class="rd2-ml"><span><?= t('Food bought') ?></span><b>− <?= $rdFmt($PT['food']) ?></b></div>
+                <?php if ($PT['waste'] > 0): ?><div class="rd2-ml"><span><?= t('Spoiled & waste') ?></span><b>− <?= $rdFmt($PT['waste']) ?></b></div><?php endif; ?>
                 <div class="rd2-ml"><span><?= t('Expenses') ?></span><b>− <?= $rdFmt($cur['expenses']) ?></b></div>
                 <div class="rd2-ml rd2-ml-total"><span><?= t('Net Profit') ?></span><b class="<?= $cur['profit'] < 0 ? 'text-danger' : '' ?>"><?= $rdFmt($cur['profit']) ?> <small><?= htmlspecialchars($rdCur) ?></small></b></div>
                 <?php if ($hasSales && $cur['profit'] >= 0): ?><div class="rd2-muted small mt-1"><?= sprintf(t('Of every 100 you sell, %s is yours.'), '<b>' . $pct($rdStory['per100']['profit']) . '</b>') ?></div>

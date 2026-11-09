@@ -52,6 +52,23 @@ if ($ids) {
     $st->execute(array_merge($ids, [$from, $to]));
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 }
+// Restaurant costing plan, Phase 3 — spoiled stock recorded on the Cooking plan (entity 'restaurant_spoilage').
+require_once __DIR__ . '/../../../core/restaurant_cook_plan.php';
+$spoil = [];
+if ($ids && rcpReady($pdo)) {
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $sp = $pdo->prepare("SELECT s.id, s.created_at, s.quantity, s.unit, s.amount, s.reason, p.product_name, w.warehouse_name,
+                                TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS by_name, u.username
+                           FROM restaurant_spoilage s
+                      LEFT JOIN products p ON p.product_id = s.product_id
+                      LEFT JOIN warehouses w ON w.warehouse_id = s.warehouse_id
+                      LEFT JOIN users u ON u.user_id = s.created_by
+                          WHERE s.warehouse_id IN ($ph) AND DATE(s.created_at) BETWEEN ? AND ?
+                       ORDER BY s.created_at DESC, s.id DESC");
+    $sp->execute(array_merge($ids, [$from, $to]));
+    $spoil = $sp->fetchAll(PDO::FETCH_ASSOC);
+}
+$spoilCost = array_sum(array_map(fn($r) => (float)$r['amount'], $spoil));
 $waste   = array_values(array_filter($rows, fn($r) => $r['stage'] === 'after_kitchen'));
 $posted  = array_sum(array_map(fn($r) => (float)$r['posted_cost'], $rows));
 $estOnly = array_sum(array_map(fn($r) => (float)$r['posted_cost'] > 0 ? 0 : (float)$r['est_cost'], $waste));
@@ -101,7 +118,32 @@ $fmtQ = fn($q) => rtrim(rtrim(number_format((float)$q, 3, '.', ''), '0'), '.');
             <div class="fs-4 fw-bold text-danger" id="stPosted"><?= htmlspecialchars($cur) ?> <?= $fmt($posted) ?></div><div class="small text-muted"><?= t('Waste cost in the books') ?></div></div></div>
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
             <div class="fs-4 fw-bold text-warning" id="stEst"><?= htmlspecialchars($cur) ?> <?= $fmt($estOnly) ?></div><div class="small text-muted"><?= t('Estimated (dishes with no recipe)') ?></div></div></div>
+        <?php if ($spoil): ?>
+        <div class="col-12 col-md-3"><div class="card border-0 shadow-sm text-center p-3" style="background:#e7f0ff;border:1px solid #b6ccfe !important;">
+            <div class="fs-4 fw-bold text-danger" id="stSpoil"><?= htmlspecialchars($cur) ?> <?= $fmt($spoilCost) ?></div><div class="small text-muted"><?= t('Spoiled stock') ?> (<?= count($spoil) ?>)</div></div></div>
+        <?php endif; ?>
     </div>
+
+    <?php if ($spoil): ?>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-header bg-white"><h6 class="mb-0 fw-bold"><i class="bi bi-box-seam me-1"></i><?= t('Spoiled stock') ?></h6></div>
+        <div class="card-body p-0"><div class="table-responsive"><table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th><?= t('S/No.') ?></th><th><?= t('Date') ?></th><th><?= t('Item') ?></th><th class="text-end"><?= t('Qty') ?></th><th><?= t('Reason') ?></th><th class="text-end"><?= t('Cost') ?></th><th><?= t('By') ?></th></tr></thead>
+            <tbody>
+            <?php foreach ($spoil as $i => $s): ?>
+                <tr>
+                    <td><?= $i + 1 ?></td>
+                    <td><?= date('d/m/Y H:i', strtotime($s['created_at'])) ?><?= count($warehouses) > 1 ? '<div class="small text-muted">' . caseFormat($s['warehouse_name']) . '</div>' : '' ?></td>
+                    <td><?= safe_output(caseFormat((string)$s['product_name'])) ?></td>
+                    <td class="text-end"><?= $fmtQ($s['quantity']) ?> <?= safe_output($s['unit'], '') ?></td>
+                    <td><?= safe_output($s['reason'], '—') ?></td>
+                    <td class="text-end"><?= $fmt($s['amount']) ?></td>
+                    <td><?= safe_output(trim((string)$s['by_name']) ?: (string)$s['username'], '—') ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div></div>
+    </div>
+    <?php endif; ?>
 
     <div id="tableView" class="card border-0 shadow-sm"><div class="card-body">
         <table id="wasteTable" class="table table-hover align-middle w-100">

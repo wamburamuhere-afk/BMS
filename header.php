@@ -1210,6 +1210,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             <a class="nav-link dropdown-toggle" href="#" id="rfMenuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-utensils"></i> <?= t('Menu') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfMenuDropdown">
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="ri ri-book-open-text"></i> <?= t('Menu items') ?></a></li>
+                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/cooking') ?>"><i class="ri ri-cooking-pot"></i> <?= t('Cooking plan') ?></a></li>
                                 <?php if (canView('categories')): ?><li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Menu groups') ?></a></li><?php endif; ?>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="ri ri-circle-plus"></i> <?= t('Add-on options') ?></a></li>
                             </ul>
@@ -2116,6 +2117,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             if (canView('restaurant_pos')) {
                 if (!empty($__rest_on)) {
                     $__side_rest[] = [getUrl('restaurant/menu'), 'bi-journal-richtext', t('Menu')];
+                    $__side_rest[] = [getUrl('restaurant/cooking'), 'bi-fire', t('Cooking plan')];
                     $__side_rest[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
                     if (!empty($__ro_nav)) $__side_rest[] = [getUrl('online_orders'), 'bi-phone', t('Online orders')];
                 }
@@ -2135,7 +2137,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'ri ri-chef-hat', t('Kitchen')];
                 $__rf_o[] = [getUrl('restaurant/reservations'), 'ri ri-calendar-check', t('Reservations')];
                 if (canView('pos')) $__rf_o[] = [getUrl('pos/credit-customers'), 'ri ri-hand-coins', t('Who Owes Me')];
-                $__rf_m = [[getUrl('restaurant/menu'), 'ri ri-book-open-text', t('Menu items')]];
+                $__rf_m = [[getUrl('restaurant/menu'), 'ri ri-book-open-text', t('Menu items')], [getUrl('restaurant/cooking'), 'ri ri-cooking-pot', t('Cooking plan')]];
                 if (canView('categories')) $__rf_m[] = [getUrl('categories'), 'bi-tags', t('Menu groups')];
                 $__rf_m[] = [getUrl('restaurant/modifier-group'), 'ri ri-circle-plus', t('Add-on options')];
                 $__rf_b = [];
