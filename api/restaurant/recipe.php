@@ -14,6 +14,11 @@
  *        recipe's amount (total_qty) and the amount for ONE plate (qty_per_unit = total ÷ plates).
  *        Selling, stock and cost of goods read qty_per_unit exactly as before, so yield 1 is the old
  *        behaviour. The plate count is products.recipe_yield (absent on a company not yet migrated → 1).
+ *        2026-11-09 (restaurant costing plan, Phase 2) — extra_cost: "other costs" for the whole recipe
+ *        (things not kept as stock, or the whole pot's cost when no stock is kept), products.recipe_extra_cost.
+ *        Changed only when sent by a user with restaurant_costing; otherwise the stored value is kept.
+ *        A recipe with other costs but no ingredients is kept (its plate count too): the dish has a
+ *        known cost but still sells without stock (is_combo stays 0). Nothing is posted from it.
  * POST action=new_ingredient  warehouse_id, name, unit, cost_price
  *        Creates a stock item (not on the menu) to use as an ingredient; stock arrives via Receive Stock.
  *
@@ -43,7 +48,9 @@ if ($action === 'search') {
                            FROM products WHERE status = 'active' AND is_service = 0 AND COALESCE(is_combo,0) = 0 AND parent_product_id IS NULL
                             AND product_name LIKE ? ORDER BY product_name LIMIT 30");
     $st->execute(['%' . trim((string)($src['q'] ?? '')) . '%']);
-    echo json_encode(['results' => array_map(fn($r) => ['id' => (int)$r['product_id'], 'text' => $r['product_name'] . ' (' . $r['unit'] . ')', 'unit' => $r['unit'], 'cost_price' => (float)$r['cost_price']], $st->fetchAll(PDO::FETCH_ASSOC))]);
+    $seeCost = restaurantCanSeeCost();
+    echo json_encode(['results' => array_map(fn($r) => ['id' => (int)$r['product_id'], 'text' => $r['product_name'] . ' (' . $r['unit'] . ')', 'unit' => $r['unit']]
+        + ($seeCost ? ['cost_price' => (float)$r['cost_price']] : []), $st->fetchAll(PDO::FETCH_ASSOC))]);
     exit;
 }
 
@@ -81,6 +88,12 @@ try {
             $y->execute([(int)$dish['product_id']]);
             $yield = max(1, (int)$y->fetchColumn());
         }
+        $extra = 0.0;   // "other costs" for the whole recipe (Phase 2)
+        if (restaurantExtraCostReady($pdo)) {
+            $x = $pdo->prepare("SELECT recipe_extra_cost FROM products WHERE product_id = ?");
+            $x->execute([(int)$dish['product_id']]);
+            $extra = (float)$x->fetchColumn();
+        }
         $st = $pdo->prepare("SELECT ac.component_product_id AS product_id, p.product_name, COALESCE(NULLIF(ac.unit,''), NULLIF(p.unit,''), 'pcs') AS unit,
                                     ac.qty_per_unit AS qty, ac.total_qty AS pot_qty, COALESCE(p.cost_price,0) AS cost_price,
                                     COALESCE((SELECT SUM(ps.stock_quantity) FROM product_stocks ps WHERE ps.product_id = p.product_id AND ps.warehouse_id = ?),0) AS stock
@@ -96,7 +109,16 @@ try {
             $cost += $r['qty'] * $r['cost_price'];
         }
         unset($r);
-        echo json_encode(['success' => true, 'dish' => $dish, 'yield' => $yield, 'components' => $rows, 'cost' => round($cost, 2)]);
+        $cost += $extra / $yield;   // one plate = its ingredients' share + its share of the other costs
+        $out = ['success' => true, 'dish' => $dish, 'yield' => $yield, 'components' => $rows, 'cost' => round($cost, 2),
+                'extra_cost' => round($extra, 2), 'can_see_cost' => true];
+        // Restaurant costing plan (2026-11-09): a cook may set the recipe, but sees amounts, not money.
+        if (!restaurantCanSeeCost()) {
+            foreach ($out['components'] as &$r) unset($r['cost_price']);
+            unset($r, $out['cost'], $out['extra_cost']);
+            $out['can_see_cost'] = false;
+        }
+        echo json_encode($out);
         return;
     }
 
@@ -129,6 +151,20 @@ try {
             $units = $chk->fetchAll(PDO::FETCH_KEY_PAIR);
             if (count($units) !== count($clean)) throw new Exception(t('Ingredients must be stock items (not dishes or services).'));
         }
+        // "Other costs" for the whole recipe: set only by someone who may see costs; otherwise kept as stored.
+        $extraReady = restaurantExtraCostReady($pdo);
+        $extra = 0.0;
+        if ($extraReady) {
+            if (array_key_exists('extra_cost', $src) && restaurantCanSeeCost()) {
+                $extra = round((float)$src['extra_cost'], 2);
+                if ($extra < 0 || $extra > 999999999) throw new Exception(t('Enter the other costs as an amount of 0 or more.'));
+            } else {
+                $x = $pdo->prepare("SELECT recipe_extra_cost FROM products WHERE product_id = ?");
+                $x->execute([$pid]);
+                $extra = (float)$x->fetchColumn();
+            }
+        }
+        $hasRecipe = $clean || $extra > 0;   // ingredients, or a known pot cost — either keeps the plate count
         $pdo->beginTransaction();
         $pdo->prepare("DELETE FROM product_assembly_components WHERE parent_product_id = ?")->execute([$pid]);
         $ins = $pdo->prepare("INSERT INTO product_assembly_components (parent_product_id, component_product_id, unit, qty_per_unit, total_qty) VALUES (?, ?, ?, ?, ?)");
@@ -138,18 +174,22 @@ try {
             $perPlate = max(0.001, round($qty / $yield, 3));
             $ins->execute([$pid, $cid, $units[$cid] ?? 'pcs', $perPlate, $qty]);
         }
+        // is_combo = ingredients leave stock on each sale; other costs alone never move stock.
         $pdo->prepare("UPDATE products SET is_combo = ?, updated_by = ? WHERE product_id = ?")->execute([$clean ? 1 : 0, $uid, $pid]);
-        if ($yieldReady()) $pdo->prepare("UPDATE products SET recipe_yield = ? WHERE product_id = ?")->execute([$clean ? $yield : 1, $pid]);
+        if ($yieldReady()) $pdo->prepare("UPDATE products SET recipe_yield = ? WHERE product_id = ?")->execute([$hasRecipe ? $yield : 1, $pid]);
+        if ($extraReady) $pdo->prepare("UPDATE products SET recipe_extra_cost = ? WHERE product_id = ?")->execute([$extra, $pid]);
         $pdo->commit();
-        logActivity($pdo, $uid, ($clean ? 'Saved recipe' : 'Removed recipe') . " for menu item: {$dish['product_name']}");
-        echo json_encode(['success' => true, 'message' => $clean ? t('Recipe saved.') : t('Recipe removed — the dish sells without stock.')]);
+        logActivity($pdo, $uid, ($hasRecipe ? 'Saved recipe' : 'Removed recipe') . " for menu item: {$dish['product_name']}"
+            . ($extra > 0 ? " (other costs $extra for $yield plate(s))" : ''));
+        echo json_encode(['success' => true, 'message' => $hasRecipe ? t('Recipe saved.') : t('Recipe removed — the dish sells without stock.')]);
         return;
     }
 
     if ($action === 'new_ingredient') {
         $name = trim((string)($src['name'] ?? ''));
         $unit = mb_substr(trim((string)($src['unit'] ?? '')) ?: 'kg', 0, 20);
-        $cost = max(0, (float)($src['cost_price'] ?? 0));
+        // Only someone who may see costs may set one; anyone else creates it at 0 — Purchases sets the real cost.
+        $cost = restaurantCanSeeCost() ? max(0, (float)($src['cost_price'] ?? 0)) : 0.0;
         if ($name === '') throw new Exception(t('Name is required.'));
         $dup = $pdo->prepare("SELECT COUNT(*) FROM products WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))");
         $dup->execute([$name]);
@@ -160,7 +200,8 @@ try {
             ->execute([$name, $unit, $unit, $cost, $cost, $warehouse_id, $uid]);
         $id = (int)$pdo->lastInsertId();
         logActivity($pdo, $uid, "Created ingredient: $name (ID $id)");
-        echo json_encode(['success' => true, 'message' => t('Ingredient added.'), 'id' => $id, 'text' => "$name ($unit)", 'unit' => $unit, 'cost_price' => $cost]);
+        echo json_encode(['success' => true, 'message' => t('Ingredient added.'), 'id' => $id, 'text' => "$name ($unit)", 'unit' => $unit]
+            + (restaurantCanSeeCost() ? ['cost_price' => $cost] : []));
         return;
     }
 

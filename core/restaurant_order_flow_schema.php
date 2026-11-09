@@ -234,6 +234,7 @@ if (!function_exists('rofsReadyRoles')) {
                 'pos' => ['view', 'create', 'edit', 'delete'], 'restaurant_pos' => ['view', 'create', 'edit'],
                 'restaurant_orders' => ['view', 'create', 'edit', 'delete', 'approve'], 'kitchen_display' => ['view', 'edit'],
                 'pos_config_settings' => ['view', 'edit'], 'pos_dashboard' => ['view'],
+                'restaurant_costing' => ['view'],   // skipped while the row does not exist yet (rofsGrant needs its id)
             ]],
         ];
     }

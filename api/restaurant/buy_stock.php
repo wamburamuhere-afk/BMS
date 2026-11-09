@@ -34,7 +34,13 @@ if ($warehouse_id <= 0 || !userCan('warehouse', $warehouse_id)) {
 }
 
 try {
-    $r = restaurantBuyStock($pdo, [
+    // Restaurant costing plan, Phase 3 — keep=1: "Something else" bought for several days (name, unit, quantity,
+    // total_paid). Kept as stock (found by name or made a new ingredient) — its cost counts when it is cooked.
+    $keep = (string)($_POST['keep'] ?? '') === '1';
+    $fn = $keep ? 'restaurantBuyKeep' : 'restaurantBuyStock';
+    $r = $fn($pdo, [
+        'name'                 => $_POST['name'] ?? '',
+        'unit'                 => $_POST['unit'] ?? '',
         'product_id'           => $_POST['product_id'] ?? 0,
         'warehouse_id'         => $warehouse_id,
         'quantity'             => $_POST['quantity'] ?? 0,

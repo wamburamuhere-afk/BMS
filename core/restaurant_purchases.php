@@ -98,7 +98,8 @@ if (!function_exists('restaurantBuyStock')) {
         if ($expiry !== null && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiry) || strtotime($expiry) === false)) throw new Exception(t('Enter a valid date.'));
         if ($expiry !== null && $expiry < $date) throw new Exception(t('The expiry date cannot be before the purchase date.'));
 
-        $st = $pdo->prepare("SELECT p.product_id, p.product_name, p.selling_price, p.is_menu_item, COALESCE(p.cost_price, 0) AS cost_price
+        $st = $pdo->prepare("SELECT p.product_id, p.product_name, p.selling_price, p.is_menu_item, COALESCE(p.cost_price, 0) AS cost_price,
+                                    COALESCE(NULLIF(p.unit,''), NULLIF(p.unit_of_measure,''), 'pcs') AS unit
                                FROM products p WHERE p.product_id = ? AND " . restaurantStockItemSql('p'));
         $st->execute([$productId]);
         $prod = $st->fetch(PDO::FETCH_ASSOC);
@@ -186,9 +187,59 @@ if (!function_exists('restaurantBuyStock')) {
             throw $e;
         }
 
-        return ['product_id' => $productId, 'product_name' => $prod['product_name'], 'quantity' => $qty, 'unit_cost' => $unitCost, 'total' => $total,
+        return ['product_id' => $productId, 'product_name' => $prod['product_name'], 'unit' => $prod['unit'], 'quantity' => $qty, 'unit_cost' => $unitCost, 'total' => $total,
                 'old_cost' => round($oldCost, 2), 'new_cost' => $newCost, 'selling_price' => $newSelling ?? (float)$prod['selling_price'], 'on_hand_before' => $onHand, 'on_hand_after' => $onHand + $qty,
                 'reference' => $ref, 'transaction_id' => $txn ?: null,
                 'payment' => $split['payment'], 'paid_now' => $split['paid'], 'owed' => $split['owed'], 'bill_id' => $bill['invoice_id'] ?? null, 'batch_id' => $intake['batch_id'] ?? null, 'movement_id' => $intake['movement_id'] ?? null];
+    }
+}
+
+if (!function_exists('restaurantBuyKeep')) {
+    /**
+     * Restaurant costing plan, Phase 3 — "Something else" bought for several days ("Will you use it all today?" → No):
+     * 25 kg of rice at 50,000 is kept as STOCK instead of becoming today's food cost, so its cost counts on the days it
+     * is cooked (Cooking plan → Taken from stock). The item is found by its name among the counted items, or created
+     * as a new ingredient (not on the Menu, no selling price) in the unit given — then bought exactly like a counted item.
+     *
+     * @param array $in name, unit, quantity, total_paid + everything restaurantBuyStock() takes (payment, supplier, date…)
+     * @return array restaurantBuyStock()'s result + 'created' (bool: a new ingredient was made)
+     */
+    function restaurantBuyKeep(PDO $pdo, array $in, int $userId): array
+    {
+        $name = trim((string)($in['name'] ?? ''));
+        $unit = mb_substr(trim((string)($in['unit'] ?? '')) ?: 'kg', 0, 20);
+        $wh   = (int)($in['warehouse_id'] ?? 0);
+        if ($name === '') throw new Exception(t('Enter what you bought.'));
+        if (mb_strlen($name) > 150) throw new Exception(t('The name is too long.'));
+        if (round((float)($in['quantity'] ?? 0), 3) <= 0) throw new Exception(t('Quantity must be greater than zero.'));
+        if (round((float)($in['total_paid'] ?? 0), 2) <= 0) throw new Exception(t('Enter the amount paid.'));
+        if (!restaurantShopActive($pdo, $wh)) throw new Exception(t('This shop is not set up as a restaurant.'));
+
+        // Already a counted item with this name? Buy that one (its own unit wins).
+        $st = $pdo->prepare("SELECT p.product_id FROM products p WHERE LOWER(TRIM(p.product_name)) = LOWER(TRIM(?)) AND " . restaurantStockItemSql('p') . " LIMIT 1");
+        $st->execute([$name]);
+        $pid = (int)$st->fetchColumn();
+        $created = false;
+        if (!$pid) {
+            $dup = $pdo->prepare("SELECT COUNT(*) FROM products WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?)) AND status = 'active'");
+            $dup->execute([$name]);
+            if ((int)$dup->fetchColumn() > 0) throw new Exception(sprintf(t('An item named "%s" already exists.'), $name));
+            $pdo->prepare("INSERT INTO products (product_name, unit, unit_of_measure, cost_price, purchase_price, selling_price, min_selling_price,
+                                                 is_service, track_inventory, warehouse_id, is_menu_item, status, created_by)
+                           VALUES (?, ?, ?, 0, 0, 0, 0, 0, 1, ?, 0, 'active', ?)")
+                ->execute([$name, $unit, $unit, $wh, $userId]);
+            $pid = (int)$pdo->lastInsertId();
+            $created = true;
+            logActivity($pdo, $userId, "Created ingredient: $name (ID $pid) — bought to keep as stock");
+        }
+        try {
+            $r = restaurantBuyStock($pdo, ['product_id' => $pid, 'unit_cost' => 0] + $in, $userId);
+        } catch (Throwable $e) {
+            // The purchase did not go through: the ingredient made for it is not left behind (soft delete — products
+            // has no 'deleted' status; 'inactive' hides it from every list and from the name checks above).
+            if ($created) $pdo->prepare("UPDATE products SET status = 'inactive' WHERE product_id = ?")->execute([$pid]);
+            throw $e;
+        }
+        return $r + ['created' => $created];
     }
 }

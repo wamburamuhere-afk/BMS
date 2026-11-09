@@ -38,6 +38,10 @@ $item_type    = (string)($_POST['item_type'] ?? 'dish');
 $name         = trim((string)($_POST['product_name'] ?? ''));
 $price        = (float)($_POST['selling_price'] ?? 0);
 $cost         = max(0, (float)($_POST['cost_price'] ?? 0));
+// Restaurant costing plan (2026-11-09): the buying price changes only when it was sent AND the user may see
+// costs (restaurant_costing). Someone without it never sees the field, so an edit must not wipe the cost to 0.
+$cost_sent    = array_key_exists('cost_price', $_POST) && restaurantCanSeeCost();
+if (!$cost_sent) $cost = 0.0;   // a new bought item without a cost: Purchases sets it on the first buy
 // A dish's rough "cost of one plate" guess. 2026-11-03: the Menu form no longer asks for it (a
 // dish's real cost comes from its recipe and the ingredients bought in Purchases). Still accepted
 // when a caller sends it; an edit that doesn't send it leaves any stored guess untouched.
@@ -110,7 +114,7 @@ try {
         $stationId = restaurantPrepAreaId($pdo, $warehouse_id, $prep_area);
         $sets = "product_name = ?, category_id = ?, selling_price = ?, kitchen_station_id = ?, is_available = ?, updated_by = ?";
         $params = [$name, $resolveCategory(), $price, $stationId, $is_available, $user_id];
-        if (!(int)$row['is_service']) { $sets .= ", cost_price = ?, purchase_price = ?"; $params[] = $cost; $params[] = $cost; }
+        if (!(int)$row['is_service'] && $cost_sent) { $sets .= ", cost_price = ?, purchase_price = ?"; $params[] = $cost; $params[] = $cost; }
         elseif ($plate_sent) { $sets .= ", purchase_price = ?"; $params[] = $plate_cost; }
         $params[] = $product_id;
         $pdo->prepare("UPDATE products SET $sets WHERE product_id = ?")->execute($params);

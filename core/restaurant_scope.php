@@ -113,6 +113,60 @@ if (!function_exists('restaurantShopActive')) {
     }
 }
 
+if (!function_exists('restaurantCanSeeCost')) {
+    /**
+     * Restaurant costing plan (2026-11-09) — may this user see buying prices, recipe costs and
+     * gross profit? Permission `restaurant_costing` (view); admins always (canView's bypass).
+     * Without it the Menu, recipes and Sales report show selling prices only, and the APIs leave
+     * cost fields out. A company not yet migrated has no row: only admins see costs until it runs.
+     */
+    function restaurantCanSeeCost(): bool
+    {
+        return canView('restaurant_costing');
+    }
+}
+
+if (!function_exists('restaurantExtraCostReady')) {
+    /**
+     * Restaurant costing plan, Phase 2 — products.recipe_extra_cost (and recipe_yield) present?
+     * Absent on a company not yet migrated: every helper below then behaves as before (ingredients only).
+     */
+    function restaurantExtraCostReady(PDO $pdo): bool
+    {
+        static $ok = null;
+        if ($ok !== null) return $ok;
+        try {
+            $ok = (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'recipe_extra_cost'")->fetch()
+               && (bool)$pdo->query("SHOW COLUMNS FROM products LIKE 'recipe_yield'")->fetch();
+        } catch (Throwable $e) {
+            $ok = false;
+        }
+        return $ok;
+    }
+}
+
+if (!function_exists('restaurantExtraPerPlateSql')) {
+    /** SQL: one plate's share of a dish's "other costs" (whole pot ÷ plates); '0' when not migrated. */
+    function restaurantExtraPerPlateSql(PDO $pdo, string $a = 'p'): string
+    {
+        return restaurantExtraCostReady($pdo)
+            ? "(COALESCE($a.recipe_extra_cost, 0) / GREATEST(COALESCE($a.recipe_yield, 1), 1))"
+            : '0';
+    }
+}
+
+if (!function_exists('restaurantDishHasCostSql')) {
+    /**
+     * SQL condition: the dish's cost is known — a recipe with ingredients, OR "other costs" typed in.
+     * The one rule for every "dish without a cost" count (Menu, dashboard, reports, notification).
+     */
+    function restaurantDishHasCostSql(PDO $pdo, string $a = 'p'): string
+    {
+        $c = "EXISTS (SELECT 1 FROM product_assembly_components ac WHERE ac.parent_product_id = $a.product_id)";
+        return restaurantExtraCostReady($pdo) ? "($c OR COALESCE($a.recipe_extra_cost, 0) > 0)" : $c;
+    }
+}
+
 if (!function_exists('restaurantShopIsRestaurantOnly')) {
     /**
      * Restaurant focus pass (2026-11-02) — is THIS shop a plain Restaurant shop (not Hybrid, not Retail) of a
