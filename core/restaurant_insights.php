@@ -435,19 +435,23 @@ if (!function_exists('rdDishEarnings')) {
     {
         $out = ['items' => [], 'best_earners' => [], 'best_sellers' => [], 'needs_cost' => [], 'costed_count' => 0, 'est_profit' => 0.0, 'avg_margin' => null];
         $in = rdIn($ids);
+        // Restaurant costing plan, Phase 2 — a plate's share of the recipe's "other costs" (0 before the migration).
+        $extraPP  = restaurantExtraPerPlateSql($pdo, 'p');
+        $extraGrp = restaurantExtraCostReady($pdo) ? ', p.recipe_extra_cost, p.recipe_yield' : '';
         try {
             $st = $pdo->prepare("
-                SELECT p.product_id, p.product_name, p.is_service, p.selling_price, COALESCE(p.cost_price,0) AS cost_price, COALESCE(p.purchase_price,0) AS plate_cost,
+                SELECT p.product_id, p.product_name, p.is_service, p.selling_price, COALESCE(p.cost_price,0) AS cost_price,
                        SUM(psi.quantity) AS qty, SUM(psi.line_total) AS revenue,
                        (SELECT COUNT(*) FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id) AS comp_count,
                        (SELECT SUM(ac.qty_per_unit * COALESCE(cp.cost_price,0)) FROM product_assembly_components ac
-                          LEFT JOIN products cp ON cp.product_id = ac.component_product_id WHERE ac.parent_product_id = p.product_id) AS recipe_cost
+                          LEFT JOIN products cp ON cp.product_id = ac.component_product_id WHERE ac.parent_product_id = p.product_id) AS recipe_cost,
+                       $extraPP AS extra_pp
                   FROM pos_sale_items psi
                   JOIN pos_sales ps ON ps.sale_id = psi.sale_id
                   JOIN products p   ON p.product_id = psi.product_id
                  WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
                    AND DATE(ps.sale_date) BETWEEN ? AND ? AND ps.warehouse_id IN ($in) AND p.is_menu_item = 1
-              GROUP BY p.product_id, p.product_name, p.is_service, p.selling_price, p.cost_price, p.purchase_price
+              GROUP BY p.product_id, p.product_name, p.is_service, p.selling_price, p.cost_price$extraGrp
               ORDER BY qty DESC");
             $st->execute([$from, $to]);
             $items = [];
@@ -455,7 +459,8 @@ if (!function_exists('rdDishEarnings')) {
                 $qty = (float)$r['qty'];
                 $price = $qty > 0 && (float)$r['revenue'] > 0 ? (float)$r['revenue'] / $qty : (float)$r['selling_price'];
                 $cost = null;
-                if ((int)$r['comp_count'] > 0) $cost = (float)$r['recipe_cost'];
+                $hasRecipe = (int)$r['comp_count'] > 0 || (float)$r['extra_pp'] > 0;   // ingredients and/or other costs
+                if ((int)$r['is_service'] === 1 && $hasRecipe) $cost = (float)$r['recipe_cost'] + (float)$r['extra_pp'];
                 elseif ((int)$r['is_service'] === 0 && (float)$r['cost_price'] > 0) $cost = (float)$r['cost_price'];
                 // A dish without a recipe has no known cost (restaurant costing plan, 2026-11-09): the old
                 // "cost of one plate" guess (purchase_price) is no longer read, so these figures match the Menu.
@@ -464,7 +469,7 @@ if (!function_exists('rdDishEarnings')) {
                     'product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => $qty,
                     'price' => round($price, 2), 'cost' => $cost === null ? null : round($cost, 2),
                     'profit_per_plate' => $ppp, 'margin' => ($ppp !== null && $price > 0) ? round($ppp / $price * 100, 1) : null,
-                    'est_profit' => $ppp === null ? null : round($ppp * $qty, 2), 'kind' => (int)$r['comp_count'] > 0 ? 'recipe' : ((int)$r['is_service'] === 0 ? 'bought' : 'dish'),
+                    'est_profit' => $ppp === null ? null : round($ppp * $qty, 2), 'kind' => ((int)$r['is_service'] === 1 && $hasRecipe) ? 'recipe' : ((int)$r['is_service'] === 0 ? 'bought' : 'dish'),
                 ];
             }
             $items = rdClassifyDishes($items);

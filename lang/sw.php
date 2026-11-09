@@ -7024,6 +7024,13 @@ return [
     'Food cost (share of the selling price)' => 'Gharama ya chakula (sehemu ya bei ya kuuza)',
     'If all %d plates sell' => 'Sahani zote %d zikiuzwa',
     'Cost of %d plates' => 'Gharama ya sahani %d',
+    // Restaurant costing plan — Phase 2: other costs per pot
+    'Other costs (not counted in stock)' => 'Gharama nyingine (zisizohesabiwa stoo)',
+    'Other costs for the whole pot' => 'Gharama nyingine za sufuria nzima',
+    'Other costs for one plate' => 'Gharama nyingine za sahani moja',
+    'Tomatoes, onions, spices, salt… anything you do not keep as stock. No stock at all? Put what the whole pot costs you here (e.g. 30,000) and leave the ingredients empty.' => 'Nyanya, vitunguu, viungo, chumvi… chochote usichokiweka stoo. Huna stoo kabisa? Andika hapa sufuria nzima inakugharimu kiasi gani (mf. 30,000) na uache viungo wazi.',
+    'Enter the other costs as an amount of 0 or more.' => 'Andika gharama nyingine kama kiasi cha 0 au zaidi.',
+    'A dish\'s cost comes from its recipe: the ingredients at the price you paid in Purchases, plus any other costs you type. Add the recipe after saving (Actions → Recipe).' => 'Gharama ya chakula inatoka kwenye mapishi yake: viungo kwa bei uliyolipa kwenye Ununuzi, pamoja na gharama nyingine unazoandika. Weka mapishi baada ya kuhifadhi (Vitendo → Mapishi).',
     'Expected sales' => 'Mauzo yanayotarajiwa',
     'Expected gross profit' => 'Faida ghafi inayotarajiwa',
     'Expected only, before you sell: gas or charcoal, staff, rent and plates that do not sell are not included. Your real profit is in the Profit Report.' => 'Ni matarajio tu, kabla ya kuuza: gesi au mkaa, wafanyakazi, kodi na sahani zisizouzwa hazijahesabiwa. Faida yako halisi iko kwenye Ripoti ya Faida.',

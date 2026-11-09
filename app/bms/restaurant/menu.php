@@ -222,7 +222,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                             <?php /* 2026-11-03: no "cost of one plate" guess for a dish — its cost comes from its
                                      recipe (ingredients at the price paid in Purchases). */ ?>
                             <div class="rf-field rf-full dish-only">
-                                <div class="rf-help mt-0"><i class="ri ri-scroll-text me-1"></i><?= t('A dish\'s cost comes from its recipe: the ingredients at the price you paid in Purchases. Add the recipe after saving (Actions → Recipe).') ?></div>
+                                <div class="rf-help mt-0"><i class="ri ri-scroll-text me-1"></i><?= t('A dish\'s cost comes from its recipe: the ingredients at the price you paid in Purchases, plus any other costs you type. Add the recipe after saving (Actions → Recipe).') ?></div>
                             </div>
                             <div class="rf-field bought-only new-only">
                                 <label class="form-label" for="f-stock"><?= t('Opening stock') ?></label>
@@ -298,6 +298,17 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                     </div>
                 </div>
                 <?php if ($can_cost): // restaurant costing plan (2026-11-09): money only for restaurant_costing ?>
+                <?php /* Phase 2 — "other costs": what is not kept as stock (tomatoes, spices, salt), or the whole pot's
+                         cost for a restaurant that keeps no stock. An estimate only: nothing leaves stock or is posted. */ ?>
+                <div class="rf-sec">
+                    <div class="rf-sec-title"><i class="bi bi-cash-stack"></i><?= t('Other costs (not counted in stock)') ?></div>
+                    <div class="rf-field">
+                        <label class="form-label" for="rcpExtra" id="rcpExtraLbl"><?= t('Other costs for the whole pot') ?></label>
+                        <div class="input-group rf-money" style="max-width:260px;"><span class="input-group-text rf-cur"><?= htmlspecialchars(rfMoneyPrefix()) ?></span>
+                            <input type="number" id="rcpExtra" class="form-control text-end" min="0" step="any" placeholder="0" inputmode="decimal"></div>
+                    </div>
+                    <div class="rf-help"><?= t('Tomatoes, onions, spices, salt… anything you do not keep as stock. No stock at all? Put what the whole pot costs you here (e.g. 30,000) and leave the ingredients empty.') ?></div>
+                </div>
                 <div class="rf-sec">
                     <div class="rf-sec-title"><i class="bi bi-calculator"></i><?= t('Cost and gross profit') ?></div>
                     <div class="card rm-stat p-3">
@@ -402,6 +413,8 @@ const RM = {
     profit: <?= json_encode(t('gross profit')) ?>,
     potTitle: <?= json_encode(t('If all %d plates sell')) ?>,
     potCost: <?= json_encode(t('Cost of %d plates')) ?>,
+    extraPot: <?= json_encode(t('Other costs for the whole pot')) ?>,
+    extraOne: <?= json_encode(t('Other costs for one plate')) ?>,
     perPlate: <?= json_encode(t('per plate')) ?>,
     inStock: <?= json_encode(t('in stock')) ?>,
     pickIngredient: <?= json_encode(t('Add an ingredient (type to search)...')) ?>,
@@ -628,7 +641,7 @@ function render() {
 }
 
 // ───────── restaurant_plan.md Phase 7 — recipes ─────────
-let RCP = { id: 0, price: 0, yield: 1, lines: [] };
+let RCP = { id: 0, price: 0, yield: 1, extra: 0, lines: [] };   // extra = other costs for the whole recipe (Phase 2)
 // Small units for typing (2026-11-03): an ingredient bought in kg can be typed in grams, one in
 // litres in millilitres. The amount is always saved in the ingredient's own unit (250 g -> 0.25 kg).
 const RCP_KG = ['kg', 'kgs', 'kilo', 'kilos', 'kilogram', 'kilograms'];
@@ -653,6 +666,7 @@ function openRecipe(id) {
     $.getJSON('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'get', product_id: id, warehouse_id: whId() }, function (res) {
         if (!res.success) { Swal.fire({ icon: 'error', title: RM.error, text: res.message }); return; }
         RCP = { id: id, price: parseFloat(res.dish.selling_price) || 0, yield: Math.max(1, parseInt(res.yield, 10) || 1),
+                extra: parseFloat(res.extra_cost) || 0,   // absent without restaurant_costing → 0 (and never sent back)
                 lines: res.components.map(c => {
                     const sm = rcpSmall(c.unit), q = r3(c.pot_qty || c.qty);
                     // cost_price is absent for a user without restaurant_costing → null (amounts only)
@@ -660,6 +674,7 @@ function openRecipe(id) {
                 }) };
         $('#rcpDish').text(caseFormatJs(res.dish.product_name));
         $('#rcpYield').val(RCP.yield);
+        $('#rcpExtra').val(RCP.extra > 0 ? RCP.extra : '');
         rcpRender();
         const m = $('#recipeModal');
         if (!$('#rcpPick').hasClass('select2-hidden-accessible')) {
@@ -671,6 +686,11 @@ function openRecipe(id) {
                 const y = parseInt(this.value, 10);
                 RCP.yield = y >= 1 && y <= 1000 ? y : 1;
                 rcpRender(true);
+            });
+            $('#rcpExtra').on('input change', function () {
+                const v = parseFloat(String(this.value).replace(',', '.'));
+                RCP.extra = v > 0 ? v : 0;
+                rcpTotals();
             });
         }
         bootstrap.Modal.getOrCreateInstance(document.getElementById('recipeModal')).show();
@@ -731,9 +751,11 @@ function rcpPerNote(l) {
 }
 function rcpTotals() {
     if (!CAN_COST) return;   // no money section for this user
-    const pot  = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0);
-    const cost = RCP.lines.reduce((s, l) => s + rcpPerPlate(l) * (l.cost || 0), 0);
+    const extra = RCP.extra || 0;   // other costs for the whole recipe (Phase 2)
+    const pot  = RCP.lines.reduce((s, l) => s + (l.qty || 0) * (l.cost || 0), 0) + extra;
+    const cost = RCP.lines.reduce((s, l) => s + rcpPerPlate(l) * (l.cost || 0), 0) + extra / RCP.yield;
     const potMode = RCP.yield > 1;
+    $('#rcpExtraLbl').text(potMode ? RM.extraPot : RM.extraOne);
     $('#rcpPotRow').toggleClass('d-none', !potMode);
     $('#rcpPotCost').text(fmt(Math.round(pot)));
     $('#rcpCost').text(fmt(Math.round(cost))); $('#rcpPrice').text(fmt(RCP.price));
@@ -770,7 +792,9 @@ function rcpNewIngredient() {
 }
 function rcpSave() {
     const comps = RCP.lines.filter(l => l.qty > 0).map(l => ({ product_id: l.product_id, qty: l.qty }));
-    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', { action: 'save', product_id: RCP.id, warehouse_id: whId(), yield: RCP.yield, components: JSON.stringify(comps), _csrf: CSRF_FIELD }, function (res) {
+    const data = { action: 'save', product_id: RCP.id, warehouse_id: whId(), yield: RCP.yield, components: JSON.stringify(comps), _csrf: CSRF_FIELD };
+    if (CAN_COST) data.extra_cost = RCP.extra || 0;   // without restaurant_costing it is not sent, so the stored value stays
+    $.post('<?= buildUrl('api/restaurant/recipe.php') ?>', data, function (res) {
         if (res.success) { bootstrap.Modal.getInstance(document.getElementById('recipeModal'))?.hide(); loadMenu(); Swal.fire({ icon: 'success', title: res.message, timer: 1600, showConfirmButton: false }); }
         else Swal.fire({ icon: 'error', title: RM.error, text: res.message });
     }, 'json').fail(() => Swal.fire({ icon: 'error', title: RM.error, text: RM.serverError }));

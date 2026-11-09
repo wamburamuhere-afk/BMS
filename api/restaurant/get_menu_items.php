@@ -32,6 +32,8 @@ if (!restaurantShopActive($pdo, $warehouse_id)) {
 }
 
 try {
+    // Restaurant costing plan, Phase 2 — a plate's share of the recipe's "other costs" (0 before the migration).
+    $extraPP = restaurantExtraPerPlateSql($pdo, 'p');
     $st = $pdo->prepare("
         SELECT p.product_id, p.product_name, p.category_id, c.category_name,
                p.selling_price, p.cost_price, p.purchase_price, p.is_service, p.is_available, p.image_url,
@@ -41,6 +43,7 @@ try {
                (SELECT COALESCE(SUM(ac.qty_per_unit * COALESCE(cp.cost_price, 0)), 0)
                   FROM product_assembly_components ac JOIN products cp ON cp.product_id = ac.component_product_id
                  WHERE ac.parent_product_id = p.product_id) AS recipe_cost,
+               $extraPP AS extra_per_plate,
                COALESCE((SELECT SUM(ps.stock_quantity) FROM product_stocks ps
                           WHERE ps.product_id = p.product_id AND ps.warehouse_id = :w1), 0) AS stock
           FROM products p
@@ -64,8 +67,12 @@ try {
         // The old "cost of one plate" guess (purchase_price on a dish) is no longer read anywhere: a dish's
         // cost comes from its recipe only (2026-11-03), so it is not sent.
         unset($r['purchase_price']);
-        $r['has_recipe']    = (int)$r['is_service'] === 1 && (int)$r['is_combo'] === 1;
-        $r['recipe_cost']   = round((float)$r['recipe_cost'], 2);
+        // A dish's cost is known when its recipe has ingredients (is_combo — they leave stock on each sale)
+        // OR "other costs" were typed (Phase 2 — no stock moves; e.g. a restaurant that keeps no stock).
+        $extra              = (float)$r['extra_per_plate'];
+        unset($r['extra_per_plate']);
+        $r['has_recipe']    = (int)$r['is_service'] === 1 && ((int)$r['is_combo'] === 1 || $extra > 0);
+        $r['recipe_cost']   = round((float)$r['recipe_cost'] + $extra, 2);
         if (!$seeCost) unset($r['cost_price'], $r['recipe_cost']);
         $r['stock']         = (float)$r['stock'];
         // The photo's web address (the same one the POS tiles and the online menu use), '' when none.

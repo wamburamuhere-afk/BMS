@@ -377,14 +377,15 @@ if (!function_exists('rnRunDailyChecks')) {
             }
         } catch (Throwable $e) { error_log('rn daily_summary: ' . $e->getMessage()); }
 
-        // Dishes sold this month with no cost (no plate cost, no recipe) — once a week.
+        // Dishes sold this month with no cost (no ingredients, no other costs) — once a week. The old per-plate
+        // guess (purchase_price) no longer counts as a cost (restaurant costing plan): same rule as the Menu.
         try {
             $rows = $pdo->query("SELECT DISTINCT p.product_id, p.product_name
                                    FROM pos_sale_items psi JOIN pos_sales ps ON ps.sale_id = psi.sale_id JOIN products p ON p.product_id = psi.product_id
                                   WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
                                     AND ps.sale_date >= " . $pdo->quote(date('Y-m-01', strtotime($today))) . " AND ps.warehouse_id IN ($in)
-                                    AND p.is_menu_item = 1 AND p.is_service = 1 AND COALESCE(p.purchase_price, 0) <= 0
-                                    AND NOT EXISTS (SELECT 1 FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id)
+                                    AND p.is_menu_item = 1 AND p.is_service = 1
+                                    AND NOT " . restaurantDishHasCostSql($pdo, 'p') . "
                                   LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
             if ($rows) {
                 $names = implode(', ', array_slice(array_column($rows, 'product_name'), 0, 4)) . (count($rows) > 4 ? '…' : '');

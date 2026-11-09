@@ -10,6 +10,12 @@
  *   (owners' managers — they set prices and recipes) gets view. View-only roles (waiter, cashier,
  *   cook) do not. Admins always pass (isAdmin() bypass). Nothing an admin later changes is undone.
  *
+ * Phase 2 — products.recipe_extra_cost DECIMAL(15,2) NOT NULL DEFAULT 0: "other costs" of a dish's recipe,
+ *   for the WHOLE pot (recipe_yield plates). Things not kept as stock (tomatoes, spices, salt), or — for a
+ *   small restaurant that keeps no stock at all — the whole pot's cost ("this pot costs me 30,000").
+ *   Only an estimate input: nothing is posted from it (real food cost stays what Purchases records), so
+ *   it never counts twice in the books. One plate's cost = ingredients' share + extra ÷ plates.
+ *
  * Dependency-free (only PDO): shared by the tenant and legacy migrations. Reuses the permission
  * helpers of core/restaurant_order_flow_schema.php (rofsHasTable / rofsPermissionId / rofsGrant).
  */
@@ -42,5 +48,15 @@ if (!function_exists('rcsEnsureCostingPermission')) {
             foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $rid) { rofsGrant($pdo, (int)$rid, $costId, ['view']); $n++; }
             $log("  + restaurant_costing view given to $n role(s) that can edit Restaurant POS.");
         }
+    }
+}
+
+if (!function_exists('rcsEnsureExtraCostColumn')) {
+    function rcsEnsureExtraCostColumn(PDO $pdo, callable $log): void
+    {
+        if (!rofsHasTable($pdo, 'products')) { $log('  ~ products table absent — nothing to do.'); return; }
+        if (rofsHasColumn($pdo, 'products', 'recipe_extra_cost')) { $log('  ~ products.recipe_extra_cost already exists.'); return; }
+        $pdo->exec("ALTER TABLE products ADD COLUMN `recipe_extra_cost` DECIMAL(15,2) NOT NULL DEFAULT 0");
+        $log('  + products.recipe_extra_cost added (default 0).');
     }
 }
