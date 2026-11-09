@@ -227,7 +227,8 @@ if (!function_exists('bmsFeatureRegistry')) {
                 'default'     => false,
                 'sort_order'  => 22,
                 // restaurant_order_flow_plan.md — Waiter/Cashier/Kitchen rights (Restaurant Orders, Kitchen Screen).
-                'page_keys'   => ['restaurant_pos', 'restaurant_orders', 'kitchen_display'],
+                // restaurant costing plan (2026-11-09) — who sees costs and profit (restaurant_costing).
+                'page_keys'   => ['restaurant_pos', 'restaurant_orders', 'kitchen_display', 'restaurant_costing'],
                 'depends_on'  => ['pos'],
                 'paths'       => [
                     'api/restaurant/',

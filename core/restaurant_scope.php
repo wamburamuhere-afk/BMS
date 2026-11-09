@@ -113,6 +113,19 @@ if (!function_exists('restaurantShopActive')) {
     }
 }
 
+if (!function_exists('restaurantCanSeeCost')) {
+    /**
+     * Restaurant costing plan (2026-11-09) — may this user see buying prices, recipe costs and
+     * gross profit? Permission `restaurant_costing` (view); admins always (canView's bypass).
+     * Without it the Menu, recipes and Sales report show selling prices only, and the APIs leave
+     * cost fields out. A company not yet migrated has no row: only admins see costs until it runs.
+     */
+    function restaurantCanSeeCost(): bool
+    {
+        return canView('restaurant_costing');
+    }
+}
+
 if (!function_exists('restaurantShopIsRestaurantOnly')) {
     /**
      * Restaurant focus pass (2026-11-02) — is THIS shop a plain Restaurant shop (not Hybrid, not Retail) of a

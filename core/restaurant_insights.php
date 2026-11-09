@@ -457,7 +457,8 @@ if (!function_exists('rdDishEarnings')) {
                 $cost = null;
                 if ((int)$r['comp_count'] > 0) $cost = (float)$r['recipe_cost'];
                 elseif ((int)$r['is_service'] === 0 && (float)$r['cost_price'] > 0) $cost = (float)$r['cost_price'];
-                elseif ((int)$r['is_service'] === 1 && (float)$r['plate_cost'] > 0) $cost = (float)$r['plate_cost'];   // the owner's estimate of one plate
+                // A dish without a recipe has no known cost (restaurant costing plan, 2026-11-09): the old
+                // "cost of one plate" guess (purchase_price) is no longer read, so these figures match the Menu.
                 $ppp = $cost === null ? null : round($price - $cost, 2);
                 $items[(int)$r['product_id']] = [
                     'product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => $qty,

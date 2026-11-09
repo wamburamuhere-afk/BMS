@@ -53,16 +53,20 @@ try {
     ");
     $st->execute([':w1' => $warehouse_id, ':w2' => $warehouse_id, ':w3' => $warehouse_id]);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    // Restaurant costing plan (2026-11-09): buying prices / recipe costs only for restaurant_costing.
+    $seeCost = restaurantCanSeeCost();
     foreach ($rows as &$r) {
         $r['product_id']    = (int)$r['product_id'];
         $r['is_service']    = (int)$r['is_service'];
         $r['is_available']  = (int)$r['is_available'];
         $r['selling_price'] = (float)$r['selling_price'];
         $r['cost_price']    = (float)$r['cost_price'];
-        $r['plate_cost']    = (int)$r['is_service'] === 1 ? (float)$r['purchase_price'] : 0.0;   // a dish's rough cost of one plate — an estimate only
+        // The old "cost of one plate" guess (purchase_price on a dish) is no longer read anywhere: a dish's
+        // cost comes from its recipe only (2026-11-03), so it is not sent.
         unset($r['purchase_price']);
         $r['has_recipe']    = (int)$r['is_service'] === 1 && (int)$r['is_combo'] === 1;
         $r['recipe_cost']   = round((float)$r['recipe_cost'], 2);
+        if (!$seeCost) unset($r['cost_price'], $r['recipe_cost']);
         $r['stock']         = (float)$r['stock'];
         // The photo's web address (the same one the POS tiles and the online menu use), '' when none.
         $r['image'] = !empty($r['image_url']) ? getUrl((string)$r['image_url']) : '';
@@ -72,7 +76,7 @@ try {
         if ($r['station_key'] !== null) $r['station_name'] = t($r['station_name']);
     }
     unset($r);
-    echo json_encode(['success' => true, 'data' => $rows]);
+    echo json_encode(['success' => true, 'data' => $rows, 'can_see_cost' => $seeCost]);
 } catch (PDOException $e) {
     error_log('get_menu_items: ' . $e->getMessage());
     http_response_code(500);

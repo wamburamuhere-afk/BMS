@@ -255,7 +255,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                         <div class="rdp-empty"><i class="bi bi-journal-richtext"></i><div><?= $rdDishes['items'] ? t('Add a recipe to your dishes (and a purchase cost to your drinks) to see which items earn you the most.') : ($rdL2 ? t('Nothing sold in this period yet.') : t('Nothing sold this month yet.')) ?></div></div>
                     <?php else: ?>
                     <div class="table-responsive"><table class="table table-sm align-middle mb-0 rdp-table">
-                        <thead><tr><th><?= t('Item') ?></th><th class="text-end"><?= t('Plates') ?></th><th class="text-end"><?= t('Profit per plate') ?></th><th class="text-end"><?= t('Margin') ?></th><th class="text-end"><?= t('Estimated profit') ?></th></tr></thead>
+                        <thead><tr><th><?= t('Item') ?></th><th class="text-end"><?= t('Plates') ?></th><th class="text-end"><?= t('Gross profit per plate') ?></th><th class="text-end"><?= t('Margin') ?></th><th class="text-end"><?= t('Estimated gross profit') ?></th></tr></thead>
                         <tbody>
                         <?php foreach ($rdDishes['best_earners'] as $d): ?>
                         <tr>
@@ -269,7 +269,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                         <?php endforeach; ?>
                         </tbody>
                     </table></div>
-                    <div class="rdp-foot"><?= t('Profit per plate = what the customer paid minus the recipe or purchase cost. An estimate to guide your menu; the profit figure above comes from your books.') ?></div>
+                    <div class="rdp-foot"><?= t('Gross profit per plate = what the customer paid minus the recipe or purchase cost (before gas, staff and rent). An estimate to guide your menu; the profit figure above comes from your books.') ?></div>
                     <?php endif; ?>
                 </div>
                 <div class="rdp-tab <?= $rdMoney ? 'd-none' : '' ?>" data-t="sellers">

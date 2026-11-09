@@ -43,7 +43,9 @@ if ($action === 'search') {
                            FROM products WHERE status = 'active' AND is_service = 0 AND COALESCE(is_combo,0) = 0 AND parent_product_id IS NULL
                             AND product_name LIKE ? ORDER BY product_name LIMIT 30");
     $st->execute(['%' . trim((string)($src['q'] ?? '')) . '%']);
-    echo json_encode(['results' => array_map(fn($r) => ['id' => (int)$r['product_id'], 'text' => $r['product_name'] . ' (' . $r['unit'] . ')', 'unit' => $r['unit'], 'cost_price' => (float)$r['cost_price']], $st->fetchAll(PDO::FETCH_ASSOC))]);
+    $seeCost = restaurantCanSeeCost();
+    echo json_encode(['results' => array_map(fn($r) => ['id' => (int)$r['product_id'], 'text' => $r['product_name'] . ' (' . $r['unit'] . ')', 'unit' => $r['unit']]
+        + ($seeCost ? ['cost_price' => (float)$r['cost_price']] : []), $st->fetchAll(PDO::FETCH_ASSOC))]);
     exit;
 }
 
@@ -96,7 +98,14 @@ try {
             $cost += $r['qty'] * $r['cost_price'];
         }
         unset($r);
-        echo json_encode(['success' => true, 'dish' => $dish, 'yield' => $yield, 'components' => $rows, 'cost' => round($cost, 2)]);
+        $out = ['success' => true, 'dish' => $dish, 'yield' => $yield, 'components' => $rows, 'cost' => round($cost, 2), 'can_see_cost' => true];
+        // Restaurant costing plan (2026-11-09): a cook may set the recipe, but sees amounts, not money.
+        if (!restaurantCanSeeCost()) {
+            foreach ($out['components'] as &$r) unset($r['cost_price']);
+            unset($r, $out['cost']);
+            $out['can_see_cost'] = false;
+        }
+        echo json_encode($out);
         return;
     }
 
@@ -149,7 +158,8 @@ try {
     if ($action === 'new_ingredient') {
         $name = trim((string)($src['name'] ?? ''));
         $unit = mb_substr(trim((string)($src['unit'] ?? '')) ?: 'kg', 0, 20);
-        $cost = max(0, (float)($src['cost_price'] ?? 0));
+        // Only someone who may see costs may set one; anyone else creates it at 0 — Purchases sets the real cost.
+        $cost = restaurantCanSeeCost() ? max(0, (float)($src['cost_price'] ?? 0)) : 0.0;
         if ($name === '') throw new Exception(t('Name is required.'));
         $dup = $pdo->prepare("SELECT COUNT(*) FROM products WHERE LOWER(TRIM(product_name)) = LOWER(TRIM(?))");
         $dup->execute([$name]);
@@ -160,7 +170,8 @@ try {
             ->execute([$name, $unit, $unit, $cost, $cost, $warehouse_id, $uid]);
         $id = (int)$pdo->lastInsertId();
         logActivity($pdo, $uid, "Created ingredient: $name (ID $id)");
-        echo json_encode(['success' => true, 'message' => t('Ingredient added.'), 'id' => $id, 'text' => "$name ($unit)", 'unit' => $unit, 'cost_price' => $cost]);
+        echo json_encode(['success' => true, 'message' => t('Ingredient added.'), 'id' => $id, 'text' => "$name ($unit)", 'unit' => $unit]
+            + (restaurantCanSeeCost() ? ['cost_price' => $cost] : []));
         return;
     }
 
