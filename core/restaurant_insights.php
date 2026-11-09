@@ -435,19 +435,23 @@ if (!function_exists('rdDishEarnings')) {
     {
         $out = ['items' => [], 'best_earners' => [], 'best_sellers' => [], 'needs_cost' => [], 'costed_count' => 0, 'est_profit' => 0.0, 'avg_margin' => null];
         $in = rdIn($ids);
+        // Restaurant costing plan, Phase 2 — a plate's share of the recipe's "other costs" (0 before the migration).
+        $extraPP  = restaurantExtraPerPlateSql($pdo, 'p');
+        $extraGrp = restaurantExtraCostReady($pdo) ? ', p.recipe_extra_cost, p.recipe_yield' : '';
         try {
             $st = $pdo->prepare("
-                SELECT p.product_id, p.product_name, p.is_service, p.selling_price, COALESCE(p.cost_price,0) AS cost_price, COALESCE(p.purchase_price,0) AS plate_cost,
+                SELECT p.product_id, p.product_name, p.is_service, p.selling_price, COALESCE(p.cost_price,0) AS cost_price,
                        SUM(psi.quantity) AS qty, SUM(psi.line_total) AS revenue,
                        (SELECT COUNT(*) FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id) AS comp_count,
                        (SELECT SUM(ac.qty_per_unit * COALESCE(cp.cost_price,0)) FROM product_assembly_components ac
-                          LEFT JOIN products cp ON cp.product_id = ac.component_product_id WHERE ac.parent_product_id = p.product_id) AS recipe_cost
+                          LEFT JOIN products cp ON cp.product_id = ac.component_product_id WHERE ac.parent_product_id = p.product_id) AS recipe_cost,
+                       $extraPP AS extra_pp
                   FROM pos_sale_items psi
                   JOIN pos_sales ps ON ps.sale_id = psi.sale_id
                   JOIN products p   ON p.product_id = psi.product_id
                  WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
                    AND DATE(ps.sale_date) BETWEEN ? AND ? AND ps.warehouse_id IN ($in) AND p.is_menu_item = 1
-              GROUP BY p.product_id, p.product_name, p.is_service, p.selling_price, p.cost_price, p.purchase_price
+              GROUP BY p.product_id, p.product_name, p.is_service, p.selling_price, p.cost_price$extraGrp
               ORDER BY qty DESC");
             $st->execute([$from, $to]);
             $items = [];
@@ -455,15 +459,17 @@ if (!function_exists('rdDishEarnings')) {
                 $qty = (float)$r['qty'];
                 $price = $qty > 0 && (float)$r['revenue'] > 0 ? (float)$r['revenue'] / $qty : (float)$r['selling_price'];
                 $cost = null;
-                if ((int)$r['comp_count'] > 0) $cost = (float)$r['recipe_cost'];
+                $hasRecipe = (int)$r['comp_count'] > 0 || (float)$r['extra_pp'] > 0;   // ingredients and/or other costs
+                if ((int)$r['is_service'] === 1 && $hasRecipe) $cost = (float)$r['recipe_cost'] + (float)$r['extra_pp'];
                 elseif ((int)$r['is_service'] === 0 && (float)$r['cost_price'] > 0) $cost = (float)$r['cost_price'];
-                elseif ((int)$r['is_service'] === 1 && (float)$r['plate_cost'] > 0) $cost = (float)$r['plate_cost'];   // the owner's estimate of one plate
+                // A dish without a recipe has no known cost (restaurant costing plan, 2026-11-09): the old
+                // "cost of one plate" guess (purchase_price) is no longer read, so these figures match the Menu.
                 $ppp = $cost === null ? null : round($price - $cost, 2);
                 $items[(int)$r['product_id']] = [
                     'product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => $qty,
                     'price' => round($price, 2), 'cost' => $cost === null ? null : round($cost, 2),
                     'profit_per_plate' => $ppp, 'margin' => ($ppp !== null && $price > 0) ? round($ppp / $price * 100, 1) : null,
-                    'est_profit' => $ppp === null ? null : round($ppp * $qty, 2), 'kind' => (int)$r['comp_count'] > 0 ? 'recipe' : ((int)$r['is_service'] === 0 ? 'bought' : 'dish'),
+                    'est_profit' => $ppp === null ? null : round($ppp * $qty, 2), 'kind' => ((int)$r['is_service'] === 1 && $hasRecipe) ? 'recipe' : ((int)$r['is_service'] === 0 ? 'bought' : 'dish'),
                 ];
             }
             $items = rdClassifyDishes($items);
@@ -604,13 +610,18 @@ if (!function_exists('rdCompareSeries')) {
         // thinks about them — drinks & stock items SOLD (cost posted with the sale: *_cogs entries), food
         // BOUGHT without stock (every other Cost-of-goods posting: "Something else", Buy ingredients, grocery
         // bills — counted the day bought), and expenses. Sales − the three = profit, the same buckets as above.
+        // Restaurant costing plan, Phase 3: stock taken for cooking ('restaurant_cook_cogs') joins the stock part
+        // ("Drinks & stock used"); spoiled stock and kitchen waste get their own part ("Spoiled & waste").
+        // The three cost parts still add up to the same Cost-of-goods total.
         $parts = function (string $a, string $b) use ($pdo, $jeScope, $pos, $n): array {
-            $out = ['stock' => array_fill(0, $n, 0.0), 'food' => array_fill(0, $n, 0.0), 'exp' => array_fill(0, $n, 0.0)];
+            $out = ['stock' => array_fill(0, $n, 0.0), 'food' => array_fill(0, $n, 0.0), 'waste' => array_fill(0, $n, 0.0), 'exp' => array_fill(0, $n, 0.0)];
+            $isWaste = "je.entity_type IN ('kitchen_waste','restaurant_spoilage')";
             try {
                 $st = $pdo->prepare("
                     SELECT " . $pos('je.entry_date', 'je.created_at', $a) . " AS p,
                            SUM(CASE WHEN at.category = 'cogs' AND je.entity_type LIKE '%\\_cogs%' THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS stock,
-                           SUM(CASE WHEN at.category = 'cogs' AND (je.entity_type IS NULL OR je.entity_type NOT LIKE '%\\_cogs%') THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS food,
+                           SUM(CASE WHEN at.category = 'cogs' AND je.entity_type IS NOT NULL AND $isWaste THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS waste,
+                           SUM(CASE WHEN at.category = 'cogs' AND (je.entity_type IS NULL OR (je.entity_type NOT LIKE '%\\_cogs%' AND NOT $isWaste)) THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS food,
                            SUM(CASE WHEN at.category IN ('expense','finance_cost') THEN (CASE WHEN jei.type='debit' THEN jei.amount ELSE -jei.amount END) ELSE 0 END) AS exp
                       FROM journal_entry_items jei
                       JOIN journal_entries je ON je.entry_id = jei.entry_id AND je.status = 'posted'
@@ -622,7 +633,7 @@ if (!function_exists('rdCompareSeries')) {
                 foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     $p = (int)$row['p'];
                     if ($p < 0 || $p >= $n) continue;
-                    foreach (['stock', 'food', 'exp'] as $c) $out[$c][$p] = round((float)$row[$c], 2);
+                    foreach (['stock', 'food', 'waste', 'exp'] as $c) $out[$c][$p] = round((float)$row[$c], 2);
                 }
             } catch (Throwable $e) { error_log('rdCompareSeries profit: ' . $e->getMessage()); }
             return $out;
@@ -631,15 +642,16 @@ if (!function_exists('rdCompareSeries')) {
               'sales' => $sales($r['from'], $r['to']), 'sales_prev' => $sales($r['prev_from'], $r['prev_to']),
               'orders' => $orders($r['from'], $r['to']), 'orders_prev' => $orders($r['prev_from'], $r['prev_to'])];
         $pp = $parts($r['from'], $r['to']);
-        $o['p_stock'] = $pp['stock']; $o['p_food'] = $pp['food']; $o['p_exp'] = $pp['exp'];
+        $o['p_stock'] = $pp['stock']; $o['p_food'] = $pp['food']; $o['p_waste'] = $pp['waste']; $o['p_exp'] = $pp['exp'];
         // Period totals for the Money panel — taken before "today" trims the night hours off the slots.
-        $o['p_tot'] = ['stock' => round(array_sum($pp['stock']), 2), 'food' => round(array_sum($pp['food']), 2), 'exp' => round(array_sum($pp['exp']), 2)];
+        $o['p_tot'] = ['stock' => round(array_sum($pp['stock']), 2), 'food' => round(array_sum($pp['food']), 2),
+                       'waste' => round(array_sum($pp['waste']), 2), 'exp' => round(array_sum($pp['exp']), 2)];
         $o['p_cum'] = []; $run = 0.0;
-        foreach ($o['sales'] as $i => $s) { $run += $s - $pp['stock'][$i] - $pp['food'][$i] - $pp['exp'][$i]; $o['p_cum'][] = round($run, 2); }
+        foreach ($o['sales'] as $i => $s) { $run += $s - $pp['stock'][$i] - $pp['food'][$i] - $pp['waste'][$i] - $pp['exp'][$i]; $o['p_cum'][] = round($run, 2); }
         if ($key === 'today') {                    // trim the night: from 08:00 (or the first sale) to 21:00 (or the last)
             $busy = []; for ($h = 0; $h < 24; $h++) if ($o['sales'][$h] != 0 || $o['sales_prev'][$h] != 0 || $o['orders'][$h] || $o['orders_prev'][$h]) $busy[] = $h;
             $lo = $busy ? min($busy[0], 8) : 8; $hi = $busy ? max(end($busy), 21) : 21;
-            foreach (['labels', 'sales', 'sales_prev', 'orders', 'orders_prev', 'p_stock', 'p_food', 'p_exp', 'p_cum'] as $k) $o[$k] = array_slice($o[$k], $lo, $hi - $lo + 1);
+            foreach (['labels', 'sales', 'sales_prev', 'orders', 'orders_prev', 'p_stock', 'p_food', 'p_waste', 'p_exp', 'p_cum'] as $k) $o[$k] = array_slice($o[$k], $lo, $hi - $lo + 1);
         }
         $mx = $o['sales'] ? max($o['sales']) : 0;
         $o['peak'] = $mx > 0 ? $o['labels'][array_search($mx, $o['sales'], true)] : null;

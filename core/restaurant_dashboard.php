@@ -71,7 +71,7 @@ if (!function_exists('restaurantDashboardData')) {
                 WHERE ps.sale_status IN ('completed','partially_refunded') AND ps.is_return_sale = 0
                   AND DATE(ps.sale_date) BETWEEN " . $pdo->quote($monthStart) . " AND " . $pdo->quote($today) . "
                   AND ps.warehouse_id IN ($in) AND p.is_menu_item = 1 AND p.is_service = 1
-                  AND NOT EXISTS (SELECT 1 FROM product_assembly_components ac WHERE ac.parent_product_id = p.product_id)")->fetchColumn();
+                  AND NOT " . restaurantDishHasCostSql($pdo, 'p'))->fetchColumn();   // no ingredients and no other costs (costing plan, Phase 2)
 
             $out['low_drinks'] = $pdo->query("SELECT p.product_name, COALESCE(SUM(ps.stock_quantity),0) AS stock
                 FROM products p LEFT JOIN product_stocks ps ON ps.product_id = p.product_id AND ps.warehouse_id IN ($in)

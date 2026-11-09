@@ -140,6 +140,27 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
                                     <label class="form-label" for="rpOtherAmount"><?= t('Amount paid') ?><span class="rf-req">*</span></label>
                                     <div class="input-group rf-money"><span class="input-group-text rf-cur"><?= $rfCur ?></span><input type="number" class="form-control rp-num" id="rpOtherAmount" min="1" step="any" inputmode="decimal"></div>
                                 </div>
+                                <?php if ($can_buy): // restaurant costing plan, Phase 3: bought for several days → kept as stock ?>
+                                <div class="rf-field rf-full">
+                                    <span class="rf-label"><?= t('Will you use it all today?') ?></span>
+                                    <div class="btn-group w-100 rp-seg" role="group" aria-label="<?= htmlspecialchars(t('Will you use it all today?')) ?>">
+                                        <input type="radio" class="btn-check" name="rpUse" id="rpUseAll" value="all" checked>
+                                        <label class="btn btn-outline-primary" for="rpUseAll"><i class="bi bi-check2 me-1"></i><?= t('Yes, all today') ?></label>
+                                        <input type="radio" class="btn-check" name="rpUse" id="rpUseKeep" value="keep">
+                                        <label class="btn btn-outline-primary" for="rpUseKeep"><i class="bi bi-box-seam me-1"></i><?= t('No, some will remain') ?></label>
+                                    </div>
+                                    <div class="rf-help" id="rpUseHelp"><?= t('Rice, oil or flour for several days? Choose "No": it is kept as stock and its cost counts on the days you cook it (Cooking plan).') ?></div>
+                                </div>
+                                <div class="rf-field rp-keep-only" style="display:none;">
+                                    <label class="form-label" for="rpKeepQty"><?= t('How much did you buy?') ?><span class="rf-req">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control rp-num" id="rpKeepQty" min="0.001" step="any" inputmode="decimal">
+                                        <select class="form-select" id="rpKeepUnit" style="max-width:110px;">
+                                            <?php foreach (['kg', 'litre', 'pcs', 'g', 'ml', 'bag', 'packet', 'dozen'] as $u): ?><option value="<?= $u ?>"><?= $u ?></option><?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -438,6 +459,8 @@ const RP = {
         pickItem: <?= json_encode(t('Pick what you bought, or choose "Something else".')) ?>, saved: <?= json_encode(t('Purchase saved.')) ?>,
         costNow: <?= json_encode(t('Cost is now')) ?>, none: <?= json_encode(t('No purchases yet.')) ?>,
         notCounted: <?= json_encode(t('Not counted')) ?>, perOne: <?= json_encode(t('profit on each')) ?>,
+        keptStock: <?= json_encode(t('Kept as stock')) ?>, keptNote: <?= json_encode(t('Its cost counts on the days you cook it')) ?>,
+        enterKeepQty: <?= json_encode(t('Enter how much you bought.')) ?>, keptSaved: <?= json_encode(t('Kept as stock: %s')) ?>,
         belowCost: <?= json_encode(t('Selling below cost')) ?>, per: <?= json_encode(t('per')) ?>,
         enterQty: <?= json_encode(t('Enter the quantity.')) ?>, enterPrice: <?= json_encode(t('Enter the price for one, or the total you paid.')) ?>,
         enterName: <?= json_encode(t('Enter what you bought.')) ?>, enterAmount: <?= json_encode(t('Enter the amount paid.')) ?>,
@@ -478,6 +501,8 @@ const RP_WHOLE = ['pcs', 'pc', 'piece', 'pieces', 'dozen', 'bunch', 'bag', 'crat
 const rpIsWhole = u => RP_WHOLE.indexOf(String(u || '').toLowerCase().trim()) !== -1;
 const rpNameOf = d => { const t = String(d.text || ''), sfx = ' (' + d.unit + ')'; return t.endsWith(sfx) ? t.slice(0, -sfx.length) : t; };
 
+/** "Something else" bought for several days → kept as stock (only offered to someone who may buy stock). */
+function rpKeep() { return rpMode === 'other' && $('#rpUseKeep').is(':checked'); }
 function rpWh() { return parseInt($('#rpShop').length ? $('#rpShop').val() : $('#rpWarehouse').val(), 10); }
 
 function rpSetMode(m) {
@@ -519,7 +544,12 @@ function rpSummary() {
     if (rpMode === 'other') {
         const name = ($('#rpOtherName').val() || '').trim(), amt = parseFloat($('#rpOtherAmount').val()) || 0;
         total = amt;
-        if (name || amt) h = `<div class="rp-sum-item">${safeOutput(name || '—')} <span class="rp-tag rp-tag-grey">${RP.s.notCounted}</span></div>` + rpLine(RP.s.foodCost, '', 'rp-muted');
+        if ((name || amt) && rpKeep()) {
+            const kq = parseFloat($('#rpKeepQty').val()) || 0, ku = safeOutput($('#rpKeepUnit').val());
+            h = `<div class="rp-sum-item">${safeOutput(name || '—')} <span class="rp-tag">${RP.s.keptStock}</span></div>`;
+            if (kq > 0) h += rpLine(`${fmt(kq)} ${ku}`, amt > 0 ? `${fmt(Math.round(amt / kq * 100) / 100)} / ${ku}` : '');
+            h += rpLine(RP.s.keptNote, '', 'rp-muted');
+        } else if (name || amt) h = `<div class="rp-sum-item">${safeOutput(name || '—')} <span class="rp-tag rp-tag-grey">${RP.s.notCounted}</span></div>` + rpLine(RP.s.foodCost, '', 'rp-muted');
     } else if (rpItem) {
         const q = parseFloat($('#rpQty').val()) || 0, p = rpUnitPrice(), u = safeOutput(rpItem.unit);
         total = q * p;
@@ -571,7 +601,8 @@ function rpLoadItem(id, name, then) {
     });
 }
 function rpReset() {
-    $('#rpQty, #rpPrice, #rpTotal, #rpSell, #rpOtherName, #rpOtherAmount, #rpNowAmt, #rpDue').val(''); $('#rpItem').val(null).trigger('change');
+    $('#rpQty, #rpPrice, #rpTotal, #rpSell, #rpOtherName, #rpOtherAmount, #rpNowAmt, #rpDue, #rpKeepQty').val(''); $('#rpItem').val(null).trigger('change');
+    $('#rpUseAll').prop('checked', true); $('.rp-keep-only').hide();
     $('#rpSupplier').val('').trigger('change'); $('#rpPayPaid').prop('checked', true);
     rpItem = null; rpLast = 'price'; rpMatch = null; $('#rpUnit').text('—'); $('#rpOtherMatch').hide(); $('#rpSellRow').hide(); $('#rpQty').attr({ step: 0.001, min: 0.001 });
     rpSetMode('stock');
@@ -792,6 +823,9 @@ $(function () {
     $('#rpSellEdit').on('click', function (e) { e.preventDefault(); $('#rpSellBox').toggle(); if ($('#rpSellBox').is(':visible')) $('#rpSell').trigger('focus').trigger('select'); });
     $('#rpOtherName').on('input', () => { rpSummary(); clearTimeout(rpMatchTimer); rpMatchTimer = setTimeout(rpCheckMatch, 400); });
     $('#rpOtherAmount').on('input', rpSummary);
+    // "Will you use it all today?" — No: quantity and unit, kept as stock (restaurant costing plan, Phase 3)
+    $('input[name="rpUse"]').on('change', function () { $('.rp-keep-only').toggle(rpKeep()); rpSummary(); });
+    $('#rpKeepQty, #rpKeepUnit').on('input change', rpSummary);
     $('#rpOtherMatch').on('click', '#rpUseMatch', function (e) { e.preventDefault(); rpUseMatch(); });
     $('#rpShop').on('change', function () { $('#rpWarehouse').val(this.value); rpReset(); loadPurchases(); loadDebts(); });
     <?php if ($preItem): ?>
@@ -867,6 +901,20 @@ $(function () {
             if (!name) return fail(RP.s.enterName);
             if (amt <= 0) return fail(RP.s.enterAmount);
             if (pay.error) return fail(pay.error);
+            if (rpKeep()) {
+                // Bought for several days: kept as stock (an existing counted item of that name, or a new ingredient).
+                const kq = parseFloat($('#rpKeepQty').val()) || 0, ku = $('#rpKeepUnit').val();
+                if (kq <= 0) return fail(RP.s.enterKeepQty);
+                $('#rpMessage').empty();
+                start();
+                $.post(RP.api + 'buy_stock.php', Object.assign({ _csrf: RP.csrf, keep: 1, name: name, unit: ku, quantity: kq, total_paid: amt,
+                        warehouse_id: rpWh(), date: date, supplier_id: $('#rpSupplier').val() || '' }, pay), function (res) {
+                    if (res.success) done(RP.s.keptSaved.replace('%s', safeOutput(res.product_name)) + `<br><small>${fmt(res.on_hand_after)} ${safeOutput(res.unit || ku)} · ${RP.s.keptNote}</small>`
+                        + (res.owed > 0 ? `<br><small>${RP.s.owedTag}: ${fmt(res.owed)} ${RP.cur}</small>` : ''));
+                    else fail(res.message || RP.s.error);
+                }, 'json').fail(() => fail(RP.s.serverError)).always(finish);
+                return;
+            }
             $('#rpMessage').empty();
             let chain = Promise.resolve(true);
             if (rpMatch) chain = chain.then(ok => ok && rpAsk(RP.s.countedTitle, RP.s.countedTxt.replace('%1$s', '<strong>' + safeOutput(rpNameOf(rpMatch)) + '</strong>').replace('%2$s', safeOutput(rpMatch.unit)), RP.s.keepOther, RP.s.switchTo)
