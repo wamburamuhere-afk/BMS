@@ -152,3 +152,60 @@ if (!function_exists('rcsEnsureCookRequests')) {
         }
     }
 }
+
+if (!function_exists('rcsEnsureCookUnsold')) {
+    /**
+     * Phase 5 — pot cooking, the plates that did not sell. A recipe's ingredients leave stock one plate at a time
+     * as plates are SOLD, but cooking by the pot uses the whole pot at once. When a day's cooks of a dish are all
+     * closed, the share of the plates not sold (not accounted for, plus the plates left unless kept to sell later)
+     * leaves stock too and goes to Cost of Sales as waste — so stock and profit stay true.
+     *   restaurant_cook_unsold: one row per dish and day (re-closing replaces it: the old one is reversed).
+     * Also registers two in-app notification events: a cook's stock request (to whoever may give stock out) and
+     * the answer (to the cook who asked).
+     */
+    function rcsEnsureCookUnsold(PDO $pdo, callable $log): void
+    {
+        if (!rofsHasTable($pdo, 'restaurant_cook_unsold')) {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS restaurant_cook_unsold (
+                id               INT AUTO_INCREMENT PRIMARY KEY,
+                warehouse_id     INT NOT NULL,
+                product_id       INT NOT NULL,
+                plan_date        DATE NOT NULL,
+                plates           DECIMAL(10,2) NOT NULL DEFAULT 0,
+                kept_left        DECIMAL(10,2) NOT NULL DEFAULT 0,
+                amount           DECIMAL(15,2) NOT NULL DEFAULT 0,
+                journal_entry_id INT NULL,
+                status           ENUM('posted','reversed') NOT NULL DEFAULT 'posted',
+                created_by       INT NULL,
+                created_at       DATETIME NOT NULL,
+                reversed_at      DATETIME NULL,
+                KEY idx_rcu_day (warehouse_id, product_id, plan_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $log('  + restaurant_cook_unsold created.');
+        } else {
+            $log('  ~ restaurant_cook_unsold already exists.');
+        }
+        // Each cook remembers its own choice: its plates left are kept to sell later (1) or thrown away (0).
+        if (rofsHasTable($pdo, 'restaurant_cook_plans') && !rofsHasColumn($pdo, 'restaurant_cook_plans', 'keep_left')) {
+            $pdo->exec("ALTER TABLE restaurant_cook_plans ADD COLUMN `keep_left` TINYINT(1) NOT NULL DEFAULT 0");
+            $log('  + restaurant_cook_plans.keep_left added.');
+        } else {
+            $log('  ~ restaurant_cook_plans.keep_left already exists (or no plans table).');
+        }
+        if (!rofsHasTable($pdo, 'notification_events') || !rofsHasTable($pdo, 'notification_rules')) { $log('  ~ notification engine tables absent — events skipped.'); return; }
+        $events = [
+            'restaurant.stock_request'          => ['Stock request from the kitchen', 'A cook asked for stock on the Cooking plan; someone with the stock right must give it out or reject it.', 'medium', 'pos_restock', 'permission'],
+            'restaurant.stock_request_answered' => ['Stock request answered', 'The storekeeper gave out or rejected the stock a cook asked for.', 'low', 'restaurant_pos', 'record_owner'],
+        ];
+        $exists = $pdo->prepare("SELECT 1 FROM notification_events WHERE event_key = ?");
+        foreach ($events as $key => [$title, $desc, $sev, $page, $target]) {
+            $exists->execute([$key]);
+            if ($exists->fetchColumn()) { $log("  ~ event $key already present."); continue; }
+            $pdo->prepare("INSERT INTO notification_events (event_key, title, description, module, page_key, required_verb, default_severity, scope_aware, is_active, created_at)
+                           VALUES (?, ?, ?, 'Restaurant', ?, 'view', ?, 1, 1, NOW())")->execute([$key, $title, $desc, $page, $sev]);
+            $pdo->prepare("INSERT INTO notification_rules (event_key, target_type, target_id, channel_email, channel_inapp, digest, is_active, created_at, updated_at)
+                           VALUES (?, ?, NULL, 0, 1, 'immediate', 1, NOW(), NOW())")->execute([$key, $target]);
+            $log("  + event $key registered (in-app).");
+        }
+    }
+}
