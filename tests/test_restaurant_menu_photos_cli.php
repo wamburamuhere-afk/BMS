@@ -192,8 +192,11 @@ preg_match('/function rcpSetQty\(i, v\) \{.*?\n}\n/s', $mp, $mS);
 preg_match('/function rcpTotals\(\) \{.*?\n}\n/s', $mp, $mT);
 ok(!empty($mH) && !empty($mF) && !empty($mS) && !empty($mT), 'recipe functions found in menu.php');
 if (preg_match('/^v\d+/', trim((string)shell_exec('node -v 2>&1'))) && $mH && $mF && $mS && $mT) {
+    // rcpTotals() also reads CAN_COST (restaurant_costing — the money part runs only for it) and RM's labels
+    // (restaurant costing plan, 2026-11-09); the jQuery stand-in returns itself for any chained call.
     $js = "let RCP = { yield: 1, price: 6500, lines: [] };\nconst safeOutput = s => String(s); const fmt = n => String(n);\nconst out = {}; const dom = {};\n"
-        . "const \$ = sel => ({ text: v => { dom[sel] = v; return { toggleClass: () => {} }; }, toggleClass: () => ({}) });\nfunction rcpRender() {}\n"
+        . "const CAN_COST = true; const RM = { potTitle: '%d', potCost: '%d', extraPot: '', extraOne: '' };\n"
+        . "const \$ = sel => { const api = new Proxy({}, { get: (_, p) => p === 'text' ? (v => { dom[sel] = v; return api; }) : (() => api) }); return api; };\nfunction rcpRender() {}\n"
         . $mH[0] . $mF[0] . $mS[0] . $mT[0] . <<<'JS'
 RCP.lines = [{ unit: 'kg', du: 'g', qty: 0, cost: 3000 }, { unit: 'litre', du: 'ml', qty: 0, cost: 8000 }, { unit: 'pcs', du: 'pcs', qty: 0, cost: 500 }];
 rcpSetQty(0, '250'); out.g = RCP.lines[0].qty;             // 250 g → 0.25 kg

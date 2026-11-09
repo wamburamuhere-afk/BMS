@@ -25,9 +25,13 @@ $dp = (string)file_get_contents("$root/includes/restaurant/dash_panel.php");
 $ri = (string)file_get_contents("$root/core/restaurant_insights.php");
 ok(str_contains($dp, 'data-ct="profit"><?= t(\'Profit\') ?></button>') && str_contains($dp, '<?php if ($rdMoney): ?><button'), 'a Profit button next to Sales | Orders (only for users who see money)');
 ok(str_contains($dp, 'class="rd2-bars rd2-pv d-none" data-ct="profit"'), 'the Profit panel sits in the same chart, hidden until chosen');
-ok(substr_count($dp, "t('Drinks & stock sold')") >= 3 && substr_count($dp, "t('Food bought')") >= 3, 'three cost parts named in the chart legend, tooltip and Money panel');
+// Restaurant costing plan (2026-11-09): stock taken for cooking counts with stock ("used"), and spoiled stock /
+// kitchen waste is its own part, shown in the legend and both money lists only when there is any.
+ok(substr_count($dp, "t('Drinks & stock used')") >= 3 && substr_count($dp, "t('Food bought')") >= 3, 'cost parts named in the chart legend, tooltip and Money panel ("Drinks & stock used", "Food bought")');
+ok(substr_count($dp, "t('Spoiled & waste')") >= 3 && str_contains($dp, "if (\$PT['waste'] > 0)"), '"Spoiled & waste" in the legend, tooltip and Money panel — only when there is any');
 ok(!str_contains($dp, "<span><?= t('Cost of Goods') ?></span><b>− <?= \$rdFmt(\$cur['cost']) ?></b>"), 'Money panel: "Cost of goods" is now its two parts');
-ok(str_contains($dp, "\$PT['food'] = round((float)\$cur['cost'] - \$PT['stock'], 2)"), 'the two parts always add up to the Cost of goods figure');
+ok(str_contains($dp, "\$PT['food'] = round((float)\$cur['cost'] - \$PT['stock'] - \$PT['waste'], 2)"), 'the parts (stock, food, waste) always add up to the Cost of goods figure');
+ok(str_contains($ri, "je.entity_type IN ('kitchen_waste','restaurant_spoilage')"), 'waste = kitchen waste + spoiled stock entries');
 ok(str_contains($dp, "\$k !== 'today'") && str_contains($dp, 'Profit is not shown by hour'), 'Today: no hourly profit (it would mislead), a plain breakdown instead');
 ok(str_contains($dp, "#dc3545") && str_contains($dp, 'Loss so far'), 'the line is red while still at a loss');
 ok(str_contains($ri, "je.entity_type LIKE '%\\\\_cogs%'"), 'drinks & stock sold = cost posted with the sale (*_cogs entries)');
