@@ -74,7 +74,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
         <?php if ($can_edit): ?>
         <div class="col-lg-5" id="cpFormCol">
             <div class="cp-card">
-                <div class="cp-card-h"><h6><i class="ri ri-fire me-1"></i><?= t('Cook') ?></h6></div>
+                <div class="cp-card-h"><h6><i class="bi bi-fire me-1"></i><?= t('Cook') ?></h6></div>
                 <div class="p-3">
                     <div id="cpMsg" class="mb-2"></div>
                     <div class="rf-field mb-3">
@@ -111,7 +111,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
                     <div class="cp-sum mt-3" id="cpSum"></div>
                     <?php endif; ?>
 
-                    <button type="button" class="btn btn-primary btn-lg w-100 mt-3" id="cpSave"><i class="ri ri-fire me-1"></i><?= t('Start cooking') ?></button>
+                    <button type="button" class="btn btn-primary btn-lg w-100 mt-3" id="cpSave"><i class="bi bi-fire me-1"></i><?= t('Start cooking') ?></button>
                 </div>
             </div>
         </div>
@@ -147,6 +147,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
 .cp-page .cp-card-h h6 { margin:0; font-weight:700; color:#0b3d91; }
 .cp-page .cp-note { background:#f5f9ff; border:1px dashed #9ec5fe; border-radius:10px; padding:10px 12px; font-size:.9rem; }
 .cp-page .cp-sum { background:#f5f9ff; border:1px dashed #9ec5fe; border-radius:12px; padding:12px 14px; }
+.cp-page .cp-sum:empty { display:none; }   /* nothing chosen yet: no empty box */
 .cp-page .cp-sum .cp-row, .cp-page .cp-plan .cp-row { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
 .cp-page .cp-sum .cp-total { border-top:1px solid #cfe2ff; margin-top:4px; padding-top:6px; font-weight:700; }
 .cp-page .cp-loss { color:#b45309; }
@@ -183,7 +184,8 @@ const CP = {
         noPlansDay: <?= json_encode(t('Nothing was cooked on this day.')) ?>,
         today: <?= json_encode(t('Today\'s cooking')) ?>, dayOf: <?= json_encode(t('Cooking on %s')) ?>,
         open: <?= json_encode(t('Cooking')) ?>, closed: <?= json_encode(t('Done')) ?>,
-        potsShort: <?= json_encode(t('pot(s)')) ?>, sold: <?= json_encode(t('Sold')) ?>, leftL: <?= json_encode(t('Left')) ?>,
+        potsShort: <?= json_encode(t('pot(s)')) ?>, platesPot: <?= json_encode(t('%d plates a pot')) ?>,
+        allCooks: <?= json_encode(t('all %d cooks of this dish today')) ?>, sold: <?= json_encode(t('Sold')) ?>, leftL: <?= json_encode(t('Left')) ?>,
         unacc: <?= json_encode(t('Not accounted for')) ?>, unaccHelp: <?= json_encode(t('eaten by staff, given away or spilled?')) ?>,
         cost: <?= json_encode(t('Cost')) ?>, platesLeftBtn: <?= json_encode(t('Plates left')) ?>, cancel: <?= json_encode(t('Cancel')) ?>,
         platesLeftQ: <?= json_encode(t('How many plates are left?')) ?>, platesLeftHelp: <?= json_encode(t('Count what is left in the pot at the end of the day. Sold plates come from the till.')) ?>,
@@ -237,7 +239,7 @@ function cpInit() {
         CPD = { dishes: r.dishes, stock: r.stock, plans: r.plans, today: r.today };
         if (CP.canEdit) {
             const sel = $('#cpDish').empty().append(new Option('', '', true, true));
-            r.dishes.forEach(d => sel.append(new Option(caseFormatJs(d.name) + (d.yield > 1 ? ` (${d.yield}/${CP.s.potsShort})` : ''), d.product_id, false, false)));
+            r.dishes.forEach(d => sel.append(new Option(caseFormatJs(d.name) + (d.yield > 1 ? ' · ' + CP.s.platesPot.replace('%d', d.yield) : ''), d.product_id, false, false)));
             sel.trigger('change.select2');
             CPX = { dish: null, lines: [], fromLast: false };
             cpFillPick(r.stock); cpRender();
@@ -374,9 +376,14 @@ function cpRenderPlans(plans) {
     $('#stPlanned').text(cpFmt(planned)); $('#stSold').text(cpFmt(sold)); $('#stLeft').text(anyLeft ? cpFmt(left) : '—');
     if (CP.canCost) $('#stGp').text(cpFmt(Math.round(gp))).toggleClass('cp-loss', gp < 0);
     if (!plans.length) { $('#cpPlans').html(`<div class="cp-empty"><i class="ri ri-cooking-pot fs-1 d-block mb-2 text-primary"></i>${today ? CP.s.noPlans : CP.s.noPlansDay}</div>`); return; }
+    // The till's sales belong to the DISH and day, not to one cook: "not accounted for" is worked out per dish —
+    // all its cooks' plates − sold − all its plates left — once every cook of it is closed, and shown on its last card.
+    const byDish = {};
+    plans.forEach(p => { const g = byDish[p.product_id] = byDish[p.product_id] || { n: 0, planned: 0, left: 0, open: 0, last: null };
+        g.n++; g.planned += p.plates_planned; g.left += p.plates_left || 0; if (p.status !== 'closed') g.open++; g.last = p.id; });
     $('#cpPlans').html(plans.map(p => {
-        const closed = p.status === 'closed';
-        const unacc = p.plates_left !== null ? Math.round((p.plates_planned - p.sold - p.plates_left) * 100) / 100 : null;
+        const closed = p.status === 'closed', g = byDish[p.product_id];
+        const unacc = (g.last === p.id && g.open === 0) ? Math.round((g.planned - p.sold - g.left) * 100) / 100 : null;
         const row = (l, v, cls) => `<div class="cp-row ${cls || ''}"><span>${l}</span><span>${v}</span></div>`;
         let h = `<div class="cp-plan ${closed ? 'cp-closed' : ''}">
             <div class="d-flex justify-content-between align-items-start gap-2">
@@ -384,9 +391,9 @@ function cpRenderPlans(plans) {
                     <div class="small text-muted">${cpFmt(p.pots)} ${CP.s.potsShort} → <strong>${cpFmt(p.plates_planned)}</strong> ${CP.s.plannedPlates.toLowerCase()}</div></div>
                 <span class="cp-badge ${closed ? 'cp-done' : ''}">${closed ? CP.s.closed : CP.s.open}</span>
             </div>`;
-        h += row(CP.s.sold, cpFmt(p.sold));
+        h += row(g.n > 1 ? `${CP.s.sold} <small class="text-muted">(${CP.s.allCooks.replace('%d', g.n)})</small>` : CP.s.sold, cpFmt(p.sold));
         if (p.plates_left !== null) h += row(CP.s.leftL, cpFmt(p.plates_left));
-        if (unacc !== null && Math.abs(unacc) > 0.004) h += row(`${CP.s.unacc} <small class="text-muted">(${CP.s.unaccHelp})</small>`, `<span class="cp-loss fw-semibold">${cpFmt(unacc)}</span>`);
+        if (unacc !== null && Math.abs(unacc) > 0.004) h += row(`${CP.s.unacc}${g.n > 1 ? ` <small class="text-muted">(${CP.s.allCooks.replace('%d', g.n)})</small>` : ''} <small class="text-muted">(${CP.s.unaccHelp})</small>`, `<span class="cp-loss fw-semibold">${cpFmt(unacc)}</span>`);
         if (p.items.length) h += `<div class="small text-muted mt-1"><i class="bi bi-box-seam me-1"></i>${p.items.map(i => `${nm(i.name)} ${cpQty(i.qty)} ${safeOutput(i.unit)}`
             + (i.status === 'requested' ? ` <span class="cp-badge">${CP.s.requested}</span>` : i.status === 'rejected' ? ` <span class="cp-badge cp-done"><s>${CP.s.rejected}</s></span>` : '')).join(' · ')}</div>`;
         if (CP.canCost) {

@@ -7043,6 +7043,8 @@ return [
     'How many plates?' => 'Sahani ngapi?',
     '= %s plates' => '= sahani %s',
     'pot(s)' => 'sufuria',
+    '%d plates a pot' => 'sahani %d kwa sufuria',
+    'all %d cooks of this dish today' => 'mapishi yote %d ya chakula hiki leo',
     'One pot of this dish gives %d plates (set in its recipe on the Menu).' => 'Sufuria moja ya chakula hiki inatoa sahani %d (imewekwa kwenye mapishi yake kwenye Menyu).',
     'This dish has no recipe yet, so each "pot" is one plate. Add a recipe on the Menu to cook by the pot.' => 'Chakula hiki bado hakina mapishi, kwa hiyo kila "sufuria" ni sahani moja. Weka mapishi kwenye Menyu ili upike kwa sufuria.',
     'These come from the recipe and leave stock as each plate is sold — do not take them here:' => 'Hivi vinatoka kwenye mapishi na vinatoka stoo kila sahani inapouzwa — usivitoe hapa:',

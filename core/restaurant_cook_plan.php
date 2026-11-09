@@ -337,7 +337,14 @@ if (!function_exists('rcpClose')) {
         $pdo->prepare("UPDATE restaurant_cook_plans SET plates_left = ?, plates_sold = ?, status = 'closed', closed_by = ?, closed_at = NOW() WHERE id = ?")
             ->execute([$left, $sold, $uid, $planId]);
         logActivity($pdo, $uid, "Cooking plan COOK-$planId closed: planned {$p['plates_planned']}, sold $sold, left $left");
-        return ['planned' => (float)$p['plates_planned'], 'sold' => $sold, 'left' => $left, 'unaccounted' => round((float)$p['plates_planned'] - $sold - $left, 2)];
+        // Sold belongs to the dish and day: "not accounted for" is per dish (all its cooks), known once every cook is closed.
+        $g = $pdo->prepare("SELECT SUM(plates_planned) AS planned, SUM(COALESCE(plates_left, 0)) AS left_p, SUM(status = 'open') AS open_n
+                              FROM restaurant_cook_plans WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status <> 'cancelled'");
+        $g->execute([(int)$p['warehouse_id'], (int)$p['product_id'], (string)$p['plan_date']]);
+        $d = $g->fetch(PDO::FETCH_ASSOC);
+        $unacc = (int)$d['open_n'] === 0 ? round(max(0, (float)$d['planned'] - $sold - (float)$d['left_p']), 2) : null;
+        return ['planned' => (float)$p['plates_planned'], 'sold' => $sold, 'left' => $left, 'unaccounted' => $unacc,
+                'dish_planned' => (float)$d['planned'], 'dish_left' => (float)$d['left_p']];
     }
 }
 
