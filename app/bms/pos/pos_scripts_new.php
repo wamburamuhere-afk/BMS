@@ -599,10 +599,17 @@ function setCustomerSelection(id, text) {
     $sel.trigger('change');
 }
 
-// Save/Load cart from localStorage
+// Save/Load cart from localStorage.
+// The browser keeps ONE cart per device, and a restaurant tablet is shared by the waiter and the cashier.
+// So the cart is saved with WHO made it and WHICH table/held order it belongs to (2026-11-10):
+//  - another person's cart is never shown (it was showing up as a new walk-in sale → paid twice);
+//  - a table's order lives on its table on the server: it is never brought back as a loose walk-in sale.
+//    Only items not yet saved to their table come back, and only when that same table is opened again.
 function saveCartToStorage() {
     try {
-        localStorage.setItem('pos_cart', JSON.stringify(cart));
+        localStorage.setItem('pos_cart', JSON.stringify({
+            v: 2, user: POS_USER_ID, table: currentTableId || null, hold: currentHoldId || null, items: cart
+        }));
         localStorage.setItem('pos_customer', $('#customerSelect').val() || '');
         localStorage.setItem('pos_customer_name', $('#customerSelect option:selected').text() || '');
     } catch (e) {
@@ -610,23 +617,34 @@ function saveCartToStorage() {
     }
 }
 
+/** What may come back from storage for THIS person on THIS screen: the items, or null (nothing). Pure — tested. */
+function posStoredCartFor(saved, userId, urlTable) {
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;   // old format: owner unknown
+    if (saved.v !== 2 || String(saved.user) !== String(userId)) return null;          // someone else's cart
+    const items = Array.isArray(saved.items) ? saved.items : [];
+    if (saved.hold) return null;                                                     // saved on its table — the server has it
+    if (saved.table) return String(saved.table) === String(urlTable || '') ? items : null;   // unsaved table items: only on that table
+    return items;
+}
+
 function loadCartFromStorage() {
     try {
-        const savedCart = localStorage.getItem('pos_cart');
+        const raw = localStorage.getItem('pos_cart');
         const savedCustomer = localStorage.getItem('pos_customer');
         const savedCustomerName = localStorage.getItem('pos_customer_name');
-
-        if (savedCart) {
-            cart = JSON.parse(savedCart);
-            updateCartDisplay();
-        }
-
+        if (!raw) return;
+        const urlTable = new URLSearchParams(window.location.search).get('table');
+        const items = posStoredCartFor(JSON.parse(raw), POS_USER_ID, urlTable);
+        if (items === null) { clearCartStorage(); return; }   // not this person's, or it belongs on a table
+        cart = items;
+        updateCartDisplay();
         if (savedCustomer) {
             setCustomerSelection(savedCustomer, savedCustomerName);
         }
     } catch (e) {
         console.error('Error loading cart:', e);
         cart = [];
+        clearCartStorage();
     }
 }
 
@@ -2352,6 +2370,9 @@ function editItemNote(index) {
 function saveOrderToTable() {
     if (!currentTableId) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
     if (cart.length === 0) { Swal.fire({ icon: 'warning', title: PT.emptyCartTitle, text: PT.addItemsBeforeHold }); return; }
+    // A kitchen screen / printer: the order is saved AND sent in one tap ("Send order") — a waiter who saved
+    // used to think it was sent while it never reached the cashier or the kitchen (2026-11-10).
+    if (posRestaurantActive() && POS_KITCHEN_MODE !== 'none') { sendCurrentOrderToKitchen(true); return; }
     const btn = $('#rsSaveTableBtn'); const orig = btn.html();
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
     const label = currentTableLabel;
@@ -2484,7 +2505,13 @@ function selectTable(tableId, warehouseId, tableNumber) {
     });
 }
 
-function sendCurrentOrderToKitchen() {
+/**
+ * Save the table's order and send what the kitchen does not have yet.
+ * leaveAfter (the "Send order" button): then the table is closed on this screen, as a save does — the order
+ * lives on its table; the chef-hat button (leaveAfter false) sends and stays on the table.
+ */
+function sendCurrentOrderToKitchen(leaveAfter) {
+    leaveAfter = leaveAfter === true;
     if (!currentTableId) {
         Swal.fire({ icon: 'warning', title: PT.error, text: PT.selectTableFirst });
         return;
@@ -2495,8 +2522,9 @@ function sendCurrentOrderToKitchen() {
     }
 
     const wid = parseInt($('#posWarehouseId').val() || 0, 10);
-    const btn = $('#sendToKitchenBtn');
+    const btn = leaveAfter ? $('#rsSaveTableBtn') : $('#sendToKitchenBtn');
     const origHtml = btn.html();
+    const tableLabel = currentTableLabel;
     // restaurant_plan.md Phase 3 — printer mode: open the slip window now, inside the click.
     const slipWin = (POS_KITCHEN_MODE === 'printer') ? window.open('', '_blank', 'width=420,height=640') : null;
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
@@ -2552,6 +2580,12 @@ function sendCurrentOrderToKitchen() {
                         const printNow = POS_KITCHEN_MODE === 'printer' && res.status === 'queued' && (res.ticket_ids || []).length;
                         if (printNow) openKitchenSlip({ ticket_ids: res.ticket_ids.join(','), warehouse_id: wid }, slipWin);
                         else if (slipWin) slipWin.close();
+                        if (leaveAfter) {   // "Send order": saved on its table and sent — this screen is free for the next order
+                            cart = []; updateCartDisplay(); clearCartStorage(); clearTableSelection(); setCustomerSelection('', '');
+                            Swal.fire({ icon: 'success', title: res.nothing_new ? PT.savedToTable.replace('%s', tableLabel) : (res.status === 'pending' ? ROF_T.sentToCashier : PT.sentToKitchen),
+                                        text: res.nothing_new ? res.message : PT.savedToTable.replace('%s', tableLabel), timer: 1800, showConfirmButton: false });
+                            return;
+                        }
                         if (res.nothing_new) Swal.fire({ icon: 'info', title: res.message, timer: 1800, showConfirmButton: false });
                         else Swal.fire({ icon: 'success', title: res.status === 'pending' ? ROF_T.sentToCashier : PT.sentToKitchen, timer: 1600, showConfirmButton: false });
                         rofLoadStrip();

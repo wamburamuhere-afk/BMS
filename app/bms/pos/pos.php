@@ -634,8 +634,13 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                         <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-truncate" id="rsTableBtn" onclick="openTablePicker()">
                             <i class="ri ri-armchair me-1"></i><span id="rsTableLabel"><?= t('Choose table') ?></span>
                         </button>
+                        <?php // A kitchen screen / printer: saving the table's order also sends it (one tap) — "Send order". By mouth: save only. ?>
                         <button type="button" class="btn btn-sm btn-primary d-none text-nowrap" id="rsSaveTableBtn" onclick="saveOrderToTable()">
+                            <?php if (($_rest_mod ? restaurantKitchenMode() : 'none') !== 'none'): ?>
+                            <i class="bi bi-send me-1"></i><?= t('Send order') ?>
+                            <?php else: ?>
                             <i class="bi bi-bookmark-check me-1"></i><?= t('Save to table') ?>
+                            <?php endif; ?>
                         </button>
                     </div>
                     <!-- restaurant_plan.md Phase 4 — split the table's bill (pay some items now). -->
