@@ -270,6 +270,98 @@ if (!function_exists('loadRolePermissionMatrix')) {
     }
 }
 
+if (!function_exists('rolePermissionVerbs')) {
+    /** The six rights a row can carry, in the order the matrix shows them. */
+    function rolePermissionVerbs(): array
+    {
+        return ['view', 'create', 'edit', 'delete', 'review', 'approve'];
+    }
+}
+
+if (!function_exists('rolePermissionSnapshot')) {
+    /**
+     * A role's rights right now: [permission_id => ['view', 'edit', …]] (only the ticked verbs; rows with none left out).
+     * Taken before and after a save so the activity log can say exactly what changed.
+     */
+    function rolePermissionSnapshot(PDO $pdo, int $roleId): array
+    {
+        $st = $pdo->prepare("SELECT permission_id, can_view, can_create, can_edit, can_delete,
+                                    COALESCE(can_review, 0) AS can_review, COALESCE(can_approve, 0) AS can_approve
+                               FROM role_permissions WHERE role_id = ?");
+        $st->execute([$roleId]);
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $verbs = [];
+            foreach (rolePermissionVerbs() as $v) {
+                if ((int)$r['can_' . $v] === 1) $verbs[] = $v;
+            }
+            if ($verbs) $out[(int)$r['permission_id']] = array_values(array_unique(array_merge($out[(int)$r['permission_id']] ?? [], $verbs)));
+        }
+        ksort($out);
+        return $out;
+    }
+}
+
+if (!function_exists('rolePermissionChanges')) {
+    /**
+     * What a save changed, row by row (pure).
+     * @param array $before snapshot  @param array $after snapshot  @param array $nameById [permission_id => page name]
+     * @return array<int, array{page:string, added:string[], removed:string[]}> sorted by page name
+     */
+    function rolePermissionChanges(array $before, array $after, array $nameById): array
+    {
+        $out = [];
+        foreach (array_unique(array_merge(array_keys($before), array_keys($after))) as $pid) {
+            $b = $before[$pid] ?? [];
+            $a = $after[$pid] ?? [];
+            $added   = array_values(array_intersect(rolePermissionVerbs(), array_diff($a, $b)));
+            $removed = array_values(array_intersect(rolePermissionVerbs(), array_diff($b, $a)));
+            if (!$added && !$removed) continue;
+            $out[] = ['page' => (string)($nameById[$pid] ?? ('#' . $pid)), 'added' => $added, 'removed' => $removed];
+        }
+        usort($out, fn($x, $y) => strnatcasecmp($x['page'], $y['page']));
+        return $out;
+    }
+}
+
+if (!function_exists('rolePermissionChangesText')) {
+    /**
+     * One line for the activity log, e.g. "Restaurant Orders: +approve; POS System: -create, -delete".
+     * Long lists are cut at $max rows with "… and N more" (the full list goes to the audit log's values).
+     */
+    function rolePermissionChangesText(array $changes, int $max = 25): string
+    {
+        if (!$changes) return 'no rights changed';
+        $parts = [];
+        foreach (array_slice($changes, 0, $max) as $c) {
+            $v = array_merge(array_map(fn($x) => "+$x", $c['added']), array_map(fn($x) => "-$x", $c['removed']));
+            $parts[] = $c['page'] . ': ' . implode(', ', $v);
+        }
+        $more = count($changes) - $max;
+        return implode('; ', $parts) . ($more > 0 ? "; … and $more more" : '');
+    }
+}
+
+if (!function_exists('rolePermissionNamesById')) {
+    /** [permission_id => page name] for every permission row (names as stored). */
+    function rolePermissionNamesById(PDO $pdo): array
+    {
+        $out = [];
+        foreach ($pdo->query("SELECT permission_id, COALESCE(NULLIF(page_name, ''), page_key) AS n FROM permissions") as $r) {
+            $out[(int)$r['permission_id']] = (string)$r['n'];
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('rolePermissionIsProtectedRole')) {
+    /** The Admin role (role_id 1 or flagged is_admin) can never be deleted from this page. */
+    function rolePermissionIsProtectedRole(array $role): bool
+    {
+        return (int)($role['role_id'] ?? 0) === 1 || (int)($role['is_admin'] ?? 0) === 1;
+    }
+}
+
 if (!function_exists('saveRolePermissionGrants')) {
     /**
      * Replace a role's grants for the rows the matrix showed; keep the rest.

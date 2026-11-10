@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-11-10 — fix(roles): every role change is logged with who did what; Access Audit tab works; forged requests refused
+
+**Changed:** `app/constant/settings/user_roles.php`, `core/role_permission_ui.php`, `ajax/get_access_log.php`, `core/restaurant_ready_roles.php`, `lang/sw.php`, `tests/test_user_roles_crud_logging_cli.php` (new)
+
+- **Create was logged as "Edit role"** (the id was already set when the log was written) — now logged as Create role.
+- **What changed, not a count:** create / edit log the exact rights added and removed per row (e.g. "Restaurant Orders: +view, +approve; POS System: -create"), a rename (old → new) and a description change; the full list goes into the audit values. A save with no change still records who saved it ("no rights changed"). Delete lists every right the role held. Logs are written inside the same transaction as the change.
+- **Assign role:** logged with the user's name and old → new role (was "user ID 12 to role ID 5"); the same role again writes nothing; a user or role that does not exist is refused (it used to save a missing role id).
+- **Ready-made restaurant roles:** rights the system adds to them are now logged too (only their creation was).
+- **Access Audit tab:** it never loaded (the endpoint returned an empty table in another format). It now lists who created / edited / deleted roles, changed a user's role and what the system added for restaurant roles, newest first, with stats; everything shown is escaped. "Generate Access Report" called a file that does not exist → now "Open full Audit Logs". "Clear Old Logs" (also a missing file) removed — history is never cleared from here.
+- **Gaps closed:** the three forms carry a CSRF token (a forged request cannot change a right); editing a role that no longer exists is refused instead of writing rights for it; the Admin role can never be deleted (the check looked for "Administrator", the role is "Admin", and the server did not check at all); delete runs in one transaction; role name in the edit title escaped; Department column filled (it always showed N/A).
+- **Checked:** new test 82/82 runs the real page and endpoint (create, edit, rename, no-change save, forged request, missing role, assign, refused deletes, delete, Access Audit JSON, ready-role log, RETAIL render with module off and with module on + all-retail shops — every row shows its stored name/description, no restaurant tab/note/role — restaurant and mixed renders, Swahili); shop-mode test 94/94; 43 suites touching these files: every failure is identical on develop without this change. Real browser: tabs, notes, Edit, Access Audit tab, no console errors; real session save with and without the token.
+
 ## 2026-11-10 — fix(roles): Roles & Permissions follows the shop mode — retail never meets restaurant rows, a restaurant reads its own words
 
 **Changed:** `core/role_permission_ui.php`, `app/constant/settings/user_roles.php`, `core/restaurant_order_flow_schema.php`, `lang/sw.php`, `tests/test_roles_matrix_shop_mode_cli.php` (new)

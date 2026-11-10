@@ -7188,6 +7188,14 @@ return [
     'For a team: the waiter sends the order, the cashier confirms it, the kitchen cooks, the waiter marks it received, then the cashier closes the bill. Leave it off when one person does everything. Works with Kitchen screen or Printer.' => 'Kwa timu: mhudumu anatuma oda, keshia anaithibitisha, jikoni wanapika, mhudumu anaweka imepokelewa, kisha keshia anafunga bili. Iache imezimwa kama mtu mmoja anafanya kila kitu. Inafanya kazi na Skrini ya jikoni au Printa.',
     // Roles & Permissions — rows in restaurant words (core/role_permission_ui.php rolePermissionShopText)
     'In a restaurant shop:' => 'Kwenye duka la mgahawa:',
+    // Roles & Permissions — Access Audit tab (ajax/get_access_log.php)
+    'Your session expired. Please try again.' => 'Muda wa kikao chako umeisha. Tafadhali jaribu tena.',
+    'Created role' => 'Ameunda jukumu',
+    'Edited role' => 'Amehariri jukumu',
+    'Deleted role' => 'Amefuta jukumu',
+    'Changed user role' => 'Amebadilisha jukumu la mtumiaji',
+    'Restaurant roles' => 'Majukumu ya mgahawa',
+    'Open full Audit Logs' => 'Fungua Kumbukumbu zote za Ukaguzi',
     'Restaurant Menu & Set-up' => 'Menyu na Mipangilio ya Mgahawa',
     'View: open the Menu and the restaurant pages. Create: add reservations. Edit: change dishes, recipes, add-on options, tables, kitchen stations, the online menu and the Cooking plan.' => 'Angalia: kufungua Menyu na kurasa za mgahawa. Ongeza: kuhifadhi meza. Hariri: kubadilisha vyakula, mapishi, nyongeza, meza, vituo vya jikoni, menyu ya mtandaoni na Pika Leo.',
     'Orders & Till' => 'Oda na Kaunta',
