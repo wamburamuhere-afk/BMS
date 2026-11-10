@@ -52,9 +52,10 @@ section('2. Source wiring — every render site wraps $user_role in t()');
 // ─────────────────────────────────────────────────────────────────────────
 $headerSrc = file_get_contents("$root/header.php");
 $headerHits = substr_count($headerSrc, 'htmlspecialchars(t($user_role))');
-$headerHits === 2
-    ? pass("header.php wraps \$user_role in t() at both render sites (found $headerHits)")
-    : fail("header.php wraps \$user_role in t() at $headerHits site(s), expected exactly 2");
+// desktop bar + user menu + the phone side menu (added later) — every one translated
+$headerHits >= 2
+    ? pass("header.php wraps \$user_role in t() at every render site (found $headerHits)")
+    : fail("header.php wraps \$user_role in t() at $headerHits site(s), expected at least 2");
 strpos($headerSrc, 'htmlspecialchars($user_role)') === false
     ? pass('no untranslated $user_role render site remains in header.php')
     : fail('header.php still has a raw, untranslated $user_role render site');

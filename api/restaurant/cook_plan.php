@@ -59,7 +59,7 @@ $strip = function (array $rows, array $keys) use ($seeCost): array {
 };
 $dayOut = function (int $wh, string $date, bool $earlier = false) use ($pdo, $seeCost, $strip): array {
     $rows = $earlier ? rcpOpenEarlier($pdo, $wh, $date) : rcpDay($pdo, $wh, $date);
-    if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost']); $r['items'] = $strip($r['items'], ['amount']); if ($r['unsold']) unset($r['unsold']['amount']); }
+    if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost'], $r['requested_cost']); $r['items'] = $strip($r['items'], ['amount']); if ($r['unsold']) unset($r['unsold']['amount']); }
     unset($r);
     return $rows;
 };

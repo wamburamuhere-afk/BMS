@@ -182,7 +182,20 @@ if (!function_exists('notifLangFor')) {
     {
         $org = function_exists('orgLanguage') ? orgLanguage() : null;
         if ($org) return $org;
-        $l = function_exists('get_setting') ? (string)get_setting('user_language_' . $userId, 'en') : 'en';
+        // read fresh (get_setting() caches the whole table once per request — a language saved later in the
+        // same run would be missed)
+        $l = 'en';
+        try {
+            global $pdo;
+            if ($pdo instanceof PDO) {
+                $st = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1");
+                $st->execute(['user_language_' . $userId]);
+                $v = $st->fetchColumn();
+                if ($v !== false && $v !== null && $v !== '') $l = (string)$v;
+            }
+        } catch (Throwable $e) {
+            $l = function_exists('get_setting') ? (string)get_setting('user_language_' . $userId, 'en') : 'en';
+        }
         return in_array($l, defined('SUPPORTED_LANGUAGES') ? SUPPORTED_LANGUAGES : ['en'], true) ? $l : 'en';
     }
 }

@@ -606,12 +606,17 @@ if (!function_exists('rcpDay')) {
         $st->execute([$warehouseId, $date]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         $sold = [];
-        $items = $pdo->prepare("SELECT i.product_id, p.product_name, i.quantity, i.unit, i.amount, " . (rcpRequestsReady($pdo) ? 'i.status' : "'issued'") . " AS status
+        $items = $pdo->prepare("SELECT i.product_id, p.product_name, i.quantity, i.unit, i.amount, COALESCE(p.cost_price, 0) AS cost_now, " . (rcpRequestsReady($pdo) ? 'i.status' : "'issued'") . " AS status
                                   FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id WHERE i.plan_id = ?");
         foreach ($rows as &$r) {
             $pid = (int)$r['product_id'];
             if (!isset($sold[$pid])) $sold[$pid] = rcpSoldOn($pdo, $warehouseId, $pid, $date);
             $items->execute([(int)$r['id']]);
+            $itemRows = $items->fetchAll(PDO::FETCH_ASSOC);
+            // stock only ASKED for has no cost yet: counted at today's buying price (what giving it out will cost) so the
+            // expected profit is not the whole sale while the request waits (2026-11-10)
+            $reqCost = 0.0;
+            foreach ($itemRows as $ir) if (($ir['status'] ?? '') === 'requested') $reqCost += (float)$ir['quantity'] * (float)$ir['cost_now'];
             $un = null;
             if (rcpUnsoldReady($pdo)) {
                 $u = $pdo->prepare("SELECT plates, kept_left, amount FROM restaurant_cook_unsold WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status = 'posted' ORDER BY id DESC LIMIT 1");
@@ -624,10 +629,10 @@ if (!function_exists('rcpDay')) {
                 'unsold' => $un ? ['plates' => (float)$un['plates'], 'kept_left' => (float)$un['kept_left'], 'amount' => (float)$un['amount']] : null,
                 'id' => (int)$r['id'], 'product_id' => $pid, 'name' => $r['product_name'], 'pots' => (float)$r['pots'],
                 'plates_planned' => (float)$r['plates_planned'], 'selling_price' => (float)$r['selling_price'],
-                'recipe_cost' => (float)$r['recipe_cost'], 'stock_cost' => (float)$r['stock_cost'],
+                'recipe_cost' => (float)$r['recipe_cost'], 'stock_cost' => (float)$r['stock_cost'], 'requested_cost' => round($reqCost, 2),
                 'sold' => $sold[$pid], 'plates_left' => $r['plates_left'] === null ? null : (float)$r['plates_left'],
                 'status' => $r['status'], 'created_at' => $r['created_at'],
-                'items' => array_map(fn($i) => ['name' => $i['product_name'], 'qty' => (float)$i['quantity'], 'unit' => $i['unit'], 'amount' => (float)$i['amount'], 'status' => $i['status']], $items->fetchAll(PDO::FETCH_ASSOC)),
+                'items' => array_map(fn($i) => ['name' => $i['product_name'], 'qty' => (float)$i['quantity'], 'unit' => $i['unit'], 'amount' => (float)$i['amount'], 'status' => $i['status']], $itemRows),
             ];
         }
         unset($r);
@@ -661,7 +666,7 @@ if (!function_exists('rcpRequests')) {
     function rcpRequests(PDO $pdo, int $warehouseId): array
     {
         if (!rcpRequestsReady($pdo)) return [];
-        $st = $pdo->prepare("SELECT c.id AS plan_id, c.plan_date, c.pots, d.product_name AS dish, i.product_id, p.product_name, i.quantity, i.unit,
+        $st = $pdo->prepare("SELECT c.id AS plan_id, c.plan_date, c.pots, c.plates_planned, d.product_name AS dish, i.product_id, p.product_name, i.quantity, i.unit,
                                     COALESCE(p.cost_price, 0) AS cost_price, i.requested_by, c.created_at,
                                     TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS by_name, u.username
                                FROM restaurant_cook_plan_items i
@@ -675,7 +680,7 @@ if (!function_exists('rcpRequests')) {
         $by = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $pid = (int)$r['plan_id'];
-            $by[$pid] = $by[$pid] ?? ['plan_id' => $pid, 'plan_date' => $r['plan_date'], 'dish' => $r['dish'], 'pots' => (float)$r['pots'],
+            $by[$pid] = $by[$pid] ?? ['plan_id' => $pid, 'plan_date' => $r['plan_date'], 'dish' => $r['dish'], 'pots' => (float)$r['pots'], 'plates' => (float)$r['plates_planned'],
                                        'by' => trim((string)$r['by_name']) ?: (string)$r['username'], 'requested_by' => (int)$r['requested_by'], 'lines' => []];
             $by[$pid]['lines'][] = ['product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => (float)$r['quantity'], 'unit' => $r['unit'],
                                     'stock' => rcpShopStock($pdo, $warehouseId, (int)$r['product_id']), 'cost_price' => (float)$r['cost_price']];
