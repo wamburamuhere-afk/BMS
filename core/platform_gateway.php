@@ -33,6 +33,9 @@ if (!function_exists('pgHandle')) {
         }
         $tenant = vlFindTenant(null, $tid);
         if (!$tenant) return [404, ['success' => false, 'message' => 'Company not found.']];
+        // vlFindTenant() does not read the plan; the catalogue needs it (own product only,
+        // and the company's own plan offered for renewal even when it is not public).
+        if (!array_key_exists('plan', $tenant)) $tenant['plan'] = pgTenantPlanKey((int)$tenant['id']);
         $req = json_decode($body, true) ?: [];
         $cid = (int)($tenant['vendor_customer_id'] ?? 0);
 
@@ -87,8 +90,12 @@ if (!function_exists('pgCatalog')) {
                                    JOIN products p ON p.product_id = v.product_id AND p.status = 'active'
                                   ORDER BY p.product_name")->fetchAll(PDO::FETCH_ASSOC);
             $mapped = vssPlatformProductsFor($pdo, array_column($rows, 'product_id'));
+            // A Smart POS company sees only Smart POS plans (2026-11-10); moving it to
+            // another product is Superadmin's job. No plan yet → every product.
+            $own = pgOwnSoldProduct($tenant, $mapped);
             foreach ($rows as $r) {
                 $terms = [];
+                if ($own !== null && isset($mapped[(int)$r['product_id']]) && $mapped[(int)$r['product_id']] !== $own) continue;
                 if (isset($mapped[(int)$r['product_id']])) {
                     // A mapped service sells Superadmin's plans: public ones, plus the plan the company is on (to renew it).
                     $extras = [];
@@ -121,6 +128,46 @@ if (!function_exists('pgCatalog')) {
     }
 }
 
+if (!function_exists('pgTenantPlanKey')) {
+    /** The plan key the company is on now (tenants.plan), or null. */
+    function pgTenantPlanKey(int $tenantId): ?string
+    {
+        try {
+            $st = getControlPdo()->prepare("SELECT plan FROM tenants WHERE id = ?");
+            $st->execute([$tenantId]);
+            $k = $st->fetchColumn();
+            return $k !== false && $k !== null && $k !== '' ? (string)$k : null;
+        } catch (Throwable $e) {
+            error_log('pgTenantPlanKey: ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+if (!function_exists('pgOwnSoldProduct')) {
+    /**
+     * The platform product (smart_pos / bms …) the company is on, when BJP sells
+     * it here — then the company sees and may request only that product's plans.
+     * Null = no plan yet ('blank'), or its product is not sold: nothing is hidden.
+     *
+     * @param array<int,string> $mapped BJP service product_id → platform product key
+     */
+    function pgOwnSoldProduct(?array $tenant, array $mapped): ?string
+    {
+        $key = $tenant !== null ? (string)($tenant['plan'] ?? '') : '';
+        if ($key === '' || $key === 'blank') return null;
+        try {
+            require_once __DIR__ . '/plans.php';
+            $plan = getPlanByKey($key);
+        } catch (Throwable $e) {
+            error_log('pgOwnSoldProduct: ' . $e->getMessage());
+            return null;
+        }
+        $own = $plan && !empty($plan['product_key']) ? (string)$plan['product_key'] : null;
+        return $own !== null && in_array($own, $mapped, true) ? $own : null;
+    }
+}
+
 if (!function_exists('pgPlanOptions')) {
     /** The plan options (and, with $withExtras, their extras) a company may request for a mapped service. */
     function pgPlanOptions(string $productKey, ?array $tenant, bool $withExtras = false): array
@@ -139,12 +186,14 @@ if (!function_exists('pgPlanSummaries')) {
         try {
             require_once __DIR__ . '/plans.php';
             $cur = $tenant !== null && !empty($tenant['plan']) ? (string)$tenant['plan'] : '';
-            $st = getControlPdo()->prepare("SELECT id, plan_key, name, tagline, product_key, max_users, max_shops, max_storage_mb, is_popular FROM plans
+            $st = getControlPdo()->prepare("SELECT id, plan_key, name, tagline, product_key, max_users, max_shops, max_storage_mb, is_popular, tier_rank FROM plans
                                              WHERE product_key = ? AND is_active = 1 AND plan_key <> 'blank' AND (is_public = 1 OR plan_key = ?)
                                              ORDER BY tier_rank, sort_order, name");
             $st->execute([$productKey, $cur]);
             $registry = bmsFeatureRegistry();
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $p) {
+            // Cards cheapest first (2026-11-10) — Basic → Standard → …, not by name.
+            $plans = planSortByPrice($st->fetchAll(PDO::FETCH_ASSOC), fn(array $p) => planPrices((int)$p['id'], true));
+            foreach ($plans as $p) {
                 $items = getControlPdo()->prepare("SELECT label, value FROM plan_items WHERE plan_id = ? ORDER BY sort_order, id");
                 $items->execute([(int)$p['id']]);
                 // Same module list registration shows and applyPlanToTenant() turns on.
@@ -310,6 +359,10 @@ if (!function_exists('pgRequestQuote')) {
         $extraLines = [];   // [[name, qty, price, token], …]
         $platformKey = vssPlatformProduct($pdo, $productId);
         if ($platformKey !== null) {
+            // Same rule as the catalogue: only the company's own product.
+            $own = pgOwnSoldProduct($tenant, vssPlatformProductsFor($pdo,
+                       array_map('intval', $pdo->query("SELECT product_id FROM vendor_subscription_services")->fetchAll(PDO::FETCH_COLUMN))));
+            if ($own !== null && $platformKey !== $own) return $fail('Your company uses another product. Contact BJP to change it.');
             // Only a plan the company may pick (public, or its own) — the price comes from the control DB.
             if (!is_string($termId)) return $fail('That plan is not available.');
             $options = pgPlanOptions($platformKey, $tenant, true);
