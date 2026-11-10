@@ -69,6 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $success_msg = wLabel('POS settings updated successfully', 'Selling settings updated successfully') . ($rof_note ?? '');
+        // Reload the page after a save: get_setting() was cached before this POST, so showing the form now
+        // would show the OLD values (e.g. "By mouth" after choosing Kitchen screen) — and a second Save
+        // would put them back.
+        require_once __DIR__ . '/../../../core/flash.php';
+        bmsFlashRedirect(getUrl('pos_config_settings'), 'success', $success_msg);
+        exit;
     } catch (Exception $e) {
         $error_msg = sprintf(wLabel('Error updating POS settings: %s', 'Error updating selling settings: %s'), $e->getMessage());
     }
