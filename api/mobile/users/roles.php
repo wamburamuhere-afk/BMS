@@ -9,7 +9,10 @@ mobileBearerAuth();
 mobileUsersBootstrap('GET');
 
 try {
-    $rows = $pdo->query("SELECT role_id, role_name, is_admin, description FROM roles ORDER BY role_name")->fetchAll(PDO::FETCH_ASSOC);
+    // Ready-made restaurant roles: there by default for a Smart POS restaurant, left out everywhere else (same as the web).
+    require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+    restaurantReadyRolesSync($pdo);
+    $rows = $pdo->query("SELECT role_id, role_name, is_admin, description FROM roles WHERE 1=1" . restaurantReadyRolesHideSql($pdo, 'roles') . " ORDER BY role_name")->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$r) {
         $r['role_id']  = (int)$r['role_id'];
         $r['is_admin'] = (int)$r['is_admin'] === 1 || $r['role_id'] === 1;

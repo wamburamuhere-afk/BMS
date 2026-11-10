@@ -1,6 +1,15 @@
 # BMS Changelog
 
-## 2026-11-10 — fix(settings): Selling Settings showed the OLD values right after Save
+## 2026-11-10 — feat(restaurant): ready-made roles only for a Smart POS restaurant (by default), Cook and Manager role gaps
+
+**Changed:** `core/restaurant_ready_roles.php` (new), `core/restaurant_order_flow_schema.php`, `core/restaurant_cook_plan.php`, `api/restaurant/cook_plan.php`, `app/bms/restaurant/cook_plan.php`, `app/bms/restaurant/cook_plan_report.php`, `header.php`, `app/constant/settings/{users,add_user,edit_user,user_roles,user_projects}.php`, `api/mobile/users/roles.php`, `api/notifications/rules_api.php`, `app/bms/stock/warehouses.php`, `api/mobile/warehouses/{create,update}.php`, `lang/sw.php`, `migrations/tenant/2026_11_10_restaurant_ready_roles.php` (new), `migrations/2026_11_10_restaurant_ready_roles_legacy_db.php` (new)
+
+- **Where the roles belong:** Waiter, Cashier, Cook and Restaurant Manager now exist **by default** for a Smart POS company with a shop in Restaurant/Hybrid mode (made when Users / Roles / Add or Edit user / Shop Access is opened or a shop is saved in Restaurant mode — no need to turn on "Cashier must confirm orders" first). Smart POS retail and Smart BMS: they are never created, and are left out of every role list and picker (web, mobile, Notification rules). Only OUR roles are hidden — same name AND our description, and only while nobody holds them — so a company's own "Cashier" and anyone already given one are never affected. Rule in one place: `restaurantReadyRolesWanted()`.
+- **Gap, Cook:** the Cook role could not use the Cooking plan (it had only view on the restaurant). Now whoever works the kitchen screen may cook pots, close them and ask for stock (`rcpCanCook()`), still without editing the menu or prices, without stock moves and without money; Planned vs actual shows them plates only.
+- **Gap, Restaurant Manager:** could not buy food or give out the stock a cook asks for (only the admin could). The role now has the stock right (`pos_restock` view/create/edit), so it also receives the "stock request" alert. Existing companies get it through the migration (our role only, rights only added, a right the owner changed is left alone; idempotent).
+- **Swahili:** role names "Waiter" (Mhudumu wa meza) and "Restaurant Manager" (Meneja wa Mgahawa).
+- **Checked:** new scratch test 28/28 (restaurant: roles made by default, no duplicates, manager stock right, owner's change kept; Cook cooks/closes/asks, cannot change a price, plates-only report; Cashier no cooking form; Manager buys and gives out stock; retail: roles not made and not listed, own roles listed, a role in use stays listed; back to restaurant: made again). Migration run twice on a restaurant DB (adds the right, then nothing) and on a tenant DB with no restaurant shop (nothing). Phase suites p1–p7 all pass; restaurant CI suites pass; role/notification suites show only their known failures.
+
 
 **Changed:** `app/constant/settings/pos_config_settings.php`
 

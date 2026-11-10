@@ -7146,6 +7146,8 @@ return [
     'Planned' => 'Zilizopangwa',
     'Real sales' => 'Mauzo halisi',
     'Real gross profit' => 'Faida ghafi halisi',
+    'Waiter' => 'Mhudumu wa meza',
+    'Restaurant Manager' => 'Meneja wa Mgahawa',
     'Still open from earlier days' => 'Bado haujafungwa tangu siku zilizopita',
     'Close each one: count the plates left. Until you do, its plates not sold are not counted.' => 'Funga kila mmoja: hesabu sahani zilizobaki. Usipofunga, sahani zake zisizouzwa hazihesabiwi.',
     'Cooked on %s' => 'Ulipikwa %s',

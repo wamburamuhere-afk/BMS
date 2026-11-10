@@ -66,6 +66,17 @@ if (!function_exists('rcpCanMoveStock')) {
     }
 }
 
+if (!function_exists('rcpCanCook')) {
+    /**
+     * Who may use the Cooking plan (cook pots, close them, ask for stock): whoever may edit the restaurant,
+     * or whoever works the kitchen screen — the ready-made Cook role, which must NOT edit the menu or prices.
+     */
+    function rcpCanCook(): bool
+    {
+        return canEdit('restaurant_pos') || canEdit('kitchen_display');
+    }
+}
+
 if (!function_exists('rcpShopStock')) {
     function rcpShopStock(PDO $pdo, int $warehouseId, int $productId): float
     {
