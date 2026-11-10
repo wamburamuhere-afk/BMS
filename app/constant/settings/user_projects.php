@@ -189,11 +189,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── Load page data ─────────────────────────────────────────────────────────
+// Ready-made restaurant roles: there by default for a Smart POS restaurant, left out everywhere else.
+require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+restaurantReadyRolesSync($pdo);
+$__hideR = restaurantReadyRolesHideSql($pdo, 'r');
 $roles = $pdo->query("
     SELECT r.role_id, r.role_name, r.description,
            COUNT(u.user_id) AS user_count
     FROM roles r
     LEFT JOIN users u ON u.role_id = r.role_id AND u.is_active = 1
+    WHERE 1=1 $__hideR
     GROUP BY r.role_id
     ORDER BY r.role_name
 ")->fetchAll(PDO::FETCH_ASSOC);
@@ -233,7 +238,7 @@ $all_users = $pdo->query("
 // Stats
 $stats = $pdo->query("
     SELECT
-        (SELECT COUNT(*) FROM roles)        AS total_roles,
+        (SELECT COUNT(*) FROM roles r WHERE 1=1 $__hideR) AS total_roles,
         (SELECT COUNT(*) FROM users WHERE is_active=1) AS total_users,
         (SELECT COUNT(*) FROM projects)     AS total_projects,
         (SELECT COUNT(*) FROM user_projects) AS total_assignments,

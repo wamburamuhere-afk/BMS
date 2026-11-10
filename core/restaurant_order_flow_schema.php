@@ -235,8 +235,40 @@ if (!function_exists('rofsReadyRoles')) {
                 'restaurant_orders' => ['view', 'create', 'edit', 'delete', 'approve'], 'kitchen_display' => ['view', 'edit'],
                 'pos_config_settings' => ['view', 'edit'], 'pos_dashboard' => ['view'],
                 'restaurant_costing' => ['view'],   // skipped while the row does not exist yet (rofsGrant needs its id)
+                // buys food (Purchases) and gives out the stock a cook asks for on the Cooking plan
+                'pos_restock' => ['view', 'create', 'edit'],
             ]],
         ];
+    }
+}
+
+if (!function_exists('rofsUpgradeReadyRoles')) {
+    /**
+     * Rights added to the ready-made roles after they were first created (e.g. the manager's stock right).
+     * Only OUR roles are touched: same name AND the description we wrote — a company's own "Cashier" never.
+     * Rights are only ever added, never removed. Returns "role: page_key" for each grant made. Idempotent.
+     */
+    function rofsUpgradeReadyRoles(PDO $pdo, callable $log): array
+    {
+        if (!rofsHasTable($pdo, 'roles') || !rofsHasTable($pdo, 'role_permissions')) return [];
+        $done = [];
+        $find = $pdo->prepare("SELECT role_id FROM roles WHERE LOWER(TRIM(role_name)) = LOWER(?) AND description = ? LIMIT 1");
+        $has  = $pdo->prepare("SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_id = ? LIMIT 1");
+        foreach (rofsReadyRoles() as $name => [$desc, $grants]) {
+            $find->execute([$name, $desc]);
+            $rid = (int)$find->fetchColumn();
+            if (!$rid) continue;
+            foreach ($grants as $key => $verbs) {
+                $pid = rofsPermissionId($pdo, $key);
+                if (!$pid) continue;
+                $has->execute([$rid, $pid]);
+                if ($has->fetchColumn()) continue;   // a right the owner already set (or changed) is left alone
+                rofsGrant($pdo, $rid, $pid, $verbs);
+                $done[] = "$name: $key";
+                $log("  + role '$name' given $key (" . implode(', ', $verbs) . ').');
+            }
+        }
+        return $done;
     }
 }
 
@@ -354,6 +386,7 @@ if (!function_exists('restaurantOrderFlowEnsureSchema')) {
                 $made = rofsEnsureReadyRoles($pdo, $log);
                 if (!$made) $log('  ~ ready-made restaurant roles: nothing new.');
             }
+            rofsUpgradeReadyRoles($pdo, $log);   // roles made earlier get the rights added since
         }
     }
 }

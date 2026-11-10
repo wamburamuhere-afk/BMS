@@ -25,7 +25,10 @@ if (!isAdmin()) {
 
 
 // Fetch available roles from database
-$stmt = $pdo->query("SELECT * FROM roles ORDER BY role_name");
+// Ready-made restaurant roles: there by default for a Smart POS restaurant, left out everywhere else.
+require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+restaurantReadyRolesSync($pdo);
+$stmt = $pdo->query("SELECT * FROM roles WHERE 1=1" . restaurantReadyRolesHideSql($pdo, 'roles') . " ORDER BY role_name");
 $roles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Log activity for viewing user list

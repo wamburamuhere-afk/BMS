@@ -22,7 +22,7 @@ if (!canView('restaurant_pos')) {
     header('Location: ' . getUrl('unauthorized'));
     exit();
 }
-$can_edit   = canEdit('restaurant_pos');
+$can_edit   = rcpCanCook();   // the restaurant editor, or the kitchen (ready-made Cook role)
 $can_move   = rcpCanMoveStock();
 $can_cost   = restaurantCanSeeCost();
 $module_on  = restaurantModuleOn($pdo) && rcpReady($pdo);

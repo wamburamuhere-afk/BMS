@@ -141,6 +141,9 @@ try {
     $pdo->commit();
 
     logActivity($pdo, $user_id, "Mobile: created shop '$warehouse_name' ($warehouse_code)");
+    // A Smart POS shop in Restaurant/Hybrid mode: the ready-made restaurant roles are there by default.
+    require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+    restaurantReadyRolesSync($pdo, true);
 
     echo json_encode([
         'success'        => true,

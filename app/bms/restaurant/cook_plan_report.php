@@ -19,7 +19,7 @@ $page_title = 'Planned vs actual';
 require_once 'header.php';
 
 $can_cost = restaurantCanSeeCost();
-$allowed  = canView('restaurant_pos') && (canEdit('restaurant_pos') || $can_cost || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess()));
+$allowed  = canView('restaurant_pos') && (rcpCanCook() || $can_cost || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess()));
 if (!$allowed) {
     header('Location: ' . getUrl('unauthorized'));
     exit();
