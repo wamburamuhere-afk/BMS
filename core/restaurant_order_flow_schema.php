@@ -233,7 +233,7 @@ if (!function_exists('rofsReadyRoles')) {
             'Restaurant Manager' => ['Restaurant manager: everything in the restaurant flow, including voiding a paid sale.', [
                 'pos' => ['view', 'create', 'edit', 'delete'], 'restaurant_pos' => ['view', 'create', 'edit'],
                 'restaurant_orders' => ['view', 'create', 'edit', 'delete', 'approve'], 'kitchen_display' => ['view', 'edit'],
-                'pos_config_settings' => ['view', 'edit'], 'pos_dashboard' => ['view'],
+                'pos_config_settings' => ['view', 'edit'],
                 'restaurant_costing' => ['view'],   // skipped while the row does not exist yet (rofsGrant needs its id)
                 // buys food (Purchases) and gives out the stock a cook asks for on the Cooking plan
                 'pos_restock' => ['view', 'create', 'edit'],
