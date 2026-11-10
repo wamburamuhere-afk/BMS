@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-10 — fix(settings): Selling Settings showed the OLD values right after Save
+
+**Changed:** `app/constant/settings/pos_config_settings.php`
+
+- **Bug:** after Save, the page showed the settings as they were before (e.g. still "By mouth" after choosing Kitchen screen, and the "Cashier must confirm orders" switch greyed off). The save itself worked, but `get_setting()` is cached for the request before the save runs. An owner who believed it had failed and pressed Save again put the old values back. Found in the live restaurant test on the BJP demo.
+- **Fix:** after a successful save the page redirects to itself (`bmsFlashRedirect`), so it reloads with the saved values, and "Selling settings updated successfully" shows as a toast. Errors still show on the page as before.
+- **Checked:** new scratch test 4/4 (save Kitchen screen + confirm → redirect → reloaded page shows them; back to By mouth → shown, switch off). The 24 test files that touch this page give the same results with and without the change (14 already fail locally on develop for other reasons).
+
 ## 2026-11-10 — fix(restaurant): gaps found in a live test of a one-person restaurant (BJP demo)
 
 **Changed:** `api/restaurant/save_menu_item.php`, `app/bms/restaurant/menu.php`, `core/restaurant_cook_plan.php`, `api/restaurant/cook_plan.php`, `app/bms/restaurant/cook_plan.php`, `includes/restaurant/dash_panel.php`, `header.php`, `lang/sw.php`
