@@ -46,9 +46,16 @@ if (!function_exists('restaurantReadyRolesSync')) {
             }
             $quiet = function ($m) {};
             $made = rofsEnsureReadyRoles($pdo, $quiet);
-            rofsUpgradeReadyRoles($pdo, $quiet);
-            if ($made && function_exists('logActivity')) {
-                logActivity($pdo, (int)($_SESSION['user_id'] ?? 0), 'Restaurant: ready-made roles added — ' . implode(', ', $made));
+            $upgraded = rofsUpgradeReadyRoles($pdo, $quiet);
+            // Done by the system while this person had the page open — logged under them so "who" is never blank.
+            if (function_exists('logActivity')) {
+                $uid = (int)($_SESSION['user_id'] ?? 0);
+                if ($made) {
+                    logActivity($pdo, $uid, 'Restaurant: ready-made roles added', 'Created automatically for a restaurant shop: ' . implode(', ', $made));
+                }
+                if ($upgraded) {
+                    logActivity($pdo, $uid, 'Restaurant: ready-made role rights added', 'Added automatically: ' . implode('; ', $upgraded));
+                }
             }
             return $made;
         } catch (Throwable $e) {

@@ -22,18 +22,39 @@ unset($_SESSION['role_success_messages'], $_SESSION['role_error_messages']);
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
+
+    // Every form on this page carries the session's CSRF token: this page decides what every role may do,
+    // so a forged request (another site making the admin's browser post here) must never change a right.
+    if (!hash_equals((string)($_SESSION['csrf_token'] ?? ''), (string)($_POST['_csrf'] ?? ''))) {
+        $_SESSION['role_error_messages'] = [t('Your session expired. Please try again.')];
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+    $__actor = (int)($_SESSION['user_id'] ?? 0);
+
     // Add/Edit Role
     if (isset($_POST['save_role'])) {
         try {
-            $role_id = (isset($_POST['role_id']) && $_POST['role_id'] !== '') ? $_POST['role_id'] : null;
-            $role_name = trim($_POST['role_name']);
-            $role_description = trim($_POST['role_description']);
+            $role_id = (isset($_POST['role_id']) && $_POST['role_id'] !== '') ? (int)$_POST['role_id'] : null;
+            $is_new = $role_id === null;
+            $role_name = trim((string)($_POST['role_name'] ?? ''));
+            $role_description = trim((string)($_POST['role_description'] ?? ''));
             $submitted_permissions = $_POST['perms'] ?? []; // perms[id][action]
-            
+
             // Validate role name
             if (empty($role_name)) {
                 throw new Exception("Role name is required");
+            }
+
+            // Editing: the role must exist (a stale or crafted id must not write rights for a role that is gone).
+            $old_role = null;
+            if (!$is_new) {
+                $st = $pdo->prepare("SELECT role_id, role_name, description FROM roles WHERE role_id = ?");
+                $st->execute([$role_id]);
+                $old_role = $st->fetch(PDO::FETCH_ASSOC);
+                if (!$old_role) {
+                    throw new Exception("Role not found (ID $role_id).");
+                }
             }
 
             // Check if role name already exists (excluding current role if editing)
@@ -51,7 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $pdo->beginTransaction();
 
-            if ($role_id) {
+            $rights_before = $is_new ? [] : rolePermissionSnapshot($pdo, (int)$role_id);
+
+            if (!$is_new) {
                 // Update existing role
                 $stmt = $pdo->prepare("UPDATE roles SET role_name = ?, description = ?, updated_at = NOW() WHERE role_id = ?");
                 $stmt->execute([$role_name, $role_description, $role_id]);
@@ -70,26 +93,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // switching the module back on restores them.
             saveRolePermissionGrants($pdo, (int)$role_id, is_array($submitted_permissions) ? $submitted_permissions : [], loadRolePermissionMatrix($pdo));
 
+            // Exactly what changed, so the logs answer "who did what": the rights added and removed, row by row.
+            $rights_after = rolePermissionSnapshot($pdo, (int)$role_id);
+            $changes = rolePermissionChanges($rights_before, $rights_after, rolePermissionNamesById($pdo));
+            $what = [];
+            if (!$is_new && $old_role['role_name'] !== $role_name) $what[] = "renamed \"{$old_role['role_name']}\" → \"$role_name\"";
+            if (!$is_new && (string)$old_role['description'] !== $role_description) $what[] = 'description changed';
+            $what[] = 'rights: ' . rolePermissionChangesText($changes);
+            $log_detail = ($is_new ? "Created role \"$role_name\" (ID $role_id)" : "Edited role \"$role_name\" (ID $role_id)")
+                        . ' — ' . implode('; ', $what);
+
+            // Both logs inside the transaction: a role change is never saved without its record.
+            logAudit($pdo, $__actor, $is_new ? 'create_role' : 'update_role', [
+                'entity_type' => 'role',
+                'entity_id'   => $role_id,
+                'description' => $log_detail,
+                'old_values'  => $is_new ? null : [
+                    'role_name'   => $old_role['role_name'],
+                    'description' => $old_role['description'],
+                ],
+                'new_values'  => [
+                    'role_name'   => $role_name,
+                    'description' => $role_description,
+                    'changes'     => $changes,
+                    'rights_held' => count($rights_after),
+                ],
+            ]);
+            logActivity($pdo, $__actor, $is_new ? 'Create role' : 'Edit role', $log_detail);
+
             $pdo->commit();
             $success_messages[] = $message;
-
-            // Log action — to both audit_logs (rich detail) AND activity_logs
-            // (so the change shows up on app/activity_log.php where security
-            // staff watch for permission grants/revokes).
-            logAudit($pdo, $_SESSION['user_id'], $role_id ? 'update_role' : 'create_role', [
-                'entity_type' => 'role',
-                'entity_id' => $role_id,
-                'description' => "$message: $role_name",
-                'new_values' => [
-                    'role_name' => $role_name,
-                    'permissions_count' => count($submitted_permissions)
-                ]
-            ]);
-            if ($role_id) {
-                logActivity($pdo, $_SESSION['user_id'], 'Edit role', "User edited role permissions: $role_name (ID $role_id)");
-            } else {
-                logActivity($pdo, $_SESSION['user_id'], 'Create role', "User created a new role: $role_name");
-            }
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $error_messages[] = t('Error saving role:') . ' ' . $e->getMessage();
@@ -103,18 +136,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Capture the role's details BEFORE deleting, so the activity log can
             // state clearly WHAT was removed (name + id), not just an opaque id.
-            $roleStmt = $pdo->prepare("SELECT role_name, description FROM roles WHERE role_id = ?");
+            $roleStmt = $pdo->prepare("SELECT role_id, role_name, description, is_admin FROM roles WHERE role_id = ?");
             $roleStmt->execute([$role_id]);
             $role_row  = $roleStmt->fetch(PDO::FETCH_ASSOC);
             if (!$role_row) {
                 throw new Exception("Role not found (ID $role_id).");
             }
             $role_name = $role_row['role_name'];
+            if (rolePermissionIsProtectedRole($role_row)) {
+                throw new Exception("The \"$role_name\" role cannot be deleted.");
+            }
 
-            // Count how many permission rows belonged to it (for a clear log).
-            $permStmt = $pdo->prepare("SELECT COUNT(*) FROM role_permissions WHERE role_id = ?");
-            $permStmt->execute([$role_id]);
-            $perm_count = (int) $permStmt->fetchColumn();
+            // The rights it held, by name (for a clear log).
+            $held = rolePermissionChanges(rolePermissionSnapshot($pdo, $role_id), [], rolePermissionNamesById($pdo));
+            $perm_count = count($held);
 
             // Check if role is in use
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE role_id = ?");
@@ -125,23 +160,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Cannot delete role. There are $user_count users assigned to this role.");
             }
 
-            // Delete role permissions
-            $stmt = $pdo->prepare("DELETE FROM role_permissions WHERE role_id = ?");
-            $stmt->execute([$role_id]);
-
-            // Delete role
-            $stmt = $pdo->prepare("DELETE FROM roles WHERE role_id = ?");
-            $stmt->execute([$role_id]);
-
-            $success_messages[] = sprintf(t('Role "%s" deleted successfully'), htmlspecialchars($role_name));
-
             // Clear, human-readable record of WHAT was deleted. WHO + WHEN are
             // captured automatically by logActivity/logAudit (user id + timestamp).
             $log_detail = "Deleted role \"$role_name\" (ID $role_id)"
-                        . ($perm_count > 0 ? " and its $perm_count permission setting(s)" : "");
+                        . ($perm_count > 0 ? " and its $perm_count right(s): " . implode('; ', array_map(
+                              fn($c) => $c['page'] . ': ' . implode(', ', $c['removed']), array_slice($held, 0, 25)))
+                              . ($perm_count > 25 ? '; … and ' . ($perm_count - 25) . ' more' : '') : " (it held no rights)");
 
-            // Log action — to both audit_logs (rich) AND activity_logs (security feed).
-            logAudit($pdo, $_SESSION['user_id'], 'delete_role', [
+            // Rights, role and its record together — never half done.
+            $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM role_permissions WHERE role_id = ?")->execute([$role_id]);
+            $pdo->prepare("DELETE FROM roles WHERE role_id = ?")->execute([$role_id]);
+            logAudit($pdo, $__actor, 'delete_role', [
                 'entity_type' => 'role',
                 'entity_id'   => $role_id,
                 'description' => $log_detail,
@@ -150,39 +180,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'role_name'        => $role_name,
                     'description'      => $role_row['description'],
                     'permission_count' => $perm_count,
+                    'rights'           => array_map(fn($c) => ['page' => $c['page'], 'verbs' => $c['removed']], $held),
                 ],
             ]);
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'],
-                'Deleted role',
-                $log_detail
-            );
+            logActivity($pdo, $__actor, 'Deleted role', $log_detail);
+            $pdo->commit();
+
+            $success_messages[] = sprintf(t('Role "%s" deleted successfully'), htmlspecialchars($role_name));
         } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             $error_messages[] = t('Error deleting role:') . ' ' . $e->getMessage();
         }
     }
-    
+
     // Update User Role
     if (isset($_POST['update_user_role'])) {
         try {
-            $user_id = $_POST['user_id'];
-            $role_id = $_POST['role_id'];
-            
-            $stmt = $pdo->prepare("UPDATE users SET role_id = ? WHERE user_id = ?");
-            $stmt->execute([$role_id, $user_id]);
-            
-            $success_messages[] = t('User role updated successfully');
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $role_id = (int)($_POST['role_id'] ?? 0);
 
-            // Log action — to both audit_logs AND activity_logs.
-            logAudit($pdo, $_SESSION['user_id'], 'update_user_role', [
-                'entity_type' => 'user',
-                'entity_id' => $user_id,
-                'description' => "Updated role for user ID: $user_id to role ID: $role_id",
-                'new_values' => ['role_id' => $role_id]
-            ]);
-            logActivity($pdo, $_SESSION['user_id'], 'Edit user role', "User changed role assignment for user ID $user_id to role ID $role_id");
+            // Both must exist: a crafted id must never leave a user on a role that is not there.
+            $st = $pdo->prepare("SELECT u.user_id, u.username, TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS full_name,
+                                        u.role_id AS old_role_id, r.role_name AS old_role_name
+                                   FROM users u LEFT JOIN roles r ON r.role_id = u.role_id
+                                  WHERE u.user_id = ?");
+            $st->execute([$user_id]);
+            $target = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$target) {
+                throw new Exception("User not found (ID $user_id).");
+            }
+            $st = $pdo->prepare("SELECT role_name FROM roles WHERE role_id = ?");
+            $st->execute([$role_id]);
+            $new_role_name = $st->fetchColumn();
+            if ($new_role_name === false) {
+                throw new Exception("Role not found (ID $role_id).");
+            }
+
+            $who = ($target['full_name'] !== '' ? $target['full_name'] : $target['username']) . " ({$target['username']}, ID $user_id)";
+            $from = $target['old_role_name'] ?? 'no role';
+
+            if ((int)$target['old_role_id'] === $role_id) {
+                $success_messages[] = t('User role updated successfully');
+            } else {
+                $log_detail = "Changed the role of $who from \"$from\" to \"$new_role_name\"";
+                $pdo->beginTransaction();
+                $pdo->prepare("UPDATE users SET role_id = ? WHERE user_id = ?")->execute([$role_id, $user_id]);
+                logAudit($pdo, $__actor, 'update_user_role', [
+                    'entity_type' => 'user',
+                    'entity_id'   => $user_id,
+                    'description' => $log_detail,
+                    'old_values'  => ['role_id' => $target['old_role_id'] !== null ? (int)$target['old_role_id'] : null, 'role_name' => $target['old_role_name']],
+                    'new_values'  => ['role_id' => $role_id, 'role_name' => $new_role_name],
+                ]);
+                logActivity($pdo, $__actor, 'Edit user role', $log_detail);
+                $pdo->commit();
+                $success_messages[] = t('User role updated successfully');
+            }
         } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             $error_messages[] = t('Error updating user role:') . ' ' . $e->getMessage();
         }
     }
@@ -215,6 +270,8 @@ $roles_stmt = $pdo->query("
 $roles = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Only rows for modules this company has active (core/role_permission_ui.php).
+// Shop mode (retail / mixed / restaurant) decides whether restaurant rows show and how shared rows are worded.
+$shop_mode = rolePermissionShopMode($pdo);
 $permissions = loadRolePermissionMatrix($pdo)['visible'];
 
 $permissions_by_module = [];
@@ -230,10 +287,11 @@ unset($_tab_rows);
 
 // Load all users with their roles
 $users_stmt = $pdo->query("
-    SELECT u.user_id, u.username, u.first_name, u.last_name, u.email, u.is_active AS status, 
-           r.role_name, r.role_id
-    FROM users u 
-    LEFT JOIN roles r ON u.role_id = r.role_id 
+    SELECT u.user_id, u.username, u.first_name, u.last_name, u.email, u.is_active AS status,
+           r.role_name, r.role_id, d.department_name
+    FROM users u
+    LEFT JOIN roles r ON u.role_id = r.role_id
+    LEFT JOIN departments d ON d.department_id = u.department_id
     ORDER BY u.first_name, u.last_name
 ");
 $users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -436,7 +494,7 @@ function getRoleBadgeColor($role_name) {
                                                             data-role-id="<?= $role['role_id'] ?>">
                                                         <i class="bi bi-pencil"></i>
                                                     </button>
-                                                    <?php if ($role['user_count'] == 0 && $role['role_name'] != 'Administrator'): ?>
+                                                    <?php if ($role['user_count'] == 0 && !rolePermissionIsProtectedRole($role)): ?>
                                                         <button class="btn btn-sm btn-outline-danger delete-role" 
                                                                 data-role-id="<?= $role['role_id'] ?>" 
                                                                 data-role-name="<?= htmlspecialchars($role['role_name']) ?>">
@@ -458,6 +516,7 @@ function getRoleBadgeColor($role_name) {
                                 </div>
                                 <div class="card-body">
                                     <form method="POST" id="roleForm">
+                                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                                         <input type="hidden" id="role_id" name="role_id">
                                         
                                         <div class="row">
@@ -505,7 +564,7 @@ function getRoleBadgeColor($role_name) {
                                                                 data-bs-toggle="tab" 
                                                                 data-bs-target="#<?= $tabId ?>" 
                                                                 type="button" role="tab">
-                                                            <?= htmlspecialchars($module_name === 'Point of Sale' ? wLabel('Point of Sale', 'Selling') : $module_name) ?>
+                                                            <?= htmlspecialchars($module_name === 'Point of Sale' ? wLabel('Point of Sale', 'Selling') : ($module_name === 'Restaurant' ? t('Restaurant') : $module_name)) ?>
                                                             <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1"><?= count($module_permissions) ?></span>
                                                         </button>
                                                     </li>
@@ -573,8 +632,12 @@ function getRoleBadgeColor($role_name) {
                                                                     <?php foreach ($module_permissions as $permission): ?>
                                                                         <tr class="perm-row">
                                                                             <td class="ps-3">
-                                                                                <div class="fw-bold small perm-name"><?= htmlspecialchars($permission['page_name'] ?? '') ?></div>
-                                                                                <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars($permission['description'] ?? '') ?></div>
+                                                                                <?php $_shop = rolePermissionShopText((string)$permission['page_key'], $shop_mode); ?>
+                                                                                <div class="fw-bold small perm-name"><?= htmlspecialchars(!empty($_shop['name']) ? t($_shop['name']) : ($permission['page_name'] ?? '')) ?></div>
+                                                                                <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars(($_shop && $_shop['replace']) ? t($_shop['text']) : ($permission['description'] ?? '')) ?></div>
+                                                                                <?php if ($_shop && !$_shop['replace']): ?>
+                                                                                <div class="text-success" style="font-size: 0.7rem;"><i class="bi bi-cup-hot me-1"></i><?= htmlspecialchars(t('In a restaurant shop:') . ' ' . t($_shop['text'])) ?></div>
+                                                                                <?php endif; ?>
                                                                                 <?php if ($_note = rolePermissionNote((string)$permission['page_key'])): ?>
                                                                                 <div class="text-primary" style="font-size: 0.7rem;"><i class="bi bi-info-circle me-1"></i><?= htmlspecialchars(t($_note)) ?></div>
                                                                                 <?php endif; ?>
@@ -762,12 +825,10 @@ function getRoleBadgeColor($role_name) {
                                     <h5 class="mb-0"><?= t('Quick Actions') ?></h5>
                                 </div>
                                 <div class="card-body">
-                                    <button class="btn btn-outline-primary btn-sm w-100 mb-2" id="generateAccessReport">
-                                        <i class="bi bi-file-earmark-text"></i> <?= t('Generate Access Report') ?>
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm w-100 mb-2" id="clearOldLogs">
-                                        <i class="bi bi-trash"></i> <?= t('Clear Old Logs') ?>
-                                    </button>
+                                    <?php // Full history (every module, date filter, export) lives on Audit Logs. History is never cleared from here. ?>
+                                    <a class="btn btn-outline-primary btn-sm w-100 mb-2" href="<?= getUrl('audit_logs') ?>" target="_blank" rel="noopener">
+                                        <i class="bi bi-file-earmark-text"></i> <?= t('Open full Audit Logs') ?>
+                                    </a>
                                     <button class="btn btn-outline-info btn-sm w-100" id="refreshAudit">
                                         <i class="bi bi-arrow-clockwise"></i> <?= t('Refresh Data') ?>
                                     </button>
@@ -790,6 +851,7 @@ function getRoleBadgeColor($role_name) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                 <input type="hidden" id="assign_user_id" name="user_id">
                 <div class="modal-body">
                     <div class="mb-3">
@@ -829,6 +891,7 @@ function getRoleBadgeColor($role_name) {
             </div>
             <div class="modal-footer">
                 <form method="POST">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <input type="hidden" id="delete_role_id" name="role_id">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= t('Cancel') ?></button>
                     <button type="submit" name="delete_role" class="btn btn-danger"><?= t('Delete Role') ?></button>
@@ -914,21 +977,18 @@ const UR_STRINGS = {
     mostActiveUser: <?= json_encode(t('Most Active User:')) ?>,
     lastUpdated: <?= json_encode(t('Last Updated:')) ?>,
     errorLoadingAccessLog: <?= json_encode(t('Error loading access log')) ?>,
-    generating: <?= json_encode(t('Generating...')) ?>,
-    accessReportGenerated: <?= json_encode(t('Access report generated successfully!')) ?>,
-    areYouSure: <?= json_encode(t('Are you sure?')) ?>,
-    confirmClearLogs: <?= json_encode(t('Are you sure you want to clear logs older than 90 days? This action cannot be undone.')) ?>,
-    yesClearThem: <?= json_encode(t('Yes, clear them!')) ?>,
-    clearing: <?= json_encode(t('Clearing...')) ?>,
-    oldLogsCleared: <?= json_encode(t('Old logs cleared successfully!')) ?>,
-    errorClearingLogs: <?= json_encode(t('Error clearing logs:')) ?>,
-    unknownError: <?= json_encode(t('Unknown error')) ?>,
-    errorClearingLogsPlain: <?= json_encode(t('Error clearing logs')) ?>,
     auditDataRefreshed: <?= json_encode(t('Audit data refreshed')) ?>,
     success: <?= json_encode(t('Success!')) ?>,
     error: <?= json_encode(t('Error!')) ?>,
     information: <?= json_encode(t('Information')) ?>,
 };
+
+// Escape anything typed by people (role names, descriptions) before it goes into HTML.
+function urEsc(v) {
+    return String(v === null || v === undefined ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 $(document).ready(function() {
     // Initialize DataTables
@@ -1005,7 +1065,7 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    $('#roleFormTitle').html('<i class="bi bi-pencil-square me-2"></i>' + UR_STRINGS.modifyingRole + ' <span class="text-primary">' + response.role.role_name + '</span>');
+                    $('#roleFormTitle').html('<i class="bi bi-pencil-square me-2"></i>' + UR_STRINGS.modifyingRole + ' <span class="text-primary">' + urEsc(response.role.role_name) + '</span>');
                     $('#role_id').val(response.role.role_id);
                     $('#role_name').val(response.role.role_name);
                     $('#role_description').val(response.role.description);
@@ -1088,14 +1148,15 @@ $(document).ready(function() {
                 if (response.success) {
                     let html = '';
                     if (response.logs.length > 0) {
+                        // Role names and descriptions are typed by people: always escaped.
                         response.logs.forEach(log => {
                             html += `
                                 <tr>
-                                    <td>${log.user_name}</td>
-                                    <td>${log.action}</td>
-                                    <td>${log.resource}</td>
-                                    <td>${log.timestamp}</td>
-                                    <td>${log.ip_address}</td>
+                                    <td>${urEsc(log.user_name)}</td>
+                                    <td>${urEsc(log.action)}</td>
+                                    <td style="white-space:normal;">${urEsc(log.resource)}</td>
+                                    <td class="text-nowrap">${urEsc(log.timestamp)}</td>
+                                    <td>${urEsc(log.ip_address)}</td>
                                 </tr>
                             `;
                         });
@@ -1109,25 +1170,25 @@ $(document).ready(function() {
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
                                 <span>${UR_STRINGS.totalLogs}</span>
-                                <strong>${response.stats.total_logs}</strong>
+                                <strong>${urEsc(response.stats.total_logs)}</strong>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
                                 <span>${UR_STRINGS.todaysActivities}</span>
-                                <strong>${response.stats.today_activities}</strong>
+                                <strong>${urEsc(response.stats.today_activities)}</strong>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
                                 <span>${UR_STRINGS.mostActiveUser}</span>
-                                <strong>${response.stats.most_active_user}</strong>
+                                <strong>${urEsc(response.stats.most_active_user)}</strong>
                             </div>
                         </div>
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
                                 <span>${UR_STRINGS.lastUpdated}</span>
-                                <strong>${response.stats.last_updated}</strong>
+                                <strong>${urEsc(response.stats.last_updated)}</strong>
                             </div>
                         </div>
                     `);
@@ -1138,61 +1199,6 @@ $(document).ready(function() {
             }
         });
     }
-
-    // Generate Access Report
-    $('#generateAccessReport').click(function() {
-        const btn = $(this);
-        const originalText = btn.html();
-        
-        btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + UR_STRINGS.generating);
-
-        setTimeout(() => {
-            showToast('success', UR_STRINGS.accessReportGenerated);
-            btn.prop('disabled', false).html(originalText);
-            window.open('ajax/generate_access_report.php', '_blank');
-        }, 2000);
-    });
-
-    // Clear Old Logs
-    $('#clearOldLogs').click(function() {
-        Swal.fire({
-            title: UR_STRINGS.areYouSure,
-            text: UR_STRINGS.confirmClearLogs,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: UR_STRINGS.yesClearThem
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const btn = $(this);
-                const originalText = btn.html();
-
-                btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> ' + UR_STRINGS.clearing);
-
-                $.ajax({
-                    url: 'ajax/clear_old_logs.php',
-                    type: 'POST',
-                    data: { days: 90 },
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.success) {
-                            showToast('success', UR_STRINGS.oldLogsCleared);
-                            loadAccessLog();
-                        } else {
-                            showToast('error', UR_STRINGS.errorClearingLogs + ' ' + (response.message || UR_STRINGS.unknownError));
-                        }
-                    },
-                    error: function() {
-                        showToast('error', UR_STRINGS.errorClearingLogsPlain);
-                    },
-                    complete: function() {
-                        btn.prop('disabled', false).html(originalText);
-                    }
-                });
-            }
-        });
-    });
 
     // Refresh Audit Data
     $('#refreshAudit').click(function() {
