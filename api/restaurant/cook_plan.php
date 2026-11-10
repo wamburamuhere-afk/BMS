@@ -54,8 +54,8 @@ $strip = function (array $rows, array $keys) use ($seeCost): array {
     unset($r);
     return $rows;
 };
-$dayOut = function (int $wh, string $date) use ($pdo, $seeCost, $strip): array {
-    $rows = rcpDay($pdo, $wh, $date);
+$dayOut = function (int $wh, string $date, bool $earlier = false) use ($pdo, $seeCost, $strip): array {
+    $rows = $earlier ? rcpOpenEarlier($pdo, $wh, $date) : rcpDay($pdo, $wh, $date);
     if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost']); $r['items'] = $strip($r['items'], ['amount']); if ($r['unsold']) unset($r['unsold']['amount']); }
     unset($r);
     return $rows;
@@ -80,7 +80,9 @@ try {
             echo json_encode(['success' => true, 'today' => date('Y-m-d'),
                 'dishes' => $strip(rcpDishes($pdo, $wh), ['plate_cost']),
                 'stock'  => $strip(rcpStockItems($pdo, $wh), ['cost_price']),
-                'plans'  => $dayOut($wh, date('Y-m-d')), 'requests' => $requests($wh)] + $rights());
+                'plans'  => $dayOut($wh, date('Y-m-d')), 'requests' => $requests($wh),
+                // cooks of earlier days never closed — closed from today's page so their plates not sold are counted
+                'earlier' => canEdit('restaurant_pos') ? $dayOut($wh, date('Y-m-d'), true) : []] + $rights());
             return;
         }
         if ($action === 'dish') {

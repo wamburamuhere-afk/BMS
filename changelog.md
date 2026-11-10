@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-10 — fix(restaurant): gaps found in a live test of a one-person restaurant (BJP demo)
+
+**Changed:** `api/restaurant/save_menu_item.php`, `app/bms/restaurant/menu.php`, `core/restaurant_cook_plan.php`, `api/restaurant/cook_plan.php`, `app/bms/restaurant/cook_plan.php`, `includes/restaurant/dash_panel.php`, `header.php`, `lang/sw.php`
+
+- **Bug, Menu group:** clicking a starter chip ("Snacks") and then picking an existing group still saved the dish in a NEW "Snacks" group — the hidden new-group name was sent and the server preferred it. Now a picked group always wins (server: the typed name is used only for "+ New group" / no id; page: picking another group clears the hidden name). Also: editing a dish whose group was made earlier on the same page (no reload) showed "No group" and would have wiped it — the missing group is now added to the list first.
+- **Gap, Cooking plan:** a cook left open on an earlier day never showed again (the page shows today only), so it was never closed — its plates not sold never reached waste and Planned vs actual counted them as sales lost. Today's page now shows "Still open from earlier days" with a "Plates left" button for each (new `rcpOpenEarlier()`, `earlier` in the `init` response, for people who may cook; no money for those without the costing right). The waste is booked on the day it was cooked.
+- **Cooking plan:** once every cook of a dish is closed its card shows the **real gross profit** (sold × price − cost, the same as Planned vs actual); the plates-left and spoiled pop-ups say "Cancel" instead of "No".
+- **Wording:** "gas or charcoal … not included" now says it counts when put in Other costs (Menu recipe + Cooking plan); the dashboard's "6 item(s) sold have no cost" now says "this month" (it counts the month while the panel shows Today).
+- **Reports menu:** "Planned vs actual" added (desktop + phone sheet), with the same gate as the page.
+- **Checked:** new test 23/23 (group rules over the real API, an earlier-day cook: listed, closed from today with yesterday's sales, 14 plates' rice out of stock, waste booked on the cooking day, roles/money stripping; pages render); earlier phase suites pass in order (p1 34, p3 43, p4 30, p5 25); CI restaurant suites pass (online menu 117, form layout 85, notifications 64, profit chart 21, phase 1, menu photos); browser at desktop and 390 px.
+
 ## 2026-11-08 — fix(deploy): reload PHP-FPM after Apache so BMS never serves old code after a deploy
 
 **Changed:** `.github/workflows/deploy.yml`, `tests/test_deploy_fpm_reload_cli.php` (new)

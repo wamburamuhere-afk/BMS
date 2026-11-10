@@ -1420,7 +1420,9 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <?php // Restaurant — only when superadmin enabled Restaurant POS for this tenant (canView checks the entitlement first, even for admins). ?>
                         <?php if(canView('restaurant_pos')):
                             require_once __DIR__ . '/core/restaurant_scope.php';
-                            $__rest_on = restaurantModuleOn($pdo); // Smart POS restaurant: show its daily pages directly ?>
+                            $__rest_on = restaurantModuleOn($pdo); // Smart POS restaurant: show its daily pages directly
+                            // "Planned vs actual" in Reports — the same gate as app/bms/restaurant/cook_plan_report.php
+                            $__cookRep = $__rest_on && (canEdit('restaurant_pos') || restaurantCanSeeCost() || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess())); ?>
                         <?php if ($__rf): // restaurant focus: Orders / Menu / Purchases above replace this dropdown ?>
                         <?php elseif ($__rest_on): ?>
                         <li class="nav-item dropdown">
@@ -1726,6 +1728,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <li><h6 class="dropdown-header"><?= t('Business Reports') ?></h6></li>
                                 <?php if ($__rf && !empty($__rest_on)): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
                                 <?php if ($__rf && !empty($__rest_on) && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__rest_on) && !empty($__cookRep)): // restaurant costing plan — same gate as the page ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/cooking-report') ?>"><i class="bi bi-clipboard-data"></i> <?= t('Planned vs actual') ?></a></li><?php endif; ?>
                                 <?php if(canView('sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> <?= t('Sales Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('purchase_report')): ?><li><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> <?= t('Purchase Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('inventory_report')): ?><li><a class="dropdown-item" href="<?= getUrl('inventory_report') ?>"><i class="bi bi-boxes"></i> <?= t('Inventory Report') ?></a></li><?php endif; ?>
@@ -2068,6 +2071,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('pos') && canView('pos_profit_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i><?= t('Profit Report') ?></a><?php endif; ?>
                 <?php if (!empty($__rest_on)): // restaurant_plan.md Phase 6 ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant Sales') ?></a><?php endif; ?>
                 <?php if (!empty($__rest_on) && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i><?= t('Waste & cancellations') ?></a><?php endif; ?>
+                <?php if (!empty($__rest_on) && !empty($__cookRep)): // restaurant costing plan — same gate as the page ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/cooking-report') ?>"><i class="bi bi-clipboard-data"></i><?= t('Planned vs actual') ?></a><?php endif; ?>
             </div>
         </div>
     </div>
