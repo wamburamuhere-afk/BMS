@@ -325,7 +325,7 @@ $starterGroups = [t('Breakfast'), t('Main meals'), t('Soups'), t('Snacks'), t('D
                         <div class="d-flex justify-content-between py-1"><span id="rcpPotCostLbl"></span><strong id="rcpPotCost2">0</strong></div>
                         <div class="d-flex justify-content-between border-top mt-1 pt-2"><span><?= t('Expected gross profit') ?></span><strong id="rcpPotProfit">0</strong></div>
                     </div>
-                    <div class="rf-help mt-2"><i class="bi bi-info-circle me-1"></i><?= t('Expected only, before you sell: gas or charcoal, staff, rent and plates that do not sell are not included. Your real profit is in the Profit Report.') ?></div>
+                    <div class="rf-help mt-2"><i class="bi bi-info-circle me-1"></i><?= t('Expected only, before you sell: staff, rent and plates that do not sell are not included — gas or charcoal only if you put it in Other costs. Your real profit is in the Profit Report.') ?></div>
                     <div class="rf-help mt-1"><i class="bi bi-info-circle me-1"></i><?= t('With a recipe, buy its ingredients as counted items in Purchases (not "Something else"), so they are not counted twice.') ?></div>
                 </div>
                 <?php endif; ?>
@@ -468,7 +468,11 @@ $(function () {
     loadMenu();
 
     $('.rm-type').on('click', function () { setType($(this).data('type')); });
-    $('#f-cat').on('change', function () { $('#f-newcat').toggleClass('d-none', $(this).val() !== '__new'); });
+    $('#f-cat').on('change', function () {
+        const isNew = $(this).val() === '__new';
+        $('#f-newcat').toggleClass('d-none', !isNew);
+        if (!isNew) $('#f-newcat').val('');   // a picked group wins — no stale "new group" name is sent
+    });
     $('.rm-starter').on('click', function () {
         const name = $(this).text().trim();
         const opt = $('#f-cat option').filter(function () { return $(this).text().trim().toLowerCase() === name.toLowerCase(); });
@@ -885,6 +889,10 @@ function editItem(id) {
     $('#f-cost').val(it.cost_price);
     $('.dish-only').toggleClass('d-none', !it.is_service || !!it.has_recipe);   // the recipe hint, until it has one
     showPhoto(it.image || '');
+    // A group made earlier on this page (no reload since) is not in the list yet: add it, so saving keeps it.
+    if (it.category_id && !$('#f-cat option[value="' + String(it.category_id) + '"]').length) {
+        $('#f-cat option[value="__new"]').before(new Option(it.category_name || ('#' + it.category_id), String(it.category_id)));
+    }
     $('#f-cat').val(it.category_id ? String(it.category_id) : '').trigger('change');
     $('#prepGroup .rm-extra').remove();
     $('input[name="prep_area"]').prop('checked', false);

@@ -621,6 +621,27 @@ if (!function_exists('rcpDay')) {
     }
 }
 
+if (!function_exists('rcpOpenEarlier')) {
+    /**
+     * Cooks of earlier days that were never closed (newest day first, at most 10 days). Shown on today's
+     * Cooking plan so they get closed: until then their plates not sold never reach waste, and the
+     * Planned vs actual report counts them as sales lost. Same row shape as rcpDay(), plus plan_date.
+     */
+    function rcpOpenEarlier(PDO $pdo, int $warehouseId, string $before): array
+    {
+        $st = $pdo->prepare("SELECT DISTINCT plan_date FROM restaurant_cook_plans
+                              WHERE warehouse_id = ? AND plan_date < ? AND status = 'open' ORDER BY plan_date DESC LIMIT 10");
+        $st->execute([$warehouseId, $before]);
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $d) {
+            foreach (rcpDay($pdo, $warehouseId, (string)$d) as $r) {
+                if ($r['status'] === 'open') $out[] = $r + ['plan_date' => (string)$d];
+            }
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('rcpRequests')) {
     /** Phase 4 — stock the cooks asked for in this shop, still waiting (open cooks), oldest first. */
     function rcpRequests(PDO $pdo, int $warehouseId): array

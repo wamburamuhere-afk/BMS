@@ -120,8 +120,9 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
         <div class="<?= $can_edit ? 'col-lg-7' : 'col-12' ?>">
             <div class="cp-card mb-3">
                 <div class="cp-card-h d-flex justify-content-between align-items-center"><h6><i class="bi bi-list-check me-1"></i><span id="cpDayTitle"><?= t('Today\'s cooking') ?></span></h6></div>
+                <div id="cpEarlier" class="cp-earlier m-2 d-none"></div>
                 <div id="cpPlans" class="p-2"></div>
-                <?php if ($can_cost): ?><div class="small text-muted px-3 pb-3"><i class="bi bi-info-circle me-1"></i><?= t('Expected only, before you sell: gas or charcoal, staff, rent and plates that do not sell are not included. Your real profit is in the Profit Report.') ?></div><?php endif; ?>
+                <?php if ($can_cost): ?><div class="small text-muted px-3 pb-3"><i class="bi bi-info-circle me-1"></i><?= t('Expected only, before you sell: staff, rent and plates that do not sell are not included — gas or charcoal only if you put it in Other costs. Your real profit is in the Profit Report.') ?></div><?php endif; ?>
             </div>
             <?php if ($can_move && rcpRequestsReady($pdo)): ?>
             <div class="cp-card mb-3 d-none" id="cpReqCard">
@@ -154,6 +155,8 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
 .cp-page .cp-line { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #eef3fd; }
 .cp-page .cp-line .cp-qty { width:150px; flex:0 0 150px; }
 .cp-page .cp-plan { border:1px solid #e3ecfb; border-radius:12px; padding:10px 12px; margin:6px; }
+.cp-page .cp-earlier { border:1px solid #f5d18b; background:#fff8e6; border-radius:12px; padding:10px 12px; }
+.cp-page .cp-earlier .cp-plan { background:#fff; margin:8px 0 0; }
 .cp-page .cp-plan.cp-closed { background:#fafcff; }
 .cp-page .cp-badge { font-size:.75rem; border-radius:999px; padding:2px 8px; background:#cfe2ff; color:#084298; }
 .cp-page .cp-badge.cp-done { background:#e9ecef; color:#495057; }
@@ -218,6 +221,10 @@ const CP = {
         reqBy: <?= json_encode(t('Asked by %s')) ?>, give: <?= json_encode(t('Give out')) ?>, reject: <?= json_encode(t('Reject')) ?>,
         giveQ: <?= json_encode(t('Give out this stock?')) ?>, giveTxt: <?= json_encode(t('It leaves stock now and its cost counts today.')) ?>,
         rejectQ: <?= json_encode(t('Reject this request?')) ?>, yes: <?= json_encode(t('Yes')) ?>,
+        earlierT: <?= json_encode(t('Still open from earlier days')) ?>,
+        earlierH: <?= json_encode(t('Close each one: count the plates left. Until you do, its plates not sold are not counted.')) ?>,
+        cookedOn: <?= json_encode(t('Cooked on %s')) ?>, realGp: <?= json_encode(t('Real gross profit')) ?>,
+        realGpH: <?= json_encode(t('sold × price − cost')) ?>,
     }
 };
 CP.canTake = CP.canMove || CP.canAsk;   // the "from stock" lines: taken straight away, or asked for
@@ -250,7 +257,7 @@ $(function () {
 function cpInit() {
     $.getJSON(CP.api, { action: 'init', warehouse_id: cpWh() }, function (r) {
         if (!r.success) { Swal.fire({ icon: 'error', title: CP.s.error, text: r.message }); return; }
-        CPD = { dishes: r.dishes, stock: r.stock, plans: r.plans, today: r.today };
+        CPD = { dishes: r.dishes, stock: r.stock, plans: r.plans, today: r.today, earlier: r.earlier || [] };
         if (CP.canEdit) {
             const sel = $('#cpDish').empty().append(new Option('', '', true, true));
             r.dishes.forEach(d => sel.append(new Option(caseFormatJs(d.name) + (d.yield > 1 ? ' · ' + CP.s.platesPot.replace('%d', d.yield) : ''), d.product_id, false, false)));
@@ -260,7 +267,7 @@ function cpInit() {
             cpFillPick(r.stock); cpRender();
         }
         $('#cpDate').val(r.today).attr('max', r.today);
-        cpRenderPlans(r.plans); cpRenderStock(r.stock); cpRenderRequests(r.requests || []);
+        cpRenderPlans(r.plans); cpRenderStock(r.stock); cpRenderRequests(r.requests || []); cpRenderEarlier();
     }).fail(() => Swal.fire({ icon: 'error', title: CP.s.error, text: CP.s.serverError }));
 }
 
@@ -389,6 +396,7 @@ function cpRenderPlans(plans) {
     const today = cpIsToday();
     $('#cpDayTitle').text(today ? CP.s.today : CP.s.dayOf.replace('%s', $('#cpDate').val()));
     $('#cpFormCol').toggle(today);
+    $('#cpEarlier').toggleClass('d-none', !today || !(CPD.earlier || []).length);
     let planned = 0, left = 0, anyLeft = false, gp = 0; const soldBy = {};
     plans.forEach(p => {
         planned += p.plates_planned; soldBy[p.product_id] = p.sold;
@@ -402,8 +410,9 @@ function cpRenderPlans(plans) {
     // The till's sales belong to the DISH and day, not to one cook: "not accounted for" is worked out per dish —
     // all its cooks' plates − sold − all its plates left — once every cook of it is closed, and shown on its last card.
     const byDish = {};
-    plans.forEach(p => { const g = byDish[p.product_id] = byDish[p.product_id] || { n: 0, planned: 0, left: 0, open: 0, last: null };
-        g.n++; g.planned += p.plates_planned; g.left += p.plates_left || 0; if (p.status !== 'closed') g.open++; g.last = p.id; });
+    plans.forEach(p => { const g = byDish[p.product_id] = byDish[p.product_id] || { n: 0, planned: 0, left: 0, open: 0, last: null, cost: 0 };
+        g.n++; g.planned += p.plates_planned; g.left += p.plates_left || 0; if (p.status !== 'closed') g.open++; g.last = p.id;
+        if (CP.canCost) g.cost += p.recipe_cost + p.stock_cost; });
     CPD.dayPlans = plans;   // for the "plates left" pop-up
     $('#cpPlans').html(plans.map(p => {
         const closed = p.status === 'closed', g = byDish[p.product_id];
@@ -430,6 +439,11 @@ function cpRenderPlans(plans) {
         if (CP.canCost) {
             const cost = p.recipe_cost + p.stock_cost, gpv = Math.round(p.plates_planned * p.selling_price - cost);
             h += row(CP.s.cost, cpFmt(Math.round(cost))) + row(CP.s.gp, `<span class="${gpv < 0 ? 'cp-loss' : 'text-primary'} fw-semibold">${cpFmt(gpv)}</span>`);
+            // Once every cook of the dish is closed, the real figure (the same as Planned vs actual): sold × price − all its cooks' cost
+            if (g.last === p.id && g.open === 0) {
+                const real = Math.round(p.sold * p.selling_price - g.cost);
+                h += row(`${CP.s.realGp} <small class="text-muted">(${CP.s.realGpH})</small>`, `<span class="${real < 0 ? 'cp-loss' : 'text-success'} fw-bold">${cpFmt(real)}</span>`);
+            }
         }
         if (CP.canEdit && today) {
             h += `<div class="d-flex gap-2 mt-2">
@@ -441,18 +455,35 @@ function cpRenderPlans(plans) {
     }).join(''));
 }
 
+/** Cooks of earlier days never closed: shown above today's cooks with their own "Plates left" button. */
+function cpRenderEarlier() {
+    const list = CPD.earlier || [];
+    $('#cpEarlier').toggleClass('d-none', !list.length || !cpIsToday());
+    if (!list.length) { $('#cpEarlier').empty(); return; }
+    $('#cpEarlier').html(`<div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1 text-warning"></i>${CP.s.earlierT} (${list.length})</div>
+        <div class="small text-muted">${CP.s.earlierH}</div>`
+        + list.map(p => `<div class="cp-plan">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="min-w-0"><div class="fw-bold text-truncate">${nm(p.name)}</div>
+                    <div class="small text-muted">${CP.s.cookedOn.replace('%s', safeOutput(p.plan_date))} · ${cpFmt(p.plates_planned)} ${CP.s.plannedPlates.toLowerCase()} · ${CP.s.sold} ${cpFmt(p.sold)}</div></div>
+                <span class="cp-badge">${CP.s.open}</span>
+            </div>
+            ${CP.canEdit ? `<button class="btn btn-sm btn-outline-primary w-100 mt-2" onclick="cpClose(${p.id})"><i class="bi bi-check2-square me-1"></i>${CP.s.platesLeftBtn}</button>` : ''}
+        </div>`).join(''));
+}
+
 function cpClose(id) {
-    const p = (CPD.dayPlans || []).find(x => x.id === id); if (!p) return;
+    const p = (CPD.dayPlans || []).find(x => x.id === id) || (CPD.earlier || []).find(x => x.id === id); if (!p) return;
     const planned = p.plates_planned, current = p.plates_left;
     // The "keep to sell later" choice only matters when the dish's recipe takes ingredients from stock (Phase 5);
     // a small restaurant without stock never sees it.
     const keepBox = p.stock_recipe
         ? `<label class="d-flex gap-2 align-items-start text-start mt-3 small" style="cursor:pointer"><input type="checkbox" id="cpKeep" class="form-check-input mt-1" ${p.keep_left ? 'checked' : ''}>
              <span><strong>${CP.s.keepLeft}</strong><br><span class="text-muted">${CP.s.keepHelp}</span></span></label>` : '';
-    Swal.fire({ title: CP.s.platesLeftOf.replace('%s', caseFormatJs(p.name)),
+    Swal.fire({ title: CP.s.platesLeftOf.replace('%s', caseFormatJs(p.name)) + (p.plan_date ? ` <small class="d-block text-muted fs-6 fw-normal">${CP.s.cookedOn.replace('%s', safeOutput(p.plan_date))}</small>` : ''),
                 html: `<div class="small text-muted mb-2">${CP.s.platesLeftHelp}</div>
                        <input id="cpLeftIn" type="number" min="0" max="${planned}" step="any" inputmode="decimal" class="swal2-input" style="width:100%;max-width:100%;margin:0;box-sizing:border-box" value="${current === null ? '' : current}">${keepBox}`,
-                showCancelButton: true, confirmButtonText: CP.s.save, cancelButtonText: CP.s.no, confirmButtonColor: '#0d6efd',
+                showCancelButton: true, confirmButtonText: CP.s.save, cancelButtonText: CP.s.cancel, confirmButtonColor: '#0d6efd',
                 didOpen: () => setTimeout(() => $('#cpLeftIn').trigger('focus'), 50),
                 preConfirm: () => {
                     const v = $('#cpLeftIn').val();
@@ -529,7 +560,7 @@ function cpRenderStock(stock) {
 }
 function cpSpoil(id) {
     const s = CPD.stock.find(x => x.product_id === id); if (!s) return;
-    Swal.fire({ title: CP.s.spoiledQ.replace('%s', caseFormatJs(s.name)), confirmButtonText: CP.s.save, showCancelButton: true, cancelButtonText: CP.s.no, confirmButtonColor: '#dc3545',
+    Swal.fire({ title: CP.s.spoiledQ.replace('%s', caseFormatJs(s.name)), confirmButtonText: CP.s.save, showCancelButton: true, cancelButtonText: CP.s.cancel, confirmButtonColor: '#dc3545',
         html: `<div class="small text-muted mb-2">${CP.s.inStock}: ${cpQty(s.stock)} ${safeOutput(s.unit)} · ${CP.s.spoilNote}</div>
                <input id="spQ" type="number" min="0" step="any" class="swal2-input cp-swal-in" placeholder="${safeOutput(CP.s.spoiledQty.replace('%s', s.unit))}" inputmode="decimal">
                <input id="spR" class="swal2-input cp-swal-in" maxlength="255" placeholder="${safeOutput(CP.s.reason)}">`,
