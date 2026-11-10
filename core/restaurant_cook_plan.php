@@ -329,6 +329,9 @@ if (!function_exists('rcpCreate')) {
             rcpNotify($pdo, 'restaurant.stock_request', [
                 'entity_type' => 'cook_plan', 'entity_id' => $id, 'warehouse_id' => $wh,
                 'title' => "Stock request: {$dish['name']}", 'message' => "The kitchen asks for $what to cook {$dish['name']}. Give it out or reject it on the Cooking plan.",
+                // each reader gets it in their own language (core/notify.php notifText)
+                'i18n' => ['title' => ['Stock request: %s', [$dish['name']]],
+                           'message' => ['The kitchen asks for %1$s to cook %2$s. Give it out or reject it on the Cooking plan.', [$what, $dish['name']]]],
                 'action_url' => 'restaurant/cooking', 'severity' => 'medium', 'dedupe_suffix' => 'once',
             ]);
         }
@@ -707,10 +710,15 @@ if (!function_exists('rcpDecide')) {
         $ref = 'COOK-' . $planId;
 
         $tell = function (bool $given) use ($pdo, $planId, $wh, $dish, $lines) {   // Phase 5: the cook who asked hears the answer
+            // answered: the request alert is cleared for everyone who could give it out (no one acts on it twice)
+            try { require_once __DIR__ . '/notify.php'; notifResolve($pdo, 'restaurant.stock_request', 'cook_plan', [$planId]); }
+            catch (Throwable $e) { error_log('rcpDecide resolve: ' . $e->getMessage()); }
             rcpNotify($pdo, 'restaurant.stock_request_answered', [
                 'entity_type' => 'cook_plan', 'entity_id' => $planId, 'warehouse_id' => $wh, 'owner_user_ids' => [(int)$lines[0]['requested_by']],
                 'title' => ($given ? 'Stock given out: ' : 'Stock request rejected: ') . $dish,
                 'message' => $given ? "The stock you asked for to cook $dish was given out." : "The stock you asked for to cook $dish was not given out. Ask the storekeeper.",
+                'i18n' => ['title' => [$given ? 'Stock given out: %s' : 'Stock request rejected: %s', [$dish]],
+                           'message' => [$given ? 'The stock you asked for to cook %s was given out.' : 'The stock you asked for to cook %s was not given out. Ask the storekeeper.', [$dish]]],
                 'action_url' => 'restaurant/cooking', 'severity' => $given ? 'low' : 'medium', 'dedupe_suffix' => $given ? 'given' : 'rejected',
             ]);
         };

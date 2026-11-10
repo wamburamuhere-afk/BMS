@@ -95,6 +95,34 @@ if (!function_exists('createNotification')) {
         if (!in_array($prio, $validPrio, true)) $prio = 'medium';
 
         try {
+            // Which record the alert is about (2026-11-10, core/restaurant_alerts_schema.php) — lets notifResolve()
+            // clear everyone's copy once someone acted. Only once the columns exist (a database not migrated yet
+            // keeps working exactly as before).
+            static $hasEntity = [];
+            $k = spl_object_id($pdo);
+            if (!isset($hasEntity[$k])) {
+                try { $hasEntity[$k] = (bool)$pdo->query("SHOW COLUMNS FROM notifications LIKE 'entity_id'")->fetch(); }
+                catch (Throwable $e) { $hasEntity[$k] = false; }
+            }
+            if ($hasEntity[$k] && !empty($p['entity_type']) && !empty($p['entity_id'])) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO notifications
+                        (user_id, title, message, type, event_key, entity_type, entity_id, category, priority, is_read,
+                         loan_id, customer_id, document_id, project_id, action_url, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, NOW())
+                ");
+                $stmt->execute([
+                    $userId, (string)($p['title'] ?? 'Notification'), (string)($p['message'] ?? ''), $type,
+                    $p['event_key'] ?? null, mb_substr((string)$p['entity_type'], 0, 50), (int)$p['entity_id'],
+                    $p['category'] ?? null, $prio,
+                    isset($p['loan_id'])     ? (int)$p['loan_id']     : null,
+                    isset($p['customer_id']) ? (int)$p['customer_id'] : null,
+                    isset($p['document_id']) ? (int)$p['document_id'] : null,
+                    isset($p['project_id'])  ? (int)$p['project_id']  : null,
+                    $p['action_url'] ?? null,
+                ]);
+                return (int)$pdo->lastInsertId();
+            }
             $stmt = $pdo->prepare("
                 INSERT INTO notifications
                     (user_id, title, message, type, event_key, category, priority, is_read,
@@ -120,6 +148,64 @@ if (!function_exists('createNotification')) {
             error_log('createNotification failed: ' . $e->getMessage());
             return 0;
         }
+    }
+}
+
+if (!function_exists('notifResolve')) {
+    /**
+     * Someone acted on it: mark every unread copy of this alert about these records as read (the cashier
+     * confirmed the order, the storekeeper answered the request, the waiter received the food).
+     * Returns how many were cleared. Never throws.
+     */
+    function notifResolve(PDO $pdo, string $eventKey, string $entityType, array $entityIds): int
+    {
+        $ids = array_values(array_filter(array_map('intval', $entityIds), fn($i) => $i > 0));
+        if (!$ids) return 0;
+        try {
+            if (!$pdo->query("SHOW COLUMNS FROM notifications LIKE 'entity_id'")->fetch()) return 0;
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $set = $pdo->query("SHOW COLUMNS FROM notifications LIKE 'read_at'")->fetch() ? 'is_read = 1, read_at = COALESCE(read_at, NOW())' : 'is_read = 1';
+            $st = $pdo->prepare("UPDATE notifications SET $set
+                                  WHERE is_read = 0 AND event_key = ? AND entity_type = ? AND entity_id IN ($in)");
+            $st->execute(array_merge([$eventKey, $entityType], $ids));
+            return $st->rowCount();
+        } catch (Throwable $e) {
+            error_log('notifResolve: ' . $e->getMessage());
+            return 0;
+        }
+    }
+}
+
+if (!function_exists('notifLangFor')) {
+    /** The language a person reads BMS in: the organisation's language when one is set, else their own choice. */
+    function notifLangFor(int $userId): string
+    {
+        $org = function_exists('orgLanguage') ? orgLanguage() : null;
+        if ($org) return $org;
+        $l = function_exists('get_setting') ? (string)get_setting('user_language_' . $userId, 'en') : 'en';
+        return in_array($l, defined('SUPPORTED_LANGUAGES') ? SUPPORTED_LANGUAGES : ['en'], true) ? $l : 'en';
+    }
+}
+
+if (!function_exists('notifText')) {
+    /**
+     * Translate an alert's text into one language without touching the page's own language.
+     * $spec: 'Plain key' | [format, [args…]] — an argument may itself be a [format, [args]] (e.g. "Table %s").
+     */
+    function notifText($spec, string $lang): string
+    {
+        static $cat = [];
+        if (!isset($cat[$lang])) {
+            $en = (defined('LANG_DIR') && is_file(LANG_DIR . '/en.php')) ? (include LANG_DIR . '/en.php') : [];
+            $loc = ($lang !== 'en' && defined('LANG_DIR') && is_file(LANG_DIR . "/$lang.php")) ? (include LANG_DIR . "/$lang.php") : [];
+            $cat[$lang] = array_merge(is_array($en) ? $en : [], is_array($loc) ? $loc : []);
+        }
+        $tr = fn(string $k) => (isset($cat[$lang][$k]) && $cat[$lang][$k] !== '') ? $cat[$lang][$k] : $k;
+        if (is_string($spec)) return $tr($spec);
+        if (!is_array($spec) || !isset($spec[0])) return '';
+        $args = array_map(fn($a) => is_array($a) ? notifText($a, $lang) : (string)$a, (array)($spec[1] ?? []));
+        $fmt = $tr((string)$spec[0]);
+        try { return $args ? vsprintf($fmt, $args) : $fmt; } catch (Throwable $e) { return vsprintf((string)$spec[0], $args); }
     }
 }
 
@@ -639,9 +725,21 @@ if (!function_exists('dispatchEvent')) {
                 'customer_id' => $ctx['customer_id'] ?? null,
                 'document_id' => $ctx['document_id'] ?? null,
                 'loan_id'     => $ctx['loan_id']     ?? null,
+                'entity_type' => $entityType,
+                'entity_id'   => $entityId ?: null,
             ];
+            // Translatable text (2026-11-10): $ctx['i18n'] = ['title' => [format, args], 'message' => [format, args]]
+            // — each person gets it in the language they read BMS in. Without it: the text as given (as before).
+            $i18n = (isset($ctx['i18n']) && is_array($ctx['i18n'])) ? $ctx['i18n'] : null;
+            $basePayload = $payload;
 
             foreach ($recipients as $uid => $u) {
+                $payload = $basePayload;
+                if ($i18n) {
+                    $lang = notifLangFor((int)$uid);
+                    if (isset($i18n['title']))   $payload['title']   = notifText($i18n['title'], $lang);
+                    if (isset($i18n['message'])) $payload['message'] = notifText($i18n['message'], $lang);
+                }
                 // Channels were decided by resolveRecipients (rules or defaults).
                 $ch = $u['channels'] ?? ['inapp' => true, 'email' => false];
 
