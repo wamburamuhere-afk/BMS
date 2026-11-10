@@ -366,8 +366,9 @@ if (!function_exists('rdDashExtras')) {
         try { $o['tables_total'] = (int)$pdo->query("SELECT COUNT(*) FROM restaurant_tables WHERE warehouse_id IN ($in)")->fetchColumn(); }
         catch (Throwable $e) { error_log('rdDashExtras tables: ' . $e->getMessage()); }
         try {
-            $r = $pdo->query("SELECT COUNT(*) AS n, COALESCE(MAX(TIMESTAMPDIFF(MINUTE, created_at, NOW())),0) AS m FROM kitchen_tickets
-                               WHERE status = 'queued' AND warehouse_id IN ($in) AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) >= 20")->fetch(PDO::FETCH_ASSOC) ?: [];
+            $r = $pdo->query("SELECT COUNT(*) AS n, COALESCE(MAX(TIMESTAMPDIFF(MINUTE, kt.created_at, NOW())),0) AS m FROM kitchen_tickets kt
+                               JOIN kitchen_stations ks ON ks.station_id = kt.station_id   -- the same tickets the kitchen screen shows
+                               WHERE kt.status = 'queued' AND kt.warehouse_id IN ($in) AND TIMESTAMPDIFF(MINUTE, kt.created_at, NOW()) >= 20")->fetch(PDO::FETCH_ASSOC) ?: [];
             $o['kitchen_waiting'] = (int)($r['n'] ?? 0); $o['kitchen_longest'] = (int)($r['m'] ?? 0);
         } catch (Throwable $e) { /* kitchen tables are optional */ }
         try {
@@ -524,6 +525,7 @@ if (!function_exists('rdAttention')) {
         } catch (Throwable $e) { error_log('rdAttention bills: ' . $e->getMessage()); }
         try {
             $r = $pdo->query("SELECT COUNT(*) AS n, COALESCE(MAX(TIMESTAMPDIFF(MINUTE, kt.created_at, NOW())),0) AS m FROM kitchen_tickets kt
+                JOIN kitchen_stations ks ON ks.station_id = kt.station_id   -- the same tickets the kitchen screen shows
                 WHERE kt.status = 'queued' AND kt.warehouse_id IN ($in) AND TIMESTAMPDIFF(MINUTE, kt.created_at, NOW()) >= 20")->fetch(PDO::FETCH_ASSOC) ?: [];
             if ((int)($r['n'] ?? 0) > 0) $list[] = ['type' => 'kitchen_wait', 'n' => (int)$r['n'], 'extra' => (int)$r['m']];
         } catch (Throwable $e) { /* kitchen tables optional */ }
@@ -667,7 +669,7 @@ if (!function_exists('rdKitchenLoad')) {
         $out = ['total' => 0, 'areas' => []];
         try {
             $st = $pdo->query("SELECT COALESCE(NULLIF(ks.name, ''), '') AS name, COUNT(*) AS n FROM kitchen_tickets kt
-                LEFT JOIN kitchen_stations ks ON ks.station_id = kt.station_id
+                JOIN kitchen_stations ks ON ks.station_id = kt.station_id   -- the same tickets the kitchen screen shows
                 WHERE kt.status IN ('queued','preparing') AND kt.warehouse_id IN (" . rdIn($ids) . ")
                 GROUP BY kt.station_id, ks.name ORDER BY n DESC");
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {

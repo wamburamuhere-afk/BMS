@@ -19,7 +19,8 @@ $page_title = 'Planned vs actual';
 require_once 'header.php';
 
 $can_cost = restaurantCanSeeCost();
-$allowed  = canView('restaurant_pos') && (rcpCanCook() || $can_cost || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess()));
+require_once __DIR__ . '/../../../core/restaurant_access.php';   // role based: the same rule as the menu link
+$allowed  = canView('restaurant_pos') && raCanCookReport();
 if (!$allowed) {
     header('Location: ' . getUrl('unauthorized'));
     exit();

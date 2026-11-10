@@ -21,6 +21,11 @@ require_once ROOT_DIR . '/core/restaurant_insights.php';
 
 // Profit and cost figures follow the same rule as the retail Performance card (reports access).
 $rdMoney  = hasReportsAccess() || canView('invoices') || canView('sales_report');
+// Role based (core/restaurant_access.php): sales totals, average bill and unpaid amounts are money — shown only to
+// whoever takes payment or has reports (not the waiter, not the cook). Links follow the same rules as the menu.
+require_once ROOT_DIR . '/core/restaurant_access.php';
+$rdSales  = raSeesMoney();
+$rdNav    = raNav($pdo);
 $rdScope  = in_array($rdScope ?? '', ['company', 'restaurant', 'combined'], true) ? $rdScope : 'restaurant';
 $rdL2     = ($rdScope === 'company');
 $rdIds    = rdRestaurantIds($pdo);
@@ -139,28 +144,32 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     // ───── the blocks, each built once and placed by the layout below ─────
     ob_start(); ?>
     <div class="row g-2 g-md-3 mb-3">
+        <?php if ($rdSales): ?>
         <div class="col-6 col-lg-3"><div class="rdp-stat h-100">
             <div class="rdp-label"><?= t('Sales today') ?></div>
             <div class="rdp-num text-primary"><?= $rdFmt($rdHero['sales']['today']) ?></div>
             <div class="rdp-sub"><?= htmlspecialchars($rdCur) ?> · <?= sprintf(t('Yesterday %s'), $rdFmt($rdHero['sales']['yesterday'])) ?></div>
             <?php if ($rdHero['sales']['trend7'] !== null): ?><div class="rdp-sub2"><?= $rdDelta($rdHero['sales']['trend7'], $rdTrendNote) ?> <?= t('last 7 days') ?></div><?php endif; ?>
         </div></div>
+        <?php endif; ?>
         <div class="col-6 col-lg-3"><div class="rdp-stat h-100">
             <div class="rdp-label"><?= t('Orders today') ?></div>
             <div class="rdp-num text-primary"><?= (int)$rdHero['orders']['today'] ?></div>
             <div class="rdp-sub"><?= t('paid orders') ?> · <?= sprintf(t('Yesterday %s'), (int)$rdHero['orders']['yesterday']) ?></div>
             <?php if ($rdHero['orders']['trend7'] !== null): ?><div class="rdp-sub2"><?= $rdDelta($rdHero['orders']['trend7'], $rdTrendNote) ?> <?= t('last 7 days') ?></div><?php endif; ?>
         </div></div>
+        <?php if ($rdSales): ?>
         <div class="col-6 col-lg-3"><div class="rdp-stat h-100">
             <div class="rdp-label"><?= t('Average bill') ?></div>
             <div class="rdp-num text-primary"><?= $rdFmt($rdHero['avg_bill']['today']) ?></div>
             <div class="rdp-sub"><?= t('per order') ?> · <?= sprintf(t('Yesterday %s'), $rdFmt($rdHero['avg_bill']['yesterday'])) ?></div>
             <?php if ($rdHero['avg_bill']['trend7'] !== null): ?><div class="rdp-sub2"><?= $rdDelta($rdHero['avg_bill']['trend7'], $rdTrendNote) ?> <?= t('last 7 days') ?></div><?php endif; ?>
         </div></div>
+        <?php endif; ?>
         <div class="col-6 col-lg-3"><div class="rdp-stat h-100">
             <div class="rdp-label"><?= t('Tables with order') ?></div>
             <div class="rdp-num <?= $rdHero['open']['tables'] > 0 ? 'text-danger' : 'text-primary' ?>"><?= (int)$rdHero['open']['tables'] ?></div>
-            <div class="rdp-sub"><?= sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])) ?></div>
+            <?php if ($rdSales): ?><div class="rdp-sub"><?= sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])) ?></div><?php endif; ?>
         </div></div>
     </div>
     <?php $b_hero_old = ob_get_clean();
@@ -328,21 +337,22 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
     <?php $b_types = ob_get_clean();
 
     // "Needs attention" rows (bills open too long, kitchen orders waiting, running low)
+    // Role based: a row only for whoever can act on it, linked only where that person may go (core/restaurant_access.php).
     $rdAttRows = [];
-    foreach ($rdAttention as $a) {
-        if ($a['type'] === 'old_bills')        { $ico = 'bi-receipt'; $txt = sprintf(t('%1$d bill(s) have been open for over 90 minutes (the longest %2$d min).'), $a['n'], $a['extra']); $lnk = getUrl('restaurant/tables-board'); }
-        elseif ($a['type'] === 'kitchen_wait') { $ico = 'ri ri-chef-hat'; $txt = sprintf(t('%1$d kitchen order(s) have waited over 20 minutes (the longest %2$d min).'), $a['n'], $a['extra']); $lnk = getUrl('restaurant/kitchen-dashboard'); }
-        elseif ($a['type'] === 'low_stock')    { $ico = 'bi-cup-straw'; $txt = sprintf(t('%d drink(s) or ingredient(s) are running low.'), $a['n']); $lnk = canView('pos_restock') ? getUrl('restaurant/purchases') : getUrl('restaurant/menu'); }
-        else                                   { $ico = 'bi-lightbulb'; $txt = sprintf(t('%d item(s) sold have no cost, so profit may look too high.'), $a['n']); $lnk = getUrl('restaurant/menu'); }
-        $rdAttRows[] = [$ico, $txt, $lnk];
+    foreach (rdAttentionForRole($rdAttention, $rdNav, $rdMoney) as $a) {
+        if ($a['type'] === 'old_bills')        { $ico = 'bi-receipt'; $txt = sprintf(t('%1$d bill(s) have been open for over 90 minutes (the longest %2$d min).'), $a['n'], $a['extra']); }
+        elseif ($a['type'] === 'kitchen_wait') { $ico = 'ri ri-chef-hat'; $txt = sprintf(t('%1$d kitchen order(s) have waited over 20 minutes (the longest %2$d min).'), $a['n'], $a['extra']); }
+        elseif ($a['type'] === 'low_stock')    { $ico = 'bi-cup-straw'; $txt = sprintf(t('%d drink(s) or ingredient(s) are running low.'), $a['n']); }
+        else                                   { $ico = 'bi-lightbulb'; $txt = sprintf(t('%d item(s) sold have no cost, so profit may look too high.'), $a['n']); }
+        $rdAttRows[] = [$ico, $txt, $a['link']];
     }
     ob_start();
     if ($rdAttRows): ?>
     <div class="rdp-card mb-3">
         <div class="rdp-card-h"><h6><i class="bi bi-bell me-1"></i><?= t('Needs your attention') ?></h6></div>
         <div class="list-group list-group-flush">
-        <?php foreach ($rdAttRows as [$ico, $txt, $lnk]): ?>
-        <a href="<?= $lnk ?>" class="list-group-item list-group-item-action d-flex align-items-center gap-2"><i class="<?= strpos($ico, 'ri ') === 0 ? $ico : 'bi ' . $ico ?> text-primary"></i><span class="small"><?= $txt ?></span><i class="bi bi-chevron-right ms-auto text-muted"></i></a>
+        <?php foreach ($rdAttRows as [$ico, $txt, $lnk]): $tag = $lnk !== '' ? 'a href="' . $lnk . '"' : 'div'; ?>
+        <<?= $tag ?> class="list-group-item <?= $lnk !== '' ? 'list-group-item-action' : '' ?> d-flex align-items-center gap-2"><i class="<?= strpos($ico, 'ri ') === 0 ? $ico : 'bi ' . $ico ?> text-primary"></i><span class="small"><?= $txt ?></span><?php if ($lnk !== ''): ?><i class="bi bi-chevron-right ms-auto text-muted"></i><?php endif; ?></<?= $lnk !== '' ? 'a' : 'div' ?>>
         <?php endforeach; ?>
         </div>
     </div>
@@ -375,17 +385,18 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         // ───────── Layout 2 — "Side actions" (redesign 2026-11-03: Preline look + two Medesk parts; blue only, amber = needs you) ─────────
         $nWith = (int)$rdHero['open']['tables'];
         // Quick actions: name, a short live line, icon, link, tone (main | blue | amber when it needs you). Same permissions as the menu.
+        // Role based: the same rules as the menu (core/restaurant_access.php) — a link here is a page this person may use.
         $acts = [];
-        if (canCreate('pos')) {
-            $acts[] = [t('Take order'), t('Open the till'), 'ri ri-hand-platter', getUrl('pos'), 'main'];
-            $acts[] = [t('Tables'), sprintf(t('%d with order'), $nWith), 'ri ri-armchair', getUrl('restaurant/tables-board'), 'blue'];
-        }
-        if ($rdKitchenOn) $acts[] = [t('Kitchen'), sprintf(t('%d waiting long'), $rdX['kitchen_waiting']), 'ri ri-chef-hat', getUrl('restaurant/kitchen-dashboard'), $rdX['kitchen_waiting'] > 0 ? 'amber' : 'blue'];
+        if ($rdNav['take'])   $acts[] = [t('Take order'), t('Open the till'), 'ri ri-hand-platter', getUrl('pos'), 'main'];
+        if ($rdNav['tables']) $acts[] = [t('Tables'), sprintf(t('%d with order'), $nWith), 'ri ri-armchair', getUrl('restaurant/tables-board'), 'blue'];
+        if ($rdKitchenOn && $rdNav['kitchen']) $acts[] = [t('Kitchen'), sprintf(t('%d waiting long'), $rdX['kitchen_waiting']), 'ri ri-chef-hat', getUrl('restaurant/kitchen-dashboard'), $rdX['kitchen_waiting'] > 0 ? 'amber' : 'blue'];
+        if ($rdNav['cooking'] && !$rdNav['take']) $acts[] = [t('Cooking plan'), t('Today\'s pots'), 'ri ri-cooking-pot', getUrl('restaurant/cooking'), 'blue'];
         $acts[] = [t('Menu'), $rdMoney ? sprintf(t('%d need a cost'), $unc) : t('Dishes and drinks'), 'ri ri-book-open-text', getUrl('restaurant/menu'), ($rdMoney && $unc > 0) ? 'amber' : 'blue'];
-        if ((canView('pos') && canView('pos_restock')) || canCreate('expenses')) $acts[] = [t('Purchases'), sprintf(t('%d running low'), count($rdData['low_drinks'])), 'ri ri-shopping-basket', getUrl('restaurant/purchases'), 'blue'];
+        if ($rdNav['buy']) $acts[] = [t('Purchases'), sprintf(t('%d running low'), count($rdData['low_drinks'])), 'ri ri-shopping-basket', getUrl('restaurant/purchases'), 'blue'];
         if (canView('expenses')) $acts[] = [t('Expenses'), sprintf(t('%d to approve'), $rdX['expenses_pending']), 'ri ri-wallet', getUrl('expenses'), 'blue'];
-        $acts[] = [t('Reservations'), sprintf(t('%d today'), $rdX['reservations_today']), 'ri ri-calendar-check', getUrl('restaurant/reservations'), 'blue'];
-        $acts[] = [t('Sales report'), t('Today and past'), 'ri ri-chart-column', getUrl('restaurant/sales-report'), 'blue'];
+        if ($rdNav['reserve']) $acts[] = [t('Reservations'), sprintf(t('%d today'), $rdX['reservations_today']), 'ri ri-calendar-check', getUrl('restaurant/reservations'), 'blue'];
+        if ($rdNav['sales'])   $acts[] = [t('Sales report'), t('Today and past'), 'ri ri-chart-column', getUrl('restaurant/sales-report'), 'blue'];
+        if ($rdNav['cookrep'] && !$rdNav['sales']) $acts[] = [t('Planned vs actual'), t('Plates cooked and sold'), 'bi bi-clipboard-data', getUrl('restaurant/cooking-report'), 'blue'];
 
         $rdCurTag = ' <small>' . htmlspecialchars($rdCur) . '</small>';
         $k = $rdRange['key'];
@@ -445,11 +456,11 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         }
         // "Needs your attention": warnings first (amber), then the rest (blue); low stock names the items
         $att = [];
-        foreach ($rdAttention as $a) {
-            if ($a['type'] === 'old_bills')        $att[] = ['amber', 'bi bi-receipt', sprintf(t('%1$d bill(s) have been open for over 90 minutes (the longest %2$d min).'), $a['n'], $a['extra']), getUrl('restaurant/tables-board')];
-            elseif ($a['type'] === 'kitchen_wait') $att[] = ['amber', 'ri ri-chef-hat', sprintf(t('%1$d kitchen order(s) have waited over 20 minutes (the longest %2$d min).'), $a['n'], $a['extra']), getUrl('restaurant/kitchen-dashboard')];
-            elseif ($a['type'] === 'low_stock')    $att[] = ['blue', 'bi bi-cup-straw', sprintf(t('%d drink(s) or ingredient(s) are running low.'), $a['n']) . ' ' . safe_output(implode(', ', array_map(fn($d) => $d['product_name'], array_slice($rdData['low_drinks'], 0, 3)))) . (count($rdData['low_drinks']) > 3 ? '…' : ''), canView('pos_restock') ? getUrl('restaurant/purchases') : getUrl('restaurant/menu')];
-            else                                   $att[] = ['blue', 'bi bi-lightbulb', sprintf(t('%d item(s) sold have no cost, so profit may look too high.'), $a['n']), getUrl('restaurant/menu')];
+        foreach (rdAttentionForRole($rdAttention, $rdNav, $rdMoney) as $a) {   // role based: only what this person can act on
+            if ($a['type'] === 'old_bills')        $att[] = ['amber', 'bi bi-receipt', sprintf(t('%1$d bill(s) have been open for over 90 minutes (the longest %2$d min).'), $a['n'], $a['extra']), $a['link']];
+            elseif ($a['type'] === 'kitchen_wait') $att[] = ['amber', 'ri ri-chef-hat', sprintf(t('%1$d kitchen order(s) have waited over 20 minutes (the longest %2$d min).'), $a['n'], $a['extra']), $a['link']];
+            elseif ($a['type'] === 'low_stock')    $att[] = ['blue', 'bi bi-cup-straw', sprintf(t('%d drink(s) or ingredient(s) are running low.'), $a['n']) . ' ' . safe_output(implode(', ', array_map(fn($d) => $d['product_name'], array_slice($rdData['low_drinks'], 0, 3)))) . (count($rdData['low_drinks']) > 3 ? '…' : ''), $a['link']];
+            else                                   $att[] = ['blue', 'bi bi-lightbulb', sprintf(t('%d item(s) sold have no cost, so profit may look too high.'), $a['n']), $a['link']];
         }
         if ($rdX['expenses_pending'] > 0 && canView('expenses')) $att[] = ['blue', 'ri ri-wallet', sprintf(t('%1$d expense(s) worth %2$s wait for approval.'), $rdX['expenses_pending'], $rdFmt($rdX['expenses_pending_amount'])), getUrl('expenses')];
         // top dishes by sales in the period
@@ -470,7 +481,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
             'amount' => (float)$o['grand_total'], 'open' => false]; }
         $staffMax = $rdStaff ? max(1, max(array_column($rdStaff, $rdMoney ? 'sales' : 'orders'))) : 1;
         ?>
-    <div class="rd2 <?= $rdMoney ? '' : 'rd2-flat' ?>">
+    <div class="rd2 <?= !$rdSales ? 'rd2-work' : ($rdMoney ? '' : 'rd2-flat') ?>">
         <nav class="rd2-acts" aria-label="<?= htmlspecialchars(t('Quick actions')) ?>">
             <?php foreach ($acts as [$an, $as, $ai, $ah, $tone]): ?>
             <a href="<?= $ah ?>" class="rd2-act rd2-t-<?= $tone ?>"><span class="rd2-sq"><i class="<?= $ai ?>"></i></span><span class="rd2-at"><b><?= $an ?></b><small><?= $as ?></small></span></a>
@@ -480,6 +491,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
         <!-- 4 tiles: Sales (with how customers order), Orders, Profit, Tables busy right now -->
         <section class="rd2-hero">
             <div class="rd2-sum">
+                <?php if ($rdSales): // sales and the average bill are money — not for the waiter or the cook ?>
                 <a href="<?= getUrl('restaurant/sales-report') ?>" class="rd2-tile">
                     <span class="rd2-tl"><?= t('Sales') ?><i class="ri ri-banknote"></i></span>
                     <span class="rd2-tv"><?= $rdFmt($cur['sales']) . $rdCurTag ?></span>
@@ -494,6 +506,13 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <span class="rd2-tv"><?= (int)$rdStory['orders'] ?></span>
                     <span class="rd2-ts"><?= sprintf(t('Average bill %s'), $rdFmt($rdStory['avg_bill'])) ?></span>
                 </a>
+                <?php else: ?>
+                <div class="rd2-tile">
+                    <span class="rd2-tl"><?= t('Orders') ?><i class="ri ri-receipt"></i></span>
+                    <span class="rd2-tv"><?= (int)$rdStory['orders'] ?></span>
+                    <span class="rd2-ts"><?= $nowWord ?></span>
+                </div>
+                <?php endif; ?>
                 <?php if ($rdMoney): ?>
                 <div class="rd2-tile">
                     <span class="rd2-tl"><?= t('Profit') ?><i class="ri ri-trending-up"></i></span>
@@ -503,7 +522,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <?php else: ?><span class="rd2-ts"><?= t('Complete') ?></span><?php endif; ?>
                 </div>
                 <?php endif; ?>
-                <a href="<?= getUrl('restaurant/tables-board') ?>" class="rd2-tile rd2-tile-main">
+                <<?= $rdNav['tables'] ? 'a href="' . getUrl('restaurant/tables-board') . '"' : 'div' ?> class="rd2-tile rd2-tile-main">
                     <span class="rd2-tl"><?= t('Tables busy') ?><span class="rd2-now"><?= t('Right now') ?></span></span>
                     <span class="rd2-tv"><?= $nWith ?><?php if ($rdX['tables_total'] > 0): ?> <small><?= sprintf(t('of %d'), $rdX['tables_total']) ?></small><?php endif; ?></span>
                     <?php if ($rdX['tables_total'] > 0 && $rdX['tables_total'] <= 16): ?>
@@ -511,11 +530,12 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                     <?php elseif ($rdX['tables_total'] > 16): ?>
                     <span class="rd2-split rd2-split-w" aria-hidden="true"><span style="width:<?= round(min(1, $nWith / $rdX['tables_total']) * 100) ?>%;background:#fff"></span></span>
                     <?php endif; ?>
-                    <span class="rd2-ts"><?= sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])) ?></span>
-                </a>
+                    <?php if ($rdSales): ?><span class="rd2-ts"><?= sprintf(t('%s not paid yet'), $rdFmt($rdHero['open']['amount'])) ?></span><?php endif; ?>
+                </<?= $rdNav['tables'] ? 'a' : 'div' ?>>
             </div>
         </section>
 
+        <?php if ($rdSales): // the sales chart is money — not for the waiter or the cook ?>
         <!-- Sales | Orders, this period against the same stretch before -->
         <section class="rd2-chart rdp-card">
             <div class="rdp-card-h">
@@ -582,6 +602,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?= $nowWord ?> <b><?= $rdFmt(array_sum($S['sales'])) ?></b> · <?= $prevWord ?> <?= $rdFmt(array_sum($S['sales_prev'])) ?>
             </div>
         </section>
+        <?php endif; ?>
 
         <!-- Kitchen right now (Medesk "department load") + Needs your attention -->
         <section class="rd2-panel rdp-card">
@@ -608,7 +629,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <div class="rd2-pt" data-pt="att">
                     <?php if (!$att): ?><div class="rdp-empty"><i class="bi bi-check2-circle"></i><div><?= t('Nothing needs your attention.') ?></div></div><?php endif; ?>
                     <?php foreach ($att as [$tone, $ico, $txt, $lnk]): ?>
-                    <a href="<?= $lnk ?>" class="rd2-row rd2-row-<?= $tone ?>"><i class="<?= $ico ?>"></i><span><?= $txt ?></span></a>
+                    <<?= $lnk !== '' ? 'a href="' . $lnk . '"' : 'div' ?> class="rd2-row rd2-row-<?= $tone ?>"><i class="<?= $ico ?>"></i><span><?= $txt ?></span></<?= $lnk !== '' ? 'a' : 'div' ?>>
                     <?php endforeach; ?>
                 </div>
                 <?php if ($rdActs): ?>
@@ -623,7 +644,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
 
         <!-- Top dishes for the period -->
         <section class="rd2-dishes rdp-card">
-            <div class="rdp-card-h"><h6><?= t('Top dishes') ?> · <?= $nowWord ?></h6><a href="<?= getUrl('restaurant/sales-report') ?>" class="small fw-semibold"><?= t('All dishes') ?> →</a></div>
+            <div class="rdp-card-h"><h6><?= t('Top dishes') ?> · <?= $nowWord ?></h6><?php if ($rdNav['sales']): ?><a href="<?= getUrl('restaurant/sales-report') ?>" class="small fw-semibold"><?= t('All dishes') ?> →</a><?php endif; ?></div>
             <?php if (!$top): ?>
             <div class="rdp-empty"><i class="ri ri-utensils"></i><div><?= t('Nothing sold in this period yet.') ?></div></div>
             <?php else: ?>
@@ -677,18 +698,19 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
 
         <!-- Latest orders: tables not paid yet, then the last paid -->
         <section class="rd2-orders rdp-card">
-            <div class="rdp-card-h"><h6><?= t('Latest orders') ?></h6><?php if (canView('pos')): ?><a href="<?= getUrl('pos_dashboard') ?>" class="small fw-semibold"><?= t('See all') ?> →</a><?php endif; ?></div>
+            <div class="rdp-card-h"><h6><?= t('Latest orders') ?></h6><?php if (canView('pos') && $rdSales): ?><a href="<?= getUrl('pos_dashboard') ?>" class="small fw-semibold"><?= t('See all') ?> →</a><?php endif; ?></div>
             <?php if (!$orderRows): ?><div class="rdp-empty"><i class="bi bi-receipt"></i><div><?= t('No orders yet today. Tap "Take order" to start.') ?></div></div><?php endif; ?>
             <?php foreach ($orderRows as $o): ?>
             <div class="rd2-or">
                 <span class="rd2-ini"><?= safe_output($o['tag']) ?></span>
                 <span class="flex-grow-1 min-w-0"><b><?= safe_output($o['title']) ?></b><small class="d-block rd2-muted"><?= safe_output($o['meta']) ?></small></span>
-                <b class="text-nowrap"><?= $rdFmt($o['amount']) ?></b>
+                <?php if ($rdSales): ?><b class="text-nowrap"><?= $rdFmt($o['amount']) ?></b><?php endif; ?>
                 <span class="rd2-st <?= $o['open'] ? 'rd2-st-open' : 'rd2-st-paid' ?>"><?= $o['open'] ? t('Open') : t('Paid') ?></span>
             </div>
             <?php endforeach; ?>
         </section>
 
+        <?php if ($rdSales): // who sold how much is money — not for the waiter or the cook ?>
         <!-- Sales by staff for the period -->
         <section class="rd2-staff rdp-card">
             <div class="rdp-card-h"><h6><?= t('Sales by staff') ?> · <?= $nowWord ?></h6></div>
@@ -702,6 +724,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?php endforeach; ?>
             </div>
         </section>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 <?php endif; ?>
@@ -760,6 +783,8 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
 .rd2-hero { grid-area:hero; } .rd2-chart { grid-area:chart; } .rd2-panel { grid-area:panel; }
 .rd2-dishes { grid-area:dishes; } .rd2-money { grid-area:money; } .rd2-orders { grid-area:orders; } .rd2-staff { grid-area:staff; }
 .rd2-flat { grid-template-areas:"acts hero hero" "acts chart panel" "acts dishes dishes" "acts orders staff"; }
+/* No money for this role (waiter, cook): no chart, money or staff blocks — the work they do, nothing left empty. */
+.rd2-work { grid-template-areas:"acts hero hero" "acts panel panel" "acts dishes orders"; }
 /* quick actions */
 .rd2-act { display:flex; align-items:center; gap:11px; border-radius:10px; padding:7px 8px; text-decoration:none; color:#1f2937; min-height:48px; }
 .rd2-act:hover { background:#f4f8ff; color:#0a58ca; }

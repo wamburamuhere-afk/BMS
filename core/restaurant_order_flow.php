@@ -346,6 +346,10 @@ if (!function_exists('rofSetTicketStatus')) {
         $args[] = $ticketId;
         $pdo->prepare("UPDATE kitchen_tickets SET " . implode(', ', $set) . " WHERE ticket_id = ?")->execute($args);
         $pdo->prepare("UPDATE kitchen_ticket_items SET status = ? WHERE ticket_id = ?")->execute([$status, $ticketId]);
+        // Alerts nobody needs to act on any more are cleared for everyone (one place for every status change):
+        // confirmed / cancelled → "Confirm order"; received / cancelled → "Ready to serve".
+        if (in_array($status, ['queued', 'cancelled'], true)) rofResolveAlerts($pdo, 'restaurant.order_to_confirm', [$ticketId]);
+        if (in_array($status, ['served', 'cancelled'], true))  rofResolveAlerts($pdo, 'restaurant.kitchen_ready', [$ticketId]);
     }
 }
 
@@ -733,6 +737,7 @@ if (!function_exists('rofConfirm')) {
         if (!$pending) throw new RofException(t('This order is no longer waiting — someone already confirmed or returned it.'), 'nothing_pending');
         $ids = [];
         foreach ($pending as $t) { rofSetTicketStatus($pdo, (int)$t['ticket_id'], 'queued', $userId, ['confirm' => true]); $ids[] = (int)$t['ticket_id']; }
+        rofResolveAlerts($pdo, 'restaurant.order_to_confirm', $ids);   // confirmed: no other cashier/manager acts on it again
         return $ids;
     }
 }
@@ -756,6 +761,7 @@ if (!function_exists('rofReturn')) {
             rofSetTicketStatus($pdo, (int)$t['ticket_id'], 'cancelled', $userId, ['reason' => $reason]);
             $ids[] = (int)$t['ticket_id'];
         }
+        rofResolveAlerts($pdo, 'restaurant.order_to_confirm', $ids);   // returned: handled for everyone
         rofNotifyReturned($pdo, $pending[0], $reason);
         return $ids;
     }
@@ -1167,15 +1173,47 @@ if (!function_exists('rofPromotePending')) {
 
 // ─── Notifications (fail-silent) ─────────────────────────────────────────────
 
+if (!function_exists('rofLabelSpec')) {
+    /**
+     * A ticket's label for an alert, in parts, so each reader gets it in their own language
+     * ("Table T1" / "Meza T1"): [format, args] for core/notify.php notifText(); else the label as stored.
+     */
+    function rofLabelSpec(PDO $pdo, int $ticketId, string $fallback)
+    {
+        try {
+            $st = $pdo->prepare("SELECT rt.table_number FROM kitchen_tickets kt JOIN restaurant_tables rt ON rt.table_id = kt.table_id WHERE kt.ticket_id = ?");
+            $st->execute([$ticketId]);
+            $n = $st->fetchColumn();
+            if ($n !== false && $n !== null && $n !== '') return ['%1$s %2$s', [['Table'], (string)$n]];
+        } catch (Throwable $e) { /* fall back to the stored label */ }
+        return ['%s', [$fallback]];
+    }
+}
+
+if (!function_exists('rofResolveAlerts')) {
+    /** Someone acted on these tickets: clear that alert for everyone (core/notify.php notifResolve). */
+    function rofResolveAlerts(PDO $pdo, string $eventKey, array $ticketIds): void
+    {
+        try {
+            require_once __DIR__ . '/notify.php';
+            if (function_exists('notifResolve')) notifResolve($pdo, $eventKey, 'kitchen_ticket', $ticketIds);
+        } catch (Throwable $e) {
+            error_log('rofResolveAlerts: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('rofNotifyToConfirm')) {
     function rofNotifyToConfirm(PDO $pdo, int $ticketId, int $warehouseId, string $label): void
     {
         try {
             require_once __DIR__ . '/restaurant_notify.php';
             if (!rnModuleOn($pdo)) return;
+            $L = rofLabelSpec($pdo, $ticketId, $label);
             rnDispatch($pdo, 'restaurant.order_to_confirm', [
                 'entity_type' => 'kitchen_ticket', 'entity_id' => $ticketId, 'warehouse_id' => $warehouseId,
                 'title' => "Confirm order: $label", 'message' => "$label is waiting for the cashier to confirm it before the kitchen starts.",
+                'i18n' => ['title' => ['Confirm order: %s', [$L]], 'message' => ['%s is waiting for the cashier to confirm it before the kitchen starts.', [$L]]],
                 'action_url' => 'pos?confirm_orders=1', 'severity' => 'high', 'dedupe_suffix' => 'once',
             ]);
         } catch (Throwable $e) {
@@ -1191,10 +1229,12 @@ if (!function_exists('rofNotifyReturned')) {
             require_once __DIR__ . '/restaurant_notify.php';
             if (!rnModuleOn($pdo)) return;
             $label = (string)($ticket['order_label'] ?: ('Order #' . $ticket['ticket_id']));
+            $L = rofLabelSpec($pdo, (int)$ticket['ticket_id'], $label);
             rnDispatch($pdo, 'restaurant.order_returned', [
                 'entity_type' => 'kitchen_ticket', 'entity_id' => (int)$ticket['ticket_id'], 'warehouse_id' => (int)$ticket['warehouse_id'],
                 'owner_user_ids' => !empty($ticket['sent_by']) ? [(int)$ticket['sent_by']] : [],
                 'title' => "Order returned: $label", 'message' => "The cashier returned $label: " . mb_substr($reason, 0, 160),
+                'i18n' => ['title' => ['Order returned: %s', [$L]], 'message' => ['The cashier returned %1$s: %2$s', [$L, mb_substr($reason, 0, 160)]]],
                 'action_url' => $ticket['table_id'] ? 'tables-board?table=' . (int)$ticket['table_id'] : 'pos',
                 'severity' => 'medium', 'dedupe_suffix' => 'once',
             ]);

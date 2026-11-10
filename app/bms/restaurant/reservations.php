@@ -19,6 +19,9 @@ if (!canView('restaurant_pos')) {
     header('Location: ' . getUrl('unauthorized'));
     exit();
 }
+// Role based (core/restaurant_access.php): the same rule as this page's menu link.
+require_once __DIR__ . '/../../../core/restaurant_access.php';
+raDeny(raCanTables());
 $can_create = canCreate('restaurant_pos');
 $can_edit   = canEdit('restaurant_pos');
 
