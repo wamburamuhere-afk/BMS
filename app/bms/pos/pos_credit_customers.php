@@ -20,6 +20,10 @@ if (!posSimpleModeEnabled()) {
     header('Location: ' . getUrl('pos_dashboard'));
     exit();
 }
+// A restaurant: customer debts are money — only whoever takes payment or has reports (not the waiter, not the cook).
+// Retail Smart POS is unchanged.
+require_once __DIR__ . '/../../../core/restaurant_access.php';
+if (canView('restaurant_pos') && restaurantOnlyCompany($pdo)) raDeny(raCanCredit());
 
 $page_title = 'Who Owes Me';
 require_once 'header.php';

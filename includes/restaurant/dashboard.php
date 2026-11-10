@@ -31,7 +31,7 @@ $rdHello = $rdHour < 12 ? t('Good morning') : ($rdHour < 17 ? t('Good afternoon'
                     <?php endforeach; ?>
                 </select>
             </form>
-            <?php if (canCreate('pos')): ?>
+            <?php if (canView('pos')): // same rule as the menu's "Take order" (the waiter takes orders too) ?>
             <a href="<?= getUrl('pos') ?>" class="rd-take"><i class="bi bi-plus-lg me-1"></i><?= t('Take order') ?></a>
             <?php endif; ?>
         </div>
