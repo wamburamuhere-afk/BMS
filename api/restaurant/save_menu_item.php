@@ -68,10 +68,15 @@ if (!in_array($item_type, ['dish', 'bought', 'existing'], true)) {
     exit;
 }
 
-/** Category id from the picker, or a new group name typed in. */
+/**
+ * Category id from the picker, or a new group name typed in. A group picked from the list wins:
+ * the typed name is used only for "+ New group" (or when no group id is sent), so a name left in the
+ * hidden box by a starter chip can never create a group the user did not choose.
+ */
 $resolveCategory = function () use ($pdo): ?int {
-    $new = trim((string)($_POST['new_category'] ?? ''));
-    if ($new !== '') {
+    $picked = trim((string)($_POST['category_id'] ?? ''));
+    $new    = trim((string)($_POST['new_category'] ?? ''));
+    if ($new !== '' && ($picked === '__new' || (int)$picked <= 0)) {
         $st = $pdo->prepare("SELECT category_id FROM categories WHERE LOWER(category_name) = LOWER(?) AND type = 'product' AND status = 'active' LIMIT 1");
         $st->execute([$new]);
         $id = (int)$st->fetchColumn();

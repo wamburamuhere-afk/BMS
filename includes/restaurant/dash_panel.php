@@ -219,7 +219,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                         <li><i class="rdp-dot rdp-bar-profit"></i><?= t('Net Profit') ?><b class="<?= $lossy ? 'text-danger' : '' ?>"><?= $rdFmt($cur['profit']) ?></b></li>
                     </ul>
                     <?php foreach ($rdWarn as $w):
-                        if ($w['type'] === 'no_cost')             { $wt = sprintf(t('%d item(s) sold have no cost.'), $w['n']); $wl = getUrl('restaurant/menu'); }
+                        if ($w['type'] === 'no_cost')             { $wt = sprintf(t('%d item(s) sold this month have no cost.'), $w['n']); $wl = getUrl('restaurant/menu'); }
                         elseif ($w['type'] === 'no_food_bought')  { $wt = t('You sold dishes with no recipe, but no food purchase is recorded this month.'); $wl = getUrl('restaurant/purchases'); }
                         else                                      { $wt = t('No expenses are recorded this month — gas, wages, rent?'); $wl = getUrl('expenses'); } ?>
                     <a href="<?= $wl ?>" class="d-block small text-danger fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i><?= $wt ?></a>
@@ -662,7 +662,7 @@ $rdClassLabel = ['star' => t('Star'), 'gem' => t('Hidden gem'), 'popular' => t('
                 <?php if ($hasSales && $cur['profit'] >= 0): ?><div class="rd2-muted small mt-1"><?= sprintf(t('Of every 100 you sell, %s is yours.'), '<b>' . $pct($rdStory['per100']['profit']) . '</b>') ?></div>
                 <?php elseif ($hasSales): ?><div class="small mt-1 text-danger"><?= t('You are spending more than you sell in this period.') ?></div><?php endif; ?>
                 <?php foreach ($rdWarn as $w):
-                    if ($w['type'] === 'no_cost')             { $wt = sprintf(t('%d item(s) sold have no cost.'), $w['n']); $wl = getUrl('restaurant/menu'); }
+                    if ($w['type'] === 'no_cost')             { $wt = sprintf(t('%d item(s) sold this month have no cost.'), $w['n']); $wl = getUrl('restaurant/menu'); }
                     elseif ($w['type'] === 'no_food_bought')  { $wt = t('You sold dishes with no recipe, but no food purchase is recorded this month.'); $wl = getUrl('restaurant/purchases'); }
                     else                                      { $wt = t('No expenses are recorded this month — gas, wages, rent?'); $wl = getUrl('expenses'); } ?>
                 <a href="<?= $wl ?>" class="d-block small rd2-warn mt-1"><i class="bi bi-exclamation-triangle me-1"></i><?= $wt ?></a>
