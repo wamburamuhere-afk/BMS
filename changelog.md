@@ -12,6 +12,16 @@
 - **Wording / numbers:** stock requests for a dish without a recipe say plates, not pots; stock only asked for counts at today's price (the card no longer shows the whole sale as profit); dashboard kitchen counts match the kitchen screen; Kiswahili Cashier = Keshia, Cook = Mpishi, "Cook a dish" = Pika chakula.
 - **Checked:** new scratch tests — navigation 25/25 (per role: may open == menu, money hidden, APIs, retail unchanged), till 5/5, alerts 13/13, wording 11/11, JS cart 10/10 + locked food 7/7; earlier phase suites all pass; restaurant CI suites pass; role translation now passes; notification-engine / role-permission-UI / pos-simple-mode / phase0 show only their known failures; browser: waiter and cook at desktop and 390 px.
 
+## 2026-11-10 — feat(subscription): a company sees only its own product's plans, and every plan list is cheapest first
+
+**Changed:** `core/plans.php`, `core/platform_gateway.php`, `tests/test_plans_by_product_sorted_cli.php` (new)
+
+- **Own product only:** on the Subscription page (Plans tab), a company on Smart POS now sees only Smart POS plans — Smart BMS is no longer offered, and it can no longer be requested ("Your company uses another product. Contact BJP to change it."). Moving a company to another product stays Superadmin's job. A company with no plan yet still sees every product.
+- **Cheapest first:** plan cards on the Subscription page, the free-trial "switch plan" box, the registration page and the registration list the mobile app reads are now sorted by price per month (the 1-month price, else the lowest monthly price), e.g. Basic → Standard → Professional → Enterprise — not alphabetically. Same price → Tier, then name. Periods inside a plan keep 1 month → 3 → 6 → 1 year. New `planMonthlySortPrice()` / `planSortByPrice()`.
+- **Fix found on the way:** the plan-request gateway never read the company's current plan (`vlFindTenant()` has no `plan`), so its product was unknown and its own non-public plan was never offered for renewal. It now reads it (`pgTenantPlanKey()`).
+- **Unchanged:** prices, plan contents, upgrade/downgrade rules (still Tier via `planWeight()`), Superadmin's Plans page.
+- **Checked:** new test 15/15 (sort rule; real signed gateway — POS company sees only POS plans in price order, BMS plan request refused, no-plan company sees both; registration + trial lists ordered). Billing page, trial switch, my subscription, billing, e2e, BJP form suites pass; catalog (4) and registration (8) fail identically on develop without this change (local company provisioning).
+
 ## 2026-11-10 — feat(restaurant): ready-made roles only for a Smart POS restaurant (by default), Cook and Manager role gaps
 
 **Changed:** `core/restaurant_ready_roles.php` (new), `core/restaurant_order_flow_schema.php`, `core/restaurant_cook_plan.php`, `api/restaurant/cook_plan.php`, `app/bms/restaurant/cook_plan.php`, `app/bms/restaurant/cook_plan_report.php`, `header.php`, `app/constant/settings/{users,add_user,edit_user,user_roles,user_projects}.php`, `api/mobile/users/roles.php`, `api/notifications/rules_api.php`, `app/bms/stock/warehouses.php`, `api/mobile/warehouses/{create,update}.php`, `lang/sw.php`, `migrations/tenant/2026_11_10_restaurant_ready_roles.php` (new), `migrations/2026_11_10_restaurant_ready_roles_legacy_db.php` (new)
