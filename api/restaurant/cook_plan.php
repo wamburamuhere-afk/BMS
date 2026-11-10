@@ -28,6 +28,9 @@ require_once __DIR__ . '/../../core/restaurant_cook_plan.php';
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
+// Role based (core/restaurant_access.php): the same rule as the page and its menu link.
+require_once __DIR__ . '/../../core/restaurant_access.php';
+if (!raCanCookPlan()) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if (!restaurantSchemaReady($pdo) || !rcpReady($pdo)) { echo json_encode(['success' => false, 'message' => t('Restaurant module is being set up for your account — please check back shortly.')]); exit; }
 
 global $pdo;
@@ -56,7 +59,7 @@ $strip = function (array $rows, array $keys) use ($seeCost): array {
 };
 $dayOut = function (int $wh, string $date, bool $earlier = false) use ($pdo, $seeCost, $strip): array {
     $rows = $earlier ? rcpOpenEarlier($pdo, $wh, $date) : rcpDay($pdo, $wh, $date);
-    if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost']); $r['items'] = $strip($r['items'], ['amount']); if ($r['unsold']) unset($r['unsold']['amount']); }
+    if (!$seeCost) foreach ($rows as &$r) { unset($r['recipe_cost'], $r['stock_cost'], $r['requested_cost']); $r['items'] = $strip($r['items'], ['amount']); if ($r['unsold']) unset($r['unsold']['amount']); }
     unset($r);
     return $rows;
 };

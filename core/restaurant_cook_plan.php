@@ -329,6 +329,9 @@ if (!function_exists('rcpCreate')) {
             rcpNotify($pdo, 'restaurant.stock_request', [
                 'entity_type' => 'cook_plan', 'entity_id' => $id, 'warehouse_id' => $wh,
                 'title' => "Stock request: {$dish['name']}", 'message' => "The kitchen asks for $what to cook {$dish['name']}. Give it out or reject it on the Cooking plan.",
+                // each reader gets it in their own language (core/notify.php notifText)
+                'i18n' => ['title' => ['Stock request: %s', [$dish['name']]],
+                           'message' => ['The kitchen asks for %1$s to cook %2$s. Give it out or reject it on the Cooking plan.', [$what, $dish['name']]]],
                 'action_url' => 'restaurant/cooking', 'severity' => 'medium', 'dedupe_suffix' => 'once',
             ]);
         }
@@ -603,12 +606,17 @@ if (!function_exists('rcpDay')) {
         $st->execute([$warehouseId, $date]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         $sold = [];
-        $items = $pdo->prepare("SELECT i.product_id, p.product_name, i.quantity, i.unit, i.amount, " . (rcpRequestsReady($pdo) ? 'i.status' : "'issued'") . " AS status
+        $items = $pdo->prepare("SELECT i.product_id, p.product_name, i.quantity, i.unit, i.amount, COALESCE(p.cost_price, 0) AS cost_now, " . (rcpRequestsReady($pdo) ? 'i.status' : "'issued'") . " AS status
                                   FROM restaurant_cook_plan_items i JOIN products p ON p.product_id = i.product_id WHERE i.plan_id = ?");
         foreach ($rows as &$r) {
             $pid = (int)$r['product_id'];
             if (!isset($sold[$pid])) $sold[$pid] = rcpSoldOn($pdo, $warehouseId, $pid, $date);
             $items->execute([(int)$r['id']]);
+            $itemRows = $items->fetchAll(PDO::FETCH_ASSOC);
+            // stock only ASKED for has no cost yet: counted at today's buying price (what giving it out will cost) so the
+            // expected profit is not the whole sale while the request waits (2026-11-10)
+            $reqCost = 0.0;
+            foreach ($itemRows as $ir) if (($ir['status'] ?? '') === 'requested') $reqCost += (float)$ir['quantity'] * (float)$ir['cost_now'];
             $un = null;
             if (rcpUnsoldReady($pdo)) {
                 $u = $pdo->prepare("SELECT plates, kept_left, amount FROM restaurant_cook_unsold WHERE warehouse_id = ? AND product_id = ? AND plan_date = ? AND status = 'posted' ORDER BY id DESC LIMIT 1");
@@ -621,10 +629,10 @@ if (!function_exists('rcpDay')) {
                 'unsold' => $un ? ['plates' => (float)$un['plates'], 'kept_left' => (float)$un['kept_left'], 'amount' => (float)$un['amount']] : null,
                 'id' => (int)$r['id'], 'product_id' => $pid, 'name' => $r['product_name'], 'pots' => (float)$r['pots'],
                 'plates_planned' => (float)$r['plates_planned'], 'selling_price' => (float)$r['selling_price'],
-                'recipe_cost' => (float)$r['recipe_cost'], 'stock_cost' => (float)$r['stock_cost'],
+                'recipe_cost' => (float)$r['recipe_cost'], 'stock_cost' => (float)$r['stock_cost'], 'requested_cost' => round($reqCost, 2),
                 'sold' => $sold[$pid], 'plates_left' => $r['plates_left'] === null ? null : (float)$r['plates_left'],
                 'status' => $r['status'], 'created_at' => $r['created_at'],
-                'items' => array_map(fn($i) => ['name' => $i['product_name'], 'qty' => (float)$i['quantity'], 'unit' => $i['unit'], 'amount' => (float)$i['amount'], 'status' => $i['status']], $items->fetchAll(PDO::FETCH_ASSOC)),
+                'items' => array_map(fn($i) => ['name' => $i['product_name'], 'qty' => (float)$i['quantity'], 'unit' => $i['unit'], 'amount' => (float)$i['amount'], 'status' => $i['status']], $itemRows),
             ];
         }
         unset($r);
@@ -658,7 +666,7 @@ if (!function_exists('rcpRequests')) {
     function rcpRequests(PDO $pdo, int $warehouseId): array
     {
         if (!rcpRequestsReady($pdo)) return [];
-        $st = $pdo->prepare("SELECT c.id AS plan_id, c.plan_date, c.pots, d.product_name AS dish, i.product_id, p.product_name, i.quantity, i.unit,
+        $st = $pdo->prepare("SELECT c.id AS plan_id, c.plan_date, c.pots, c.plates_planned, d.product_name AS dish, i.product_id, p.product_name, i.quantity, i.unit,
                                     COALESCE(p.cost_price, 0) AS cost_price, i.requested_by, c.created_at,
                                     TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS by_name, u.username
                                FROM restaurant_cook_plan_items i
@@ -672,7 +680,7 @@ if (!function_exists('rcpRequests')) {
         $by = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $pid = (int)$r['plan_id'];
-            $by[$pid] = $by[$pid] ?? ['plan_id' => $pid, 'plan_date' => $r['plan_date'], 'dish' => $r['dish'], 'pots' => (float)$r['pots'],
+            $by[$pid] = $by[$pid] ?? ['plan_id' => $pid, 'plan_date' => $r['plan_date'], 'dish' => $r['dish'], 'pots' => (float)$r['pots'], 'plates' => (float)$r['plates_planned'],
                                        'by' => trim((string)$r['by_name']) ?: (string)$r['username'], 'requested_by' => (int)$r['requested_by'], 'lines' => []];
             $by[$pid]['lines'][] = ['product_id' => (int)$r['product_id'], 'name' => $r['product_name'], 'qty' => (float)$r['quantity'], 'unit' => $r['unit'],
                                     'stock' => rcpShopStock($pdo, $warehouseId, (int)$r['product_id']), 'cost_price' => (float)$r['cost_price']];
@@ -707,10 +715,15 @@ if (!function_exists('rcpDecide')) {
         $ref = 'COOK-' . $planId;
 
         $tell = function (bool $given) use ($pdo, $planId, $wh, $dish, $lines) {   // Phase 5: the cook who asked hears the answer
+            // answered: the request alert is cleared for everyone who could give it out (no one acts on it twice)
+            try { require_once __DIR__ . '/notify.php'; notifResolve($pdo, 'restaurant.stock_request', 'cook_plan', [$planId]); }
+            catch (Throwable $e) { error_log('rcpDecide resolve: ' . $e->getMessage()); }
             rcpNotify($pdo, 'restaurant.stock_request_answered', [
                 'entity_type' => 'cook_plan', 'entity_id' => $planId, 'warehouse_id' => $wh, 'owner_user_ids' => [(int)$lines[0]['requested_by']],
                 'title' => ($given ? 'Stock given out: ' : 'Stock request rejected: ') . $dish,
                 'message' => $given ? "The stock you asked for to cook $dish was given out." : "The stock you asked for to cook $dish was not given out. Ask the storekeeper.",
+                'i18n' => ['title' => [$given ? 'Stock given out: %s' : 'Stock request rejected: %s', [$dish]],
+                           'message' => [$given ? 'The stock you asked for to cook %s was given out.' : 'The stock you asked for to cook %s was not given out. Ask the storekeeper.', [$dish]]],
                 'action_url' => 'restaurant/cooking', 'severity' => $given ? 'low' : 'medium', 'dedupe_suffix' => $given ? 'given' : 'rejected',
             ]);
         };

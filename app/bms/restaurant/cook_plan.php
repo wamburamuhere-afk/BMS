@@ -22,6 +22,9 @@ if (!canView('restaurant_pos')) {
     header('Location: ' . getUrl('unauthorized'));
     exit();
 }
+// Role based (core/restaurant_access.php): the same rule as this page's menu link.
+require_once __DIR__ . '/../../../core/restaurant_access.php';
+raDeny(raCanCookPlan());
 $can_edit   = rcpCanCook();   // the restaurant editor, or the kitchen (ready-made Cook role)
 $can_move   = rcpCanMoveStock();
 $can_cost   = restaurantCanSeeCost();
@@ -74,7 +77,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());
         <?php if ($can_edit): ?>
         <div class="col-lg-5" id="cpFormCol">
             <div class="cp-card">
-                <div class="cp-card-h"><h6><i class="bi bi-fire me-1"></i><?= t('Cook') ?></h6></div>
+                <div class="cp-card-h"><h6><i class="bi bi-fire me-1"></i><?= t('Cook a dish') ?></h6></div>
                 <div class="p-3">
                     <div id="cpMsg" class="mb-2"></div>
                     <div class="rf-field mb-3">
@@ -225,6 +228,7 @@ const CP = {
         earlierH: <?= json_encode(t('Close each one: count the plates left. Until you do, its plates not sold are not counted.')) ?>,
         cookedOn: <?= json_encode(t('Cooked on %s')) ?>, realGp: <?= json_encode(t('Real gross profit')) ?>,
         realGpH: <?= json_encode(t('sold × price − cost')) ?>,
+        incAsked: <?= json_encode(t('includes %s of stock asked for')) ?>,
     }
 };
 CP.canTake = CP.canMove || CP.canAsk;   // the "from stock" lines: taken straight away, or asked for
@@ -401,7 +405,7 @@ function cpRenderPlans(plans) {
     plans.forEach(p => {
         planned += p.plates_planned; soldBy[p.product_id] = p.sold;
         if (p.plates_left !== null) { left += p.plates_left; anyLeft = true; }
-        if (CP.canCost) gp += p.plates_planned * p.selling_price - p.recipe_cost - p.stock_cost;
+        if (CP.canCost) gp += p.plates_planned * p.selling_price - p.recipe_cost - p.stock_cost - (p.requested_cost || 0);
     });
     const sold = Object.values(soldBy).reduce((a, b) => a + b, 0);
     $('#stPlanned').text(cpFmt(planned)); $('#stSold').text(cpFmt(sold)); $('#stLeft').text(anyLeft ? cpFmt(left) : '—');
@@ -412,7 +416,7 @@ function cpRenderPlans(plans) {
     const byDish = {};
     plans.forEach(p => { const g = byDish[p.product_id] = byDish[p.product_id] || { n: 0, planned: 0, left: 0, open: 0, last: null, cost: 0 };
         g.n++; g.planned += p.plates_planned; g.left += p.plates_left || 0; if (p.status !== 'closed') g.open++; g.last = p.id;
-        if (CP.canCost) g.cost += p.recipe_cost + p.stock_cost; });
+        if (CP.canCost) g.cost += p.recipe_cost + p.stock_cost + (p.requested_cost || 0); });
     CPD.dayPlans = plans;   // for the "plates left" pop-up
     $('#cpPlans').html(plans.map(p => {
         const closed = p.status === 'closed', g = byDish[p.product_id];
@@ -437,8 +441,11 @@ function cpRenderPlans(plans) {
         if (p.items.length) h += `<div class="small text-muted mt-1"><i class="bi bi-box-seam me-1"></i>${p.items.map(i => `${nm(i.name)} ${cpQty(i.qty)} ${safeOutput(i.unit)}`
             + (i.status === 'requested' ? ` <span class="cp-badge">${CP.s.requested}</span>` : i.status === 'rejected' ? ` <span class="cp-badge cp-done"><s>${CP.s.rejected}</s></span>` : '')).join(' · ')}</div>`;
         if (CP.canCost) {
-            const cost = p.recipe_cost + p.stock_cost, gpv = Math.round(p.plates_planned * p.selling_price - cost);
-            h += row(CP.s.cost, cpFmt(Math.round(cost))) + row(CP.s.gp, `<span class="${gpv < 0 ? 'cp-loss' : 'text-primary'} fw-semibold">${cpFmt(gpv)}</span>`);
+            // stock still only asked for counts at today's buying price — the profit is never the whole sale while it waits
+            const asked = p.requested_cost || 0;
+            const cost = p.recipe_cost + p.stock_cost + asked, gpv = Math.round(p.plates_planned * p.selling_price - cost);
+            h += row(asked > 0 ? `${CP.s.cost} <small class="text-muted">(${CP.s.incAsked.replace('%s', cpFmt(Math.round(asked)))})</small>` : CP.s.cost, cpFmt(Math.round(cost)))
+               + row(CP.s.gp, `<span class="${gpv < 0 ? 'cp-loss' : 'text-primary'} fw-semibold">${cpFmt(gpv)}</span>`);
             // Once every cook of the dish is closed, the real figure (the same as Planned vs actual): sold × price − all its cooks' cost
             if (g.last === p.id && g.open === 0) {
                 const real = Math.round(p.sold * p.selling_price - g.cost);
@@ -520,7 +527,9 @@ function cpRenderRequests(reqs) {
     if (!$('#cpReqCard').length) return;
     $('#cpReqCard').toggleClass('d-none', !reqs.length); $('#cpReqCount').text(reqs.length || '');
     $('#cpReqs').html(reqs.map(q => `<div class="cp-plan">
-            <div class="d-flex justify-content-between gap-2"><div class="min-w-0"><div class="fw-bold text-truncate">${nm(q.dish)} · ${cpFmt(q.pots)} ${CP.s.potsShort}</div>
+            <div class="d-flex justify-content-between gap-2"><div class="min-w-0"><div class="fw-bold text-truncate">${nm(q.dish)} · ${q.plates === undefined || Math.abs(q.pots - q.plates) < 0.005
+                ? CP.s.platesOnly.replace('%s', cpFmt(q.plates === undefined ? q.pots : q.plates))   /* no recipe: plates were entered, not pots */
+                : `${cpFmt(q.pots)} ${CP.s.potsShort} → ${cpFmt(q.plates)} ${CP.s.plannedPlates.toLowerCase()}`}</div>
                 <div class="small text-muted">${CP.s.reqBy.replace('%s', safeOutput(q.by || '—'))}</div></div></div>
             ${q.lines.map(l => { const short = l.qty > l.stock + 0.0005;
                 return `<div class="cp-row small"><span>${nm(l.name)}: <strong>${cpQty(l.qty)} ${safeOutput(l.unit)}</strong></span><span class="${short ? 'cp-loss fw-semibold' : 'text-muted'}">${CP.s.inStock}: ${cpQty(l.stock)} ${safeOutput(l.unit)}</span></div>`; }).join('')}

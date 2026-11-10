@@ -29,6 +29,9 @@ header('Content-Type: application/json');
 
 if (!isAuthenticated())        { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('pos'))           { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
+// A restaurant: customer debts are money — not for the waiter or the cook (core/restaurant_access.php). Retail unchanged.
+require_once __DIR__ . '/../../core/restaurant_access.php';
+if (canView('restaurant_pos') && restaurantOnlyCompany($pdo) && !raCanCredit()) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if (!posSimpleModeEnabled())   { http_response_code(403); echo json_encode(['success' => false, 'message' => t('This view is only available in Simple POS mode.')]); exit; }
 
 try {

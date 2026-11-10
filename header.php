@@ -1113,6 +1113,12 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                     // retail, Hybrid, mixed) is false, and every line below that reads it then renders exactly as before.
                     require_once __DIR__ . '/core/restaurant_scope.php';
                     $__rf = posSimpleModeEnabled() && canView('restaurant_pos') && restaurantOnlyCompany($pdo);
+                    // Role based: every restaurant link uses the SAME rule as its page (core/restaurant_access.php).
+                    $__ra = null;
+                    if (canView('restaurant_pos')) {
+                        require_once __DIR__ . '/core/restaurant_access.php';
+                        $__ra = raNav($pdo);
+                    }
                     // Online menu (restaurant_online_menu_plan.md): "Online orders" link + new-order alert, only once a shop switched it on.
                     $__ro_nav = false;
                     if (canView('restaurant_pos') && canCreate('pos')) {
@@ -1182,7 +1188,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <!-- Core Modules — every group below is rendered by bmsNavMenu()
                              (core/nav_menu.php): 0 granted links = hidden, 1 = direct header
                              link, 2+ = dropdown. Simple POS mode keeps each group's original gate. -->
-                        <?php if (posSimpleModeEnabled() && canView('dashboard')): ?>
+                        <?php if (posSimpleModeEnabled()): // every Smart POS user lands on the dashboard after login (getLandingPage) — so everyone needs the way back ?>
                         <!-- Smart POS desktop: Dashboard is its own first menu item; "My Business" below
                              keeps the rest. Full ERP mode is unchanged (Dashboard stays in "Core"). -->
                         <li class="nav-item">
@@ -1194,27 +1200,48 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                         <?php
                         $__rf_can_pos = canView('pos');
                         $__rf_can_buy = (canView('pos') && canView('pos_restock')) || canView('suppliers');
+                        $__rf_any_order = $__ra['take'] || $__ra['tables'] || $__ro_nav || $__ra['kitchen'] || $__ra['reserve'] || $__ra['credit'];
                         ?>
+                        <?php if ($__rf_any_order): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="rfOrdersDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-clipboard-list"></i> <?= t('Orders') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfOrdersDropdown">
-                                <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="ri ri-hand-platter"></i> <?= t('Take order') ?></a></li><?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="ri ri-armchair"></i> <?= t('Tables') ?></a></li>
+                                <?php if ($__ra['take']): ?><li><a class="dropdown-item" href="<?= getUrl('pos') ?>"><i class="ri ri-hand-platter"></i> <?= t('Take order') ?></a></li><?php endif; ?>
+                                <?php if ($__ra['tables']): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="ri ri-armchair"></i> <?= t('Tables') ?></a></li><?php endif; ?>
                                 <?php if ($__ro_nav): ?><li><a class="dropdown-item" href="<?= getUrl('online_orders') ?>"><i class="bi bi-phone"></i> <?= t('Online orders') ?></a></li><?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="ri ri-chef-hat"></i> <?= t('Kitchen') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="ri ri-calendar-check"></i> <?= t('Reservations') ?></a></li>
-                                <?php if ($__rf_can_pos): ?><li><a class="dropdown-item" href="<?= getUrl('pos/credit-customers') ?>"><i class="ri ri-hand-coins"></i> <?= t('Who Owes Me') ?></a></li><?php endif; ?>
+                                <?php if ($__ra['kitchen']): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="ri ri-chef-hat"></i> <?= t('Kitchen') ?></a></li><?php endif; ?>
+                                <?php if ($__ra['reserve']): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="ri ri-calendar-check"></i> <?= t('Reservations') ?></a></li><?php endif; ?>
+                                <?php if ($__ra['credit']): ?><li><a class="dropdown-item" href="<?= getUrl('pos/credit-customers') ?>"><i class="ri ri-hand-coins"></i> <?= t('Who Owes Me') ?></a></li><?php endif; ?>
                             </ul>
                         </li>
+                        <?php endif; ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="rfMenuDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-utensils"></i> <?= t('Menu') ?></a>
                             <ul class="dropdown-menu" aria-labelledby="rfMenuDropdown">
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="ri ri-book-open-text"></i> <?= t('Menu items') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/cooking') ?>"><i class="ri ri-cooking-pot"></i> <?= t('Cooking plan') ?></a></li>
+                                <?php if ($__ra['cooking']): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/cooking') ?>"><i class="ri ri-cooking-pot"></i> <?= t('Cooking plan') ?></a></li><?php endif; ?>
                                 <?php if (canView('categories')): ?><li><a class="dropdown-item" href="<?= getUrl('categories') ?>"><i class="bi bi-tags"></i> <?= t('Menu groups') ?></a></li><?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="ri ri-circle-plus"></i> <?= t('Add-on options') ?></a></li>
+                                <?php if ($__ra['addons']): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="ri ri-circle-plus"></i> <?= t('Add-on options') ?></a></li><?php endif; ?>
                             </ul>
                         </li>
+                        <?php
+                        // Restaurant reports for a role without the general Reports menu (cashier, cook, manager…):
+                        // each report shows only to whoever may open it — same rule as the page.
+                        $__rf_rep = [];
+                        if (!hasReportsAccess()) {
+                            if ($__ra['sales'])   $__rf_rep[] = [getUrl('restaurant/sales-report'), 'bi bi-cup-hot', t('Restaurant Sales')];
+                            if ($__ra['waste'])   $__rf_rep[] = [getUrl('restaurant/waste-report'), 'bi bi-trash3', t('Waste & cancellations')];
+                            if ($__ra['cookrep']) $__rf_rep[] = [getUrl('restaurant/cooking-report'), 'bi bi-clipboard-data', t('Planned vs actual')];
+                        }
+                        ?>
+                        <?php if ($__rf_rep): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="rfRepDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-chart-column"></i> <?= t('Reports') ?></a>
+                            <ul class="dropdown-menu" aria-labelledby="rfRepDropdown">
+                                <?php foreach ($__rf_rep as [$__u, $__i, $__l]): ?><li><a class="dropdown-item" href="<?= $__u ?>"><i class="<?= $__i ?>"></i> <?= htmlspecialchars($__l) ?></a></li><?php endforeach; ?>
+                            </ul>
+                        </li>
+                        <?php endif; ?>
                         <?php if ($__rf_can_buy): ?>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="rfBuyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="ri ri-shopping-basket"></i> <?= t('Purchases') ?></a>
@@ -1422,7 +1449,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             require_once __DIR__ . '/core/restaurant_scope.php';
                             $__rest_on = restaurantModuleOn($pdo); // Smart POS restaurant: show its daily pages directly
                             // "Planned vs actual" in Reports — the same gate as app/bms/restaurant/cook_plan_report.php
-                            $__cookRep = $__rest_on && (canEdit('restaurant_pos') || canEdit('kitchen_display') || restaurantCanSeeCost() || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess())); ?>
+                            $__cookRep = $__rest_on && !empty($__ra['cookrep']); // same rule as the page (core/restaurant_access.php) ?>
                         <?php if ($__rf): // restaurant focus: Orders / Menu / Purchases above replace this dropdown ?>
                         <?php elseif ($__rest_on): ?>
                         <li class="nav-item dropdown">
@@ -1431,11 +1458,11 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="restaurantDropdown">
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant/menu') ?>"><i class="bi bi-journal-richtext"></i> <?= t('Menu') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li>
+                                <?php if (!empty($__ra['tables'])): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/tables-board') ?>"><i class="bi bi-grid-3x3-gap"></i> <?= t('Tables') ?></a></li><?php endif; ?>
                                 <?php if ($__ro_nav): ?><li><a class="dropdown-item" href="<?= getUrl('online_orders') ?>"><i class="bi bi-phone"></i> <?= t('Online orders') ?></a></li><?php endif; ?>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li>
-                                <li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Modifier Group') ?></a></li>
+                                <?php if (!empty($__ra['kitchen'])): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/kitchen-dashboard') ?>"><i class="bi bi-fire"></i> <?= t('Kitchen') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__ra['reserve'])): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/reservations') ?>"><i class="bi bi-calendar-check"></i> <?= t('Reservations') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__ra['addons'])): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/modifier-group') ?>"><i class="bi bi-list-check"></i> <?= t('Modifier Group') ?></a></li><?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?= getUrl('restaurant') ?>"><i class="bi bi-cup-hot"></i> <?= t('All restaurant pages') ?></a></li>
                             </ul>
@@ -1726,8 +1753,8 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                  are dropped. See core/pos_nav.php::posSimpleModeEnabled(). -->
                             <ul class="dropdown-menu" aria-labelledby="reportsDropdown">
                                 <li><h6 class="dropdown-header"><?= t('Business Reports') ?></h6></li>
-                                <?php if ($__rf && !empty($__rest_on)): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
-                                <?php if ($__rf && !empty($__rest_on) && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
+                                <?php if ($__rf && !empty($__rest_on) && !empty($__ra['sales'])): ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
+                                <?php if ($__rf && !empty($__rest_on) && !empty($__ra['waste'])): // same rule as the page (core/restaurant_access.php) ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
                                 <?php if (!empty($__rest_on) && !empty($__cookRep)): // restaurant costing plan — same gate as the page ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/cooking-report') ?>"><i class="bi bi-clipboard-data"></i> <?= t('Planned vs actual') ?></a></li><?php endif; ?>
                                 <?php if(canView('sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('sales_report') ?>"><i class="bi bi-cart"></i> <?= t('Sales Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('purchase_report')): ?><li><a class="dropdown-item" href="<?= getUrl('purchase_report') ?>"><i class="bi bi-basket"></i> <?= t('Purchase Report') ?></a></li><?php endif; ?>
@@ -1736,8 +1763,8 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                                 <?php if(canView('pos') && canView('pos_user_sales_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i> <?= t('Sales by User Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('pos') && canView('pos_profit_report')): ?><li><a class="dropdown-item" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i> <?= t('Profit Report') ?></a></li><?php endif; ?>
                                 <?php if(canView('product_analysis')): ?><li><a class="dropdown-item" href="<?= getUrl('product_analysis') ?>?view=profit"><i class="bi bi-trophy"></i> <?= t('Most Profitable Products') ?></a></li><?php endif; ?>
-                                <?php if (!empty($__rest_on) && !$__rf): // restaurant_plan.md Phase 6 ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
-                                <?php if (!empty($__rest_on) && !$__rf && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__rest_on) && !$__rf && !empty($__ra['sales'])): // restaurant_plan.md Phase 6 ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i> <?= t('Restaurant Sales') ?></a></li><?php endif; ?>
+                                <?php if (!empty($__rest_on) && !$__rf && !empty($__ra['waste'])): // same rule as the page ?><li><a class="dropdown-item" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i> <?= t('Waste & cancellations') ?></a></li><?php endif; ?>
                             </ul>
                             <?php else: ?>
                             <div class="dropdown-menu mega-dropdown-menu" aria-labelledby="reportsDropdown">
@@ -1979,7 +2006,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
 
     <nav class="bms-bnav d-flex d-lg-none d-print-none" aria-label="<?= htmlspecialchars(t('Main Menu')) ?>">
         <?php // Five items, "Sell" raised in the middle; everything else lives in the ☰ side menu. ?>
-        <?php if (canView('dashboard')): ?>
+        <?php if (canView('dashboard') || posSimpleModeEnabled()): // Smart POS: everyone lands on the dashboard, so everyone gets the way back ?>
         <a class="bn-item<?= $__bn_on('dashboard') ? ' active' : '' ?>" href="<?= getUrl('dashboard') ?>"><i class="<?= !empty($__rf) ? 'ri ri-layout-dashboard' : 'bi bi-speedometer2' ?>"></i><span><?= t('Dashboard') ?></span></a>
         <?php endif; ?>
         <?php
@@ -2008,7 +2035,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
         <?php if (canView('expenses')): ?>
         <a class="bn-item<?= $__bn_on('expenses') ? ' active' : '' ?>" href="<?= getUrl('expenses') ?>"><i class="<?= !empty($__rf) ? 'ri ri-wallet' : 'bi bi-receipt' ?>"></i><span><?= t('Expenses') ?></span></a>
         <?php endif; ?>
-        <?php if (hasReportsAccess()): ?>
+        <?php $__ra_rep = !empty($__ra) && ($__ra['sales'] || $__ra['waste'] || $__ra['cookrep']); if (hasReportsAccess() || $__ra_rep): // restaurant roles: their restaurant reports ?>
         <button type="button" class="bn-item<?= $__bn_reports_on ? ' active' : '' ?>" data-bs-toggle="offcanvas" data-bs-target="#bmsReportsSheet" aria-controls="bmsReportsSheet"><i class="<?= !empty($__rf) ? 'ri ri-chart-column' : 'bi bi-graph-up' ?>"></i><span><?= t('Reports') ?></span></button>
         <?php endif; ?>
     </nav>
@@ -2054,7 +2081,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
     </script>
     <?php endif; ?>
 
-    <?php if (hasReportsAccess()): ?>
+    <?php $__ra_rep = !empty($__ra) && ($__ra['sales'] || $__ra['waste'] || $__ra['cookrep']); if (hasReportsAccess() || $__ra_rep): // restaurant roles: their restaurant reports ?>
     <!-- Reports list — same six reports and gates as the Simple Mode Reports dropdown -->
     <div class="offcanvas offcanvas-bottom bms-sheet d-lg-none d-print-none" tabindex="-1" id="bmsReportsSheet" aria-labelledby="bmsReportsSheetLabel">
         <div class="offcanvas-header pb-0">
@@ -2069,8 +2096,8 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                 <?php if(canView('expense_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('expense_report') ?>"><i class="bi bi-cash-stack"></i><?= t('Expense Report') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_user_sales_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_user_sales_report') ?>"><i class="bi bi-person-badge"></i><?= t('Sales by User Report') ?></a><?php endif; ?>
                 <?php if(canView('pos') && canView('pos_profit_report')): ?><a class="list-group-item list-group-item-action" href="<?= getUrl('pos_profit_report') ?>"><i class="bi bi-graph-up-arrow"></i><?= t('Profit Report') ?></a><?php endif; ?>
-                <?php if (!empty($__rest_on)): // restaurant_plan.md Phase 6 ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant Sales') ?></a><?php endif; ?>
-                <?php if (!empty($__rest_on) && (isAdmin() || canApprove('restaurant_orders') || hasReportsAccess())): // restaurant_order_flow_plan.md ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i><?= t('Waste & cancellations') ?></a><?php endif; ?>
+                <?php if (!empty($__rest_on) && !empty($__ra['sales'])): // restaurant_plan.md Phase 6 — same rule as the page ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/sales-report') ?>"><i class="bi bi-cup-hot"></i><?= t('Restaurant Sales') ?></a><?php endif; ?>
+                <?php if (!empty($__rest_on) && !empty($__ra['waste'])): // same rule as the page ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/waste-report') ?>"><i class="bi bi-trash3"></i><?= t('Waste & cancellations') ?></a><?php endif; ?>
                 <?php if (!empty($__rest_on) && !empty($__cookRep)): // restaurant costing plan — same gate as the page ?><a class="list-group-item list-group-item-action" href="<?= getUrl('restaurant/cooking-report') ?>"><i class="bi bi-clipboard-data"></i><?= t('Planned vs actual') ?></a><?php endif; ?>
             </div>
         </div>
@@ -2121,8 +2148,8 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             if (canView('restaurant_pos')) {
                 if (!empty($__rest_on)) {
                     $__side_rest[] = [getUrl('restaurant/menu'), 'bi-journal-richtext', t('Menu')];
-                    $__side_rest[] = [getUrl('restaurant/cooking'), 'bi-fire', t('Cooking plan')];
-                    $__side_rest[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
+                    if (!empty($__ra['cooking'])) $__side_rest[] = [getUrl('restaurant/cooking'), 'bi-fire', t('Cooking plan')];
+                    if (!empty($__ra['tables']))  $__side_rest[] = [getUrl('restaurant/tables-board'), 'bi-grid-3x3-gap', t('Tables')];
                     if (!empty($__ro_nav)) $__side_rest[] = [getUrl('online_orders'), 'bi-phone', t('Online orders')];
                 }
                 $__side_rest[] = [getUrl('restaurant'), 'bi-cup-hot', t('Restaurant')];
@@ -2135,15 +2162,17 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
             ];
             if (!empty($__rf)) {   // restaurant focus: the same four menus as the desktop bar
                 $__rf_o = [];
-                if (canView('pos')) $__rf_o[] = [getUrl('pos'), 'ri ri-hand-platter', t('Take order')];
-                $__rf_o[] = [getUrl('restaurant/tables-board'), 'ri ri-armchair', t('Tables')];
-                if (!empty($__ro_nav)) $__rf_o[] = [getUrl('online_orders'), 'bi bi-phone', t('Online orders')];
-                $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'ri ri-chef-hat', t('Kitchen')];
-                $__rf_o[] = [getUrl('restaurant/reservations'), 'ri ri-calendar-check', t('Reservations')];
-                if (canView('pos')) $__rf_o[] = [getUrl('pos/credit-customers'), 'ri ri-hand-coins', t('Who Owes Me')];
-                $__rf_m = [[getUrl('restaurant/menu'), 'ri ri-book-open-text', t('Menu items')], [getUrl('restaurant/cooking'), 'ri ri-cooking-pot', t('Cooking plan')]];
+                // Every link: the same rule as its page (core/restaurant_access.php, raNav()).
+                if (!empty($__ra['take']))    $__rf_o[] = [getUrl('pos'), 'ri ri-hand-platter', t('Take order')];
+                if (!empty($__ra['tables']))  $__rf_o[] = [getUrl('restaurant/tables-board'), 'ri ri-armchair', t('Tables')];
+                if (!empty($__ro_nav))        $__rf_o[] = [getUrl('online_orders'), 'bi bi-phone', t('Online orders')];
+                if (!empty($__ra['kitchen'])) $__rf_o[] = [getUrl('restaurant/kitchen-dashboard'), 'ri ri-chef-hat', t('Kitchen')];
+                if (!empty($__ra['reserve'])) $__rf_o[] = [getUrl('restaurant/reservations'), 'ri ri-calendar-check', t('Reservations')];
+                if (!empty($__ra['credit']))  $__rf_o[] = [getUrl('pos/credit-customers'), 'ri ri-hand-coins', t('Who Owes Me')];
+                $__rf_m = [[getUrl('restaurant/menu'), 'ri ri-book-open-text', t('Menu items')]];
+                if (!empty($__ra['cooking'])) $__rf_m[] = [getUrl('restaurant/cooking'), 'ri ri-cooking-pot', t('Cooking plan')];
                 if (canView('categories')) $__rf_m[] = [getUrl('categories'), 'bi-tags', t('Menu groups')];
-                $__rf_m[] = [getUrl('restaurant/modifier-group'), 'ri ri-circle-plus', t('Add-on options')];
+                if (!empty($__ra['addons']))  $__rf_m[] = [getUrl('restaurant/modifier-group'), 'ri ri-circle-plus', t('Add-on options')];
                 $__rf_b = [];
                 if (canView('pos') && canView('pos_restock')) $__rf_b[] = [getUrl('restaurant/purchases'), 'ri ri-shopping-basket', t('Buy stock & ingredients')];
                 if (canView('suppliers')) $__rf_b[] = [getUrl('suppliers'), 'bi-truck', t('Suppliers')];

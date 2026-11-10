@@ -35,6 +35,7 @@ const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value
 let currentTableId = null;
 let currentTableLabel = '';
 let currentHoldId = null;         // the pos_held_sales row backing the open table order, once one exists
+let rofLocked = {};               // product_id → kitchen quantity this person may not take off (rofLoadStrip, rofMayReduce)
 let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetched once and reused
 // restaurant_plan.md Phase 2 — dine_in / take_away / delivery; '' = not chosen (sent as nothing,
 // exactly like before). Only a restaurant/hybrid shop ever sets it.
@@ -599,10 +600,17 @@ function setCustomerSelection(id, text) {
     $sel.trigger('change');
 }
 
-// Save/Load cart from localStorage
+// Save/Load cart from localStorage.
+// The browser keeps ONE cart per device, and a restaurant tablet is shared by the waiter and the cashier.
+// So the cart is saved with WHO made it and WHICH table/held order it belongs to (2026-11-10):
+//  - another person's cart is never shown (it was showing up as a new walk-in sale → paid twice);
+//  - a table's order lives on its table on the server: it is never brought back as a loose walk-in sale.
+//    Only items not yet saved to their table come back, and only when that same table is opened again.
 function saveCartToStorage() {
     try {
-        localStorage.setItem('pos_cart', JSON.stringify(cart));
+        localStorage.setItem('pos_cart', JSON.stringify({
+            v: 2, user: POS_USER_ID, table: currentTableId || null, hold: currentHoldId || null, items: cart
+        }));
         localStorage.setItem('pos_customer', $('#customerSelect').val() || '');
         localStorage.setItem('pos_customer_name', $('#customerSelect option:selected').text() || '');
     } catch (e) {
@@ -610,23 +618,34 @@ function saveCartToStorage() {
     }
 }
 
+/** What may come back from storage for THIS person on THIS screen: the items, or null (nothing). Pure — tested. */
+function posStoredCartFor(saved, userId, urlTable) {
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;   // old format: owner unknown
+    if (saved.v !== 2 || String(saved.user) !== String(userId)) return null;          // someone else's cart
+    const items = Array.isArray(saved.items) ? saved.items : [];
+    if (saved.hold) return null;                                                     // saved on its table — the server has it
+    if (saved.table) return String(saved.table) === String(urlTable || '') ? items : null;   // unsaved table items: only on that table
+    return items;
+}
+
 function loadCartFromStorage() {
     try {
-        const savedCart = localStorage.getItem('pos_cart');
+        const raw = localStorage.getItem('pos_cart');
         const savedCustomer = localStorage.getItem('pos_customer');
         const savedCustomerName = localStorage.getItem('pos_customer_name');
-
-        if (savedCart) {
-            cart = JSON.parse(savedCart);
-            updateCartDisplay();
-        }
-
+        if (!raw) return;
+        const urlTable = new URLSearchParams(window.location.search).get('table');
+        const items = posStoredCartFor(JSON.parse(raw), POS_USER_ID, urlTable);
+        if (items === null) { clearCartStorage(); return; }   // not this person's, or it belongs on a table
+        cart = items;
+        updateCartDisplay();
         if (savedCustomer) {
             setCustomerSelection(savedCustomer, savedCustomerName);
         }
     } catch (e) {
         console.error('Error loading cart:', e);
         cart = [];
+        clearCartStorage();
     }
 }
 
@@ -1495,6 +1514,7 @@ function updateCartDisplay() {
                             `<span class="badge bg-secondary" title="${safeOutput(item.serial_numbers.join(', '))}">${posFmtQty(item.quantity)}</span>` :
                             `<div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
                                 <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)"
+                                        ${(rofLocked[item.product_id] || 0) > 0 && rofProductQty(item.product_id, -1) - 1 < (rofLocked[item.product_id] || 0) - 1e-9 ? `disabled title="${safeOutput(ROF_T.lockedTitle)}"` : ''}
                                         style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
                                 <input type="number" class="form-control text-center${posLineAllowsDecimal(item) ? ' pos-qty-part' : ''}"
                                        style="width: ${posLineAllowsDecimal(item) ? 46 : 35}px; padding: 2px; font-size: 11px; height: 22px;"
@@ -1512,10 +1532,12 @@ function updateCartDisplay() {
                         <strong class="small text-success">${itemTotal.toLocaleString()}</strong>
                     </td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})"
+                        ${(rofLocked[item.product_id] || 0) > 0 && rofProductQty(item.product_id, index) < (rofLocked[item.product_id] || 0) - 1e-9
+                            ? `<i class="bi bi-lock text-muted" style="font-size: 14px;" title="${safeOutput(ROF_T.lockedTitle)}"></i>`
+                            : `<button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})"
                                 style="font-size: 14px;" title="${PT.remove}">
                             <i class="bi bi-trash"></i>
-                        </button>
+                        </button>`}
                     </td>
                 </tr>
             `;
@@ -1532,9 +1554,26 @@ function updateCartDisplay() {
 // + / − always move by exactly 1. A part quantity keeps its part (0.5 → 1.5 → 0.5) and
 // never goes to 0 or below — removing a line is the trash button's job. A whole-number
 // line never goes under 1, exactly as before.
+// Role based (2026-11-10): food the kitchen already has that this person may not cancel (rofMayCancel — e.g. a
+// waiter, once the cashier confirmed it) cannot be taken off the cart either: the till does not offer it, and
+// the server refuses it too ("Only the cashier can remove food the kitchen already has").
+function rofProductQty(productId, skipIndex) {
+    return cart.reduce((s, c, i) => s + (i !== skipIndex && String(c.product_id) === String(productId) ? (parseFloat(c.quantity) || 0) : 0), 0);
+}
+/** May line `index` become `newQty`? Shows why not. Pure check + message. */
+function rofMayReduce(index, newQty) {
+    const it = cart[index];
+    if (!it) return true;
+    const locked = rofLocked[it.product_id] || 0;
+    if (!locked || rofProductQty(it.product_id, index) + newQty + 1e-9 >= locked) return true;
+    Swal.fire({ icon: 'info', title: ROF_T.lockedTitle, text: ROF_T.lockedText.replace('%s', caseFormatJs(it.product_name)) });
+    return false;
+}
+
 function updateCartQuantity(index, change) {
     if (cart[index]) {
         const newQuantity = posRoundQty(cart[index].quantity + change);
+        if (newQuantity > 0 && !rofMayReduce(index, newQuantity)) return;
         if (newQuantity > 0) {
             cart[index].quantity = newQuantity;
             updateCartDisplay();
@@ -1550,6 +1589,7 @@ function updateCartQuantityInput(index, value) {
     const item = cart[index];
     if (!item) return;
     const quantity = posReadTypedQty(value, posLineAllowsDecimal(item), item.product_name);
+    if (quantity !== null && !rofMayReduce(index, quantity)) { updateCartDisplay(); return; }
     if (quantity !== null) item.quantity = quantity;
     updateCartDisplay();
     saveCartToStorage();
@@ -1613,6 +1653,7 @@ function editLinePrice(index) {
 }
 
 function removeFromCart(index) {
+    if (!rofMayReduce(index, 0)) return;
     cart.splice(index, 1);
     updateCartDisplay();
     saveCartToStorage();
@@ -2352,6 +2393,9 @@ function editItemNote(index) {
 function saveOrderToTable() {
     if (!currentTableId) { Swal.fire({ icon: 'warning', title: PT.selectTableFirst }); return; }
     if (cart.length === 0) { Swal.fire({ icon: 'warning', title: PT.emptyCartTitle, text: PT.addItemsBeforeHold }); return; }
+    // A kitchen screen / printer: the order is saved AND sent in one tap ("Send order") — a waiter who saved
+    // used to think it was sent while it never reached the cashier or the kitchen (2026-11-10).
+    if (posRestaurantActive() && POS_KITCHEN_MODE !== 'none') { sendCurrentOrderToKitchen(true); return; }
     const btn = $('#rsSaveTableBtn'); const orig = btn.html();
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
     const label = currentTableLabel;
@@ -2484,7 +2528,13 @@ function selectTable(tableId, warehouseId, tableNumber) {
     });
 }
 
-function sendCurrentOrderToKitchen() {
+/**
+ * Save the table's order and send what the kitchen does not have yet.
+ * leaveAfter (the "Send order" button): then the table is closed on this screen, as a save does — the order
+ * lives on its table; the chef-hat button (leaveAfter false) sends and stays on the table.
+ */
+function sendCurrentOrderToKitchen(leaveAfter) {
+    leaveAfter = leaveAfter === true;
     if (!currentTableId) {
         Swal.fire({ icon: 'warning', title: PT.error, text: PT.selectTableFirst });
         return;
@@ -2495,8 +2545,9 @@ function sendCurrentOrderToKitchen() {
     }
 
     const wid = parseInt($('#posWarehouseId').val() || 0, 10);
-    const btn = $('#sendToKitchenBtn');
+    const btn = leaveAfter ? $('#rsSaveTableBtn') : $('#sendToKitchenBtn');
     const origHtml = btn.html();
+    const tableLabel = currentTableLabel;
     // restaurant_plan.md Phase 3 — printer mode: open the slip window now, inside the click.
     const slipWin = (POS_KITCHEN_MODE === 'printer') ? window.open('', '_blank', 'width=420,height=640') : null;
     btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
@@ -2552,6 +2603,12 @@ function sendCurrentOrderToKitchen() {
                         const printNow = POS_KITCHEN_MODE === 'printer' && res.status === 'queued' && (res.ticket_ids || []).length;
                         if (printNow) openKitchenSlip({ ticket_ids: res.ticket_ids.join(','), warehouse_id: wid }, slipWin);
                         else if (slipWin) slipWin.close();
+                        if (leaveAfter) {   // "Send order": saved on its table and sent — this screen is free for the next order
+                            cart = []; updateCartDisplay(); clearCartStorage(); clearTableSelection(); setCustomerSelection('', '');
+                            Swal.fire({ icon: 'success', title: res.nothing_new ? PT.savedToTable.replace('%s', tableLabel) : (res.status === 'pending' ? ROF_T.sentToCashier : PT.sentToKitchen),
+                                        text: res.nothing_new ? res.message : PT.savedToTable.replace('%s', tableLabel), timer: 1800, showConfirmButton: false });
+                            return;
+                        }
                         if (res.nothing_new) Swal.fire({ icon: 'info', title: res.message, timer: 1800, showConfirmButton: false });
                         else Swal.fire({ icon: 'success', title: res.status === 'pending' ? ROF_T.sentToCashier : PT.sentToKitchen, timer: 1600, showConfirmButton: false });
                         rofLoadStrip();
@@ -2583,6 +2640,8 @@ function sendCurrentOrderToKitchen() {
 
 // ───────────── restaurant_order_flow_plan.md — Waiter → Cashier → Kitchen → Waiter → Bill ─────────────
 const ROF_T = {
+    lockedTitle: <?= json_encode(t('The kitchen already has this')) ?>,
+    lockedText: <?= json_encode(t('Only the cashier can remove food the kitchen already has: %s.')) ?>,
     cashierPays: <?= json_encode(t('The cashier takes payment. Save the order to its table and send it.')) ?>,
     sentToCashier: <?= json_encode(t('Sent to the cashier to confirm.')) ?>,
     reasonTitle: <?= json_encode(t('Why is it cancelled?')) ?>,
@@ -2626,6 +2685,7 @@ function rofAskReason(text, title, placeholder) {
 
 function rofHideStrip() {
     if (rofStripTimer) { clearInterval(rofStripTimer); rofStripTimer = null; }
+    if (Object.keys(rofLocked).length) { rofLocked = {}; updateCartDisplay(); }
     $('#rofStrip').addClass('d-none'); $('#rofStripLines').empty(); $('#rofCancelOrderBtn').addClass('d-none');
 }
 
@@ -2644,6 +2704,10 @@ function rofLoadStrip() {
         if (currentTableId !== tid) return;
         if (!res.success) { rofHideStrip(); return; }
         const R = res.rights || POS_FLOW;
+        // what this person may not take off (kitchen lines they may not cancel) — the cart greys those out
+        const locked = {};
+        (res.lines || []).forEach(l => { if (!rofMayCancel(l, R)) locked[l.product_id] = (locked[l.product_id] || 0) + (parseFloat(l.qty) || 0); });
+        if (JSON.stringify(locked) !== JSON.stringify(rofLocked)) { rofLocked = locked; updateCartDisplay(); }
         let html = '';
         (res.lines || []).forEach(l => {
             const recv = (l.status === 'ready' && R.take)

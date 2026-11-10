@@ -16,6 +16,9 @@ require_once __DIR__ . '/../../core/restaurant_order_flow.php';
 
 if (!isAuthenticated()) { http_response_code(401); echo json_encode(['success' => false, 'message' => t('Unauthorized')]); exit; }
 if (!canView('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Restaurant POS is not included in your plan.')]); exit; }
+// Role based (core/restaurant_access.php): the same rule as the page and its menu link.
+require_once __DIR__ . '/../../core/restaurant_access.php';
+if (!raCanTables()) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 if (!restaurantSchemaReady($pdo)) { echo json_encode(['success' => false, 'message' => t('Restaurant module is being set up for your account — please check back shortly.')]); exit; }
 
 global $pdo;

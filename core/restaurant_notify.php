@@ -138,12 +138,16 @@ if (!function_exists('rnNotifyKitchenReady')) {
             if (!$k) return;
             $label = $k['table_number'] !== null ? 'Table ' . $k['table_number'] : ($k['order_label'] ?: 'Order #' . $k['ticket_id']);
             $items = mb_substr((string)($k['items'] ?? ''), 0, 160);
+            // each reader gets it in their own language ("Meza T1 iko tayari…") — core/notify.php notifText
+            $L = $k['table_number'] !== null ? ['%1$s %2$s', [['Table'], (string)$k['table_number']]] : ['%s', [$label]];
             rnDispatch($pdo, 'restaurant.kitchen_ready', [
                 'entity_type'    => 'kitchen_ticket', 'entity_id' => (int)$k['ticket_id'],
                 'warehouse_id'   => (int)$k['warehouse_id'],
                 'owner_user_ids' => $k['waiter_id'] ? [(int)$k['waiter_id']] : [],
                 'title'          => "Ready to serve: $label",
                 'message'        => "$label is ready" . ($items !== '' ? ": $items" : '') . '.',
+                'i18n'           => ['title' => ['Ready to serve: %s', [$L]],
+                                     'message' => $items !== '' ? ['%1$s is ready: %2$s.', [$L, $items]] : ['%s is ready.', [$L]]],
                 'action_url'     => $k['table_id'] ? 'tables-board?table=' . (int)$k['table_id'] : 'kitchen-dashboard?ticket=' . (int)$k['ticket_id'],
                 'severity'       => 'medium',
                 'dedupe_suffix'  => 'once',

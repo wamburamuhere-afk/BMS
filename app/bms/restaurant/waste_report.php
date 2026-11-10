@@ -17,7 +17,8 @@ require_once __DIR__ . '/../../../core/restaurant_order_flow.php';
 $page_title = 'Waste & cancellations';
 require_once 'header.php';
 
-$allowed = canView('restaurant_pos') && (isAdmin() || rofCanConfirm($pdo) || (function_exists('hasReportsAccess') && hasReportsAccess()));
+require_once __DIR__ . '/../../../core/restaurant_access.php';   // role based: the same rule as the menu link
+$allowed = canView('restaurant_pos') && raCanWasteReport($pdo);
 if (!$allowed) {
     header('Location: ' . getUrl('unauthorized'));
     exit();
