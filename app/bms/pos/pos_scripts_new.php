@@ -35,6 +35,7 @@ const POS_LOYALTY_REDEEM_VALUE = <?= (float)getSetting('pos_loyalty_redeem_value
 let currentTableId = null;
 let currentTableLabel = '';
 let currentHoldId = null;         // the pos_held_sales row backing the open table order, once one exists
+let rofLocked = {};               // product_id → kitchen quantity this person may not take off (rofLoadStrip, rofMayReduce)
 let modifierGroupsCache = null;   // full modifier_groups+options catalog, fetched once and reused
 // restaurant_plan.md Phase 2 — dine_in / take_away / delivery; '' = not chosen (sent as nothing,
 // exactly like before). Only a restaurant/hybrid shop ever sets it.
@@ -1513,6 +1514,7 @@ function updateCartDisplay() {
                             `<span class="badge bg-secondary" title="${safeOutput(item.serial_numbers.join(', '))}">${posFmtQty(item.quantity)}</span>` :
                             `<div class="d-flex align-items-center justify-content-center" style="gap: 2px;">
                                 <button class="btn btn-outline-secondary" onclick="updateCartQuantity(${index}, -1)"
+                                        ${(rofLocked[item.product_id] || 0) > 0 && rofProductQty(item.product_id, -1) - 1 < (rofLocked[item.product_id] || 0) - 1e-9 ? `disabled title="${safeOutput(ROF_T.lockedTitle)}"` : ''}
                                         style="padding: 2px 4px; font-size: 10px; line-height: 1; min-width: 18px;">-</button>
                                 <input type="number" class="form-control text-center${posLineAllowsDecimal(item) ? ' pos-qty-part' : ''}"
                                        style="width: ${posLineAllowsDecimal(item) ? 46 : 35}px; padding: 2px; font-size: 11px; height: 22px;"
@@ -1530,10 +1532,12 @@ function updateCartDisplay() {
                         <strong class="small text-success">${itemTotal.toLocaleString()}</strong>
                     </td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})"
+                        ${(rofLocked[item.product_id] || 0) > 0 && rofProductQty(item.product_id, index) < (rofLocked[item.product_id] || 0) - 1e-9
+                            ? `<i class="bi bi-lock text-muted" style="font-size: 14px;" title="${safeOutput(ROF_T.lockedTitle)}"></i>`
+                            : `<button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart(${index})"
                                 style="font-size: 14px;" title="${PT.remove}">
                             <i class="bi bi-trash"></i>
-                        </button>
+                        </button>`}
                     </td>
                 </tr>
             `;
@@ -1550,9 +1554,26 @@ function updateCartDisplay() {
 // + / − always move by exactly 1. A part quantity keeps its part (0.5 → 1.5 → 0.5) and
 // never goes to 0 or below — removing a line is the trash button's job. A whole-number
 // line never goes under 1, exactly as before.
+// Role based (2026-11-10): food the kitchen already has that this person may not cancel (rofMayCancel — e.g. a
+// waiter, once the cashier confirmed it) cannot be taken off the cart either: the till does not offer it, and
+// the server refuses it too ("Only the cashier can remove food the kitchen already has").
+function rofProductQty(productId, skipIndex) {
+    return cart.reduce((s, c, i) => s + (i !== skipIndex && String(c.product_id) === String(productId) ? (parseFloat(c.quantity) || 0) : 0), 0);
+}
+/** May line `index` become `newQty`? Shows why not. Pure check + message. */
+function rofMayReduce(index, newQty) {
+    const it = cart[index];
+    if (!it) return true;
+    const locked = rofLocked[it.product_id] || 0;
+    if (!locked || rofProductQty(it.product_id, index) + newQty + 1e-9 >= locked) return true;
+    Swal.fire({ icon: 'info', title: ROF_T.lockedTitle, text: ROF_T.lockedText.replace('%s', caseFormatJs(it.product_name)) });
+    return false;
+}
+
 function updateCartQuantity(index, change) {
     if (cart[index]) {
         const newQuantity = posRoundQty(cart[index].quantity + change);
+        if (newQuantity > 0 && !rofMayReduce(index, newQuantity)) return;
         if (newQuantity > 0) {
             cart[index].quantity = newQuantity;
             updateCartDisplay();
@@ -1568,6 +1589,7 @@ function updateCartQuantityInput(index, value) {
     const item = cart[index];
     if (!item) return;
     const quantity = posReadTypedQty(value, posLineAllowsDecimal(item), item.product_name);
+    if (quantity !== null && !rofMayReduce(index, quantity)) { updateCartDisplay(); return; }
     if (quantity !== null) item.quantity = quantity;
     updateCartDisplay();
     saveCartToStorage();
@@ -1631,6 +1653,7 @@ function editLinePrice(index) {
 }
 
 function removeFromCart(index) {
+    if (!rofMayReduce(index, 0)) return;
     cart.splice(index, 1);
     updateCartDisplay();
     saveCartToStorage();
@@ -2617,6 +2640,8 @@ function sendCurrentOrderToKitchen(leaveAfter) {
 
 // ───────────── restaurant_order_flow_plan.md — Waiter → Cashier → Kitchen → Waiter → Bill ─────────────
 const ROF_T = {
+    lockedTitle: <?= json_encode(t('The kitchen already has this')) ?>,
+    lockedText: <?= json_encode(t('Only the cashier can remove food the kitchen already has: %s.')) ?>,
     cashierPays: <?= json_encode(t('The cashier takes payment. Save the order to its table and send it.')) ?>,
     sentToCashier: <?= json_encode(t('Sent to the cashier to confirm.')) ?>,
     reasonTitle: <?= json_encode(t('Why is it cancelled?')) ?>,
@@ -2660,6 +2685,7 @@ function rofAskReason(text, title, placeholder) {
 
 function rofHideStrip() {
     if (rofStripTimer) { clearInterval(rofStripTimer); rofStripTimer = null; }
+    if (Object.keys(rofLocked).length) { rofLocked = {}; updateCartDisplay(); }
     $('#rofStrip').addClass('d-none'); $('#rofStripLines').empty(); $('#rofCancelOrderBtn').addClass('d-none');
 }
 
@@ -2678,6 +2704,10 @@ function rofLoadStrip() {
         if (currentTableId !== tid) return;
         if (!res.success) { rofHideStrip(); return; }
         const R = res.rights || POS_FLOW;
+        // what this person may not take off (kitchen lines they may not cancel) — the cart greys those out
+        const locked = {};
+        (res.lines || []).forEach(l => { if (!rofMayCancel(l, R)) locked[l.product_id] = (locked[l.product_id] || 0) + (parseFloat(l.qty) || 0); });
+        if (JSON.stringify(locked) !== JSON.stringify(rofLocked)) { rofLocked = locked; updateCartDisplay(); }
         let html = '';
         (res.lines || []).forEach(l => {
             const recv = (l.status === 'ready' && R.take)

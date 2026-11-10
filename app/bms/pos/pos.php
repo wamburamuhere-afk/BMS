@@ -162,7 +162,10 @@ $old_sale_max_days   = posOldSaleMaxDays();
 
 $pos_simple = posSimpleModeEnabled();
 // A shift still open from an earlier day: cash totals keep accumulating into it.
-$shift_from_earlier_day = $shift_active && date('Y-m-d', strtotime($shift_active['start_time'])) < date('Y-m-d');
+// Role based (2026-11-10): the cash drawer, shift and money overview belong to whoever takes payment.
+// A waiter saves table orders without a shift (api/pos/hold_sale.php) — none of it is shown to them.
+$pos_can_pay = isAdmin() || canCreate('pos');
+$shift_from_earlier_day = $pos_can_pay && $shift_active && date('Y-m-d', strtotime($shift_active['start_time'])) < date('Y-m-d');
 $cashier_name = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''))
     ?: ($_SESSION['username'] ?? t('User'));
 ?>
@@ -262,24 +265,30 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                     <i class="bi bi-upc-scan"></i> <span class="pos-scan-txt"><?= t('SCANNER READY') ?></span>
                 </span>
             </h4>
-            <?php if ($shift_active): ?>
+            <?php if (!$pos_can_pay): // no cash controls for whoever does not take payment ?>
+            <?php elseif ($shift_active): ?>
             <span class="pos-hdr-mini-bal d-md-none"><small><?= t('Cash in drawer') ?></small><span class="cash-balance-display"><?= htmlspecialchars($currency) ?> <?= number_format((float)$cash_balance, 2) ?></span></span>
             <?php else: ?>
             <span class="pos-hdr-mini-bal d-md-none"><?= t('No shift') ?></span>
             <?php endif; ?>
+            <?php if ($pos_can_pay): ?>
             <button type="button" class="pos-hdr-actions d-md-none" id="posActionsBtn"
                     data-bs-toggle="offcanvas" data-bs-target="#posActionsSheet" aria-controls="posActionsSheet" aria-haspopup="dialog">
                 <i class="bi bi-grid-fill"></i> <?= t('Actions') ?> <i class="bi bi-chevron-down"></i>
             </button>
+            <?php endif; ?>
             </div>
             <small class="opacity-75" id="posShiftInfoLine">
-                <?php if ($shift_active): ?>
+                <?php if (!$pos_can_pay): ?>
+                <?= htmlspecialchars(trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')) ?: ($_SESSION['username'] ?? '')) ?> · <?= t('Orders go to the cashier for payment.') ?>
+                <?php elseif ($shift_active): ?>
                 <span class="pos-shift-info-item"><?= t('Shift:') ?> <?= $shift_active['shift_code'] ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Started:') ?> <?= date('H:i', strtotime($shift_active['start_time'])) ?></span><span class="pos-shift-info-sep"> | </span><span class="pos-shift-info-item"><?= t('Cashier:') ?> <?= htmlspecialchars($cashier_name) ?></span>
                 <?php else: ?>
                 <?= t('No active shift') ?>
                 <?php endif; ?>
             </small>
         </div>
+        <?php if ($pos_can_pay): // cash balance, drawer, shift — whoever takes payment ?>
         <div class="d-flex align-items-center gap-3">
             <div class="text-center">
                 <div class="fs-6"><?= t('Cash Balance') ?></div>
@@ -344,6 +353,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                 <?php endif; ?>
             </div>
         </div>
+        <?php endif; ?>
     </div>
 
     <?php if ($can_record_old_sale): ?>
@@ -360,6 +370,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
     <!-- Phones: every header action in one sheet, each explained in a line, so a
          new cashier knows what each one does. Rows call the same functions as the
          desktop buttons, after the sheet has closed (posAction()). -->
+    <?php if ($pos_can_pay): ?>
     <div class="offcanvas offcanvas-bottom pos-actions-sheet d-md-none" tabindex="-1" id="posActionsSheet" aria-labelledby="posActionsTitle">
         <div class="pos-actions-grab" aria-hidden="true"></div>
         <div class="pos-actions-head">
@@ -413,6 +424,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
             <?php endif; ?>
         </div>
     </div>
+    <?php endif; ?>
 
     <?php if ($pos_simple && $shift_from_earlier_day): ?>
     <!-- Dismissible; comes back every 24 hours counted from the shift's opening time.
