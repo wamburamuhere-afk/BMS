@@ -684,6 +684,50 @@ if (!function_exists('planOfferShape')) {
     }
 }
 
+if (!function_exists('planMonthlySortPrice')) {
+    /**
+     * The price a plan is LISTED by (2026-11-10): its 1-month price, else the
+     * lowest price per month among its terms. Null = no price (listed last).
+     * Display order only — upgrade/downgrade still follows planWeight().
+     *
+     * @param array $prices rows carrying `months` + `price_tzs` (planPrices() / planOfferShape())
+     */
+    function planMonthlySortPrice(array $prices): ?float
+    {
+        $best = null;
+        foreach ($prices as $p) {
+            $m  = max(1, (int)($p['months'] ?? 1));
+            $pm = (float)($p['price_tzs'] ?? 0) / $m;
+            if ($m === 1) return $pm;
+            $best = $best === null ? $pm : min($best, $pm);
+        }
+        return $best;
+    }
+}
+
+if (!function_exists('planSortByPrice')) {
+    /**
+     * Plans cheapest first (by planMonthlySortPrice), so every list a company or a
+     * visitor sees reads Basic → Standard → Professional → Enterprise, never by
+     * name. Same price → tier_rank, then name. Plans without a price go last.
+     *
+     * @param callable $pricesOf fn(array $plan): array — that plan's price rows
+     */
+    function planSortByPrice(array $plans, callable $pricesOf): array
+    {
+        $rows = [];
+        foreach (array_values($plans) as $i => $p) {
+            $rows[] = ['price' => planMonthlySortPrice($pricesOf($p)), 'tier' => (int)($p['tier_rank'] ?? 0),
+                       'name' => mb_strtolower((string)($p['name'] ?? '')), 'i' => $i, 'plan' => $p];
+        }
+        usort($rows, function (array $a, array $b): int {
+            if (($a['price'] === null) !== ($b['price'] === null)) return $a['price'] === null ? 1 : -1;
+            return [$a['price'], $a['tier'], $a['name'], $a['i']] <=> [$b['price'], $b['tier'], $b['name'], $b['i']];
+        });
+        return array_column($rows, 'plan');
+    }
+}
+
 if (!function_exists('listPublicOffers')) {
     /**
      * What the public may see: active products → their active, public plans
@@ -712,6 +756,7 @@ if (!function_exists('listPublicOffers')) {
                 if ($shape['prices']) $plans[] = $shape;
             }
             if (!$plans) continue;
+            $plans = planSortByPrice($plans, fn(array $p) => $p['prices']);   // cheapest first (2026-11-10)
             $out[] = ['product_key' => (string)$prod['product_key'], 'name' => (string)$prod['name'],
                       'description' => $prod['description'] !== null ? (string)$prod['description'] : null,
                       'plans' => $plans];
