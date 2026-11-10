@@ -1,5 +1,20 @@
 # BMS Changelog
 
+## 2026-11-10 — fix(roles): Roles & Permissions follows the shop mode — retail never meets restaurant rows, a restaurant reads its own words
+
+**Changed:** `core/role_permission_ui.php`, `app/constant/settings/user_roles.php`, `core/restaurant_order_flow_schema.php`, `lang/sw.php`, `tests/test_roles_matrix_shop_mode_cli.php` (new)
+
+- **Before:** the permission rows followed only the modules switched on — never the shops' POS Mode. The roles list above them already did (ready-made restaurant roles only with a Restaurant/Hybrid shop), so the two disagreed.
+- **Restaurant POS off:** nothing changes (same rows, names and texts as before).
+- **Restaurant POS on, every shop Retail:** Restaurant POS / Restaurant Orders / Kitchen Screen / Restaurant costs rows are left out — same rule as the ready-made roles (`rofsHasRestaurantShop`). Ticks already saved on them are kept and come back when a shop is set to Restaurant.
+- **Mixed (a Restaurant/Hybrid shop alongside Retail ones):** everything shows; restaurant rows sit in their own **Restaurant** tab; shared rows keep their retail text and add a note "In a restaurant shop: …" (e.g. POS System: View = waiter, Create = cashier; Restock = Purchases + giving stock to the cook).
+- **Every active shop Restaurant (Smart POS):** shared rows are described in restaurant words only (Orders & Till, Purchases & Stock, Menu groups, Shops…). No row is hidden: each one is still used by a restaurant (POS Advanced = kitchen printers / tills / targets; price, discount and old sale are on the restaurant till; Products is needed to link add-ons).
+- **Restaurant POS row:** text corrected (it still said "Kitchen Display", which has its own row) — View opens the Menu, Create adds reservations, Edit changes the menu, recipes, add-ons, tables, kitchen stations, online menu and Cooking plan.
+- **Mobile Money:** its 11 rows no longer show (no BMS page reads them; MM lives in LMS); saved ticks are kept.
+- **Ready-made Restaurant Manager:** removed `pos_dashboard`, a right that has never existed (it was silently skipped).
+- **Not changed:** Admin (Legacy) stays — the Compliance report still checks it.
+- **Checked:** new test 94/94 (decision for every shop mix; module off = identical rows; live all-retail / mixed / all-restaurant / hybrid on the DB, rolled back; save across a mode change keeps hidden grants; crafted POST refused; Swahili). Real page rendered over HTTP for all-retail, mixed, all-restaurant (English + Swahili) and a real form save + delete. Existing suites (role permission UI, simple mode, admin lock, activity-log label) show only the failures they show on develop without this change; restaurant order flow and role translation pass.
+
 ## 2026-11-10 — fix(restaurant): role based — what a role may use is in its menu; nothing else; alerts, till and wording (big-restaurant live test)
 
 **Changed:** `core/restaurant_access.php` (new), `core/restaurant_alerts_schema.php` (new), `header.php`, `includes/restaurant/dash_panel.php`, `includes/restaurant/dashboard.php`, restaurant pages (`tables_board`, `reservations`, `cook_plan`, `cook_plan_report`, `sales_report`, `waste_report`, `modifier_group`), `app/bms/pos/pos_credit_customers.php`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, APIs (`get_tables_board`, `get_reservations`, `save_reservation`, `update_reservation_status`, `cook_plan`, `pos/get_credit_aging`, `pos/get_credit_sale_detail`), `core/notify.php`, `core/restaurant_order_flow.php`, `core/restaurant_notify.php`, `core/restaurant_cook_plan.php`, `core/restaurant_insights.php`, `lang/sw.php`, `tests/test_user_role_translation_cli.php`, `migrations/tenant/2026_11_10_restaurant_alerts.php` (new), `migrations/2026_11_10_restaurant_alerts_legacy_db.php` (new)

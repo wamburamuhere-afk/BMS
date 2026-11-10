@@ -215,6 +215,8 @@ $roles_stmt = $pdo->query("
 $roles = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Only rows for modules this company has active (core/role_permission_ui.php).
+// Shop mode (retail / mixed / restaurant) decides whether restaurant rows show and how shared rows are worded.
+$shop_mode = rolePermissionShopMode($pdo);
 $permissions = loadRolePermissionMatrix($pdo)['visible'];
 
 $permissions_by_module = [];
@@ -505,7 +507,7 @@ function getRoleBadgeColor($role_name) {
                                                                 data-bs-toggle="tab" 
                                                                 data-bs-target="#<?= $tabId ?>" 
                                                                 type="button" role="tab">
-                                                            <?= htmlspecialchars($module_name === 'Point of Sale' ? wLabel('Point of Sale', 'Selling') : $module_name) ?>
+                                                            <?= htmlspecialchars($module_name === 'Point of Sale' ? wLabel('Point of Sale', 'Selling') : ($module_name === 'Restaurant' ? t('Restaurant') : $module_name)) ?>
                                                             <span class="badge bg-secondary-subtle text-secondary rounded-pill ms-1"><?= count($module_permissions) ?></span>
                                                         </button>
                                                     </li>
@@ -573,8 +575,12 @@ function getRoleBadgeColor($role_name) {
                                                                     <?php foreach ($module_permissions as $permission): ?>
                                                                         <tr class="perm-row">
                                                                             <td class="ps-3">
-                                                                                <div class="fw-bold small perm-name"><?= htmlspecialchars($permission['page_name'] ?? '') ?></div>
-                                                                                <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars($permission['description'] ?? '') ?></div>
+                                                                                <?php $_shop = rolePermissionShopText((string)$permission['page_key'], $shop_mode); ?>
+                                                                                <div class="fw-bold small perm-name"><?= htmlspecialchars(!empty($_shop['name']) ? t($_shop['name']) : ($permission['page_name'] ?? '')) ?></div>
+                                                                                <div class="text-muted" style="font-size: 0.7rem;"><?= htmlspecialchars(($_shop && $_shop['replace']) ? t($_shop['text']) : ($permission['description'] ?? '')) ?></div>
+                                                                                <?php if ($_shop && !$_shop['replace']): ?>
+                                                                                <div class="text-success" style="font-size: 0.7rem;"><i class="bi bi-cup-hot me-1"></i><?= htmlspecialchars(t('In a restaurant shop:') . ' ' . t($_shop['text'])) ?></div>
+                                                                                <?php endif; ?>
                                                                                 <?php if ($_note = rolePermissionNote((string)$permission['page_key'])): ?>
                                                                                 <div class="text-primary" style="font-size: 0.7rem;"><i class="bi bi-info-circle me-1"></i><?= htmlspecialchars(t($_note)) ?></div>
                                                                                 <?php endif; ?>
