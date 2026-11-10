@@ -58,6 +58,9 @@ try {
         ->execute($params);
 
     logActivity($pdo, $_SESSION['user_id'], "Mobile: updated shop #$warehouse_id ($warehouse_name)");
+    // A Smart POS shop in Restaurant/Hybrid mode: the ready-made restaurant roles are there by default.
+    require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+    restaurantReadyRolesSync($pdo, true);
     echo json_encode(['success'=>true,'message'=>'Shop updated successfully']);
 } catch (Throwable $e) {
     error_log('mobile/warehouses/update.php: ' . $e->getMessage());

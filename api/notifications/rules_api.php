@@ -40,7 +40,8 @@ try {
                                        default_severity, scope_aware, is_active
                                 FROM notification_events ORDER BY module, title")->fetchAll(PDO::FETCH_ASSOC);
 
-        $roles = $pdo->query("SELECT role_id, role_name FROM roles ORDER BY role_name")->fetchAll(PDO::FETCH_ASSOC);
+        require_once __DIR__ . '/../../core/restaurant_ready_roles.php';   // restaurant roles: only where they belong
+        $roles = $pdo->query("SELECT role_id, role_name FROM roles WHERE 1=1" . restaurantReadyRolesHideSql($pdo, 'roles') . " ORDER BY role_name")->fetchAll(PDO::FETCH_ASSOC);
         $users = $pdo->query("SELECT user_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS name, username, email
                               FROM users WHERE is_active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         $roleMap = []; foreach ($roles as $r) $roleMap[(int)$r['role_id']] = $r['role_name'];

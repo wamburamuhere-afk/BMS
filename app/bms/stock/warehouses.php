@@ -152,6 +152,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
 
                 logActivity($pdo, $user_id, 'Create warehouse', "User created a new warehouse: $warehouse_name ($warehouse_code)");
+                // A Smart POS shop in Restaurant/Hybrid mode: the ready-made restaurant roles are there by default.
+                if (in_array($pos_mode ?? '', ['restaurant', 'hybrid'], true)) {
+                    require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+                    restaurantReadyRolesSync($pdo, true);
+                }
 
                 // Phase 6 warehouse-scope grants are transaction-derived or
                 // explicitly curated (project_scope.php) — a brand-new
@@ -328,6 +333,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 logActivity($pdo, $user_id, 'Edit warehouse', "User edited warehouse: $warehouse_name ($warehouse_code)");
+                // A Smart POS shop in Restaurant/Hybrid mode: the ready-made restaurant roles are there by default.
+                if (in_array($pos_mode ?? '', ['restaurant', 'hybrid'], true)) {
+                    require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+                    restaurantReadyRolesSync($pdo, true);
+                }
                 $_SESSION['success'] = [isShopLabel() ? 'Shop updated successfully!' : 'Warehouse updated successfully!'];
                 header("Location: warehouses.php");
                 exit();

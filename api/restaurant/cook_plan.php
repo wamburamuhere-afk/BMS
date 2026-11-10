@@ -60,9 +60,9 @@ $dayOut = function (int $wh, string $date, bool $earlier = false) use ($pdo, $se
     unset($r);
     return $rows;
 };
-$rights = fn() => ['can_edit' => canEdit('restaurant_pos'), 'can_move_stock' => rcpCanMoveStock(), 'can_see_cost' => $seeCost,
+$rights = fn() => ['can_edit' => rcpCanCook(), 'can_move_stock' => rcpCanMoveStock(), 'can_see_cost' => $seeCost,
                     // Phase 4: someone who may cook, without the stock right, may ask for stock
-                    'can_request' => canEdit('restaurant_pos') && !rcpCanMoveStock() && rcpRequestsReady($pdo)];
+                    'can_request' => rcpCanCook() && !rcpCanMoveStock() && rcpRequestsReady($pdo)];
 /** Phase 4 — waiting stock requests, only for whoever may give stock out. */
 $requests = function (int $wh) use ($pdo, $seeCost, $strip): array {
     if (!rcpCanMoveStock()) return [];
@@ -82,7 +82,7 @@ try {
                 'stock'  => $strip(rcpStockItems($pdo, $wh), ['cost_price']),
                 'plans'  => $dayOut($wh, date('Y-m-d')), 'requests' => $requests($wh),
                 // cooks of earlier days never closed — closed from today's page so their plates not sold are counted
-                'earlier' => canEdit('restaurant_pos') ? $dayOut($wh, date('Y-m-d'), true) : []] + $rights());
+                'earlier' => rcpCanCook() ? $dayOut($wh, date('Y-m-d'), true) : []] + $rights());
             return;
         }
         if ($action === 'dish') {
@@ -127,7 +127,7 @@ try {
         return;
     }
 
-    if (!canEdit('restaurant_pos')) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
+    if (!rcpCanCook()) { http_response_code(403); echo json_encode(['success' => false, 'message' => t('Permission denied')]); exit; }
 
     if ($action === 'create') {
         $wh = (int)($src['warehouse_id'] ?? 0);

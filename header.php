@@ -1422,7 +1422,7 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
                             require_once __DIR__ . '/core/restaurant_scope.php';
                             $__rest_on = restaurantModuleOn($pdo); // Smart POS restaurant: show its daily pages directly
                             // "Planned vs actual" in Reports — the same gate as app/bms/restaurant/cook_plan_report.php
-                            $__cookRep = $__rest_on && (canEdit('restaurant_pos') || restaurantCanSeeCost() || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess())); ?>
+                            $__cookRep = $__rest_on && (canEdit('restaurant_pos') || canEdit('kitchen_display') || restaurantCanSeeCost() || isAdmin() || (function_exists('hasReportsAccess') && hasReportsAccess())); ?>
                         <?php if ($__rf): // restaurant focus: Orders / Menu / Purchases above replace this dropdown ?>
                         <?php elseif ($__rest_on): ?>
                         <li class="nav-item dropdown">

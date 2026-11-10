@@ -25,7 +25,10 @@ if (!canEdit('users')) {
 // Fetch roles from database
 $roles = [];
 try {
-    $stmt = $pdo->query("SELECT role_id, role_name FROM roles ORDER BY role_name");
+    // Ready-made restaurant roles: there by default for a Smart POS restaurant, left out everywhere else.
+    require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+    restaurantReadyRolesSync($pdo);
+    $stmt = $pdo->query("SELECT role_id, role_name FROM roles WHERE 1=1" . restaurantReadyRolesHideSql($pdo, 'roles') . " ORDER BY role_name");
     $roles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $errors['database'] = t('Error fetching roles:') . ' ' . $e->getMessage();

@@ -200,11 +200,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 require_once 'header.php';
 
 // Load all roles
+// Ready-made restaurant roles: there by default for a Smart POS restaurant, left out everywhere else.
+require_once __DIR__ . '/../../../core/restaurant_ready_roles.php';
+restaurantReadyRolesSync($pdo);
+$__hideR = restaurantReadyRolesHideSql($pdo, 'r');
 $roles_stmt = $pdo->query("
-    SELECT r.*, COUNT(u.user_id) as user_count 
-    FROM roles r 
-    LEFT JOIN users u ON r.role_id = u.role_id 
-    GROUP BY r.role_id 
+    SELECT r.*, COUNT(u.user_id) as user_count
+    FROM roles r
+    LEFT JOIN users u ON r.role_id = u.role_id
+    WHERE 1=1 $__hideR
+    GROUP BY r.role_id
     ORDER BY r.role_name
 ");
 $roles = $roles_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -236,7 +241,7 @@ $users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get permission statistics
 $stats_stmt = $pdo->query("
     SELECT 
-        (SELECT COUNT(*) FROM roles) as total_roles,
+        (SELECT COUNT(*) FROM roles r WHERE 1=1 $__hideR) as total_roles,
         (SELECT COUNT(*) FROM permissions) as total_permissions,
         (SELECT COUNT(*) FROM users) as total_users,
         (SELECT COUNT(DISTINCT module_name) FROM permissions) as total_modules
