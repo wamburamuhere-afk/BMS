@@ -19,6 +19,9 @@ requireSuperadmin();
 $me = currentSuperadmin();
 
 $platformName  = getPlatformSetting('platform_name', 'BMS Platform');
+// Public website (landing page, search engines) — core/public_site.php.
+require_once ROOT_DIR . '/core/public_site.php';
+$publicSite    = publicSiteInfo();
 $smtpHost      = getPlatformSetting('smtp_host');
 $smtpPort      = getPlatformSetting('smtp_port', '587');
 $smtpUsername  = getPlatformSetting('smtp_username');
@@ -85,6 +88,23 @@ $isAutoUser   = ($emailProvider === 'sendgrid');   // auto-fill username = "apik
                             <input type="text" class="form-control" name="platform_name" required maxlength="191"
                                    value="<?= safe_output($platformName, '') ?>">
                             <div class="form-text">Shown as the default sender name on platform-originated email (welcome messages, announcements) when no From Name is set below.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="platform_legal_name">Company legal name</label>
+                            <input type="text" class="form-control" id="platform_legal_name" name="platform_legal_name" maxlength="191"
+                                   value="<?= safe_output($publicSite['legal_name'], '') ?>">
+                            <div class="form-text">The company that runs this platform. Shown in the public website footer and to search engines.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="platform_address">Company address <span class="text-muted">(optional)</span></label>
+                            <input type="text" class="form-control" id="platform_address" name="platform_address" maxlength="255"
+                                   value="<?= safe_output($publicSite['address'], '') ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="platform_public_url">Main public website <span class="text-muted">(optional)</span></label>
+                            <input type="url" class="form-control" id="platform_public_url" name="platform_public_url" maxlength="191" placeholder="https://bms.example.co.tz"
+                                   value="<?= safe_output($publicSite['public_url_setting'], '') ?>">
+                            <div class="form-text">Leave empty on the main site. On a second copy (e.g. a demo), enter the main site's address: this copy is then hidden from search engines and points them to the main site.</div>
                         </div>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-circle me-1"></i> Save branding

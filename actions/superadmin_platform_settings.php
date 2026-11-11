@@ -40,8 +40,17 @@ if ($action === 'save_branding') {
         echo json_encode(['success' => false, 'message' => 'Enter a platform name (up to 191 characters).']);
         exit;
     }
+    // Public website details (core/public_site.php) — validated before anything is saved.
+    require_once __DIR__ . '/../core/public_site.php';
+    $site = publicSiteValidate($_POST);
+    if (!$site['ok']) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => $site['error']]);
+        exit;
+    }
     setPlatformSetting('platform_name', $platformName, (int)$me['id']);
-    logTenantAdminAction(null, null, 'platform_settings', 'Updated branding: platform_name');
+    foreach ($site['values'] as $k => $v) setPlatformSetting($k, $v, (int)$me['id']);
+    logTenantAdminAction(null, null, 'platform_settings', 'Updated branding: platform_name, ' . implode(', ', array_keys($site['values'])));
     echo json_encode(['success' => true, 'message' => 'Branding updated.']);
     exit;
 }

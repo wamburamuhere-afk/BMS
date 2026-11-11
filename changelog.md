@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-11-11 — feat(site): public website on the platform's own address (Option B) + search engines
+
+**Changed:** `landing.php` (new), `core/landing_content.php` (new), `core/public_site.php` (new), `public_robots.php` (new), `public_sitemap.php` (new), `index.php`, `roots.php`, `app/superadmin/settings.php`, `actions/superadmin_platform_settings.php`, `tests/test_landing_cli.php` (new)
+
+- **Pages:** `/`, `/smart-pos`, `/smart-bms`, `/pricing`, `/faq`, `/contact` — English and Kiswahili (`?lang=sw`), server-rendered, phone-friendly. Only on the platform's own address: a company's own address keeps `/` → its login, and gets 404 for these pages; Superadmin too. Signed-in users at `/` still go to their dashboard.
+- **Nothing hand-typed that the system holds:** products, plans, prices, terms, limits, plan items and the compare table from Superadmin plans (`listPublicOffers`, same wording as the sign-up page); trial length and whether sign-up is open live; phone / WhatsApp / email / hours from Support settings (an empty set shows "contact details will appear here", never invented numbers); legal name, address and main website from **Superadmin › Platform settings › Branding** (three new fields; legal name defaults to BJP TECHNOLOGIES (L) LTD until set). Product preview figures are labelled "Example".
+- **Log in:** finds the company by its web address (existing `api/mobile/tenant_info.php`), shows its name and logo, then opens that company's own login. "BJP staff: sign in here" → `/login`. **login.php and the sign-up flow are unchanged.**
+- **Contact:** the message form opens WhatsApp (or email) with the text ready — nothing is stored on the site.
+- **Search engines:** per-page title and description naming "Smart POS" / "Smart BMS", canonical, hreflang en/sw, sharing tags, structured data (Organization, WebSite, SoftwareApplication with live TZS prices, FAQPage). `robots.txt` and `sitemap.xml` per address: the main site is open with app areas blocked; company addresses, Superadmin and a second copy (Branding › Main public website set to another address, e.g. demo → bms) are `Disallow: /` + `noindex`, with canonical to the main site. Every response on a company or Superadmin address carries `X-Robots-Tag: noindex`.
+- **Not included:** a sharing-preview image (no BJP logo or screenshot exists in the codebase — `assets/images/logo.png` belongs to another company); a Terms of Service page (needs your text).
+- **Checked:** new test 79/79 (real server, three kinds of address, prices = live catalogue exactly, no placeholders, structured data, robots/sitemap, second-copy rule, settings validation, login.php untouched). Browser: desktop and 390 px phone, tabs, price terms, Log in lookup (found / not found), Kiswahili. Real Superadmin Branding save + invalid address refused (local settings restored).
+
 ## 2026-11-11 — feat(signup): a Smart POS sign-up gets its first shop; a restaurant gets Restaurant POS; plan changes keep it
 
 **Changed:** `core/signup_shop.php` (new), `core/tenant_provisioner.php`, `core/tenant_registration.php`, `core/plans.php`, `core/product_copy.php` (new), `register.php`, `actions/register_tenant.php`, `api/mobile/register.php`, `cron/process_registration_jobs.php`, `scripts/setup_control_db.php`, `tests/test_signup_shop_cli.php` (new), `tests/test_mobile_signup_plans_cli.php`
