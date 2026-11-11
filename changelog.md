@@ -1,5 +1,21 @@
 # BMS Changelog
 
+## 2026-11-11 — feat(pos): refund shown on the original receipt; sequential return numbers; credit-sale returns
+
+**Changed:** `api/pos/create_return.php`, `api/pos/print_receipt.php`, `api/pos/email_receipt.php`, `api/pos/get_sales.php`, `api/pos/get_sale_items.php`, `api/pos/get_credit_sale_detail.php`, `app/bms/pos/pos_dashboard.php`, `core/sales_posting.php`, `core/escpos_printer.php`, `assets/js/pos-credit-aging.js`, `lang/sw.php`, `tests/test_pos_receipt_qty_format_cli.php`
+**New:** `core/pos_receipt_returns.php`, `migrations/tenant/2026_11_11_pos_return_credit.php`, `migrations/2026_11_11_pos_return_credit_legacy_db.php`, `tests/test_pos_refund_on_receipt_cli.php`
+
+- **Receipt — returned items:** On the original receipt, a returned product's QTY column shows the sold quantity struck through with the remaining quantity beside it (e.g. ~~3~~ 2). Price and line-total reflect what the customer keeps. No new sale row appears in the Sales list for a return; a "Refunded" column shows the refunded amount on the original sale row.
+- **Return receipt:** A separate REFUND RECEIPT (compact title + "For receipt #…" + TOTAL REFUNDED + payment breakdown) is accessible via "View Refund Receipt" in the Actions menu of the original sale.
+- **Bottom of original receipt:** Sold total / Refunded (RET-XXXX): –amount / NET PAID / PARTIALLY REFUNDED stamp.
+- **Sequential return numbers:** Returns are now numbered BJP-RET-0001, BJP-RET-0002 … via `nextCode($pdo, 'RET')` instead of random RET-YYYYMMDD-XXXX strings.
+- **Credit-sale returns:** If the original sale has an unpaid balance, the return amount is first applied against what is owed (`return_credit` payment row in `pos_sale_payments`), keeping cash in the drawer correct. The ledger credits AR, not the cash account, for that portion.
+- **COGS on return:** Unit cost resolved via FEFO batch cost (or `cost_price` fallback) through `posSaleLineUnitCost()`, so the reversal matches the original sale charge exactly.
+- **Shared helper:** `core/pos_receipt_returns.php` (`posReceiptReturns()`, `posRefundShortNo()`) used by all three receipt paths (browser print, ESC/POS thermal, emailed PDF) to keep the display logic in one place.
+- **Sales list (pos_dashboard.php):** Default view hides return rows (Sales filter); a "Returns" filter shows them. Each original sale row carries a "Refunded" column; the Actions menu lists "View Refund Receipt (BJP-RET-XXXX)" for each refund.
+- **Migration:** `pos_sale_payments.payment_method` ENUM extended with `'return_credit'`; idempotent, runs on both tenant and legacy DB.
+- **Tests:** 65 assertions in `test_pos_refund_on_receipt_cli.php` (cash return, credit return, split part-paid, receipt HTML, ESC/POS bytes, email code, dashboard JS); `test_pos_receipt_qty_format_cli.php` updated to skip partially-refunded sales in the render check.
+
 ## 2026-11-11 — feat(site): public website on the platform's own address (Option B) + search engines
 
 **Changed:** `landing.php` (new), `core/landing_content.php` (new), `core/public_site.php` (new), `public_robots.php` (new), `public_sitemap.php` (new), `index.php`, `roots.php`, `app/superadmin/settings.php`, `actions/superadmin_platform_settings.php`, `tests/test_landing_cli.php` (new)

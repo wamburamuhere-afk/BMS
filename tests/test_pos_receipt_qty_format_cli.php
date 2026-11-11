@@ -45,15 +45,24 @@ section('2. Every receipt output uses it');
 $print = file_get_contents("$root/api/pos/print_receipt.php");
 $email = file_get_contents("$root/api/pos/email_receipt.php");
 $esc   = file_get_contents("$root/core/escpos_printer.php");
-ok(substr_count($print, "format_qty(\$item['quantity'])") === 2 && strpos($print, "<?= \$item['quantity'] ?>") === false, 'printed receipt: QTY column and "@ price x qty" line');
+// 2026-11-11 — after a return the QTY shows the sold qty crossed out then what remains ($showQty =
+// the line's quantity when nothing came back), so both places format $showQty / the sold qty.
+ok(substr_count($print, "format_qty(\$showQty)") === 2 && strpos($print, "format_qty(\$rl['sold'])") !== false
+   && strpos($print, "\$showQty  = \$lineBack ? \$rl['kept'] : \$item['quantity'];") !== false
+   && strpos($print, "<?= \$item['quantity'] ?>") === false, 'printed receipt: QTY column and "@ price x qty" line');
 ok(strpos($email, "\$esc(format_qty(\$l['quantity']))") !== false, 'emailed receipt: QTY column');
 ok(strpos($esc, "format_qty(\$item['quantity'] ?? 0) . ' x '") !== false, 'network thermal printer: "qty x price" line');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('3. Real printed receipt (rolled back)');
 // ─────────────────────────────────────────────────────────────────────────
+// Skip partially-refunded sales: returned_quantity on a line changes the QTY
+// div to <span class="qty-was">…</span>remaining, so the plain-text regex used
+// below would miss the sold quantity.
 $saleId = (int)$pdo->query("SELECT s.sale_id FROM pos_sales s
-                             WHERE (SELECT COUNT(*) FROM pos_sale_items i WHERE i.sale_id = s.sale_id) >= 2
+                             WHERE s.sale_status NOT IN ('partially_refunded','refunded')
+                               AND s.is_return_sale = 0
+                               AND (SELECT COUNT(*) FROM pos_sale_items i WHERE i.sale_id = s.sale_id) >= 2
                              ORDER BY s.sale_id DESC LIMIT 1")->fetchColumn();
 if (!$saleId) {
     ok(false, 'no local sale with 2+ lines to render a receipt from');
