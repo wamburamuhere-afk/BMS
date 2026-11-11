@@ -38,7 +38,7 @@ if (!function_exists('landingCopy')) {
             // home
             'pill_new' => 'Mpya', 'pill' => 'Smart POS sasa ina hali ya Mgahawa',
             'h_a' => 'Endesha', 'h_words' => ['duka lako', 'mgahawa wako', 'kampuni yako'], 'h_b' => 'kwa njia ya kisasa.',
-            'hero_sub' => 'Mauzo, stock, madeni, oda za jikoni na uhasibu kamili — kwa simu au kompyuta, kwa Kiswahili au Kiingereza.',
+            'hero_sub' => 'Smart POS kwa mauzo, stock na madeni ya maduka na migahawa. Smart BMS kampuni yako inapohitaji uhasibu kamili. Kwa simu au kompyuta, kwa Kiswahili au Kiingereza.',
             'points' => $days > 0 ? [sprintf('Siku %d bure', $days), 'Hakuna malipo leo', 'Akaunti yako binafsi'] : ['Hakuna malipo leo', 'Akaunti yako binafsi', 'Simu na kompyuta'],
             'example' => 'Mfano', 'today' => 'Leo', 'app_menu' => ['Dashibodi', 'Uza', 'Bidhaa', 'Wanaodaiwa', 'Ripoti'],
             'k_sales' => 'Mauzo ya leo', 'k_profit' => 'Faida ghafi', 'k_credit' => 'Madeni yaliyolipwa',
@@ -143,7 +143,7 @@ if (!function_exists('landingCopy')) {
             // home
             'pill_new' => 'New', 'pill' => 'Smart POS now has a Restaurant mode',
             'h_a' => 'Run your', 'h_words' => ['shop', 'restaurant', 'company'], 'h_b' => 'the smart way.',
-            'hero_sub' => 'Sales, stock, credit, kitchen orders and full accounting — on your phone or computer, in English or Kiswahili.',
+            'hero_sub' => 'Smart POS for sales, stock and credit in shops and restaurants. Smart BMS when your company needs full accounting. On your phone or computer, in English or Kiswahili.',
             'points' => $days > 0 ? [sprintf('%d days free', $days), 'No payment today', 'Your own private account'] : ['No payment today', 'Your own private account', 'Phone and computer'],
             'example' => 'Example', 'today' => 'Today', 'app_menu' => ['Dashboard', 'Sell', 'Products', 'Who owes me', 'Reports'],
             'k_sales' => "Today's sales", 'k_profit' => 'Gross profit', 'k_credit' => 'Credit repaid',
@@ -359,7 +359,7 @@ if (!function_exists('landingMeta')) {
     function landingMeta(string $path, bool $sw, array $data, array $site): array
     {
         $m = $sw ? [
-            ''                     => ['Smart BMS — Smart POS na mfumo wa uhasibu kwa biashara', 'Smart POS kwa maduka na migahawa, na Smart BMS yenye uhasibu kamili kwa kampuni: mauzo, stock, madeni, oda za jikoni, Trial Balance na mishahara — kwa simu au kompyuta, kwa Kiswahili.'],
+            ''                     => ['Smart BMS — Smart POS na mfumo wa uhasibu kwa biashara', 'Smart POS kwa maduka na migahawa: mauzo, stock, madeni na oda za jikoni. Smart BMS kwa kampuni: uhasibu kamili, Trial Balance na mishahara. Kwa simu au kompyuta, kwa Kiswahili.'],
             'smart-pos'            => ['Smart POS — mfumo wa mauzo kwa maduka na migahawa | Smart BMS', 'Smart POS: mfumo wa mauzo kwa duka la rejareja au mgahawa. Risiti, stock, madeni, meza, skrini ya jikoni na menyu.'],
             'smart-pos/retail'     => ['Smart POS kwa duka la rejareja — mauzo, stock na madeni | Smart BMS', 'Smart POS kwa maduka: uza haraka na risiti, pokea stock, uza kwa nusu kilo, fuatilia wanaokudai, matumizi na faida, na duka la mtandaoni.'],
             'smart-pos/restaurant' => ['Smart POS kwa mgahawa — meza, jikoni na menyu | Smart BMS', 'Smart POS kwa migahawa: meza na oda, skrini ya jikoni, menyu yenye picha na mapishi, menyu kwa QR, manunuzi ya mkopo na upotevu wa chakula.'],
@@ -368,7 +368,7 @@ if (!function_exists('landingMeta')) {
             'faq'                  => ['Maswali yanayoulizwa | Smart BMS', 'Majibu kuhusu malipo, majaribio ya bure, usalama wa taarifa na Smart POS kwa migahawa.'],
             'contact'              => ['Wasiliana nasi | Smart BMS', 'Ongea na ' . $site['legal_name'] . ' kuhusu Smart POS na Smart BMS — simu, WhatsApp au email.'],
         ] : [
-            ''                     => ['Smart BMS — Smart POS and accounting software for business', 'Smart POS for shops and restaurants, and Smart BMS with full accounting for companies: sales, stock, credit, kitchen orders, Trial Balance and payroll — on phone or computer, in English or Kiswahili.'],
+            ''                     => ['Smart BMS — Smart POS and accounting software for business', 'Smart POS for shops and restaurants: sales, stock, credit and kitchen orders. Smart BMS for companies: full accounting, Trial Balance and payroll. On phone or computer, in English or Kiswahili.'],
             'smart-pos'            => ['Smart POS — point of sale for shops and restaurants | Smart BMS', 'Smart POS: point of sale for a retail shop or a restaurant. Receipts, stock, credit sales, tables, kitchen screen and menu.'],
             'smart-pos/retail'     => ['Smart POS for retail shops — sales, stock and credit | Smart BMS', 'Smart POS for shops: fast selling with receipts, stock receiving, half-kilo sales, credit sales, expenses and profit, and your own online shop.'],
             'smart-pos/restaurant' => ['Smart POS for restaurants — tables, kitchen and menu | Smart BMS', 'Smart POS for restaurants: tables and orders, kitchen screen, menu with photos and recipes, QR menu ordering, buying on credit and food waste.'],

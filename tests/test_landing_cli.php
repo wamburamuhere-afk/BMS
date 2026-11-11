@@ -208,6 +208,17 @@ ok(!preg_match('/\bshops?\b|retail|stock receiving/i', $rest), 'Restaurant page 
 $retailSw = mainText($html['smart-pos/retail']['sw']); $restSw = mainText($html['smart-pos/restaurant']['sw']);
 ok(!preg_match('/mgahawa|jikoni|mhudumu|meza/iu', $retailSw), 'Kiswahili Retail page says nothing about restaurants');
 ok(!preg_match('/\bduka\b|maduka|rejareja/iu', $restSw), 'Kiswahili Restaurant page says nothing about shops');
+// Accounting belongs to Smart BMS only: no Smart POS page or Smart POS wording claims it.
+foreach (['smart-pos', 'smart-pos/retail', 'smart-pos/restaurant'] as $p) foreach (['en', 'sw'] as $l) {
+    ok(!preg_match('/accounting|uhasibu|trial balance|balance sheet|mizania/iu', mainText($html[$p][$l])), "/$p [$l] does not claim accounting (Smart BMS only)");
+}
+foreach ([false, true] as $s) {
+    $pos = json_encode([bmsProductCopy($s)['bms_shop'], bmsRestaurantCopy($s)], JSON_UNESCAPED_UNICODE);
+    ok(!preg_match('/accounting|uhasibu|trial balance|mizania/iu', $pos), 'Smart POS sign-up wording (' . ($s ? 'sw' : 'en') . ') does not claim accounting');
+    $hs = landingCopy($s, 14)['hero_sub']; $acc = $s ? 'uhasibu' : 'accounting';
+    ok(mb_stripos($hs, $acc) !== false && mb_stripos($hs, 'Smart BMS') < mb_stripos($hs, $acc) && mb_stripos($hs, 'Smart POS') < mb_stripos($hs, 'Smart BMS'),
+       'home line (' . ($s ? 'sw' : 'en') . '): accounting is named only with Smart BMS');
+}
 ok(strpos(mainText($html['smart-bms']['en']), 'Trial Balance') !== false && strpos(mainText($html['smart-bms']['en']), 'double-entry') !== false, 'Smart BMS page leads with accounting');
 preg_match_all('#<tfoot><tr><td>[^<]+</td><td><span class="count" data-to="(\d+)">.*?data-to="(\d+)"#s', $html['smart-bms']['en'], $tb);
 ok(isset($tb[1][0]) && $tb[1][0] === $tb[2][0], 'example Trial Balance: debits = credits (' . ($tb[1][0] ?? '?') . ')');
