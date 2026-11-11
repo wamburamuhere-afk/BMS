@@ -78,9 +78,14 @@ if ($wid !== null && !userCan('warehouse', $wid)) {
     exit;
 }
 
-$items = $pdo->prepare("SELECT product_name, quantity, unit_price, line_total, discount_amount, tax_rate FROM pos_sale_items WHERE sale_id = ? ORDER BY sale_item_id");
+$items = $pdo->prepare("SELECT product_name, quantity, returned_quantity, unit_price, line_total, discount_amount, tax_rate FROM pos_sale_items WHERE sale_id = ? ORDER BY sale_item_id");
 $items->execute([$sale_id]);
 $lines = $items->fetchAll(PDO::FETCH_ASSOC);
+
+// 2026-11-11 — same return view as print_receipt.php (core/pos_receipt_returns.php).
+require_once __DIR__ . '/../../core/pos_receipt_returns.php';
+$ret = posReceiptReturns($pdo, $sale, $lines);
+$methodLabel = fn(string $m) => t(ucfirst(str_replace('_', ' ', $m)));
 
 $company_name = getSetting('company_name', 'BUSINESS MANAGEMENT SYSTEM');
 $currency     = getSetting('currency', 'TZS');
@@ -91,11 +96,13 @@ $esc          = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-
 // Checklist builders). Company header/logo/address/TIN/VRN come from
 // generateLetterPdf()'s own letterhead (use_letterhead => true below), so
 // they are NOT repeated here.
-$infoRows = [
-    [t('Receipt #'), $sale['receipt_number']],
+$infoRows = $ret['mode'] === 'refund'
+    ? [[t('Refund #'), $sale['receipt_number']], [t('For receipt #'), $ret['original_receipt']]]
+    : [[t('Receipt #'), $sale['receipt_number']]];
+$infoRows = array_merge($infoRows, [
     [t('Date'), date('d/m/Y H:i', strtotime($sale['sale_date']))],
     [t('Cashier'), $sale['cashier_name'] ?? t('N/A')],
-];
+]);
 if (!empty($sale['register_name']))  $infoRows[] = [t('Register'), $sale['register_name']];
 if (!empty($sale['warehouse_name'])) $infoRows[] = [wLabel('Warehouse', 'Shop', true), $sale['warehouse_name']];
 if (!empty($sale['customer_name']))  $infoRows[] = [t('Customer'), $sale['customer_name']];
@@ -113,16 +120,39 @@ $itemsHtml = '<table border="1" cellpadding="4" cellspacing="0" width="100%" sty
     . '<th width="21%" align="right">' . $esc(t('Price')) . '</th>'
     . '<th width="21%" align="right">' . $esc(t('Total')) . '</th>'
     . '</tr>';
-foreach ($lines as $l) {
+foreach ($lines as $k => $l) {
+    // A line with goods returned: sold qty crossed out, then what remains; total = what remains.
+    $rl = $ret['mode'] === 'returns' ? $ret['lines'][$k] : null;
+    $back = $rl && $rl['returned'] > 0;
+    $name = $esc($l['product_name']);
+    $qty  = $esc(format_qty($l['quantity']));
+    $tot  = number_format((float)$l['line_total'], 0);
+    if ($back) {
+        if ($rl['kept'] <= 0) $name = '<del>' . $name . '</del>';
+        $qty = '<del>' . $esc(format_qty($rl['sold'])) . '</del> ' . $esc(format_qty($rl['kept']));
+        $tot = number_format($rl['kept_total'], 0);
+    }
     $itemsHtml .= '<tr>'
-        . '<td>' . $esc($l['product_name']) . '</td>'
-        . '<td align="center">' . $esc(format_qty($l['quantity'])) . '</td>'
+        . '<td>' . $name . '</td>'
+        . '<td align="center">' . $qty . '</td>'
         . '<td align="right">' . number_format((float)$l['unit_price'], 0) . '</td>'
-        . '<td align="right">' . number_format((float)$l['line_total'], 0) . '</td>'
+        . '<td align="right">' . $tot . '</td>'
         . '</tr>';
 }
 $itemsHtml .= '</table>';
 
+if ($ret['mode'] === 'refund') {
+    $totalsRows = [[t('TOTAL REFUNDED'), $currency . ' ' . number_format($ret['sold_total'], 0)]];
+    if ($ret['to_balance'] > 0.009) $totalsRows[] = [t('Taken off amount owed'), number_format($ret['to_balance'], 0)];
+    if ($ret['cash_back'] > 0.009)  $totalsRows[] = [sprintf(t('Paid back (%s)'), $methodLabel($ret['method'])), number_format($ret['cash_back'], 0)];
+    if ($ret['reason'] !== '')      $totalsRows[] = [t('Reason'), $ret['reason']];
+} elseif ($ret['mode'] === 'returns') {
+    $totalsRows = [[t('Sold total'), $currency . ' ' . number_format($ret['sold_total'], 0)]];
+    foreach ($ret['refunds'] as $rf) $totalsRows[] = [sprintf(t('Refunded (%s)'), $rf['short']), '-' . number_format($rf['amount'], 0)];
+    $totalsRows[] = [t('NET PAID'), $currency . ' ' . number_format($ret['net_paid'], 0)];
+    $totalsRows[] = [sprintf(t('Payment (%s)'), $methodLabel((string)($sale['payment_method'] ?? ''))), number_format((float)$sale['amount_tendered'], 0)];
+    if ((float)$sale['change_given'] > 0.009) $totalsRows[] = [t('Change'), number_format((float)$sale['change_given'], 0)];
+} else {
 $totalsRows = [[t('Subtotal'), number_format((float)$sale['subtotal'], 0)]];
 if ((float)($sale['discount_amount'] ?? 0) > 0.009) {
     $totalsRows[] = [t('Discount'), '-' . number_format((float)$sale['discount_amount'], 0)];
@@ -134,16 +164,22 @@ $totalsRows[] = [
     number_format((float)$sale['amount_tendered'], 0),
 ];
 $totalsRows[] = [t('Change'), number_format((float)$sale['change_given'], 0)];
+}
 
 $totalsHtml = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:12px;margin-top:10px;">';
 foreach ($totalsRows as [$k, $v]) {
     $totalsHtml .= '<tr><td width="70%" align="right"><strong>' . $esc($k) . ':</strong></td><td width="30%" align="right">' . $esc($v) . '</td></tr>';
 }
 $totalsHtml .= '</table>';
+if ($ret['mode'] === 'returns') {
+    $totalsHtml .= '<p style="text-align:center;font-size:12px;border:1px solid #000;padding:4px;margin-top:8px;"><strong>' . $esc(t($ret['stamp'])) . '</strong></p>';
+} elseif ($ret['mode'] === 'refund') {
+    $infoHtml = '<p style="text-align:center;font-size:13px;"><strong>' . $esc(t('REFUND RECEIPT')) . '</strong></p>' . $infoHtml;
+}
 
 $footerExtra = trim((string)($sale['reg_receipt_footer'] ?? ''));
 $footerHtml = '<p style="text-align:center;font-size:11px;margin-top:16px;">*** ' . $esc(t('THANK YOU')) . ' ***<br>'
-    . $esc(t('Goods sold are not returnable'))
+    . $esc(t('Please keep this receipt for your records'))
     . ($footerExtra !== '' ? '<br>' . nl2br($esc($footerExtra)) : '')
     . '</p>';
 
@@ -166,7 +202,7 @@ try {
 
     $subject = sprintf(t('Receipt #%s — %s'), $sale['receipt_number'], $company_name);
     $shortBody = '<p>' . sprintf(t('Thank you for your purchase. Your receipt <strong>#%s</strong> for <strong>%s %s</strong> is attached as a PDF.'),
-        $esc($sale['receipt_number']), $esc($currency), number_format((float)$sale['grand_total'], 0)) . '</p>'
+        $esc($sale['receipt_number']), $esc($currency), number_format($ret['mode'] === 'returns' ? $ret['net_paid'] : (float)$sale['grand_total'], 0)) . '</p>'
         . '<p>' . $esc(t('Thank you for your business.')) . '</p>';
 
     $ok = sendEmail($email, $subject, $shortBody, ['attachments' => [$tmpPath]]);
