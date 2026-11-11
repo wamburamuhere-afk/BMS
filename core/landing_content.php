@@ -3,13 +3,17 @@
  * core/landing_content.php — data, wording and search-engine details for the public website (landing.php).
  *
  * landingData()   live: products/plans/prices/terms/limits (listPublicOffers — Superadmin › Plans),
- *                 free-trial days, whether sign-up is open, the company-address domain, FAQ, segments
- * landingCopy()   the page wording, English and Kiswahili. Every statement describes something the
- *                 system really does (checked 2026-11-11); numbers on the product preview are labelled "Example".
+ *                 free-trial days, whether sign-up is open, the company-address domain, FAQ
+ * landingCopy()   the page wording, English and Kiswahili, key for key (tests/test_landing_cli.php
+ *                 checks both languages have the same keys, nothing empty). Every statement describes
+ *                 something the system really does (checked 2026-11-11); figures on the example screens
+ *                 are labelled "Example".
  * landingMeta()   <title> + description per page
  * landingJsonLd() structured data (Organization, WebSite, SoftwareApplication with live prices, FAQPage)
  *
  * Plans are shown exactly as the sign-up page shows them (same feature lines, same term labels).
+ * Redesign 2026-11-11: Products menu (Smart BMS; Smart POS → Retail shop / Restaurant), one language
+ * shown at a time, separate Retail and Restaurant pages, footer about the business.
  */
 
 require_once __DIR__ . '/plans.php';
@@ -22,91 +26,215 @@ if (!function_exists('landingCopy')) {
     {
         $days = max(0, $trialDays);
         return $sw ? [
-            'home' => 'Mwanzo', 'menu' => 'Menyu', 'products' => 'Bidhaa', 'login' => 'Ingia', 'trial' => 'Anza bure', 'contact' => 'Wasiliana',
-            'trial_long' => 'Anza majaribio ya bure', 'see_how' => 'Angalia Smart POS', 'see_prices' => 'Ona bei', 'learn_more' => 'Soma zaidi',
-            'badge' => 'Smart POS · Smart BMS · Kiingereza na Kiswahili',
-            'hero_title' => 'Biashara yako yote, kwenye skrini moja.',
-            'hero_sub' => 'Mauzo, stock, madeni, matumizi na faida — kwa simu au kompyuta, kwa Kiswahili au Kiingereza.',
+            // header, menus, shared
+            'home' => 'Mwanzo', 'menu' => 'Menyu', 'menu_open' => 'Fungua menyu', 'language' => 'Lugha',
+            'products' => 'Bidhaa', 'pricing' => 'Bei', 'faq' => 'Maswali', 'contact' => 'Wasiliana',
+            'login' => 'Ingia', 'trial' => 'Anza bure', 'trial_long' => 'Anza majaribio ya bure', 'close' => 'Funga',
+            'see_prices' => 'Ona bei', 'ask_price' => 'Uliza bei', 'see_products' => 'Tazama bidhaa zetu',
+            'm_bms_d' => 'Kwa kampuni zinazohitaji uhasibu kamili.', 'm_bms_s' => 'Uhasibu, mauzo, manunuzi, HR na mishahara',
+            'm_pos_d' => 'Kuuza kwa urahisi. Chagua aina ya biashara yako.',
+            'm_ret' => 'Duka la rejareja', 'm_ret_s' => 'Maduka, famasi, hardware, boutique',
+            'm_res' => 'Mgahawa', 'm_res_s' => 'Migahawa, café, jikoni za hoteli',
+            // home
+            'pill_new' => 'Mpya', 'pill' => 'Smart POS sasa ina hali ya Mgahawa',
+            'h_a' => 'Endesha', 'h_words' => ['duka lako', 'mgahawa wako', 'kampuni yako'], 'h_b' => 'kwa njia ya kisasa.',
+            'hero_sub' => 'Smart POS kwa mauzo, stock na madeni ya maduka na migahawa. Smart BMS kampuni yako inapohitaji uhasibu kamili. Kwa simu au kompyuta, kwa Kiswahili au Kiingereza.',
             'points' => $days > 0 ? [sprintf('Siku %d bure', $days), 'Hakuna malipo leo', 'Akaunti yako binafsi'] : ['Hakuna malipo leo', 'Akaunti yako binafsi', 'Simu na kompyuta'],
             'example' => 'Mfano', 'today' => 'Leo', 'app_menu' => ['Dashibodi', 'Uza', 'Bidhaa', 'Wanaodaiwa', 'Ripoti'],
             'k_sales' => 'Mauzo ya leo', 'k_profit' => 'Faida ghafi', 'k_credit' => 'Madeni yaliyolipwa',
-            'built_title' => 'Imejengwa kwa jinsi unavyofanya kazi',
+            'k_up' => '▲ 12% ukilinganisha na jana', 'k_up2' => '▲ 8%', 'k_who' => 'Wateja 3',
+            'feed' => [['Mauzo mapya', '35,000 TZS'], ['Deni limelipwa', '20,000 TZS'], ['Mauzo mapya', '12,500 TZS'], ['Oda ya mtandaoni', 'Imekubaliwa · 18,000 TZS']],
+            'rc_title' => 'Risiti #0142', 'rc_items' => [['Sukari kg 1', '3,500'], ['Mchele kg 0.5', '1,600'], ['Sabuni ×2', '2,400']], 'rc_total' => 'Jumla',
+            'choose_k' => 'Chagua inayokufaa', 'choose_h' => 'Mfumo mmoja, kwa aina ya biashara yako',
+            'cards' => [
+                'retail'     => ['Duka la rejareja', 'Uza haraka, jua kilichopo stoo na nani anakudai.', ['Risiti za kuchapisha au email', 'Stock na kupokea mzigo', 'Mauzo ya mkopo'], 'Angalia Duka la rejareja'],
+                'restaurant' => ['Mgahawa', 'Kutoka mezani, hadi jikoni, hadi bili.', ['Meza na oda', 'Skrini ya jikoni', 'Menyu, mapishi na oda kwa QR'], 'Angalia Mgahawa'],
+                'company'    => ['Kampuni', 'Uhasibu kamili, kila idara imeunganishwa.', ['Trial Balance, Faida na Hasara, Mizania', 'Ankara, manunuzi na benki', 'HR na mishahara'], 'Angalia Smart BMS'],
+            ],
             'values' => [
                 ['Rahisi kwa mmiliki', 'Imetengenezwa kwa wamiliki wa biashara, si wahasibu tu — kwa Kiswahili au Kiingereza.'],
-                ['Kila jukumu, kazi yake', 'Wafanyakazi wanaona wanachohitaji tu. Mfano, mhudumu wa meza haoni pesa.'],
+                ['Kila jukumu, kazi yake', 'Wafanyakazi wanaona wanachohitaji tu. Mhudumu wa meza haoni pesa.'],
                 ['Taarifa zako ni zako', 'Kila kampuni ina database yake binafsi, na nakala inahifadhiwa kila siku.'],
             ],
             'band_title' => 'Uko tayari kuanza?', 'band_sub' => $days > 0 ? sprintf('Siku %d bure — hakuna malipo leo.', $days) : 'Hakuna malipo leo.',
             'band_sub_closed' => 'Ongea nasi tukufungulie akaunti.',
-            'start_with' => 'Anza na', 'ask_price' => 'Uliza bei', 'bms_approval' => 'Akaunti za Smart BMS zinakaguliwa na BJP kabla ya kufunguliwa.',
-            'what_you_get' => 'Unachopata', 'first_steps' => 'Hatua zako za kwanza',
-            'rest_kicker' => 'Mgahawa', 'rest_title' => 'Smart POS kwa migahawa', 'rest_sub' => 'Chagua "Mgahawa" unapojisajili: duka lako la kwanza linafunguka katika hali ya Mgahawa. Mhudumu, keshia na mpishi — kila mmoja anaona kazi yake tu.',
-            'rest_list' => ['Meza na oda', 'Skrini ya jikoni', 'Menyu na mapishi', 'Gharama kwa sahani', 'Menyu kwa QR', 'Ripoti ya upotevu'],
+            // product pages (shared)
+            'what_you_get' => 'Unachopata', 'first_steps' => 'Hatua zako za kwanza baada ya kuingia', 'signup_h' => 'Jisajili kwa hatua 4 fupi',
+            'bms_approval' => 'BJP inakagua kila akaunti ya Smart BMS kabla ya kufunguliwa.',
+            // Smart POS overview
+            'pos_hub_k' => 'Smart POS', 'pos_hub_h' => 'Mfumo wa mauzo, kwa jinsi unavyouza.',
+            'pos_hub_sub' => 'Smart POS inafanya kazi kwa maduka na migahawa. Chagua yako ili uone inavyokufaa.',
+            'pos_same' => 'Mipango ni ileile kwa duka na mgahawa. Unachagua Duka au Mgahawa unapojisajili.',
+            // Retail
+            'ret_k' => 'Smart POS · Duka la rejareja', 'ret_feats_h' => 'Kila kitu duka linahitaji',
+            'ret_feats' => [
+                ['bolt', 'Kuuza haraka', 'Risiti ya kuchapisha au ya email kwa sekunde.'],
+                ['box', 'Stock unayoiamini', 'Bidhaa, huduma na kupokea mzigo.'],
+                ['scale', 'Uza kwa uzito au ujazo', 'Nusu kilo, robo lita — mashine ya mauzo inakubali.'],
+                ['credit', 'Mauzo ya mkopo', 'Ona nani anakudai na rekodi anacholipa.'],
+                ['chart', 'Matumizi na faida', 'Ripoti za siku, wiki, mwezi, robo mwaka na mwaka.'],
+                ['cart', 'Duka lako la mtandaoni', 'Shiriki kiungo; wateja wanaagiza, wewe unathibitisha.'],
+            ],
+            'till_title' => 'Uza', 'till_items' => [['Sukari', 'kg 1', 3500], ['Mchele', 'kg 0.5', 1600], ['Sabuni ya kuogea', '×2', 2400], ['Mafuta ya kupikia', 'lita 1', 6000]], 'till_total' => 'Jumla',
+            'ret_steps' => ['Mpango', 'Duka lako (Duka limechaguliwa)', 'Akaunti ya admin', 'Duka lako la kwanza liko tayari'],
+            // Restaurant
+            'res_k' => 'Smart POS · Mgahawa', 'res_feats_h' => 'Imejengwa kwa jiko lenye shughuli nyingi',
+            'flow_h' => 'Oda inavyosafiri',
+            'flow' => [['Mhudumu', 'anachukua oda'], ['Keshia', 'anathibitisha'], ['Jikoni', 'wanapika'], ['Mhudumu', 'anapeleka mezani'], ['Bili', 'inalipwa']],
+            'flow_note' => 'Skrini ya jikoni na uthibitisho wa keshia unaviwasha kwenye Settings, ukivihitaji.',
+            'tickets' => [['Meza 4', '12:41', '2 × Pilau · 1 × Juisi', 'Inapikwa'], ['Meza 7', '12:38', '1 × Chipsi mayai', 'Tayari kupelekwa']],
+            'res_feats' => [
+                ['table', 'Meza na oda', 'Fungua meza, ongeza vyakula, tuma jikoni.'],
+                ['screen', 'Skrini ya jikoni', 'Wapishi wanaona kila oda na kuiweka tayari.'],
+                ['book', 'Menyu yenye picha na mapishi', 'Jua gharama ya viungo vya kila chakula.'],
+                ['qr', 'Menyu kwa QR mezani', 'Wateja wanaagiza kwa simu zao; wafanyakazi wanakubali kwanza.'],
+                ['truck', 'Nunua kwa mkopo, lipa baadaye', 'Manunuzi kwa wasambazaji unayolipa ukiwa tayari.'],
+                ['trash', 'Upotevu unarekodiwa', 'Chakula kilichoharibika kinaondolewa, hivyo faida yako ni ya kweli.'],
+            ],
+            'res_steps' => ['Mpango', 'Mgahawa wako (Mgahawa umechaguliwa)', 'Akaunti ya admin', 'Hali ya Mgahawa imewashwa; majukumu ya Mhudumu, Keshia, Mpishi na Meneja wa Mgahawa yako tayari'],
+            // Smart BMS
+            'bms_k' => 'Smart BMS · Mfumo kamili', 'bms_h' => 'Uhasibu wa kweli, biashara yako yote imeunganishwa.',
+            'bms_sub' => 'Kila mauzo, manunuzi, malipo na mshahara vinaingia kwenye leja moja ya double-entry, hivyo Trial Balance, Faida na Hasara, na Mizania vinakubaliana kila wakati.',
+            'tb_title' => 'Trial Balance', 'tb_bal' => '✓ Imesawazika', 'tb_cols' => ['Akaunti', 'Debit', 'Credit'], 'tb_total' => 'Jumla',
+            'tb_rows' => [['1-1100', 'Fedha benki', 8450000, 0], ['1-1200', 'Wadaiwa wa biashara', 3120000, 0], ['2-1100', 'Wadai wa biashara', 0, 2270000], ['4-1000', 'Mauzo', 0, 14620000], ['6-1000', 'Mishahara', 5320000, 0]],
+            'tb_note' => 'Mfano, kwa TZS. Debit ni sawa na credit.',
+            'stmts' => ['Chart of accounts', 'Journals', 'Faida na Hasara', 'Mizania', 'Mtiririko wa fedha', 'Akaunti za benki'],
+            'bms_feats_h' => 'Kila idara, kitabu kimoja cha hesabu',
+            'bms_feats' => [
+                ['ledger', 'Uhasibu', 'Chart of accounts, journals na ripoti zote za fedha.'],
+                ['invoice', 'Mauzo', 'Nukuu, ankara na malipo ya wateja.'],
+                ['truck', 'Manunuzi', 'Wasambazaji, bili na maghala.'],
+                ['bank', 'Benki na matumizi', 'Kila shilingi inayoingia na kutoka inarekodiwa.'],
+                ['users', 'HR na mishahara', 'Taarifa za wafanyakazi, payslip na mishahara.'],
+                ['grid', 'Miradi, mali na CRM', 'Pamoja na Point of Sale.'],
+            ],
+            'bms_steps' => ['Mpango', 'Kampuni yako', 'Akaunti ya admin', 'BJP inakagua na kufungua akaunti yako'],
+            // pricing
             'price_title' => 'Bei wazi. Hakuna mshangao.', 'price_sub' => $days > 0 ? sprintf('Kila mpango unaanza na siku %d bure. Badilisha mpango wakati wowote.', $days) : 'Badilisha mpango wakati wowote.',
             'no_prices' => 'Bei zinaandaliwa', 'no_prices_sub' => 'Ongea nasi tukueleze bei.',
             'billing' => 'Muda wa malipo', 'popular' => 'Maarufu zaidi', 'per_month' => 'kwa mwezi', 'not_term' => 'Haupo kwa muda huu',
             'after_trial' => $days > 0 ? sprintf('baada ya siku %d bure', $days) : 'kwa kipindi', 'compare' => 'Linganisha mipango', 'feature' => 'Kipengele',
-            'faq_title' => 'Maswali yanayoulizwa', 'faq_sub' => 'Chagua mada upande wa kushoto.', 'topics' => 'Mada',
+            // faq + contact
+            'faq_title' => 'Maswali yanayoulizwa', 'faq_sub' => 'Chagua mada.', 'topics' => 'Mada',
             'still_q' => 'Bado una swali?', 'still_q_sub' => 'Tuko tayari kukusaidia.',
-            'contact_title' => 'Ongea nasi', 'contact_sub' => 'Tunakusaidia kuchagua na kuanza.', 'phone' => 'Simu', 'hrs' => 'Saa', 'hours' => 'Saa za kazi',
+            'contact_title' => 'Ongea nasi', 'contact_sub' => 'Tunakusaidia kuchagua na kuanza.', 'phone' => 'Simu', 'email' => 'Email', 'hrs' => 'Saa', 'hours' => 'Saa za kazi',
             'form_title' => 'Tutumie ujumbe', 'form_sub_wa' => 'Ujumbe wako utafunguka kwenye WhatsApp, tayari kutumwa.', 'form_sub_mail' => 'Ujumbe wako utafunguka kwenye email yako, tayari kutumwa.',
             'f_name' => 'Jina lako', 'f_biz' => 'Aina ya biashara', 'biz_opts' => ['Duka', 'Mgahawa', 'Kampuni', 'Nyingine'], 'f_msg' => 'Ujumbe',
             'send_wa' => 'Tuma kwa WhatsApp', 'send_mail' => 'Tuma kwa email', 'no_contacts' => 'Mawasiliano yataonekana hapa hivi karibuni.', 'call_us' => 'Tupigie simu.',
-            'foot_about' => 'Mfumo wa mauzo na usimamizi wa biashara kwa maduka, migahawa na kampuni.',
-            'privacy' => 'Sera ya Faragha', 'staff_login' => 'Wafanyakazi wa BJP: ingia hapa', 'close' => 'Funga',
+            'm_need' => 'Andika jina lako na ujumbe.',
+            // footer
+            'foot_about' => 'Smart POS inaendesha mauzo ya maduka na migahawa. Smart BMS inazipa kampuni zinazokua uhasibu kamili, mishahara na ripoti za fedha.',
+            'f_products' => 'Bidhaa', 'f_help' => 'Msaada', 'f_talk' => 'Ongea nasi', 'f_acct' => 'Uhasibu', 'privacy' => 'Sera ya Faragha',
+            // log in window
+            'staff_login' => 'Wafanyakazi wa BJP: ingia hapa',
             'co_addr' => 'Anwani ya kampuni yako', 'co_ph' => 'jina-la-kampuni', 'co_find' => 'Tafuta kampuni yangu', 'co_go' => 'Endelea kuingia →',
             'co_hint' => 'Kila kampuni inaingia kwenye anwani yake. Umesahau? Iko kwenye email ya kukaribisha.',
             'co_not_found' => 'Hatukupata kampuni yenye anwani hiyo.', 'co_bad' => 'Andika herufi ndogo, namba na kistari tu.', 'co_busy' => 'Hatukuweza kukagua sasa. Jaribu tena.',
-            'm_need' => 'Andika jina lako na ujumbe.',
-            'seg' => [
-                'shop' => ['Maduka', 'Uza haraka, jua stoo yako.', 'Kwa duka moja au mengi: mauzo, stock, madeni na faida.'],
-                'restaurant' => ['Migahawa', 'Kutoka mezani hadi jikoni.', 'Mhudumu, keshia na mpishi — kila mmoja anaona kazi yake tu.'],
-                'company' => ['Kampuni', 'Hesabu zako zinakubaliana kila wakati.', 'Mauzo, manunuzi, fedha, HR na miradi kwenye mfumo mmoja.'],
-            ],
-            'shop_extra' => 'Duka la mtandaoni',
         ] : [
-            'home' => 'Home', 'menu' => 'Menu', 'products' => 'Products', 'login' => 'Log in', 'trial' => 'Start free trial', 'contact' => 'Contact',
-            'trial_long' => 'Start your free trial', 'see_how' => 'See Smart POS', 'see_prices' => 'See prices', 'learn_more' => 'Learn more',
-            'badge' => 'Smart POS · Smart BMS · English & Kiswahili',
-            'hero_title' => 'Your whole business, on one screen.',
-            'hero_sub' => 'Sales, stock, credit, expenses and profit — on your phone or computer, in English or Kiswahili.',
+            // header, menus, shared
+            'home' => 'Home', 'menu' => 'Menu', 'menu_open' => 'Open menu', 'language' => 'Language',
+            'products' => 'Products', 'pricing' => 'Pricing', 'faq' => 'FAQ', 'contact' => 'Contact',
+            'login' => 'Log in', 'trial' => 'Start free trial', 'trial_long' => 'Start your free trial', 'close' => 'Close',
+            'see_prices' => 'See prices', 'ask_price' => 'Ask for prices', 'see_products' => 'See our products',
+            'm_bms_d' => 'For companies that need full accounting.', 'm_bms_s' => 'Accounting, sales, purchases, HR and payroll',
+            'm_pos_d' => 'Selling made simple. Pick your kind of business.',
+            'm_ret' => 'Retail shop', 'm_ret_s' => 'Shops, pharmacies, hardware, boutiques',
+            'm_res' => 'Restaurant', 'm_res_s' => 'Restaurants, cafés, hotel kitchens',
+            // home
+            'pill_new' => 'New', 'pill' => 'Smart POS now has a Restaurant mode',
+            'h_a' => 'Run your', 'h_words' => ['shop', 'restaurant', 'company'], 'h_b' => 'the smart way.',
+            'hero_sub' => 'Smart POS for sales, stock and credit in shops and restaurants. Smart BMS when your company needs full accounting. On your phone or computer, in English or Kiswahili.',
             'points' => $days > 0 ? [sprintf('%d days free', $days), 'No payment today', 'Your own private account'] : ['No payment today', 'Your own private account', 'Phone and computer'],
             'example' => 'Example', 'today' => 'Today', 'app_menu' => ['Dashboard', 'Sell', 'Products', 'Who owes me', 'Reports'],
             'k_sales' => "Today's sales", 'k_profit' => 'Gross profit', 'k_credit' => 'Credit repaid',
-            'built_title' => 'Built around how you work',
+            'k_up' => '▲ 12% vs yesterday', 'k_up2' => '▲ 8%', 'k_who' => '3 customers',
+            'feed' => [['New sale', '35,000 TZS'], ['Credit repaid', '20,000 TZS'], ['New sale', '12,500 TZS'], ['Online order', 'Accepted · 18,000 TZS']],
+            'rc_title' => 'Receipt #0142', 'rc_items' => [['Sugar 1 kg', '3,500'], ['Rice 0.5 kg', '1,600'], ['Soap ×2', '2,400']], 'rc_total' => 'Total',
+            'choose_k' => 'Find your fit', 'choose_h' => 'One system, made for your kind of business',
+            'cards' => [
+                'retail'     => ['Retail shop', 'Sell fast, know what is in stock and who owes you.', ['Receipts, printed or emailed', 'Stock and receiving', 'Credit sales'], 'See Retail shop'],
+                'restaurant' => ['Restaurant', 'From the table to the kitchen to the bill.', ['Tables and orders', 'Kitchen screen', 'Menu, recipes and QR ordering'], 'See Restaurant'],
+                'company'    => ['Company', 'Full accounting with every department connected.', ['Trial Balance, Profit & Loss, Balance Sheet', 'Invoices, purchases and banks', 'HR and payroll'], 'See Smart BMS'],
+            ],
             'values' => [
                 ['Simple for owners', 'Made for business owners, not only accountants — in English or Kiswahili.'],
-                ['Every role, its own work', 'Staff see only what they need. A waiter never sees the money, for example.'],
+                ['Each role sees its own work', 'Staff see only what they need. A waiter never sees the money.'],
                 ['Your data is yours', 'Every company has its own private database, backed up every day.'],
             ],
             'band_title' => 'Ready to start?', 'band_sub' => $days > 0 ? sprintf('%d days free — no payment today.', $days) : 'No payment today.',
             'band_sub_closed' => 'Talk to us and we will open your account.',
-            'start_with' => 'Start with', 'ask_price' => 'Ask for prices', 'bms_approval' => 'Smart BMS accounts are reviewed by BJP before they open.',
-            'what_you_get' => 'What you get', 'first_steps' => 'Your first steps',
-            'rest_kicker' => 'Restaurants', 'rest_title' => 'Smart POS for restaurants', 'rest_sub' => 'Choose "Restaurant" when you sign up: your first shop opens in Restaurant mode. Waiter, cashier and cook — each sees only their own work.',
-            'rest_list' => ['Tables and orders', 'Kitchen screen', 'Menu and recipes', 'Cost per plate', 'QR menu', 'Waste report'],
+            // product pages (shared)
+            'what_you_get' => 'What you get', 'first_steps' => 'Your first steps after signing in', 'signup_h' => 'Sign up in 4 short steps',
+            'bms_approval' => 'BJP reviews every Smart BMS account before it opens.',
+            // Smart POS overview
+            'pos_hub_k' => 'Smart POS', 'pos_hub_h' => 'A till made for the way you sell.',
+            'pos_hub_sub' => 'Smart POS works for shops and for restaurants. Pick yours to see how it fits.',
+            'pos_same' => 'The plans are the same for shops and restaurants. You choose Retail or Restaurant when you sign up.',
+            // Retail
+            'ret_k' => 'Smart POS · Retail shop', 'ret_feats_h' => 'Everything a shop needs',
+            'ret_feats' => [
+                ['bolt', 'Fast selling', 'Printed or emailed receipts in seconds.'],
+                ['box', 'Stock you can trust', 'Products, services and receiving stock.'],
+                ['scale', 'Sell by weight or volume', 'Half a kilo, a quarter litre — the till takes it.'],
+                ['credit', 'Credit sales', 'See who owes you and record what they pay back.'],
+                ['chart', 'Expenses and profit', 'Reports: daily, weekly, monthly, quarterly and yearly.'],
+                ['cart', 'Your own online shop', 'Share a link; customers order, you confirm.'],
+            ],
+            'till_title' => 'Sell', 'till_items' => [['Sugar', '1 kg', 3500], ['Rice', '0.5 kg', 1600], ['Bathing soap', '×2', 2400], ['Cooking oil', '1 L', 6000]], 'till_total' => 'Total',
+            'ret_steps' => ['Plan', 'Your shop (Retail ticked)', 'Admin account', 'Your first shop is ready'],
+            // Restaurant
+            'res_k' => 'Smart POS · Restaurant', 'res_feats_h' => 'Built for a busy kitchen',
+            'flow_h' => 'How an order moves',
+            'flow' => [['Waiter', 'takes the order'], ['Cashier', 'confirms'], ['Kitchen', 'cooks'], ['Waiter', 'serves'], ['Bill', 'is paid']],
+            'flow_note' => 'Switch on the kitchen screen and cashier confirmation in Settings, when you need them.',
+            'tickets' => [['Table 4', '12:41', '2 × Pilau · 1 × Juice', 'Cooking'], ['Table 7', '12:38', '1 × Chips mayai', 'Ready to serve']],
+            'res_feats' => [
+                ['table', 'Tables and orders', 'Open a table, add dishes, send to the kitchen.'],
+                ['screen', 'Kitchen screen', 'Cooks see each order and mark it ready.'],
+                ['book', 'Menu with photos and recipes', 'Know the ingredient cost of every dish.'],
+                ['qr', 'QR menu at the table', 'Guests order from their phone; staff accept first.'],
+                ['truck', 'Buy on credit, pay later', 'Supplier purchases you settle when you are ready.'],
+                ['trash', 'Waste recorded', 'Spoiled food is written off, so your profit is true.'],
+            ],
+            'res_steps' => ['Plan', 'Your restaurant (Restaurant ticked)', 'Admin account', 'Restaurant mode on; Waiter, Cashier, Cook and Restaurant Manager roles ready'],
+            // Smart BMS
+            'bms_k' => 'Smart BMS · Complete system', 'bms_h' => 'Real accounting, with your whole business connected.',
+            'bms_sub' => 'Every sale, purchase, payment and payslip posts to one double-entry ledger, so your Trial Balance, Profit & Loss and Balance Sheet always agree.',
+            'tb_title' => 'Trial Balance', 'tb_bal' => '✓ Balanced', 'tb_cols' => ['Account', 'Debit', 'Credit'], 'tb_total' => 'Total',
+            'tb_rows' => [['1-1100', 'Cash at bank', 8450000, 0], ['1-1200', 'Trade debtors', 3120000, 0], ['2-1100', 'Trade creditors', 0, 2270000], ['4-1000', 'Sales', 0, 14620000], ['6-1000', 'Salaries', 5320000, 0]],
+            'tb_note' => 'Example, in TZS. Debits equal credits.',
+            'stmts' => ['Chart of accounts', 'Journals', 'Profit & Loss', 'Balance Sheet', 'Cash Flow', 'Bank accounts'],
+            'bms_feats_h' => 'Every department, one set of books',
+            'bms_feats' => [
+                ['ledger', 'Accounting', 'Chart of accounts, journals and the full financial reports.'],
+                ['invoice', 'Sales', 'Quotations, invoices and customer payments.'],
+                ['truck', 'Purchases', 'Suppliers, bills and warehouses.'],
+                ['bank', 'Banks and expenses', 'Every shilling in and out recorded.'],
+                ['users', 'HR and payroll', 'Staff records, payslips and payroll.'],
+                ['grid', 'Projects, assets and CRM', 'Plus a Point of Sale, included.'],
+            ],
+            'bms_steps' => ['Plan', 'Your company', 'Admin account', 'BJP reviews and opens your account'],
+            // pricing
             'price_title' => 'Clear prices. No surprises.', 'price_sub' => $days > 0 ? sprintf('Every plan starts with %d days free. Change plan any time.', $days) : 'Change plan any time.',
             'no_prices' => 'Prices are being prepared', 'no_prices_sub' => 'Talk to us and we will share our prices.',
             'billing' => 'Billing period', 'popular' => 'Most popular', 'per_month' => 'a month', 'not_term' => 'Not offered for this length',
             'after_trial' => $days > 0 ? sprintf('after your %d free days', $days) : 'per period', 'compare' => 'Compare plans', 'feature' => 'Feature',
-            'faq_title' => 'Frequently asked questions', 'faq_sub' => 'Pick a topic on the left.', 'topics' => 'Topics',
+            // faq + contact
+            'faq_title' => 'Frequently asked questions', 'faq_sub' => 'Pick a topic.', 'topics' => 'Topics',
             'still_q' => 'Still have a question?', 'still_q_sub' => 'We are happy to help.',
-            'contact_title' => 'Talk to us', 'contact_sub' => 'We help you choose and get started.', 'phone' => 'Phone', 'hrs' => 'Hrs', 'hours' => 'Opening hours',
+            'contact_title' => 'Talk to us', 'contact_sub' => 'We help you choose and get started.', 'phone' => 'Phone', 'email' => 'Email', 'hrs' => 'Hrs', 'hours' => 'Opening hours',
             'form_title' => 'Send us a message', 'form_sub_wa' => 'Your message opens in WhatsApp, ready to send.', 'form_sub_mail' => 'Your message opens in your email, ready to send.',
             'f_name' => 'Your name', 'f_biz' => 'Type of business', 'biz_opts' => ['Shop', 'Restaurant', 'Company', 'Other'], 'f_msg' => 'Message',
             'send_wa' => 'Send on WhatsApp', 'send_mail' => 'Send by email', 'no_contacts' => 'Our contact details will appear here soon.', 'call_us' => 'Give us a call.',
-            'foot_about' => 'Sales and business management for shops, restaurants and companies.',
-            'privacy' => 'Privacy Policy', 'staff_login' => 'BJP staff: sign in here', 'close' => 'Close',
+            'm_need' => 'Please enter your name and a message.',
+            // footer
+            'foot_about' => 'Smart POS runs the till for shops and restaurants. Smart BMS gives growing companies full accounting, payroll and financial reports.',
+            'f_products' => 'Products', 'f_help' => 'Help', 'f_talk' => 'Talk to us', 'f_acct' => 'Accounting', 'privacy' => 'Privacy Policy',
+            // log in window
+            'staff_login' => 'BJP staff: sign in here',
             'co_addr' => "Your company's web address", 'co_ph' => 'your-company', 'co_find' => 'Find my company', 'co_go' => 'Continue to sign in →',
             'co_hint' => 'Every company signs in on its own address. Forgot it? It is in your welcome email.',
             'co_not_found' => 'We could not find a company with that address.', 'co_bad' => 'Use lowercase letters, numbers and hyphens only.', 'co_busy' => 'We could not check right now. Please try again.',
-            'm_need' => 'Please enter your name and a message.',
-            'seg' => [
-                'shop' => ['Shops', 'Sell fast, know your stock.', 'For one shop or many: sales, stock, credit and profit.'],
-                'restaurant' => ['Restaurants', 'From table to kitchen.', 'Waiter, cashier and cook — each sees only their own work.'],
-                'company' => ['Companies', 'Your numbers always agree.', 'Sales, purchases, finance, HR and projects in one system.'],
-            ],
-            'shop_extra' => 'Online shop',
         ];
     }
 }
@@ -220,20 +348,9 @@ if (!function_exists('landingData')) {
         $products = landingProducts($sw);
         $byKey = [];
         foreach ($products as $p) $byKey[$p['key']] = $p;
-
-        $T = landingCopy($sw, $trial);
-        $copy = bmsProductCopy($sw);
-        $segments = [
-            ['key' => 'shop', 'name' => $T['seg']['shop'][0], 'head' => $T['seg']['shop'][1], 'sub' => $T['seg']['shop'][2], 'product' => 'Smart POS', 'page' => 'smart-pos',
-             'feats' => array_merge($copy['bms_shop']['card'], [$T['shop_extra']])],
-            ['key' => 'restaurant', 'name' => $T['seg']['restaurant'][0], 'head' => $T['seg']['restaurant'][1], 'sub' => $T['seg']['restaurant'][2], 'product' => 'Smart POS', 'page' => 'smart-pos',
-             'feats' => $T['rest_list']],
-            ['key' => 'company', 'name' => $T['seg']['company'][0], 'head' => $T['seg']['company'][1], 'sub' => $T['seg']['company'][2], 'product' => 'Smart BMS', 'page' => 'smart-bms',
-             'feats' => $copy['bms_full']['card']],
-        ];
         $f = landingFaqs($sw, $trial);
         return ['products' => $products, 'products_by_key' => $byKey, 'trial_days' => $trial, 'signup_open' => $open,
-                'base_domain' => $base, 'segments' => $segments, 'faqs' => $f['faqs'], 'faq_cats' => $f['cats']];
+                'base_domain' => $base, 'faqs' => $f['faqs'], 'faq_cats' => $f['cats']];
     }
 }
 
@@ -242,19 +359,23 @@ if (!function_exists('landingMeta')) {
     function landingMeta(string $path, bool $sw, array $data, array $site): array
     {
         $m = $sw ? [
-            ''          => ['Smart BMS — Mfumo wa mauzo (POS) na usimamizi wa biashara', 'Smart POS na Smart BMS: mauzo, stock, madeni, matumizi na faida kwa maduka, migahawa na kampuni — kwa simu au kompyuta, kwa Kiswahili.'],
-            'smart-pos' => ['Smart POS — mfumo wa mauzo kwa maduka na migahawa | Smart BMS', 'Smart POS: uza haraka na risiti, pokea stock, fuatilia wanaokudai na uone faida. Hali ya Mgahawa: meza, jikoni na menyu.'],
-            'smart-bms' => ['Smart BMS — mfumo kamili wa usimamizi wa biashara', 'Smart BMS: mauzo, nukuu na ankara, manunuzi, fedha na ripoti za fedha, HR na mishahara, miradi na CRM kwenye mfumo mmoja.'],
-            'pricing'   => ['Bei za Smart POS na Smart BMS', 'Mipango na bei za Smart POS na Smart BMS. Kila mpango unaanza na majaribio ya bure.'],
-            'faq'       => ['Maswali yanayoulizwa | Smart BMS', 'Majibu kuhusu malipo, majaribio ya bure, usalama wa taarifa na Smart POS kwa migahawa.'],
-            'contact'   => ['Wasiliana nasi | Smart BMS', 'Ongea na ' . $site['legal_name'] . ' kuhusu Smart POS na Smart BMS — simu, WhatsApp au email.'],
+            ''                     => ['Smart BMS — Smart POS na mfumo wa uhasibu kwa biashara', 'Smart POS kwa maduka na migahawa: mauzo, stock, madeni na oda za jikoni. Smart BMS kwa kampuni: uhasibu kamili, Trial Balance na mishahara. Kwa simu au kompyuta, kwa Kiswahili.'],
+            'smart-pos'            => ['Smart POS — mfumo wa mauzo kwa maduka na migahawa | Smart BMS', 'Smart POS: mfumo wa mauzo kwa duka la rejareja au mgahawa. Risiti, stock, madeni, meza, skrini ya jikoni na menyu.'],
+            'smart-pos/retail'     => ['Smart POS kwa duka la rejareja — mauzo, stock na madeni | Smart BMS', 'Smart POS kwa maduka: uza haraka na risiti, pokea stock, uza kwa nusu kilo, fuatilia wanaokudai, matumizi na faida, na duka la mtandaoni.'],
+            'smart-pos/restaurant' => ['Smart POS kwa mgahawa — meza, jikoni na menyu | Smart BMS', 'Smart POS kwa migahawa: meza na oda, skrini ya jikoni, menyu yenye picha na mapishi, menyu kwa QR, manunuzi ya mkopo na upotevu wa chakula.'],
+            'smart-bms'            => ['Smart BMS — mfumo wa uhasibu na usimamizi wa biashara', 'Smart BMS: uhasibu wa double-entry (Trial Balance, Faida na Hasara, Mizania, Mtiririko wa fedha), mauzo na ankara, manunuzi, benki, HR na mishahara, miradi na CRM.'],
+            'pricing'              => ['Bei za Smart POS na Smart BMS', 'Mipango na bei za Smart POS na Smart BMS. Kila mpango unaanza na majaribio ya bure.'],
+            'faq'                  => ['Maswali yanayoulizwa | Smart BMS', 'Majibu kuhusu malipo, majaribio ya bure, usalama wa taarifa na Smart POS kwa migahawa.'],
+            'contact'              => ['Wasiliana nasi | Smart BMS', 'Ongea na ' . $site['legal_name'] . ' kuhusu Smart POS na Smart BMS — simu, WhatsApp au email.'],
         ] : [
-            ''          => ['Smart BMS — Smart POS and business management software', 'Smart POS and Smart BMS: sales, stock, credit, expenses and profit for shops, restaurants and companies — on phone or computer, in English or Kiswahili.'],
-            'smart-pos' => ['Smart POS — point of sale for shops and restaurants | Smart BMS', 'Smart POS: fast selling with receipts, stock receiving, credit sales and profit. Restaurant mode: tables, kitchen screen and menu.'],
-            'smart-bms' => ['Smart BMS — complete business management system', 'Smart BMS: sales, quotations and invoices, purchasing, finance and financial reports, HR and payroll, projects and CRM in one system.'],
-            'pricing'   => ['Smart POS and Smart BMS pricing', 'Plans and prices for Smart POS and Smart BMS. Every plan starts with a free trial.'],
-            'faq'       => ['Frequently asked questions | Smart BMS', 'Answers about payment, the free trial, data security and Smart POS for restaurants.'],
-            'contact'   => ['Contact us | Smart BMS', 'Talk to ' . $site['legal_name'] . ' about Smart POS and Smart BMS — phone, WhatsApp or email.'],
+            ''                     => ['Smart BMS — Smart POS and accounting software for business', 'Smart POS for shops and restaurants: sales, stock, credit and kitchen orders. Smart BMS for companies: full accounting, Trial Balance and payroll. On phone or computer, in English or Kiswahili.'],
+            'smart-pos'            => ['Smart POS — point of sale for shops and restaurants | Smart BMS', 'Smart POS: point of sale for a retail shop or a restaurant. Receipts, stock, credit sales, tables, kitchen screen and menu.'],
+            'smart-pos/retail'     => ['Smart POS for retail shops — sales, stock and credit | Smart BMS', 'Smart POS for shops: fast selling with receipts, stock receiving, half-kilo sales, credit sales, expenses and profit, and your own online shop.'],
+            'smart-pos/restaurant' => ['Smart POS for restaurants — tables, kitchen and menu | Smart BMS', 'Smart POS for restaurants: tables and orders, kitchen screen, menu with photos and recipes, QR menu ordering, buying on credit and food waste.'],
+            'smart-bms'            => ['Smart BMS — accounting and business management system', 'Smart BMS: double-entry accounting (Trial Balance, Profit & Loss, Balance Sheet, Cash Flow), sales and invoices, purchases, banks, HR and payroll, projects and CRM.'],
+            'pricing'              => ['Smart POS and Smart BMS pricing', 'Plans and prices for Smart POS and Smart BMS. Every plan starts with a free trial.'],
+            'faq'                  => ['Frequently asked questions | Smart BMS', 'Answers about payment, the free trial, data security and Smart POS for restaurants.'],
+            'contact'              => ['Contact us | Smart BMS', 'Talk to ' . $site['legal_name'] . ' about Smart POS and Smart BMS — phone, WhatsApp or email.'],
         ];
         [$title, $desc] = $m[$path] ?? $m[''];
         return ['title' => $title, 'description' => $desc];
@@ -279,11 +400,13 @@ if (!function_exists('landingJsonLd')) {
             $out[] = $org;
             $out[] = ['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => 'Smart BMS', 'url' => $site['base'] . '/', 'inLanguage' => $lang];
         }
-        if ($path === 'smart-pos' || $path === 'smart-bms') {
-            $pk = $path === 'smart-pos' ? 'bms_shop' : 'bms_full';
-            $app = ['@context' => 'https://schema.org', '@type' => 'SoftwareApplication', 'name' => $path === 'smart-pos' ? 'Smart POS' : 'Smart BMS',
+        $appPages = ['smart-pos' => 'bms_shop', 'smart-pos/retail' => 'bms_shop', 'smart-pos/restaurant' => 'bms_shop', 'smart-bms' => 'bms_full'];
+        if (isset($appPages[$path])) {
+            $pk = $appPages[$path];
+            $desc = $path === 'smart-pos/restaurant' ? bmsRestaurantCopy($sw)['sub'] : bmsProductCopy($sw)[$pk]['sub'];
+            $app = ['@context' => 'https://schema.org', '@type' => 'SoftwareApplication', 'name' => $pk === 'bms_shop' ? 'Smart POS' : 'Smart BMS',
                     'applicationCategory' => 'BusinessApplication', 'operatingSystem' => 'Web', 'url' => $abs($path, $lang),
-                    'description' => bmsProductCopy($sw)[$pk]['sub'], 'publisher' => ['@type' => 'Organization', 'name' => $site['legal_name']]];
+                    'description' => $desc, 'publisher' => ['@type' => 'Organization', 'name' => $site['legal_name']]];
             $prices = [];
             foreach ($data['products_by_key'][$pk]['plans'] ?? [] as $pl) foreach ($pl['prices'] as $px) if ($px['price'] > 0) $prices[] = $px['price'];
             if ($prices) {
