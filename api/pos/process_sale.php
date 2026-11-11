@@ -568,7 +568,10 @@ try {
     // Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split. These
     // are the real security boundary; the client-side hiding in pos.php/
     // pos_scripts_new.php is UX only, never trusted on its own.
-    $can_price_override    = canEdit('pos_price_override');
+    // Prices are never changed at the till (2026-11-10, owner's decision): nobody — admins included — may
+    // sell at a hand-typed price. A lower price for one customer is a Discount (pos_discount_override);
+    // the price itself is changed where it is stored (the product, or the batch inside the shop).
+    $can_price_override    = false;
     $can_discount_override = canEdit('pos_discount_override');
 
     foreach ($items as $item) {
@@ -577,6 +580,12 @@ try {
 
         if (!$db_product) {
             throw new Exception("Product ID $pid not found", 404);
+        }
+
+        // A line still carrying a hand-typed price (a cart or held order saved before "Edit Price" was
+        // removed): refused by name, never silently re-priced — the cashier must see the real total.
+        if (!empty($item['manual_price_override'])) {
+            throw new Exception("The price of '{$db_product['product_name']}' was typed by hand. Prices can no longer be changed at the till: remove '{$db_product['product_name']}' and add it again (use Discount for a lower price).", 422);
         }
 
         // Phase 30 (pos_upgrade_plan.md §9) — modifier choices for this line,
@@ -692,13 +701,15 @@ try {
             $requested_price = $priceResolution['requested_price'];
         }
         // Phase 30 — fold the server-validated modifier total into this
-        // line's TRUE price (not a discount), for the normal add-to-cart
-        // path. Skipped when a manual price override was attempted: the
-        // cashier's typed price (or the forced-back catalog price, if the
-        // override wasn't permitted) is already the final intended figure —
-        // adding the modifier again would double-count it.
-        if (empty($item['manual_price_override'])) {
-            $original_price += $modifierAdjustmentTotal;
+        // line's TRUE price (not a discount). (A hand-typed price never gets
+        // this far — it is refused at the top of the loop.)
+        $original_price += $modifierAdjustmentTotal;
+
+        // Never above the stored price (2026-11-10): a plain line (no other unit — a unit may be priced on its
+        // own) is charged at most the shop's price (+ add-ons). A higher figure can only come from a stale or
+        // crafted cart, so the price at the till is never raised. A LOWER figure stays a discount, checked below.
+        if ($sold_unit_label === '' && $requested_price > $original_price + 0.01) {
+            $requested_price = $original_price;
         }
         $tax_rate = floatval($item['tax_rate'] ?? 0);
         $discount_percent = floatval($item['discount_percent'] ?? 0);

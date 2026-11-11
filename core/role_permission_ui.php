@@ -42,6 +42,9 @@ if (!function_exists('rolePermissionRetiredKeys')) {
     {
         return [
             'tax_settings', 'audit_report', 'activity_log',
+            // "Edit Price" was removed from the till (2026-11-10): prices are never changed at the till, so this
+            // right has nothing left to control. Discount keeps its own right (pos_discount_override).
+            'pos_price_override',
             // Mobile Money lives only in LMS now: no BMS page reads these rights any more.
             'mm_agents', 'mm_commission_rates', 'mm_commissions', 'mm_compliance', 'mm_dashboard', 'mm_float',
             'mm_networks', 'mm_reconciliation', 'mm_reports', 'mm_shifts', 'mm_transactions',

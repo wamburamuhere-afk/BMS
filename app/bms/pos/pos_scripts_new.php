@@ -184,10 +184,7 @@ const PT = {
     successfullyUpdatedItems: <?= json_encode(t('Successfully updated %d items.')) ?>,
     cartQtyLabel: <?= json_encode(t('cart qty:')) ?>,
     barcodeNotFound: <?= json_encode(t('Barcode not found')) ?>,
-    editPriceTitle: <?= json_encode(t('Edit Price')) ?>,
-    newPriceLabel: <?= json_encode(t('New unit price')) ?>,
-    priceOverrideBelowMin: <?= json_encode(t('%s: price cannot be below the minimum selling price of %s')) ?>,
-    priceUpdated: <?= json_encode(t('Price updated')) ?>,
+    handPriceWarn: <?= json_encode(t('Price typed by hand — remove and add again')) ?>,
     discountPermissionDenied: <?= json_encode(t('You do not have permission to apply a discount.')) ?>,
     unitLabel: <?= json_encode(t('Unit')) ?>,
     overrideAndProceed: <?= json_encode(t('Override and Proceed')) ?>,
@@ -279,13 +276,9 @@ function posReadTypedQty(value, allowDecimal, productName) {
     return n;
 }
 
-// Phase 16 (pos_upgrade_plan.md §8) — loss-control permission split: a cashier
-// can sell without necessarily being allowed to change a line's price or apply
-// a discount. These flags only control client-side affordances (show/hide the
-// edit-price pencil, the discount toolbar button already gated server-side in
-// pos.php); api/pos/process_sale.php independently re-validates both — the
-// real security boundary, never trusts these client flags alone.
-const POS_CAN_PRICE_OVERRIDE = <?= json_encode(canEdit('pos_price_override')) ?>;
+// Prices are never changed at the till (2026-11-10, owner's decision): a lower price for one customer is a
+// Discount (its own right, the toolbar button gated in pos.php); the price itself is changed only where it is
+// stored — the product, or the batch inside the shop. api/pos/process_sale.php refuses a hand-typed price.
 
 // Phase 15 (pos_upgrade_plan.md §8) — safeOutput() is a per-page LOCAL JS
 // convention in this codebase (each page defines its own copy, never a
@@ -1503,7 +1496,7 @@ function updateCartDisplay() {
                     </td>
                     <td class="text-end">
                         <span class="small">${priceDisplay}</span>
-                        ${POS_CAN_PRICE_OVERRIDE ? `<br><button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:10px;" onclick="editLinePrice(${index})" title="${PT.editPriceTitle}"><i class="bi bi-pencil"></i> ${PT.editPriceTitle}</button>` : ''}
+                        ${item.manual_price_override ? `<br><span class="small text-danger pos-hand-price"><i class="bi bi-exclamation-triangle me-1"></i>${PT.handPriceWarn}</span>` : ''}
                     </td>
                     <td class="text-center" style="padding: 0.25rem;">
                         ${item.serial_numbers ?
@@ -1613,43 +1606,6 @@ function updateCartQuantityLive(index, inputEl) {
         if (cell) cell.textContent = (n * item.discounted_price).toLocaleString();
     }
     calculateCartTotal();
-}
-
-// Phase 16 (pos_upgrade_plan.md §8) — manual price override, only reachable
-// when POS_CAN_PRICE_OVERRIDE is true (button isn't even rendered otherwise).
-// Overriding the price clears any discount already applied to this line —
-// one deliberate override, not stacked with a percentage/fixed discount.
-function editLinePrice(index) {
-    const item = cart[index];
-    if (!item) return;
-
-    Swal.fire({
-        title: PT.editPriceTitle,
-        input: 'number',
-        inputLabel: PT.newPriceLabel,
-        inputValue: item.price,
-        inputAttributes: { min: item.min_selling_price, step: '0.01' },
-        showCancelButton: true,
-        confirmButtonText: PT.ok,
-        cancelButtonText: PT.cancel,
-        inputValidator: (value) => {
-            const v = parseFloat(value);
-            if (isNaN(v) || v < item.min_selling_price) {
-                return PT.priceOverrideBelowMin.replace('%s', applyCaseModeJs(item.product_name)).replace('%s', item.min_selling_price.toLocaleString());
-            }
-        }
-    }).then(result => {
-        if (!result.isConfirmed) return;
-        const newPrice = parseFloat(result.value);
-        item.price = newPrice;
-        item.discounted_price = newPrice;
-        item.discount_percent = 0;
-        item.discount_value = 0;
-        item.manual_price_override = true;
-        updateCartDisplay();
-        saveCartToStorage();
-        Swal.fire({ icon: 'success', title: PT.priceUpdated, timer: 1200, showConfirmButton: false });
-    });
 }
 
 function removeFromCart(index) {

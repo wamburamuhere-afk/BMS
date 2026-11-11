@@ -65,7 +65,10 @@ foreach (['pos_price_override', 'pos_discount_override'] as $key) {
 // ─────────────────────────────────────────────────────────────────────────
 section('3. Wiring — the real security boundary lives in process_sale.php, not just the UI');
 $sale = src($root, 'api/pos/process_sale.php');
-has($sale, "canEdit('pos_price_override')", 'process_sale.php checks pos_price_override');
+// 2026-11-10: "Edit Price" removed from the till — nobody may sell at a hand-typed price any more.
+has($sale, '$can_price_override    = false;', 'process_sale.php never honours a hand-typed price (no right can unlock it)');
+strpos($sale, "canEdit('pos_price_override')") === false ? pass('process_sale.php no longer reads pos_price_override') : fail('process_sale.php still reads pos_price_override');
+has($sale, "if (!empty(\$item['manual_price_override'])) {", 'process_sale.php refuses a line carrying a hand-typed price');
 has($sale, "canEdit('pos_discount_override')", 'process_sale.php checks pos_discount_override');
 has($sale, 'resolvePosLineBasePrice(', 'process_sale.php resolves base price via the extracted guard');
 has($sale, 'assertPosLineDiscountPermitted(', 'process_sale.php enforces discount permission via the extracted guard');
@@ -74,9 +77,10 @@ $posPage = src($root, 'app/bms/pos/pos.php');
 has($posPage, "canEdit('pos_discount_override')", 'pos.php gates the Apply Discount button server-side');
 
 $scripts = src($root, 'app/bms/pos/pos_scripts_new.php');
-has($scripts, "canEdit('pos_price_override')", 'pos_scripts_new.php reads pos_price_override to build POS_CAN_PRICE_OVERRIDE');
-has($scripts, 'function editLinePrice(', 'the manual price-edit affordance exists');
-has($scripts, 'manual_price_override', 'a client-side override sets manual_price_override, matched by the server guard');
+strpos($scripts, 'function editLinePrice(') === false && strpos($scripts, 'POS_CAN_PRICE_OVERRIDE') === false
+    ? pass('the till has no "Edit Price" button any more (editLinePrice / POS_CAN_PRICE_OVERRIDE gone)')
+    : fail('the till still carries the "Edit Price" affordance');
+has($scripts, 'item.manual_price_override ? ', 'a line saved earlier with a hand-typed price is flagged on the till (remove and add again)');
 
 // ─────────────────────────────────────────────────────────────────────────
 section('4. Runtime — resolvePosLineBasePrice()');

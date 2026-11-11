@@ -11,6 +11,9 @@
  * The real security boundary: a client can send ANY item['price'] /
  * item['manual_price_override'] / item['discount_percent'] it likes — none of
  * it is trusted unless the resolution below explicitly allows it.
+ *
+ * 2026-11-10: "Edit Price" was removed from the till. process_sale.php now refuses any line with
+ * manual_price_override and always passes $canPriceOverride = false here, so the stored price is used.
  */
 
 /**

@@ -84,7 +84,7 @@ $texts = array_filter($vis, fn($pk) => rolePermissionShopText($pk, 'retail') !==
 ok('no row reworded (names and descriptions as stored)', $texts === []);
 $tabs = tabsOf($m['visible']);
 ok('no Restaurant tab', !isset($tabs['Restaurant']));
-foreach (['pos', 'pos_restock', 'pos_config_settings', 'pos_price_override', 'pos_discount_override', 'pos_past_sales'] as $pk) {
+foreach (['pos', 'pos_restock', 'pos_config_settings', 'pos_discount_override', 'pos_past_sales'] as $pk) {
     if (isset($idByKey[$pk])) ok("'$pk' still in the Point of Sale tab", in_array($pk, $tabs['Point of Sale'] ?? [], true));
 }
 
