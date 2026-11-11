@@ -745,6 +745,7 @@ const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';
 const RETURN_URL  = '<?= buildUrl('api/pos/create_return.php') ?>';
 const RECEIVE_URL = '<?= buildUrl('api/pos/receive_payment.php') ?>';
 const RECEIPT_URL = '<?= buildUrl('api/pos/print_receipt.php') ?>';
+const REFUND_STATEMENT_URL = '<?= buildUrl('api/pos/refund_statement.php') ?>';
 const TARGET_URL  = '<?= buildUrl('api/pos/save_sales_target.php') ?>';
 const CURRENCY    = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
 const CAN_CREATE  = <?= json_encode($can_create) ?>;
@@ -777,6 +778,7 @@ const T = {
     actions: <?= json_encode(t('Actions')) ?>,
     viewReceipt: <?= json_encode(t('View Receipt')) ?>,
     viewRefundReceipt: <?= json_encode(t('View Refund Receipt')) ?>,
+    viewRefunds: <?= json_encode(t('View Refunds (%d)')) ?>,
     refundedLabel: <?= json_encode(t('Refunded')) ?>,
     refundFor: <?= json_encode(t('For receipt %s')) ?>,
     retOwedNote: <?= json_encode(t('This customer still owes %s on this sale. The return comes off that first; only the rest is paid back.')) ?>,
@@ -994,10 +996,14 @@ function payBadge(row) {
 // so both show the same real names (View Receipt / Receive Payment / Return-Refund / Void Sale).
 function actionItems(row) {
     let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> ${T.viewReceipt}</a></li>`;
-    // Each refund of this receipt opens its own refund receipt (they no longer have their own row).
-    (row.refunds || []).forEach(rf => {
-        items += `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${rf.sale_id}" target="_blank"><i class="bi bi-receipt-cutoff text-primary me-2"></i> ${T.viewRefundReceipt} (${safeOutput(rf.receipt_number)})</a></li>`;
-    });
+    // One entry however many refunds the receipt had: a single refund opens its own refund receipt,
+    // several open the refund statement (every refund of this receipt + totals).
+    const refunds = row.refunds || [];
+    if (refunds.length === 1) {
+        items += `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${refunds[0].sale_id}" target="_blank"><i class="bi bi-receipt-cutoff text-primary me-2"></i> ${T.viewRefundReceipt} (${safeOutput(refunds[0].receipt_number)})</a></li>`;
+    } else if (refunds.length > 1) {
+        items += `<li><a class="dropdown-item py-2 rounded" href="${REFUND_STATEMENT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt-cutoff text-primary me-2"></i> ${T.viewRefunds.replace('%d', refunds.length)}</a></li>`;
+    }
     if (CAN_EDIT   && row.can_receive) items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> ${T.receivePayment}</button></li>`;
     if (CAN_CREATE && row.can_return)  items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> ${T.returnRefund}</button></li>`;
     if (CAN_DELETE && row.can_void)    items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')"><i class="bi bi-x-octagon text-danger me-2"></i> ${T.voidSaleLabel}</button></li>`;
