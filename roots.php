@@ -214,6 +214,8 @@ $routes = [
     // Public website on the platform's own address only (landing.php 404s on a company's
     // address and on Superadmin; "/" is handled by index.php). 2026-11-11.
     'smart-pos'      => ROOT_DIR . '/landing.php',
+    'smart-pos/retail'     => ROOT_DIR . '/landing.php',
+    'smart-pos/restaurant' => ROOT_DIR . '/landing.php',
     'smart-bms'      => ROOT_DIR . '/landing.php',
     'pricing'        => ROOT_DIR . '/landing.php',
     'faq'            => ROOT_DIR . '/landing.php',

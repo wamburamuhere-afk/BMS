@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-11-11 — feat(site): website redesign — Products menu, Retail and Restaurant pages, one language at a time; Pricing → sign-up step 3
+
+**Changed:** `landing.php`, `core/landing_content.php`, `core/product_copy.php`, `core/public_site.php`, `roots.php`, `public_sitemap.php`, `register.php`, `tests/test_landing_cli.php`, `tests/test_signup_shop_cli.php`
+
+- **Header:** one **Products** menu (Smart BMS — for companies that need accounting; Smart POS → **Retail shop** / **Restaurant**) in place of separate Smart POS / Smart BMS items. Language shows one at a time (globe · EN ▾ / SW ▾, the same switcher as Register). On a phone: one slim row (logo · language · ☰) and a full-width menu with products, pages, Log in and Start free trial.
+- **Home:** moving first screen — text slides in, the headline word turns shop / restaurant / company (Kiswahili with the right grammar: duka lako / mgahawa wako / kampuni yako), example figures count up, bars grow, a "new sale" card changes; still for visitors who turn motion off. "Find your fit" cards for Retail shop, Restaurant and Smart BMS.
+- **New pages:** `/smart-pos/retail` (only shop topics; sign-up with Retail ticked) and `/smart-pos/restaurant` (only restaurant topics: order flow, kitchen screen, menu and recipes, QR ordering, buying on credit, waste; sign-up with **Restaurant ticked**). `/smart-pos` is now a short overview pointing to both. `/smart-bms` leads with accounting (example Trial Balance that balances, financial statements). Line icons replace emoji.
+- **Footer:** about the business (Smart POS for shops and restaurants; Smart BMS for full accounting, payroll and financial reports), Products / Help / Talk to us columns (contacts from Support settings). "BJP staff: sign in here" removed from the footer; it stays inside the Log in window.
+- **Sign-up page (`register.php`):** `?business=restaurant` ticks Restaurant; choosing Restaurant switches every line to restaurant wording ("Tell us about your restaurant", restaurant name/type, left panel, step name, first steps) — new `bmsRestaurantCopy()`. A live plan picked on Pricing opens straight at the Shop/Company step (steps 1–2 done, "Change" goes back); a forged or retired plan still starts at the plan step. Smart BMS unchanged.
+- **Search engines:** own title/description for the new pages; sitemap lists them (19 URLs); SoftwareApplication data on the product pages.
+- **Checked:** `test_landing_cli` 157/157 (incl. English/Kiswahili same keys, nothing empty, no English sentence on any Kiswahili page and the reverse, Retail page free of restaurant words and vice versa, footer, menus, sign-up links, step 3); `test_signup_shop` 47/47, `test_register_redesign` 42/42. Browser: desktop and 390 px phone, Products menu, phone menu, language menu, Restaurant → sign-up (Restaurant ticked, Kiswahili), Retail/Restaurant switch, Pricing 1-year plan → step 3 with "Starter · 1 year", Change → plan step.
+
 ## 2026-11-11 — feat(site): public website on the platform's own address (Option B) + search engines
 
 **Changed:** `landing.php` (new), `core/landing_content.php` (new), `core/public_site.php` (new), `public_robots.php` (new), `public_sitemap.php` (new), `index.php`, `roots.php`, `app/superadmin/settings.php`, `actions/superadmin_platform_settings.php`, `tests/test_landing_cli.php` (new)

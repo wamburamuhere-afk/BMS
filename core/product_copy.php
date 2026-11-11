@@ -77,3 +77,48 @@ if (!function_exists('bmsProductCopy')) {
         ];
     }
 }
+
+if (!function_exists('bmsRestaurantCopy')) {
+    /**
+     * Smart POS wording for a RESTAURANT (2026-11-11): the same product and plans as bms_shop, but a
+     * restaurant owner reads only about restaurants. register.php lays this over the bms_shop wording
+     * when "Restaurant" is chosen; the landing page's Restaurant page uses it too. Same keys as
+     * bmsProductCopy()['bms_shop'] (tests/test_landing_cli.php checks).
+     * Verified 2026-11-11: tables (restaurant_tables), kitchen screen (restaurant_kitchen_mode),
+     * menu photos + recipes, QR menu ordering (/m/<link>), supplier bills paid later, food waste,
+     * ready roles Waiter / Cashier / Cook / Restaurant Manager (rofsEnsureReadyRoles at sign-up).
+     */
+    function bmsRestaurantCopy(bool $sw): array
+    {
+        return [
+            'icon'     => 'pos',
+            'tag'      => $sw ? 'Bora kwa migahawa' : 'Best for restaurants',
+            'desc'     => $sw ? 'Meza, jikoni, menyu na malipo kwa mgahawa wako.' : 'Tables, kitchen, menu and payments for your restaurant.',
+            'head'     => $sw ? 'Kutoka mezani, hadi jikoni, hadi bili.' : 'From the table to the kitchen to the bill.',
+            'sub'      => $sw ? 'Mhudumu anachukua oda, jikoni wanaiona kwenye skrini, na keshia anafunga bili. Kila mmoja anaona kazi yake tu.'
+                              : 'Waiters take orders, the kitchen sees them on screen, and the cashier closes the bill. Each person sees only their own work.',
+            'benefits' => $sw
+                ? ['Meza na oda, zinatumwa jikoni', 'Skrini ya jikoni kwa wapishi', 'Menyu yenye picha na mapishi', 'Menyu kwa QR: mteja anaagiza akiwa mezani', 'Nunua kwa mkopo kwa wasambazaji, lipa baadaye', 'Upotevu wa chakula, matumizi na faida']
+                : ['Tables and orders, sent to the kitchen', 'Kitchen screen for your cooks', 'Menu with photos and recipes', 'QR menu: guests order from the table', 'Buy from suppliers on credit, pay later', 'Food waste, expenses and profit'],
+            'card'     => $sw
+                ? ['Meza na oda', 'Skrini ya jikoni', 'Menyu, mapishi na QR', 'Ripoti za siku hadi mwaka']
+                : ['Tables and orders', 'Kitchen screen', 'Menu, recipes and QR ordering', 'Reports from daily to yearly'],
+            'step'     => $sw ? 'Mgahawa' : 'Restaurant',
+            'co_h'     => $sw ? 'Tueleze kuhusu mgahawa wako' : 'Tell us about your restaurant',
+            'co_sub'   => $sw ? 'Hii itaonekana kwenye bili na risiti zako. Unaweza kuibadilisha baadaye kwenye Settings.' : 'This appears on your bills and receipts. You can change it later in Settings.',
+            'name_l'   => $sw ? 'Jina la mgahawa' : 'Restaurant name',
+            'type_l'   => $sw ? 'Aina ya mgahawa' : 'Type of restaurant',
+            'type_ph'  => $sw ? 'mf. Mgahawa, Café, Grill, Jiko la hoteli' : 'e.g. Restaurant, Café, Grill, Hotel kitchen',
+            'logo_for' => $sw ? 'inaonekana kwenye bili na risiti zako' : 'shows on your bills and receipts',
+            'admin_sub'=> $sw ? 'Utaingia kwa username na password yako. Kisha ongeza wafanyakazi na uwape majukumu: Mhudumu, Keshia au Mpishi.'
+                              : 'You will sign in with your username and password. Then add your staff and give each a role: Waiter, Cashier or Cook.',
+            'first'    => $sw
+                ? ['Ongeza vyakula na bei zake kwenye menyu', 'Weka meza zako', 'Ongeza wafanyakazi: mhudumu, keshia, mpishi', 'Pokea oda ya kwanza']
+                : ['Add your dishes and prices to the menu', 'Set up your tables', 'Add your staff: waiter, cashier, cook', 'Take your first order'],
+            'demo_t'   => $sw ? 'Mauzo ya leo' : "Today's sales",
+            'demo_v'   => ['412,000', '688,500', '903,000'],
+            'demo_n'   => $sw ? ['Meza 4 · bili imelipwa · 42,000 TZS', 'Oda mpya jikoni · Meza 7', 'Oda ya QR imekubaliwa · Meza 2']
+                              : ['Table 4 · bill paid · 42,000 TZS', 'New kitchen order · Table 7', 'QR order accepted · Table 2'],
+        ];
+    }
+}
