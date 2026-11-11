@@ -345,7 +345,8 @@ try {
         ok('restaurant: Restock row in restaurant words', ($byKey['pos_restock']['name'] ?? '') === 'Purchases & Stock');
         ok('restaurant: no retail note left', !array_filter($p['rows'], fn($r) => str_contains($r['extra'], 'In a restaurant shop')));
     }
-    ok('restaurant: nothing a restaurant uses is hidden', isset($byKey['pos_price_override'], $byKey['pos_discount_override'], $byKey['pos_advanced'], $byKey['products']));
+    ok('restaurant: nothing a restaurant uses is hidden', isset($byKey['pos_discount_override'], $byKey['pos_advanced'], $byKey['products']));
+    ok('restaurant: POS Price Override retired too (no "Edit Price" on any till)', !isset($byKey['pos_price_override']));
     $p2 = $parseRows(runPage('GET', [], ['features' => allFeatureKeys(), 'lang' => 'sw'])['html']);
     $sw = [];
     foreach ($p2['rows'] as $pid => $r) $sw[(string)$stored[$pid]['page_key']] = $r;

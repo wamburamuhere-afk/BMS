@@ -161,7 +161,8 @@ has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'alt="${caseFormatJs(product.
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'title="${caseFormatJs(product.product_name)}">${caseFormatJs(product.product_name)}', 'POS grid tile: name/title uses caseFormatJs()');
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), '<h6>${caseFormatJs(currentProduct.product_name)}</h6>', 'POS quick-view: product name uses caseFormatJs()');
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), '<strong class="small">${caseFormatJs(item.product_name)}</strong>', 'POS cart line: product name uses caseFormatJs()');
-has(src($root, 'app/bms/pos/pos_scripts_new.php'), "replace('%s', applyCaseModeJs(item.product_name))", 'POS price-override-below-min warning uses applyCaseModeJs()');
+// (The "price below minimum" warning lived inside the till's Edit Price pop-up, removed 2026-11-10 —
+//  prices are never changed at the till; tests/test_pos_no_price_edit_cli.php covers that.)
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), '${applyCaseModeJs(item.product_name)} x${item.quantity}', 'POS WhatsApp receipt text uses applyCaseModeJs()');
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'setCustomerSelection(existing.customer_id, applyCaseModeJs(existing.customer_name))', 'POS held-table-order resume uses applyCaseModeJs()');
 has(src($root, 'app/bms/pos/pos_scripts_new.php'), 'caseFormatJs(sale.customer_name) : PT.walkIn', 'POS held-sales list: customer name uses caseFormatJs()');

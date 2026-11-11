@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-11 — fix(pos): "Edit Price" removed from the till — prices are never changed at the till
+
+**Changed:** `app/bms/pos/pos_scripts_new.php`, `api/pos/process_sale.php`, `core/pos_override_guard.php`, `core/role_permission_ui.php`, `lang/sw.php`, `tests/test_pos_no_price_edit_cli.php` (new), `tests/test_pos_override_permissions_cli.php`, `tests/test_role_permission_ui_cli.php`, `tests/test_roles_matrix_shop_mode_cli.php`, `tests/test_user_roles_crud_logging_cli.php`, `tests/test_text_display_case_refs_cli.php`
+
+- **Owner's decision:** a lower price for one customer is a **Discount** (its own right, POS Discount Override — unchanged); the price itself is changed only where it is stored (the Product page, or a new price on Receive Stock). Two ways to cut a price, and a button staff could misread, are gone.
+- **Till:** the "Edit Price" button under each cart line is removed for everyone, admins included, on every shop type. A line saved earlier with a hand-typed price (an open cart or held order from before) shows "Price typed by hand — remove and add again".
+- **Server (`process_sale.php`):** a hand-typed price is refused by name, for everyone ("remove it and add it again; use Discount for a lower price") — never silently re-priced. A plain line sent ABOVE the stored price (stale / crafted cart) is charged the stored price, never more; price tiers, units priced on their own and add-ons are unaffected. Discount checks unchanged.
+- **Roles & Permissions:** "POS Price Override" retired (it controlled only this button) — hidden, saved ticks kept.
+- **Found, not changed:** editing a batch's selling price in the shop is a price-history correction by design — it does not change what the till charges.
+- **Checked:** new test 39/39 runs the real sale (normal sale; hand-typed price refused incl. admin; above-price → stored price; Discount recorded as a discount and the product price unchanged; price tier 420 kept; a dozen priced 4,500 kept; add-on +500 kept and not a discount; batch price edit still works; Roles row retired). 62 suites touching these files: every remaining failure is identical on develop. Browser: till cart has no Edit Price, old line shows the warning, Discount present, no console errors.
+
 ## 2026-11-10 — fix(roles): every role change is logged with who did what; Access Audit tab works; forged requests refused
 
 **Changed:** `app/constant/settings/user_roles.php`, `core/role_permission_ui.php`, `ajax/get_access_log.php`, `core/restaurant_ready_roles.php`, `lang/sw.php`, `tests/test_user_roles_crud_logging_cli.php` (new)
