@@ -14,6 +14,7 @@
 - **Shared helper:** `core/pos_receipt_returns.php` (`posReceiptReturns()`, `posRefundShortNo()`) used by all three receipt paths (browser print, ESC/POS thermal, emailed PDF) to keep the display logic in one place.
 - **Sales list (pos_dashboard.php):** Default view hides return rows (Sales filter); a "Returns" filter shows them. Each original sale row carries a "Refunded" column; the Actions menu lists "View Refund Receipt (BJP-RET-XXXX)" for each refund.
 - **Migration:** `pos_sale_payments.payment_method` ENUM extended with `'return_credit'`; idempotent, runs on both tenant and legacy DB.
+- **S/No fix (`pos_dashboard.php`):** the Sales view now numbers 1, 2, 3… over the receipts shown only; hidden refund rows no longer use up numbers (`renumberView()`, also re-run when switching Sales/Returns).
 - **Tests:** 65 assertions in `test_pos_refund_on_receipt_cli.php` (cash return, credit return, split part-paid, receipt HTML, ESC/POS bytes, email code, dashboard JS); `test_pos_receipt_qty_format_cli.php` updated to skip partially-refunded sales in the render check.
 
 ## 2026-11-11 — feat(site): public website on the platform's own address (Option B) + search engines

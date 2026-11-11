@@ -1084,7 +1084,20 @@ function initHistoryTable() {
         const r = (settings.aoData[idx] && settings.aoData[idx]._aData) || {};
         return ($('#kindFilter').val() === 'returns') ? !!r.is_return_sale : !r.is_return_sale;
     });
-    $('#kindFilter').on('change', function () { table.draw(); });
+    $('#kindFilter').on('change', function () { renumberView(); table.draw(); });
+}
+
+// S/No counts only the rows in the chosen view (Sales or Returns), so hidden refund rows never use up numbers.
+function renumberView() {
+    const s = table.settings()[0];
+    const wantReturns = $('#kindFilter').val() === 'returns';
+    let n = 0;
+    s.aiDisplayMaster.forEach(function (idx) {
+        const row = s.aoData[idx];
+        row._bmsSn = (!!row._aData.is_return_sale === wantReturns) ? ++n : 0;
+        row._aSortData = null;
+        if (row.anCells && row.anCells[0]) row.anCells[0].innerHTML = row._bmsSn || '';
+    });
 }
 
 // ══════════════════════ TOOLBAR ACTIONS ══════════════════════
@@ -1102,7 +1115,9 @@ function loadSales() {
     $.getJSON(GET_SALES, { start_date: from, end_date: to }, function (res) {
         if (!res.success) { Swal.fire({ icon:'error', title: T.error, text: res.message || T.loadFailed }); return; }
         const rows = res.data || [];
-        table.clear().rows.add(rows).draw();
+        table.clear().rows.add(rows);
+        renumberView();
+        table.draw();
         applyView();
 
         let net = 0, count = 0, returns = 0, voided = 0;
