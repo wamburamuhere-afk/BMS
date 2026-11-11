@@ -201,7 +201,35 @@ try {
     ok(strpos($em, "t('Goods sold are not returnable')") === false && strpos(file_get_contents("$root/api/pos/print_receipt.php"), "Goods sold are not returnable") === false, '"not returnable" removed from printed and emailed receipts');
     $pg = file_get_contents("$root/app/bms/pos/pos_dashboard.php");
     ok(strpos($pg, 'id="kindFilter"') !== false && strpos($pg, '!r.is_return_sale') !== false, 'list: Sales (default) hides refund rows; Returns shows them');
-    ok(strpos($pg, 'T.viewRefundReceipt') !== false && strpos($pg, '(row.refunds || []).forEach') !== false, 'Actions: View Refund Receipt for each refund');
+    ok(strpos($pg, 'refunds.length === 1') !== false && strpos($pg, 'refunds.length > 1') !== false && strpos($pg, 'REFUND_STATEMENT_URL}?id=${row.sale_id}') !== false
+       && strpos($pg, '(row.refunds || []).forEach') === false, 'Actions: ONE refund entry — the refund receipt for one refund, the statement for several');
+
+    // ───────────────────────────────────────────────────────────────────────────
+    section('G. One "View Refunds" statement for a receipt refunded in several steps');
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'dev.bms.local';   // buildUrl() needs a host (a web request always has one)
+    $st = raw('api/pos/refund_statement.php', 'GET', ['id' => $sid]);   // $sid: 3 refunds (1 Soda, 1 Bread, then the rest)
+    ok(strpos($st, 'REFUND STATEMENT') !== false && strpos($st, htmlspecialchars($rcpt)) !== false, "statement titled and tied to $rcpt");
+    ok(strpos($st, htmlspecialchars($rno1)) !== false && strpos($st, htmlspecialchars($rno1b)) !== false && substr_count($st, 'class="refund-block"') === 3, 'lists each of the 3 refund numbers, one block each');
+    ok(substr_count($st, 'TOTAL REFUNDED:') === 4, 'each refund shows its amount + one overall TOTAL REFUNDED (3 + 1)');
+    ok(strpos($st, 'Sold total:') !== false && strpos($st, '6,000') !== false && strpos($st, '-6,000') !== false, 'Sold total 6,000, refunded -6,000');
+    ok(preg_match('/NET PAID:<\/span><span>[A-Z]{3} 0<\/span>/', $st) === 1 && strpos($st, '<div class="refund-stamp">REFUNDED</div>') !== false, 'NET PAID 0 and stamp REFUNDED (everything came back)');
+    ok(strpos($st, 'Reason:') !== false && strpos($st, 'Damaged') !== false && strpos($st, 'Paid back (Cash):') !== false, 'each refund shows its reason and how it was paid back');
+    ok(strpos($st, 'print_receipt.php?id=' . $rid1) !== false && strpos($st, 'print_receipt.php?id=' . (int)$r1b['return_id']) !== false, 'each refund links to its own refund receipt');
+    ok(stripos($st, 'Warning:') === false && stripos($st, 'Fatal error') === false, 'no PHP warnings or errors');
+
+    $st2 = raw('api/pos/refund_statement.php', 'GET', ['id' => $sid2]);   // $sid2: 1 refund of 1 Soda out of 3
+    ok(substr_count($st2, 'class="refund-block"') === 1 && strpos($st2, '-1,000') !== false && strpos($st2, '<div class="refund-stamp">PARTIALLY REFUNDED</div>') !== false, 'one refund: one block, -1,000, stamp PARTIALLY REFUNDED');
+
+    $st3 = raw('api/pos/refund_statement.php', 'GET', ['id' => (int)$plainSale['sale_id']]);   // never refunded
+    ok(strpos($st3, 'No refunds have been made on this receipt.') !== false && strpos($st3, 'class="refund-stamp"') === false && strpos($st3, 'NET PAID') === false, 'a receipt never refunded: says so, no totals');
+
+    $stc = raw('api/pos/refund_statement.php', 'GET', ['id' => $crid]);   // a credit refund: settled against the balance
+    $stcSale = raw('api/pos/refund_statement.php', 'GET', ['id' => $csid]);
+    ok(strpos($stcSale, 'Taken off amount owed:') !== false && strpos($stcSale, 'Paid back') === false, 'credit sale: statement shows "Taken off amount owed", no paid back');
+
+    $stsrc = file_get_contents("$root/api/pos/refund_statement.php");
+    ok(strpos($stsrc, "is_return_sale'] === 1") !== false && strpos($stsrc, "userCan('warehouse'") !== false && strpos($stsrc, "canView('pos')") !== false, 'a refund id redirects to its own receipt; same permission + shop-scope guard as the receipt');
+    ok(strpos($stsrc, "sale_status NOT IN ('voided','cancelled')") !== false, 'voided/cancelled refunds are not counted');
     ok(strpos($pg, "<th class=\"text-primary text-end\"><?= t('Refunded') ?></th>") !== false && strpos($pg, "data: 'refunded_total'") !== false, 'list: Refunded column');
 } finally {
     $pdo->endOuter();

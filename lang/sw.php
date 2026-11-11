@@ -7237,4 +7237,9 @@ return [
     'This customer still owes %s on this sale. The return comes off that first; only the rest is paid back.' => 'Mteja huyu bado anadaiwa %s kwenye mauzo haya. Marejesho yanapunguza deni hilo kwanza; kinachobaki tu ndicho kinalipwa tena.',
     'Return processed. %1$s taken off what the customer owes; %2$s paid back.' => 'Marejesho yamekamilika. %1$s imepunguzwa kwenye deni la mteja; %2$s imelipwa tena.',
     'Goods returned (%s)' => 'Bidhaa zimerejeshwa (%s)',
+    'View Refunds (%d)' => 'Tazama Marejesho (%d)',
+    'REFUND STATEMENT' => 'TAARIFA YA MAREJESHO',
+    'Sold on:' => 'Iliuzwa:',
+    'No refunds have been made on this receipt.' => 'Hakuna marejesho yaliyofanywa kwenye risiti hii.',
+    'View refund receipt' => 'Tazama risiti ya marejesho',
 ];
