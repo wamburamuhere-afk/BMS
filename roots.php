@@ -211,6 +211,16 @@ $routes = [
     'forgot_password' => ROOT_DIR . '/forgot-password.php',
     // Public, unauthenticated — required by Google for the BMS Backups app.
     'privacy'        => ROOT_DIR . '/privacy.php',
+    // Public website on the platform's own address only (landing.php 404s on a company's
+    // address and on Superadmin; "/" is handled by index.php). 2026-11-11.
+    'smart-pos'      => ROOT_DIR . '/landing.php',
+    'smart-bms'      => ROOT_DIR . '/landing.php',
+    'pricing'        => ROOT_DIR . '/landing.php',
+    'faq'            => ROOT_DIR . '/landing.php',
+    'contact'        => ROOT_DIR . '/landing.php',
+    // For search engines, generated per address (core/public_site.php).
+    'robots.txt'     => ROOT_DIR . '/public_robots.php',
+    'sitemap.xml'    => ROOT_DIR . '/public_sitemap.php',
     // Signed in, but holding a password their provider chose for them — the
     // only page they may reach until they replace it.
     'change-password' => ROOT_DIR . '/change-password.php',

@@ -11,6 +11,13 @@ require_once __DIR__ . '/roots.php';
 $request_uri = $_SERVER['REQUEST_URI'] ?? '/';
 $clean_uri = trim(strtok($request_uri, '?'), '/');
 
+// A company's own address and the Superadmin address are never for search engines (2026-11-11).
+// Uses the company this request already resolved — no extra query.
+require_once __DIR__ . '/core/superadmin_auth.php';
+if (!headers_sent() && ((function_exists('bmsCurrentTenant') && bmsCurrentTenant() !== null) || isSuperadminHost())) {
+    header('X-Robots-Tag: noindex, nofollow');
+}
+
 // If accessing root URL directly
 if (empty($clean_uri) || $clean_uri === 'index.php') {
     // The superadmin host's root ('/') is the platform panel's own front door
@@ -35,7 +42,13 @@ if (empty($clean_uri) || $clean_uri === 'index.php') {
     } elseif (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
         redirectTo('dashboard');
     } else {
-        // User is not logged in, redirect to login
+        // Not signed in. On the platform's own address (bms.… / demo.…) "/" is the public website
+        // (landing.php); on a company's own address it stays the company's login, as before.
+        require_once __DIR__ . '/core/public_site.php';
+        if ((!function_exists('bmsCurrentTenant') || bmsCurrentTenant() === null) && publicSiteIsPlatformRoot()) {
+            require __DIR__ . '/landing.php';
+            exit();
+        }
         redirectTo('login');
     }
 } else {
