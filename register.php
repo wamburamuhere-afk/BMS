@@ -307,6 +307,7 @@ $T = $sw ? [
 require_once __DIR__ . '/core/product_copy.php';
 $PRODUCT_COPY = bmsProductCopy($sw);
 $GENERIC_COPY = $PRODUCT_COPY['bms_shop'];   // a product we have no copy for borrows the neutral shop wording
+$RESTAURANT_COPY = bmsRestaurantCopy($sw);   // laid over the Smart POS wording when "Restaurant" is ticked
 
 // ── Live catalogue ───────────────────────────────────────────────────────────
 $products = [];
@@ -358,6 +359,11 @@ foreach ($products as $pr) foreach ($pr['plans'] as $pl) {
 if (!$planFound) { $pickPlan = ''; $pickTerm = ''; }   // a forged or retired key falls back to the default
 if (!in_array($pickProduct, array_column($products, 'key'), true)) $pickProduct = '';
 if (count($products) === 1) $pickProduct = $products[0]['key'];
+// ?business=restaurant (from the website's Restaurant page) ticks Restaurant; anything else = Retail.
+$pickBiz = ($_GET['business'] ?? '') === 'restaurant' ? 'restaurant' : 'retail';
+// A plan picked on the Pricing page (a real, live plan) opens straight at the Shop/Company step —
+// the plan question was already answered there. "Change" on the plan card goes back to it.
+$planFromLink = $planFound && $pickProduct !== '';
 
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE;
 // Eye button inside a password box: shows / hides what was typed.
@@ -367,8 +373,9 @@ $pwEye = static fn(string $for): string =>
     . '<svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
     . '<svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>'
     . '</button>';
-$langUrl = function (string $l) use ($pickProduct, $pickPlan, $pickTerm): string {
-    return '?' . http_build_query(array_filter(['product' => $pickProduct, 'plan' => $pickPlan, 'term' => $pickTerm, 'lang' => $l]));
+$langUrl = function (string $l) use ($pickProduct, $pickPlan, $pickTerm, $pickBiz): string {
+    return '?' . http_build_query(array_filter(['product' => $pickProduct, 'plan' => $pickPlan, 'term' => $pickTerm,
+                                                'business' => $pickBiz === 'restaurant' ? 'restaurant' : '', 'lang' => $l]));
 };
 $langSwitcher = function () use ($sw, $langUrl): string {
     $globe = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19M12 2.5c2.6 2.8 3.9 6 3.9 9.5s-1.3 6.7-3.9 9.5c-2.6-2.8-3.9-6-3.9-9.5s1.3-6.7 3.9-9.5z"/></svg>';
@@ -659,15 +666,15 @@ $icons = [
                         <legend class="form-label" style="font-size:14px"><?= htmlspecialchars($T['biz_q']) ?> <span class="req">*</span></legend>
                         <div class="row g-3">
                             <div class="col-sm-6">
-                                <label class="plcard sel" id="posBizRetail" style="cursor:pointer;flex-direction:row;align-items:flex-start;gap:12px;padding:18px">
-                                    <input type="radio" name="pos_business" value="retail" checked class="form-check-input mt-1" style="flex-shrink:0">
+                                <label class="plcard<?= $pickBiz === 'retail' ? ' sel' : '' ?>" id="posBizRetail" style="cursor:pointer;flex-direction:row;align-items:flex-start;gap:12px;padding:18px">
+                                    <input type="radio" name="pos_business" value="retail"<?= $pickBiz === 'retail' ? ' checked' : '' ?> class="form-check-input mt-1" style="flex-shrink:0">
                                     <span><strong style="display:block;font-size:16px"><?= htmlspecialchars($T['biz_retail']) ?></strong>
                                     <span style="display:block;font-size:13px;color:var(--muted)"><?= htmlspecialchars($T['biz_retail_sub']) ?></span></span>
                                 </label>
                             </div>
                             <div class="col-sm-6">
-                                <label class="plcard" id="posBizRest" style="cursor:pointer;flex-direction:row;align-items:flex-start;gap:12px;padding:18px">
-                                    <input type="radio" name="pos_business" value="restaurant" class="form-check-input mt-1" style="flex-shrink:0">
+                                <label class="plcard<?= $pickBiz === 'restaurant' ? ' sel' : '' ?>" id="posBizRest" style="cursor:pointer;flex-direction:row;align-items:flex-start;gap:12px;padding:18px">
+                                    <input type="radio" name="pos_business" value="restaurant"<?= $pickBiz === 'restaurant' ? ' checked' : '' ?> class="form-check-input mt-1" style="flex-shrink:0">
                                     <span><strong style="display:block;font-size:16px"><?= htmlspecialchars($T['biz_rest']) ?></strong>
                                     <span style="display:block;font-size:13px;color:var(--muted)"><?= htmlspecialchars($T['biz_rest_sub']) ?></span></span>
                                 </label>
@@ -850,6 +857,8 @@ $icons = [
     const T = <?= json_encode($T, $jsonFlags) ?>;
     const PRODUCTS = <?= json_encode($products, $jsonFlags) ?>;
     const GENERIC = <?= json_encode($GENERIC_COPY, $jsonFlags) ?>;
+    const RESTAURANT = <?= json_encode($RESTAURANT_COPY, $jsonFlags) ?>;
+    const PLAN_FROM_LINK = <?= $planFromLink ? 'true' : 'false' ?>;
     const ICONS = <?= json_encode($icons, $jsonFlags) ?>;
     const BASE = <?= json_encode($baseDom, $jsonFlags) ?>;
     const TRIAL_DAYS = <?= (int)$trialDays ?>;
@@ -868,11 +877,17 @@ $icons = [
         product: <?= json_encode($pickProduct, $jsonFlags) ?>,
         plan: <?= json_encode($pickPlan, $jsonFlags) ?>,
         term: <?= json_encode($pickTerm, $jsonFlags) ?>,
+        biz: <?= json_encode($pickBiz, $jsonFlags) ?>,
         subTouched: false, subOk: false
     };
 
     const prod = () => PRODUCTS.find(p => p.key === S.product) || null;
-    const copy = () => (prod() ? prod().copy : GENERIC);
+    const isPos = () => !prod() || prod().key !== 'bms_full';
+    // A restaurant reads restaurant wording everywhere (Smart POS only; Smart BMS is never touched).
+    const copy = () => {
+        const base = prod() ? prod().copy : GENERIC;
+        return (isPos() && S.biz === 'restaurant') ? Object.assign({}, base, RESTAURANT) : base;
+    };
     const plan = () => { const p = prod(); return p ? (p.plans.find(x => x.key === S.plan) || null) : null; };
     const price = () => { const p = plan(); return p && p.prices[S.term] ? p.prices[S.term] : null; };
 
@@ -978,7 +993,7 @@ $icons = [
         if (location.search) history.replaceState(null, '', location.pathname);
         document.querySelectorAll('.lang-menu a').forEach(a => {
             const u = new URLSearchParams(a.getAttribute('href').slice(1));
-            [['product', S.product], ['plan', S.plan], ['term', S.term]].forEach(([k, v]) => v ? u.set(k, v) : u.delete(k));
+            [['product', S.product], ['plan', S.plan], ['term', S.term], ['business', S.biz === 'restaurant' ? 'restaurant' : '']].forEach(([k, v]) => v ? u.set(k, v) : u.delete(k));
             a.setAttribute('href', '?' + u.toString());
         });
         $('#signinLine').toggleClass('d-none-i', ['creating', 'done', 'pending'].includes(S.screen));
@@ -1059,12 +1074,13 @@ $icons = [
         $('#logoFor').text(c.logo_for);
         $('#companyBack').toggleClass('invisible', !hasPlanStep);
         // Retail / Restaurant: Smart POS only. Smart BMS is never sent a choice (its path is unchanged).
-        const isPos = !prod() || prod().key !== 'bms_full';
-        $('#posBizBox').toggleClass('d-none-i', !isPos).prop('disabled', !isPos);
+        $('#posBizBox').toggleClass('d-none-i', !isPos()).prop('disabled', !isPos());
     }
     $(document).on('change', 'input[name="pos_business"]', function () {
-        $('#posBizRetail').toggleClass('sel', this.value === 'retail');
-        $('#posBizRest').toggleClass('sel', this.value === 'restaurant');
+        S.biz = this.value === 'restaurant' ? 'restaurant' : 'retail';
+        $('#posBizRetail').toggleClass('sel', S.biz === 'retail');
+        $('#posBizRest').toggleClass('sel', S.biz === 'restaurant');
+        renderCompany(); renderAside(); syncUrl();   // heading, labels, step name and left panel follow the choice
     });
 
     // ── Company fields ───────────────────────────────────────────────────────
@@ -1339,7 +1355,9 @@ $icons = [
     if (CLOSED) { renderAside(); return; }
     renderProducts();
     if (S.product && prod()) ensureSelection(); else S.product = '';
-    show(hasProductStep && !S.product ? 'product' : (hasPlanStep ? 'plan' : 'company'));
+    // A plan chosen on the Pricing page → straight to the Shop/Company step (steps before it show as done).
+    if (PLAN_FROM_LINK && prod() && plan()) show('company');
+    else show(hasProductStep && !S.product ? 'product' : (hasPlanStep ? 'plan' : 'company'));
 })();
 </script>
 </body>
