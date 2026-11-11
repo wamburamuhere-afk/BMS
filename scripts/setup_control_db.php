@@ -1008,6 +1008,8 @@ try {
         'plan_term' => "ADD COLUMN `plan_term` VARCHAR(8) NULL AFTER `plan_key`",
         // The owner's chosen login name (web signup has it; NULL = the phone, as before).
         'owner_username' => "ADD COLUMN `owner_username` VARCHAR(50) NULL AFTER `owner_phone`",
+        // Smart POS sign-up from the app: 'retail' | 'restaurant' (core/signup_shop.php). NULL = retail.
+        'pos_business'   => "ADD COLUMN `pos_business` VARCHAR(20) NULL AFTER `plan_term`",
     ] as $col => $clause) {
         if (!in_array($col, $rjCols, true)) {
             $admin->exec("ALTER TABLE `{$controlDb}`.`registration_jobs` {$clause}");

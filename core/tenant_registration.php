@@ -313,6 +313,20 @@ if (!function_exists('registerTenant')) {
         // never part of the visitor's wait. The result carries what to send.
         $deferEmails = !empty($in['defer_emails']);
 
+        // Smart POS (retail or restaurant) starts with its first shop already made from these details
+        // (core/signup_shop.php). Smart BMS keeps its own path: held for approval, no shop.
+        require_once __DIR__ . '/signup_shop.php';
+        $posBusiness = signupPosBusiness($in['pos_business'] ?? 'retail');
+        $signupShop = $needsApproval ? null : [
+            'name'           => $company,
+            'pos_mode'       => $posBusiness,
+            'phone'          => $phone,
+            'email'          => $ownerEmail,
+            'address'        => trim((string)($in['company_physical_address'] ?? '')),
+            'country'        => trim((string)($in['country'] ?? '')),
+            'contact_person' => trim(trim((string)($in['owner_first_name'] ?? '')) . ' ' . trim((string)($in['owner_last_name'] ?? ''))),
+        ];
+
         $r = provisionTenant($company, $sub, $username, $pw, [
             // A self-registered company starts on its free trial (trial_ends_at is set
             // by provisionTenant()). 'trial' signs in exactly like 'active', but it is
@@ -336,6 +350,7 @@ if (!function_exists('registerTenant')) {
             'logo_extension'      => $in['logo_extension'] ?? null,
             'company_type'        => mb_substr(trim((string)($in['business_type'] ?? '')), 0, 60),
             'skip_welcome_email'  => !empty($in['skip_welcome_email']) || $needsApproval || $deferEmails,
+            'signup_shop'         => $signupShop,
         ]);
 
         if (!$r['ok']) {
@@ -350,7 +365,7 @@ if (!function_exists('registerTenant')) {
             return ['ok' => false, 'error' => $public, 'tenant_id' => null, 'subdomain' => null, 'login_url' => null];
         }
 
-        finishSelfRegistration((int)$r['tenant_id'], $choice, $ownerEmail);
+        finishSelfRegistration((int)$r['tenant_id'], $choice, $ownerEmail, $needsApproval ? 'retail' : $posBusiness);
         if ($needsApproval) {
             holdTenantForApproval((int)$r['tenant_id']);
         }
@@ -458,9 +473,11 @@ if (!function_exists('finishSelfRegistration')) {
      * Best-effort throughout: the owner can already sign in, so a failure here is
      * logged for a superadmin to finish, never fatal.
      *
-     * @param array|null $choice  registrationPlanChoice() result, or null
+     * @param array|null $choice       registrationPlanChoice() result, or null
+     * @param string     $posBusiness  'restaurant' switches Restaurant POS on (after the plan, so the plan
+     *                                 cannot take it away); 'retail' (default) changes nothing
      */
-    function finishSelfRegistration(int $tenantId, ?array $choice, string $contactEmail): void
+    function finishSelfRegistration(int $tenantId, ?array $choice, string $contactEmail, string $posBusiness = 'retail'): void
     {
         // tenant_module_control_plan.md §5.1 — the platform-wide switch for
         // the UNATTENDED path only (nobody at the platform in the loop yet).
@@ -499,6 +516,18 @@ if (!function_exists('finishSelfRegistration')) {
             } else {
                 logTenantAdminAction($tenantId, null, 'registration_plan',
                     'Signed up on ' . $choice['plan']['name'] . ' (' . $choice['plan']['plan_key'] . ', term ' . $choice['term_key'] . ')');
+            }
+        }
+
+        // A restaurant sign-up: Restaurant POS on — the same switch Superadmin flips under
+        // Tenant › Point of Sale › More. Same Smart POS plan as retail; the restaurant is a switch,
+        // not a plan (applyPlanToTenant() keeps it on through later plan changes).
+        if ($posBusiness === 'restaurant') {
+            $fr = setTenantFeatures($tenantId, ['restaurant_pos' => true]);
+            if (!$fr['ok']) {
+                error_log('finishSelfRegistration: Restaurant POS could not be switched on for tenant ' . $tenantId . ': ' . $fr['error']);
+            } else {
+                logTenantAdminAction($tenantId, null, 'registration_restaurant', 'Signed up as a restaurant — Restaurant POS switched on');
             }
         }
 

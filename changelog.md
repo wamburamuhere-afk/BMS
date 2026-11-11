@@ -1,5 +1,18 @@
 # BMS Changelog
 
+## 2026-11-11 — feat(signup): a Smart POS sign-up gets its first shop; a restaurant gets Restaurant POS; plan changes keep it
+
+**Changed:** `core/signup_shop.php` (new), `core/tenant_provisioner.php`, `core/tenant_registration.php`, `core/plans.php`, `core/product_copy.php` (new), `register.php`, `actions/register_tenant.php`, `api/mobile/register.php`, `cron/process_registration_jobs.php`, `scripts/setup_control_db.php`, `tests/test_signup_shop_cli.php` (new), `tests/test_mobile_signup_plans_cli.php`
+
+- **Sign-up page:** same flow, plus one choice on the Shop step for Smart POS — **Retail shop** (default) or **Restaurant**. Hidden and never sent for Smart BMS.
+- **First shop (Smart POS only):** made during provisioning (new step 9.8, after the company database is brought up to date) from the form — company name, phone, email, physical address, country, owner as contact person — main shop, active, **capacity 999999**, sequential shop code (`nextCode('WH')`), default storage location. Retail → Retail mode; Restaurant → Restaurant mode + the ready-made Waiter / Cashier / Cook / Restaurant Manager roles. An ordinary shop, edited from Shops like any other. Never made twice.
+- **Restaurant:** Restaurant POS switched on after the plan is applied (Superadmin log: "Signed up as a restaurant"). Same Smart POS plans as retail — the restaurant is a switch, not a plan.
+- **Gap fixed — plan changes switched restaurants off:** applying a plan set modules to exactly the plan's list (Smart POS = POS + Shops), so a plan change, trial switch, paid upgrade or scheduled downgrade turned Restaurant POS off — also for restaurants switched on by hand. A plan apply now leaves Restaurant POS as it is (except Smart BMS); it never adds it to a retail company.
+- **Smart BMS:** unchanged — no shop, held for approval (a crafted Restaurant choice is ignored).
+- **Mobile app:** same first shop (retail by default); optional `pos_business` = `retail` | `restaurant` on `api/mobile/register.php`, stored in `registration_jobs.pos_business` (added by `setup_control_db.php` on deploy). The worker now decides the plan before provisioning.
+- **Product wording** moved unchanged from `register.php` to `core/product_copy.php` (proved identical in both languages) so the landing page shares one source.
+- **Checked:** new test 47/47 with real sign-ups (web retail, web restaurant, Smart BMS, mobile worker restaurant), plan changes, edit, idempotence, full cleanup. `test_mobile_signup_plans` updated: a new company now uses 1 shop from the start (24/24). Other sign-up/plan suites pass or fail identically on develop (stale local template, local throttle state, local permission rows).
+
 ## 2026-11-11 — fix(pos): "Edit Price" removed from the till — prices are never changed at the till
 
 **Changed:** `app/bms/pos/pos_scripts_new.php`, `api/pos/process_sale.php`, `core/pos_override_guard.php`, `core/role_permission_ui.php`, `lang/sw.php`, `tests/test_pos_no_price_edit_cli.php` (new), `tests/test_pos_override_permissions_cli.php`, `tests/test_role_permission_ui_cli.php`, `tests/test_roles_matrix_shop_mode_cli.php`, `tests/test_user_roles_crud_logging_cli.php`, `tests/test_text_display_case_refs_cli.php`

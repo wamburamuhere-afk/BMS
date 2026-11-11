@@ -248,6 +248,13 @@ if ($username !== '' && controlColumnExists('registration_jobs', 'owner_username
     $jobCols[] = 'owner_username';
     $jobVals[] = $username;
 }
+// Smart POS: 'retail' (default) or 'restaurant' — the first shop's mode (core/signup_shop.php).
+// Optional; an app that does not send it gets a retail shop, as the web form's default.
+if (controlColumnExists('registration_jobs', 'pos_business')) {
+    require_once __DIR__ . '/../../core/signup_shop.php';
+    $jobCols[] = 'pos_business';
+    $jobVals[] = signupPosBusiness($body['pos_business'] ?? 'retail');
+}
 // Smart BMS is not self-service: built now, locked until a superadmin approves (same as the web).
 $pendingApproval = (string)($planChoice['plan']['product_key'] ?? '') === 'bms_full';
 $cpdo->prepare("INSERT INTO registration_jobs (" . implode(', ', $jobCols) . ")

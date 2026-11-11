@@ -273,6 +273,21 @@ if (!function_exists('planNormalizeFeaturesForProduct')) {
     }
 }
 
+if (!function_exists('planTenantHasRestaurant')) {
+    /** Is Restaurant POS on for this company right now (its effective state)? False when it cannot be read. */
+    function planTenantHasRestaurant(int $tenantId): bool
+    {
+        try {
+            foreach (tenantFeatureMatrix($tenantId) as $row) {
+                if (($row['key'] ?? '') === 'restaurant_pos') return !empty($row['effective']);
+            }
+        } catch (Throwable $e) {
+            error_log('planTenantHasRestaurant: ' . $e->getMessage());
+        }
+        return false;
+    }
+}
+
 if (!function_exists('planTermMonths')) {
     /** A term's length in months: 6 month → 6, 1 year → 12. */
     function planTermMonths(int $value, string $unit): int
@@ -970,6 +985,13 @@ if (!function_exists('applyPlanToTenant')) {
         $desired = [];
         foreach (array_keys(bmsFeatureRegistry()) as $key) {
             $desired[$key] = in_array($key, $planFeatures, true);
+        }
+        // Restaurant POS is a per-company switch, not part of a Smart POS plan: a restaurant and a retail
+        // shop buy the same plans. Applying a plan (plan change, trial switch, paid upgrade, scheduled
+        // downgrade) leaves it exactly as it is — before this, every one of them switched a restaurant's
+        // Restaurant POS off. Smart BMS is the exception: it is not a till-first product (Simple Mode off).
+        if (($plan['product_key'] ?? null) !== 'bms_full' && planTenantHasRestaurant($tenantId)) {
+            $desired['restaurant_pos'] = true;
         }
 
         $fr = setTenantFeatures($tenantId, $desired);

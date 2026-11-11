@@ -739,6 +739,30 @@ if (!function_exists('provisionTenant')) {
                 error_log("provisionTenant: apply_tenant_migrations failed for {$subdomain}: " . $e->getMessage());
             }
 
+            // ── 9.8 First shop (Smart POS sign-up only) — after 9.7 on purpose ──
+            // The shop needs the newest shop columns (pos_mode) and, for a restaurant, the
+            // restaurant permissions — both arrive with the migrations above. Best-effort like
+            // 9.5: the company already works; the owner can add a shop from Shops if this fails.
+            // Smart BMS sign-ups and operator-created companies don't pass 'signup_shop'.
+            if (!empty($opts['signup_shop']) && is_array($opts['signup_shop'])) {
+                try {
+                    require_once __DIR__ . '/signup_shop.php';
+                    $ownerRow = $tpdo->prepare("SELECT user_id FROM users WHERE username = ? LIMIT 1");
+                    $ownerRow->execute([$ownerEmail]);
+                    $ss = seedSignupShop($tpdo, $opts['signup_shop'] + ['created_by' => (int)$ownerRow->fetchColumn()]);
+                    $msg = $ss['created']
+                        ? "{$ss['warehouse_code']} ({$ss['pos_mode']})" . ($ss['roles'] ? '; roles: ' . implode(', ', $ss['roles']) : '')
+                        : 'skipped (a shop already exists)';
+                    $result['signup_shop'] = $ss;
+                    $step('seed_signup_shop', 'ok', $msg);
+                    logProvisioningStep($tenantId, $subdomain, 'seed_signup_shop', 'ok', $msg);
+                } catch (Throwable $e) {
+                    $step('seed_signup_shop', 'failed', $e->getMessage());
+                    logProvisioningStep($tenantId, $subdomain, 'seed_signup_shop', 'failed', $e->getMessage());
+                    error_log("provisionTenant: seed_signup_shop failed for {$subdomain}: " . $e->getMessage());
+                }
+            }
+
             $result['ok'] = true;
             logProvisioningStep($tenantId, $subdomain, 'complete', 'ok');
             return $result;

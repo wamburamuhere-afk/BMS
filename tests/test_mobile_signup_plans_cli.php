@@ -117,15 +117,17 @@ $tok = $login['token'] ?? null;
 check($code === 200 && $tok, 'owner signs in with the chosen username');
 
 section('5. Plan limits');
-$c->prepare("UPDATE tenants SET max_shops = 1, max_users = 3 WHERE id = ?")->execute([(int)$t['id']]);
+// 2026-11-11: a Smart POS sign-up starts with its first shop already made (core/signup_shop.php),
+// so the company uses 1 shop from the start. With a limit of 2 it can add exactly one more.
+$c->prepare("UPDATE tenants SET max_shops = 2, max_users = 3 WHERE id = ?")->execute([(int)$t['id']]);
 [, $me] = $call('GET', '/api/mobile/me.php', [], $tok, $host);
-check(($me['limits']['shops']['max'] ?? null) === 1 && ($me['limits']['shops']['used'] ?? null) === 0, 'me.php: limits.shops = {used 0, max 1}');
+check(($me['limits']['shops']['max'] ?? null) === 2 && ($me['limits']['shops']['used'] ?? null) === 1, 'me.php: limits.shops = {used 1 (the sign-up shop), max 2}');
 check(($me['limits']['users']['max'] ?? null) === 3 && ($me['limits']['users']['used'] ?? 0) >= 1, 'me.php: limits.users = {used ≥1, max 3}');
 [$c1, $w1] = $call('POST', '/api/mobile/warehouses/create.php', ['warehouse_name' => 'Shop One'], $tok, $host);
 [$c2, $w2] = $call('POST', '/api/mobile/warehouses/create.php', ['warehouse_name' => 'Shop Two'], $tok, $host);
-check($c1 === 200 && $c2 === 422 && ($w2['code'] ?? '') === 'shop_limit_reached', "second shop refused: 422 shop_limit_reached ($c1 / $c2)");
+check($c1 === 200 && $c2 === 422 && ($w2['code'] ?? '') === 'shop_limit_reached', "shop past the limit refused: 422 shop_limit_reached ($c1 / $c2)");
 [, $me] = $call('GET', '/api/mobile/me.php', [], $tok, $host);
-check(($me['limits']['shops']['used'] ?? null) === 1, 'me.php now shows 1 of 1 shops used');
+check(($me['limits']['shops']['used'] ?? null) === 2, 'me.php now shows 2 of 2 shops used');
 
 section('6. Smart BMS signup waits for approval');
 if (!$bmsPlan) { echo "  \033[33m⚠ no Smart BMS plan in the catalogue here — skipped\033[0m\n"; exit; }

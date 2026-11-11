@@ -85,6 +85,12 @@ $T = $sw ? [
     'back'           => '← Rudi',
     'continue_with'  => 'Endelea na %s →',
     'continue'       => 'Endelea →',
+    'biz_q'          => 'Unaendesha nini?',
+    'biz_retail'     => 'Duka (rejareja)',
+    'biz_retail_sub' => 'Unauza bidhaa dukani.',
+    'biz_rest'       => 'Mgahawa',
+    'biz_rest_sub'   => 'Meza, jikoni na menyu.',
+    'biz_hint'       => 'Tutatengeneza duka lako la kwanza kwa taarifa hizi. Unaweza kulibadilisha baadaye kwenye Maduka.',
     'web_address'    => 'Anwani yako ya mtandao',
     'sub_hint'       => 'Herufi ndogo, namba na kistari. Herufi 3–32.',
     'sub_ok'         => '✓ %s inapatikana',
@@ -206,6 +212,12 @@ $T = $sw ? [
     'back'           => '← Back',
     'continue_with'  => 'Continue with %s →',
     'continue'       => 'Continue →',
+    'biz_q'          => 'What do you run?',
+    'biz_retail'     => 'Retail shop',
+    'biz_retail_sub' => 'You sell goods over the counter.',
+    'biz_rest'       => 'Restaurant',
+    'biz_rest_sub'   => 'Tables, kitchen and menu.',
+    'biz_hint'       => 'We create your first shop from these details. You can change it later in Shops.',
     'web_address'    => 'Your web address',
     'sub_hint'       => 'Lowercase letters, numbers and hyphens. 3–32 characters.',
     'sub_ok'         => '✓ %s is available',
@@ -291,69 +303,9 @@ $T = $sw ? [
     'live'           => 'Live',
 ];
 
-// What each product really delivers (verified against core/plans.php
-// platformProductProfile + core/feature_registry.php, 2026-10-23).
-$PRODUCT_COPY = [
-    'bms_shop' => [
-        'icon'     => 'pos',
-        'tag'      => $sw ? 'Bora kwa maduka' : 'Best for shops',
-        'desc'     => $sw ? 'Mauzo (POS), stock na usimamizi rahisi wa duka.' : 'Point of sale, stock and simple shop management.',
-        'head'     => $sw ? 'Simamia duka lako kwa njia ya kisasa.' : 'Manage your shop the smart way.',
-        'sub'      => $sw ? 'Uza haraka, jua kilichopo stoo, fuatilia wanaokudai na uone faida yako — kwa simu au kompyuta.'
-                          : 'Sell fast, know what is in stock, track who owes you and see your profit — from your phone or computer.',
-        'benefits' => $sw
-            ? ['Kuuza haraka, na risiti ya kuchapisha au ya email', 'Bidhaa, huduma na kupokea stock', 'Mauzo ya mkopo — fuatilia wanaokudai', 'Matumizi na faida', 'Ripoti: kila siku, wiki, mwezi, robo mwaka na mwaka', 'Kiingereza na Kiswahili, kwenye simu na kompyuta']
-            : ['Fast selling with printed or emailed receipts', 'Products, services and receiving stock', 'Credit sales — track who owes you', 'Expenses and profit tracking', 'Reports: daily, weekly, monthly, quarterly and yearly', 'English and Swahili, on phone and computer'],
-        'card'     => $sw
-            ? ['Kuuza haraka na risiti', 'Bidhaa na kupokea stock', 'Mauzo ya mkopo — wanaokudai', 'Ripoti za siku hadi mwaka']
-            : ['Fast selling with receipts', 'Products and stock receiving', 'Credit sales — who owes you', 'Reports from daily to yearly'],
-        'step'     => $sw ? 'Duka' : 'Shop',
-        'co_h'     => $sw ? 'Tueleze kuhusu duka lako' : 'Tell us about your shop',
-        'co_sub'   => $sw ? 'Hii itaonekana kwenye risiti zako. Unaweza kuibadilisha baadaye kwenye Settings.' : 'This appears on your receipts. You can change it later in Settings.',
-        'name_l'   => $sw ? 'Jina la biashara / duka' : 'Business / shop name',
-        'type_l'   => $sw ? 'Aina ya duka' : 'Type of shop',
-        'type_ph'  => $sw ? 'mf. Hardware, Famasi, Boutique' : 'e.g. Hardware, Pharmacy, Boutique',
-        'logo_for' => $sw ? 'inaonekana kwenye risiti zako' : 'shows on your receipts',
-        'admin_sub'=> $sw ? 'Utaingia kwa username na password yako.' : 'You will sign in with your username and password.',
-        'first'    => $sw
-            ? ['Ongeza bidhaa na bei zake', 'Pokea stock ya mwanzo', 'Fanya mauzo ya kwanza', 'Angalia mauzo ya leo kwenye dashboard']
-            : ['Add your products and prices', 'Receive your opening stock', 'Make your first sale', "Check today's sales on your dashboard"],
-        'demo_t'   => $sw ? 'Mauzo ya leo' : "Today's sales",
-        'demo_v'   => ['845,000', '1,120,000', '1,365,000'],
-        'demo_n'   => $sw ? ['Mauzo mapya · 35,000 TZS', 'Deni limelipwa · 20,000 TZS', 'Mauzo mapya · 12,500 TZS']
-                          : ['New sale · 35,000 TZS', 'Credit repaid · 20,000 TZS', 'New sale · 12,500 TZS'],
-    ],
-    'bms_full' => [
-        'icon'     => 'bms',
-        'tag'      => $sw ? 'Mfumo kamili' : 'Complete system',
-        'desc'     => $sw ? 'Mfumo kamili wa usimamizi wa biashara.' : 'The complete business management system.',
-        'head'     => $sw ? 'Endesha biashara yako yote kwenye mfumo mmoja.' : 'Run your whole business in one system.',
-        'sub'      => $sw ? 'Mauzo, manunuzi, fedha, HR na miradi kwenye mfumo mmoja uliounganishwa — hesabu zako zinakubaliana kila wakati.'
-                          : 'Sales, purchases, finance, HR and projects in one connected system — so your numbers always agree.',
-        'benefits' => $sw
-            ? ['Mauzo, nukuu (quotations) na ankara', 'Manunuzi, wasambazaji na maghala', 'Fedha: matumizi, benki, journals na ripoti za fedha', 'HR na mishahara (payroll)', 'Miradi, mali (assets) na CRM', 'Point of Sale imejumuishwa']
-            : ['Sales, quotations and invoicing', 'Purchases, suppliers and warehouses', 'Finance: expenses, banks, journals and financial reports', 'HR and payroll', 'Projects, assets and CRM', 'Point of Sale included'],
-        'card'     => $sw
-            ? ['Mauzo, nukuu na ankara', 'Manunuzi na maghala', 'Fedha na ripoti za fedha', 'HR, mishahara, miradi na CRM']
-            : ['Sales, quotations and invoicing', 'Purchases and warehouses', 'Finance and financial reports', 'HR, payroll, projects and CRM'],
-        'step'     => $sw ? 'Kampuni' : 'Company',
-        'co_h'     => $sw ? 'Tueleze kuhusu kampuni yako' : 'Tell us about your company',
-        'co_sub'   => $sw ? 'Hii itaonekana kwenye ankara na ripoti zako. Unaweza kuibadilisha baadaye kwenye Settings.' : 'This appears on your invoices and reports. You can change it later in Settings.',
-        'name_l'   => $sw ? 'Jina la kampuni' : 'Company name',
-        'type_l'   => $sw ? 'Aina ya biashara' : 'Business type',
-        'type_ph'  => $sw ? 'mf. Ujenzi, Biashara, Usafirishaji' : 'e.g. Construction, Trading, Logistics',
-        'logo_for' => $sw ? 'inaonekana kwenye ankara na ripoti' : 'shows on your invoices and reports',
-        'admin_sub'=> $sw ? 'Utaingia kwa username na password yako. Ongeza wafanyakazi na majukumu yao baada ya kuingia.'
-                          : 'You will sign in with your username and password. Add your staff and their roles after sign-in.',
-        'first'    => $sw
-            ? ['Pitia chart of accounts yako', 'Ongeza wateja na wasambazaji', 'Tengeneza ankara ya kwanza', 'Ongeza wafanyakazi na majukumu yao']
-            : ['Review your chart of accounts', 'Add customers and suppliers', 'Create your first invoice', 'Add your staff and their roles'],
-        'demo_t'   => $sw ? 'Mapato ya mwezi huu' : 'Revenue this month',
-        'demo_v'   => ['12,400,000', '13,150,000', '14,620,000'],
-        'demo_n'   => $sw ? ['Ankara INV-0042 imelipwa', 'Oda ya manunuzi imeidhinishwa', 'Mishahara imerekodiwa']
-                          : ['Invoice INV-0042 paid', 'Purchase order approved', 'Payroll posted'],
-    ],
-];
+// What each product really delivers — one source shared with the landing page (core/product_copy.php).
+require_once __DIR__ . '/core/product_copy.php';
+$PRODUCT_COPY = bmsProductCopy($sw);
 $GENERIC_COPY = $PRODUCT_COPY['bms_shop'];   // a product we have no copy for borrows the neutral shop wording
 
 // ── Live catalogue ───────────────────────────────────────────────────────────
@@ -701,6 +653,28 @@ $icons = [
                     <h2 class="hs" id="coHead"></h2>
                     <p class="sub-p" id="coSub"></p>
                     <div class="err d-none-i" id="errCompany"></div>
+                    <?php // Smart POS only (hidden for Smart BMS): what the first shop will be. The shop is made at
+                          // sign-up from these details (core/signup_shop.php); Restaurant also switches Restaurant POS on. ?>
+                    <fieldset class="mb-3" id="posBizBox">
+                        <legend class="form-label" style="font-size:14px"><?= htmlspecialchars($T['biz_q']) ?> <span class="req">*</span></legend>
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label class="plcard sel" id="posBizRetail" style="cursor:pointer;flex-direction:row;align-items:flex-start;gap:12px;padding:18px">
+                                    <input type="radio" name="pos_business" value="retail" checked class="form-check-input mt-1" style="flex-shrink:0">
+                                    <span><strong style="display:block;font-size:16px"><?= htmlspecialchars($T['biz_retail']) ?></strong>
+                                    <span style="display:block;font-size:13px;color:var(--muted)"><?= htmlspecialchars($T['biz_retail_sub']) ?></span></span>
+                                </label>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="plcard" id="posBizRest" style="cursor:pointer;flex-direction:row;align-items:flex-start;gap:12px;padding:18px">
+                                    <input type="radio" name="pos_business" value="restaurant" class="form-check-input mt-1" style="flex-shrink:0">
+                                    <span><strong style="display:block;font-size:16px"><?= htmlspecialchars($T['biz_rest']) ?></strong>
+                                    <span style="display:block;font-size:13px;color:var(--muted)"><?= htmlspecialchars($T['biz_rest_sub']) ?></span></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="hint"><?= htmlspecialchars($T['biz_hint']) ?></div>
+                    </fieldset>
                     <div class="mb-3">
                         <label for="company_name" class="form-label"><span id="nameLabel"></span> <span class="req">*</span></label>
                         <input type="text" class="form-control" id="company_name" name="company_name" maxlength="191" autocomplete="organization" required>
@@ -1084,7 +1058,14 @@ $icons = [
         $('#business_type').attr('placeholder', c.type_ph);
         $('#logoFor').text(c.logo_for);
         $('#companyBack').toggleClass('invisible', !hasPlanStep);
+        // Retail / Restaurant: Smart POS only. Smart BMS is never sent a choice (its path is unchanged).
+        const isPos = !prod() || prod().key !== 'bms_full';
+        $('#posBizBox').toggleClass('d-none-i', !isPos).prop('disabled', !isPos);
     }
+    $(document).on('change', 'input[name="pos_business"]', function () {
+        $('#posBizRetail').toggleClass('sel', this.value === 'retail');
+        $('#posBizRest').toggleClass('sel', this.value === 'restaurant');
+    });
 
     // ── Company fields ───────────────────────────────────────────────────────
     let subTimer = null;
