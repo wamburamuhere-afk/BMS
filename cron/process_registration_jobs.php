@@ -85,6 +85,26 @@ if ($password === null) {
 // The owner's login name: chosen in the app (owner_username), else the phone, as before.
 $loginName = trim((string)($job['owner_username'] ?? '')) !== '' ? trim((string)$job['owner_username']) : (string)$job['owner_phone'];
 
+// ── The plan, decided before provisioning (it decides whether a first shop is made) ──
+// Re-checked against the live catalogue; a plan retired while queued falls back to the
+// default public plan instead of failing — the same rule used after provisioning before.
+$choice = registrationPlanChoice((string)($job['plan_key'] ?? ''), (string)($job['plan_term'] ?? ''));
+if (!$choice['ok']) $choice = registrationPlanChoice('', '');
+$needsApproval = !empty($choice['ok']) && (string)($choice['plan']['product_key'] ?? '') === 'bms_full';
+
+// Smart POS (retail or restaurant) starts with its first shop — same as the web form
+// (core/signup_shop.php). Smart BMS: unchanged, no shop, held for approval.
+require_once __DIR__ . '/../core/signup_shop.php';
+$posBusiness = signupPosBusiness($job['pos_business'] ?? 'retail');
+$signupShop = $needsApproval ? null : [
+    'name'           => (string)$job['company_name'],
+    'pos_mode'       => $posBusiness,
+    'phone'          => (string)$job['owner_phone'],
+    'email'          => (string)$job['owner_email'],
+    'address'        => (string)($job['phys_address'] ?? ''),
+    'contact_person' => trim((string)$job['owner_first_name'] . ' ' . (string)$job['owner_last_name']),
+];
+
 // ── Provision the tenant ──────────────────────────────────────────────────────
 try {
     $result = provisionTenant(
@@ -105,6 +125,7 @@ try {
             'postal_address'   => $job['post_address'],
             'phone'            => $job['owner_phone'],
             'skip_welcome_email' => true,
+            'signup_shop'      => $signupShop,
         ]
     );
 
@@ -123,16 +144,13 @@ try {
 // The stored plan is re-checked now; if it was retired while queued, the
 // company starts on the default public plan instead of failing.
 try {
-    $choice = registrationPlanChoice((string)($job['plan_key'] ?? ''), (string)($job['plan_term'] ?? ''));
-    if (!$choice['ok']) $choice = registrationPlanChoice('', '');
-    finishSelfRegistration($tenantId, $choice['ok'] ? $choice : null, (string)$job['owner_email']);
+    finishSelfRegistration($tenantId, $choice['ok'] ? $choice : null, (string)$job['owner_email'], $needsApproval ? 'retail' : $posBusiness);
 } catch (Throwable $e) {
     error_log('process_registration_jobs: finishSelfRegistration failed for tenant ' . $tenantId . ': ' . $e->getMessage());
 }
 
 // Smart BMS is not self-service — locked until a superadmin approves, exactly as
 // a web signup (registerTenant()). Superadmins are told either way.
-$needsApproval = !empty($choice['ok']) && (string)($choice['plan']['product_key'] ?? '') === 'bms_full';
 try {
     if ($needsApproval) holdTenantForApproval($tenantId);
 } catch (Throwable $e) {
