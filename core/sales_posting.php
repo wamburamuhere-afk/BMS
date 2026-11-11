@@ -258,7 +258,8 @@ if (!function_exists('postPosReturn')) {
      */
     function postPosReturn(
         PDO $pdo, int $returnId, string $refundMethod, float $refundGross, float $refundTax,
-        float $restockCost, string $date, ?string $reference, ?int $projectId, int $userId
+        float $restockCost, string $date, ?string $reference, ?int $projectId, int $userId,
+        float $toReceivable = 0.0
     ): array {
         $out = ['revenue' => false, 'cogs' => false, 'reason' => ''];
         if ($returnId <= 0 || $refundGross <= 0) { $out['reason'] = 'no_return'; return $out; }
@@ -271,14 +272,20 @@ if (!function_exists('postPosReturn')) {
 
         if (!_sp_already_posted($pdo, 'pos_return', $returnId)) {
             $sr   = salesReturnsAccountId($pdo) ?: salesRevenueAccountId($pdo);  // contra revenue
-            $cash = posReceiptAccountId($pdo, $refundMethod);
+            // 2026-11-11 — a return on a credit sale not yet fully paid: that part comes off what the
+            // customer owes (Cr Accounts Receivable), only the rest is paid back (Cr Cash/Bank).
+            $toAr = round(max(0.0, min($toReceivable, $refundGross)), 2);
+            $back = round($refundGross - $toAr, 2);
+            $cash = $back > 0.009 ? posReceiptAccountId($pdo, $refundMethod) : -1;
+            $ar   = $toAr > 0.009 ? arAccountId($pdo) : -1;
             $vat  = ($refundTax > 0) ? outputVatAccountId($pdo) : null;
-            if (!$sr || !$cash) {
+            if (!$sr || !$cash || !$ar) {
                 $out['reason'] = 'return_accounts_not_configured';
             } else {
                 $lines = [['account_id' => (int)$sr, 'type' => 'debit', 'amount' => ($vat ? $netReturn : $refundGross), 'description' => 'Sales return']];
                 if ($vat && $refundTax > 0) $lines[] = ['account_id' => (int)$vat, 'type' => 'debit', 'amount' => $refundTax, 'description' => 'Output VAT reversal'];
-                $lines[] = ['account_id' => (int)$cash, 'type' => 'credit', 'amount' => $refundGross, 'description' => 'Refund'];
+                if ($toAr > 0.009) $lines[] = ['account_id' => (int)$ar,   'type' => 'credit', 'amount' => $toAr, 'description' => 'Taken off amount owed'];
+                if ($back > 0.009) $lines[] = ['account_id' => (int)$cash, 'type' => 'credit', 'amount' => $back, 'description' => 'Refund'];
                 try { postLedgerEntry($pdo, $desc, $lines, $pid, $returnId, 'pos_return', $date, $userId, $whId); $out['revenue'] = true; }
                 catch (Throwable $e) { error_log("postPosReturn revenue failed (return $returnId): " . $e->getMessage()); $out['reason'] = 'return_post_error'; }
             }
@@ -299,6 +306,48 @@ if (!function_exists('postPosReturn')) {
         } elseif ($restockCost > 0) { $out['cogs'] = true; }
 
         return $out;
+    }
+}
+
+if (!function_exists('posSaleLineUnitCost')) {
+    /**
+     * 2026-11-11 — the cost ONE unit of a sold POS line was charged at, by the same rule as
+     * posSaleCogs(): its FEFO batch cost when batches were drawn, else products.cost_price; 0 for a
+     * service, and 0 when cost_price > selling_price (the data-entry guard). A return reverses
+     * exactly this, so the returned part's profit cancels.
+     */
+    function posSaleLineUnitCost(PDO $pdo, int $saleItemId): float
+    {
+        try {
+            $b = $pdo->prepare("SELECT COALESCE(SUM(psib.quantity),0) AS q, COALESCE(SUM(psib.quantity * pb.unit_cost),0) AS c
+                                  FROM pos_sale_item_batches psib
+                                  JOIN product_batches pb ON pb.batch_id = psib.batch_id
+                                 WHERE psib.sale_item_id = ?");
+            $b->execute([$saleItemId]);
+            $row = $b->fetch(PDO::FETCH_ASSOC);
+            if ($row && (float)$row['q'] > 0) return round((float)$row['c'] / (float)$row['q'], 4);
+        } catch (Throwable $e) { /* no batch tables on this database — product cost below */ }
+        $p = $pdo->prepare("SELECT COALESCE(p.cost_price,0) AS cost, COALESCE(p.selling_price,0) AS sell, COALESCE(p.is_service,0) AS svc
+                              FROM pos_sale_items si JOIN products p ON p.product_id = si.product_id
+                             WHERE si.sale_item_id = ?");
+        $p->execute([$saleItemId]);
+        $r = $p->fetch(PDO::FETCH_ASSOC);
+        if (!$r || (int)$r['svc'] === 1) return 0.0;
+        if ((float)$r['cost'] > (float)$r['sell'] && (float)$r['sell'] > 0) return 0.0;
+        return (float)$r['cost'];
+    }
+}
+
+if (!function_exists('posReturnCreditReady')) {
+    /** pos_sale_payments accepts 'return_credit' (migration 2026_11_11_pos_return_credit). */
+    function posReturnCreditReady(PDO $pdo): bool
+    {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM pos_sale_payments LIKE 'payment_method'")->fetch(PDO::FETCH_ASSOC);
+            return $col && strpos((string)$col['Type'], "'return_credit'") !== false;
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 }
 

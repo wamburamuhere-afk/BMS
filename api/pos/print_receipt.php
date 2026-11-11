@@ -80,6 +80,14 @@ $stmt = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY s
 $stmt->execute([$sale_id]);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// 2026-11-11 — goods that came back show on the receipt itself (sold qty crossed out → what
+// remains, Refunded lines, NET PAID, stamp); a return row prints as a refund receipt.
+require_once __DIR__ . '/../../core/pos_receipt_returns.php';
+$ret = posReceiptReturns($pdo, $sale, $items);
+$is_refund = $ret['mode'] === 'refund';
+$has_returns = $ret['mode'] === 'returns';
+$methodLabel = fn(string $m) => t(ucfirst(str_replace('_', ' ', $m)));
+
 // Company info — read from the tenant's own Company Profile settings (was
 // hardcoded to placeholder BJP values, so every tenant's receipts printed the
 // same fake address/phone/TIN regardless of who they actually are).
@@ -123,10 +131,22 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         'company_phone' => $company_phone, 'company_tin' => $company_tin, 'company_vrn' => $company_vrn,
         'receipt_number' => $sale['receipt_number'], 'cashier_name' => $sale['cashier_name'],
         'sale_date' => $sale['sale_date'], 'customer_name' => applyCaseMode($sale['customer_name']),
-        'items' => array_map(fn($i) => [
-            'product_name' => applyCaseMode($i['product_name']), 'quantity' => $i['quantity'],
-            'unit_price' => $i['unit_price'], 'line_total' => $i['line_total'],
-        ], $items),
+        'items' => array_map(function ($i, $k) use ($has_returns, $ret) {
+            $row = ['product_name' => applyCaseMode($i['product_name']), 'quantity' => $i['quantity'],
+                    'unit_price' => $i['unit_price'], 'line_total' => $i['line_total']];
+            if ($has_returns && $ret['lines'][$k]['returned'] > 0) {   // what remains; the sold qty is shown as "was"
+                $row['qty_was']    = $ret['lines'][$k]['sold'];
+                $row['quantity']   = $ret['lines'][$k]['kept'];
+                $row['line_total'] = $ret['lines'][$k]['kept_total'];
+            }
+            return $row;
+        }, $items, array_keys($items)),
+        'is_refund' => $is_refund, 'original_receipt' => $ret['original_receipt'], 'return_reason' => $ret['reason'],
+        'to_balance' => $ret['to_balance'], 'cash_back' => $ret['cash_back'],
+        'returns' => $has_returns ? [
+            'sold_total' => $ret['sold_total'], 'net_paid' => $ret['net_paid'], 'stamp' => t($ret['stamp']),
+            'refunds' => array_map(fn($r) => ['label' => sprintf(t('Refunded (%s)'), $r['short']), 'amount' => $r['amount']], $ret['refunds']),
+        ] : null,
         'subtotal' => $sale['subtotal'], 'tax_amount' => $sale['tax_amount'],
         'discount_amount' => $sale['discount_amount'], 'grand_total' => $sale['grand_total'],
         'payment_method' => $sale['payment_method'], 'amount_tendered' => $sale['amount_tendered'],
@@ -233,6 +253,12 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             margin-top: 15px;
             font-size: 11px;
         }
+        /* Goods that came back: sold qty crossed out, then what remains (same row). */
+        .qty-was { text-decoration: line-through; color: #777; margin-right: 4px; }
+        .item-gone { text-decoration: line-through; color: #777; }
+        .refund-row { color: #9a2a1f; }
+        .refund-stamp { border: 1.5px solid #000; text-align: center; font-weight: bold; padding: 4px; margin-top: 8px; letter-spacing: .05em; }
+        .refund-title { text-align: center; font-weight: bold; font-size: 14px; letter-spacing: .05em; margin-bottom: 6px; }
         @media print {
             @page { size: <?= $receipt_width ?>mm auto; margin: 3mm 5mm; }
             body {
@@ -267,10 +293,24 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
     </div>
 
     <div class="receipt-info">
+        <?php if ($is_refund): ?>
+        <div class="refund-title" style="display:block;"><?= t('REFUND RECEIPT') ?></div>
+        <div>
+            <span><?= t('Refund #:') ?></span>
+            <span><strong><?= htmlspecialchars($sale['receipt_number']) ?></strong></span>
+        </div>
+        <?php if ($ret['original_receipt'] !== ''): ?>
+        <div>
+            <span><?= t('For receipt #:') ?></span>
+            <span><?= htmlspecialchars($ret['original_receipt']) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php else: ?>
         <div>
             <span><?= t('Receipt #:') ?></span>
-            <span><strong><?= $sale['receipt_number'] ?></strong></span>
+            <span><strong><?= htmlspecialchars($sale['receipt_number']) ?></strong></span>
         </div>
+        <?php endif; ?>
         <div>
             <span><?= t('Date:') ?></span>
             <span><?= date('d/m/Y H:i', strtotime($sale['sale_date'])) ?></span>
@@ -315,11 +355,16 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <div class="item-qty"><?= t('QTY') ?></div>
             <div class="item-price"><?= t('PRICE') ?></div>
         </div>
-        <?php foreach ($items as $item): ?>
+        <?php foreach ($items as $k => $item):
+            // A line with goods returned: sold qty crossed out, then what remains; price = what remains.
+            $rl = $has_returns ? $ret['lines'][$k] : null;
+            $lineBack = $rl && $rl['returned'] > 0;
+            $showQty  = $lineBack ? $rl['kept'] : $item['quantity'];
+        ?>
         <div class="item-row">
-            <div class="item-name"><?= caseFormat($item['product_name']) ?></div>
-            <div class="item-qty"><?= format_qty($item['quantity']) ?></div>
-            <div class="item-price"><?= number_format($item['line_total'], 0) ?></div>
+            <div class="item-name<?= ($lineBack && $rl['kept'] <= 0) ? ' item-gone' : '' ?>"><?= caseFormat($item['product_name']) ?></div>
+            <div class="item-qty"><?php if ($lineBack): ?><span class="qty-was"><?= format_qty($rl['sold']) ?></span><?php endif; ?><?= format_qty($showQty) ?></div>
+            <div class="item-price"><?= number_format($lineBack ? $rl['kept_total'] : $item['line_total'], 0) ?></div>
         </div>
         <?php if ($receipt_template !== 'slim'): ?>
         <div style="font-size: 10px; color: #666; margin-left: 5px;">
@@ -336,7 +381,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <?php else: ?>
                 <?= number_format($item['unit_price'], 0) ?>
             <?php endif; ?>
-            x <?= format_qty($item['quantity']) ?>
+            x <?= format_qty($showQty) ?>
             <?php if ($receipt_template === 'detailed' && (float)($item['discount_amount'] ?? 0) > 0.009): ?>
                 — <?= t('Discount:') ?> -<?= number_format($item['discount_amount'], 0) ?>
             <?php endif; ?>
@@ -348,6 +393,60 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         <?php endforeach; ?>
     </div>
 
+    <?php if ($is_refund): ?>
+    <div class="totals">
+        <div class="total-row grand-total">
+            <span><?= t('TOTAL REFUNDED:') ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($ret['sold_total'], 0) ?></span>
+        </div>
+        <?php if ($ret['to_balance'] > 0.009): ?>
+        <div class="total-row">
+            <span><?= t('Taken off amount owed:') ?></span>
+            <span><?= number_format($ret['to_balance'], 0) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($ret['cash_back'] > 0.009): ?>
+        <div class="total-row">
+            <span><?= sprintf(t('Paid back (%s):'), $methodLabel($ret['method'])) ?></span>
+            <span><?= number_format($ret['cash_back'], 0) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($ret['reason'] !== ''): ?>
+        <div class="total-row">
+            <span><?= t('Reason:') ?></span>
+            <span><?= htmlspecialchars($ret['reason']) ?></span>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php elseif ($has_returns): ?>
+    <div class="totals">
+        <div class="total-row">
+            <span><?= t('Sold total:') ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($ret['sold_total'], 0) ?></span>
+        </div>
+        <?php foreach ($ret['refunds'] as $rf): ?>
+        <div class="total-row refund-row">
+            <span><?= sprintf(t('Refunded (%s):'), htmlspecialchars($rf['short'])) ?></span>
+            <span>-<?= number_format($rf['amount'], 0) ?></span>
+        </div>
+        <?php endforeach; ?>
+        <div class="total-row" style="font-weight:bold;font-size:14px;">
+            <span><?= t('NET PAID:') ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($ret['net_paid'], 0) ?></span>
+        </div>
+        <div class="total-row" style="border-top:1px dashed #000;padding-top:5px;margin-top:5px;">
+            <span><?= sprintf(t('Payment (%s):'), $methodLabel((string)$sale['payment_method'])) ?></span>
+            <span><?= number_format($sale['amount_tendered'], 0) ?></span>
+        </div>
+        <?php if ((float)$sale['change_given'] > 0.009): ?>
+        <div class="total-row">
+            <span><?= t('Change:') ?></span>
+            <span><?= number_format($sale['change_given'], 0) ?></span>
+        </div>
+        <?php endif; ?>
+        <div class="refund-stamp"><?= htmlspecialchars(t($ret['stamp'])) ?></div>
+    </div>
+    <?php else: ?>
     <div class="totals">
         <?php if ($receipt_template !== 'slim'): ?>
         <div class="total-row">
@@ -378,11 +477,11 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <span><?= number_format($sale['change_given'], 0) ?></span>
         </div>
     </div>
+    <?php endif; ?>
 
     <div class="footer">
         <div style="margin-bottom: 10px;">*** <?= t('THANK YOU') ?> ***</div>
         <div><?= t('Please keep this receipt for your records') ?></div>
-        <div style="margin-top: 10px;"><?= t('Goods sold are not returnable') ?></div>
         <?php if ($receipt_footer_extra !== ''): ?>
         <div style="margin-top: 10px;"><?= nl2br(htmlspecialchars($receipt_footer_extra)) ?></div>
         <?php endif; ?>
