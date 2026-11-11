@@ -7206,5 +7206,7 @@ return [
     'Extra tills, network (kitchen) printers and sales targets.' => 'Kaunta za ziada, printa za mtandao (za jikoni) na malengo ya mauzo.',
     'The groups dishes and drinks sit in on the Menu.' => 'Makundi ambamo vyakula na vinywaji vimepangwa kwenye Menyu.',
     'Your restaurant shops (Settings → Shops). Edit also shows the set-up buttons on restaurant pages.' => 'Maduka yako ya mgahawa (Mipangilio → Maduka). Hariri pia inaonyesha vitufe vya mipangilio kwenye kurasa za mgahawa.',
+    // POS till: a cart line still carrying a hand-typed price (saved before "Edit Price" was removed)
+    'Price typed by hand — remove and add again' => 'Bei imeandikwa kwa mkono — iondoe kisha uiongeze tena',
     'Dishes, drinks and ingredients. Edit is needed to link add-on options to a dish.' => 'Vyakula, vinywaji na viungo. Hariri inahitajika ili kuunganisha nyongeza na chakula.',
 ];

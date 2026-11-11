@@ -75,7 +75,7 @@ foreach (['field_visits', 'color_settings', 'payment_create', 'attendance_settin
           'crm_leads', 'purchase_orders', 'grn', 'projects'] as $pk) {
     if (isset($idByKey[$pk])) ok("hidden: $pk", !in_array($pk, $vis, true));
 }
-foreach (['pos', 'pos_config_settings', 'pos_restock', 'pos_price_override', 'pos_discount_override',
+foreach (['pos', 'pos_config_settings', 'pos_restock', 'pos_discount_override',
           'warehouses', 'locations', 'products', 'customers', 'trial_balance', 'dashboard'] as $pk) {
     if (isset($idByKey[$pk])) ok("shown: $pk", in_array($pk, $vis, true));
 }
@@ -89,8 +89,13 @@ ok('visible + preserved = all non-hidden rows',
 
 $tabs = [];
 foreach ($m['visible'] as $r) $tabs[rolePermissionTabName($r['page_key'], $r['module_name'])][] = $r['page_key'];
-foreach (['pos', 'pos_restock', 'pos_config_settings', 'pos_price_override', 'pos_discount_override'] as $pk) {
+foreach (['pos', 'pos_restock', 'pos_config_settings', 'pos_discount_override'] as $pk) {
     if (isset($idByKey[$pk])) ok("'$pk' is in the Point of Sale tab", in_array($pk, $tabs['Point of Sale'] ?? [], true));
+}
+// "Edit Price" was removed from the till (2026-11-10): its right is retired — never shown, grants kept.
+if (isset($idByKey['pos_price_override'])) {
+    ok('POS Price Override row retired (no "Edit Price" on the till any more)', !in_array('pos_price_override', $vis, true)
+        && in_array($idByKey['pos_price_override'], $m['preserved_ids'], true));
 }
 foreach ($tabs as $name => $keys) {
     if ($name === 'Point of Sale') continue;
