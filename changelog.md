@@ -6,6 +6,7 @@
 
 - Default legal name in the public website footer ("© <year> …") is now `BJP TECHNOLOGIES (T) LTD`; the landing test checks the new default (79 assertions pass).
 - `CLAUDE.md` project description updated to match.
+- Old name "BJP Technologies Co. Ltd" replaced with `BJP TECHNOLOGIES (T) LTD` in `privacy.php` (public Privacy Policy), `scripts/migrate_tenant_one.php` (default company name), `docs/FINANCIAL_SYSTEM_EXPLAINED.html` and `superadmin_plan.md`. "Powered By BJP Technologies ©" print footers deliberately left unchanged. Dated daily reports and `scratch/` scripts left as historical.
 - A legal name already saved in Superadmin › Platform settings › Branding overrides this default and must be changed there on the live system.
 
 ## 2026-11-11 — feat(site): website redesign — Products menu, Retail and Restaurant pages, one language at a time; Pricing → sign-up step 3

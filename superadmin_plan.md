@@ -1,6 +1,6 @@
 # BMS Superadmin Professional Upgrade Plan
 
-> **Project:** BJP Technologies Co. Ltd — BMS Platform  
+> **Project:** BJP TECHNOLOGIES (T) LTD — BMS Platform  
 > **Drafted:** 2026-09-25  
 > **Total effort:** ~27 hours across 10 phases | 45 tasks  
 > **Priority tiers:** 🔴 Critical · 🟠 High · 🔵 Medium · ⚫ Low

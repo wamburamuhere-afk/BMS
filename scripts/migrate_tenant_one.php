@@ -5,7 +5,7 @@
  * connection.
  *
  *   php scripts/migrate_tenant_one.php --owner-email=you@example.com
- *   php scripts/migrate_tenant_one.php --owner-email=you@example.com --subdomain=bjp --company="BJP Technologies Co. Ltd"
+ *   php scripts/migrate_tenant_one.php --owner-email=you@example.com --subdomain=bjp --company="BJP TECHNOLOGIES (T) LTD"
  *
  * WHAT THIS DOES NOT DO, ON PURPOSE:
  *   - Does not rename or move the `bms` database. docs/MULTI_TENANCY_CONVENTIONS.md
@@ -63,7 +63,7 @@ if ($err = tenantSubdomainError($subdomain)) {
     bail("--subdomain: $err");
 }
 
-$companyName = trim((string)($args['company'] ?? 'BJP Technologies Co. Ltd'));
+$companyName = trim((string)($args['company'] ?? 'BJP TECHNOLOGIES (T) LTD'));
 if ($companyName === '') {
     bail('--company cannot be empty.');
 }

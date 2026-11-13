@@ -10,7 +10,7 @@
  */
 header('Content-Type: text/html; charset=utf-8');
 
-$bjpName  = 'BJP Technologies Co. Ltd';
+$bjpName  = 'BJP TECHNOLOGIES (T) LTD';
 $bjpEmail = 'bjptechnologieslimited@gmail.com';
 $coName = $bjpName; $coEmail = $bjpEmail; $coPhone = '';
 try {
@@ -50,7 +50,7 @@ $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     <h1>Privacy Policy</h1>
     <p class="updated">Last updated: 1 November 2026</p>
 
-    <p><?= $h($coName) ?> ("we") uses the Business Management System ("BMS"), business software provided by BJP Technologies Co. Ltd, Tanzania ("BJP"), to run its operations. This policy explains how information is handled in BMS.</p>
+    <p><?= $h($coName) ?> ("we") uses the Business Management System ("BMS"), business software provided by BJP TECHNOLOGIES (T) LTD, Tanzania ("BJP"), to run its operations. This policy explains how information is handled in BMS.</p>
 
     <h2>Information we handle</h2>
     <p>Each company using BMS enters and controls its own business records, such as customers, suppliers, products, sales, staff and accounting records, and the files it uploads. We also hold account details of the people who use the system, such as names, email addresses and phone numbers, along with sign-in and activity records used for security.</p>
