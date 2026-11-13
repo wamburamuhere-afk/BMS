@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-13 — fix(brand): company name is "BJP TECHNOLOGIES (T) LTD" (was "(L)")
+
+**Changed:** `core/public_site.php`, `tests/test_landing_cli.php`, `CLAUDE.md`
+
+- Default legal name in the public website footer ("© <year> …") is now `BJP TECHNOLOGIES (T) LTD`; the landing test checks the new default (79 assertions pass).
+- `CLAUDE.md` project description updated to match.
+- A legal name already saved in Superadmin › Platform settings › Branding overrides this default and must be changed there on the live system.
+
 ## 2026-11-11 — feat(site): public website on the platform's own address (Option B) + search engines
 
 **Changed:** `landing.php` (new), `core/landing_content.php` (new), `core/public_site.php` (new), `public_robots.php` (new), `public_sitemap.php` (new), `index.php`, `roots.php`, `app/superadmin/settings.php`, `actions/superadmin_platform_settings.php`, `tests/test_landing_cli.php` (new)

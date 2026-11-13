@@ -128,11 +128,11 @@ ok((string)getPlatformSetting('platform_public_url', '') === (string)$before, 's
 
 // ─────────────────────────────────────────────────────────────────────────────
 section('E. Settings, login and sign-up');
-$v = publicSiteValidate(['platform_legal_name' => 'BJP TECHNOLOGIES (L) LTD', 'platform_public_url' => 'https://Bms.Example.co.tz/']);
+$v = publicSiteValidate(['platform_legal_name' => 'BJP TECHNOLOGIES (T) LTD', 'platform_public_url' => 'https://Bms.Example.co.tz/']);
 ok($v['ok'] && $v['values']['platform_public_url'] === 'https://bms.example.co.tz', 'main website normalised (lowercase, no trailing slash)');
 ok(!publicSiteValidate(['platform_public_url' => 'bms.example.co.tz'])['ok'] && !publicSiteValidate(['platform_public_url' => 'https://x.co.tz/page'])['ok']
    && !publicSiteValidate(['platform_public_url' => 'javascript:alert(1)'])['ok'], 'address without https://, with a path, or a script → refused');
-ok(publicSiteDefaultLegalName() === 'BJP TECHNOLOGIES (L) LTD', 'default legal name until Superadmin sets one');
+ok(publicSiteDefaultLegalName() === 'BJP TECHNOLOGIES (T) LTD', 'default legal name until Superadmin sets one');
 $s = (string)file_get_contents("$root/app/superadmin/settings.php");
 ok(strpos($s, 'name="platform_legal_name"') !== false && strpos($s, 'name="platform_address"') !== false && strpos($s, 'name="platform_public_url"') !== false, 'Superadmin › Branding has the three fields');
 $diff = trim((string)shell_exec('git -C ' . escapeshellarg($root) . ' diff --stat origin/develop -- login.php 2>&1'));

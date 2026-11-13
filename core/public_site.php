@@ -17,7 +17,7 @@ if (!function_exists('publicSiteDefaultLegalName')) {
     /** Used only until Superadmin saves a legal name (Platform settings › Branding). */
     function publicSiteDefaultLegalName(): string
     {
-        return 'BJP TECHNOLOGIES (L) LTD';
+        return 'BJP TECHNOLOGIES (T) LTD';
     }
 }
 
