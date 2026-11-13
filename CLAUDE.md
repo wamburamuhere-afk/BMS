@@ -1,7 +1,7 @@
 # BMS — Claude Code Instructions
 
 ## Project Overview
-Full-stack PHP/MySQL ERP for BJP Technologies Co. Ltd (Tanzania).
+Full-stack PHP/MySQL ERP for BJP TECHNOLOGIES (T) LTD (Tanzania).
 Stack: PHP, MySQL, Bootstrap 5, PDO, GitHub Actions CI/CD.
 Live sites deploy automatically on push to `main` via `.github/workflows/deploy.yml`.
 
