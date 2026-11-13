@@ -70,7 +70,14 @@ try {
     $payments = $payStmt->fetchAll(PDO::FETCH_ASSOC);
 
     $paid = 0.0;
-    foreach ($payments as $p) $paid += (float)$p['amount'];
+    foreach ($payments as &$p) {
+        $paid += (float)$p['amount'];
+        // 2026-11-11 — goods returned that came off the balance (create_return.php) read as such.
+        $p['method_label'] = $p['payment_method'] === 'return_credit'
+            ? sprintf(t('Goods returned (%s)'), (string)$p['reference'])
+            : t(ucfirst(str_replace('_', ' ', (string)$p['payment_method'])));
+    }
+    unset($p);
     $balance = round((float)$sale['grand_total'] - $paid, 2);
 
     echo json_encode([

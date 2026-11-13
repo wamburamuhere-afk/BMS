@@ -69,6 +69,12 @@ try {
         ];
     }
 
+    $balanceDue = 0.0;
+    try {
+        $paid = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM pos_sale_payments WHERE sale_id = " . (int)$sale_id)->fetchColumn();
+        $balanceDue = max(0.0, round((float)$sale['grand_total'] - $paid, 2));
+    } catch (Throwable $e) { $balanceDue = 0.0; }
+
     echo json_encode([
         'success' => true,
         'sale'    => [
@@ -77,6 +83,8 @@ try {
             'customer_name'  => $sale['customer_name'] ?: 'Walk-in',
             'sale_status'    => $sale['sale_status'],
             'grand_total'    => (float)$sale['grand_total'],
+            // 2026-11-11 — what the customer still owes on this sale: a return first comes off it.
+            'balance_due'    => $balanceDue,
         ],
         'lines'   => $lines,
     ]);

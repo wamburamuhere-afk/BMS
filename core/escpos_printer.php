@@ -77,7 +77,14 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
     if (!empty($data['company_vrn']))     $out .= $center('VRN: ' . $data['company_vrn']);
     $out .= ESCPOS_ALIGN_LEFT . $line;
 
-    $out .= $twoCol('Receipt#:', (string)($data['receipt_number'] ?? ''));
+    $isRefund = !empty($data['is_refund']);
+    if ($isRefund) {   // 2026-11-11 — a return row prints as a refund receipt
+        $out .= ESCPOS_ALIGN_CENTER . ESCPOS_BOLD_ON . $center(t('REFUND RECEIPT')) . ESCPOS_BOLD_OFF . ESCPOS_ALIGN_LEFT;
+        $out .= $twoCol(t('Refund #:'), (string)($data['receipt_number'] ?? ''));
+        if (!empty($data['original_receipt'])) $out .= $twoCol(t('For receipt #:'), (string)$data['original_receipt']);
+    } else {
+        $out .= $twoCol('Receipt#:', (string)($data['receipt_number'] ?? ''));
+    }
     $out .= $twoCol('Date:', (string)($data['sale_date'] ?? date('Y-m-d H:i')));
     $out .= $twoCol('Cashier:', (string)($data['cashier_name'] ?? ''));
     if (!empty($data['customer_name'])) $out .= $twoCol('Customer:', (string)$data['customer_name']);
@@ -86,9 +93,36 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
     foreach (($data['items'] ?? []) as $item) {
         $out .= (string)($item['product_name'] ?? '') . "\n";
         $qtyPrice = format_qty($item['quantity'] ?? 0) . ' x ' . number_format((float)($item['unit_price'] ?? 0), 2);
+        // A thermal printer cannot cross a number out: the sold quantity is shown as "(was 3)".
+        if (isset($item['qty_was'])) $qtyPrice .= ' (' . sprintf(t('was %s'), format_qty($item['qty_was'])) . ')';
         $out .= $twoCol('  ' . $qtyPrice, number_format((float)($item['line_total'] ?? 0), 2));
     }
     $out .= $line;
+
+    if ($isRefund) {
+        $out .= ESCPOS_BOLD_ON . $twoCol(t('TOTAL REFUNDED:'), $currency . ' ' . number_format((float)($data['grand_total'] ?? 0), 2)) . ESCPOS_BOLD_OFF;
+        if ((float)($data['to_balance'] ?? 0) > 0.009) $out .= $twoCol(t('Taken off amount owed:'), number_format((float)$data['to_balance'], 2));
+        if ((float)($data['cash_back'] ?? 0) > 0.009) {
+            $m = t(ucfirst(str_replace('_', ' ', (string)($data['payment_method'] ?? ''))));
+            $out .= $twoCol(sprintf(t('Paid back (%s):'), $m), number_format((float)$data['cash_back'], 2));
+        }
+        if (!empty($data['return_reason'])) $out .= t('Reason:') . ' ' . $data['return_reason'] . "\n";
+        $out .= $line . ESCPOS_ALIGN_CENTER . $center('*** THANK YOU ***') . "\n\n\n" . ESCPOS_CUT;
+        return $out;   // a refund opens no cash drawer by itself
+    }
+
+    if (!empty($data['returns'])) {   // goods came back: Sold total / Refunded / NET PAID / stamp
+        $r = $data['returns'];
+        $out .= $twoCol(t('Sold total:'), $currency . ' ' . number_format((float)$r['sold_total'], 2));
+        foreach ($r['refunds'] as $rf) $out .= $twoCol($rf['label'] . ':', '-' . number_format((float)$rf['amount'], 2));
+        $out .= ESCPOS_BOLD_ON . $twoCol(t('NET PAID:'), $currency . ' ' . number_format((float)$r['net_paid'], 2)) . ESCPOS_BOLD_OFF;
+        $out .= $line;
+        if (isset($data['amount_tendered'])) $out .= $twoCol('Payment (' . (string)($data['payment_method'] ?? '') . '):', number_format((float)$data['amount_tendered'], 2));
+        if ((float)($data['change_given'] ?? 0) > 0.009) $out .= $twoCol('Change:', number_format((float)$data['change_given'], 2));
+        $out .= ESCPOS_ALIGN_CENTER . ESCPOS_BOLD_ON . $center('** ' . $r['stamp'] . ' **') . ESCPOS_BOLD_OFF;
+        $out .= $line . $center('*** THANK YOU ***') . "\n\n\n" . ESCPOS_CUT;
+        return $out;   // a reprint opens no cash drawer
+    }
 
     $out .= $twoCol('Subtotal:', number_format((float)($data['subtotal'] ?? 0), 2));
     if (!empty($data['discount_amount'])) $out .= $twoCol('Discount:', '-' . number_format((float)$data['discount_amount'], 2));

@@ -362,6 +362,14 @@ $company_logo = getSetting('company_logo', '');
                             <i class="bi bi-printer text-primary me-1"></i> <?= t('Print') ?>
                         </button>
                     </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                    <!-- 2026-11-11 — refunds live inside their receipt; this shows them as their own list when wanted. -->
+                    <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1 d-print-none" style="border:1px solid #dee2e6;border-radius:8px;height:38px;">
+                        <select class="form-select form-select-sm border-0 fw-bold p-0" id="kindFilter" style="width:auto;background:transparent;" aria-label="<?= htmlspecialchars(t('Show sales or returns')) ?>">
+                            <option value="sales" selected><?= t('Sales') ?></option>
+                            <option value="returns"><?= t('Returns') ?></option>
+                        </select>
+                    </div>
                     <div class="d-flex align-items-center bg-white shadow-sm px-2 py-1 d-print-none" style="border:1px solid #dee2e6;border-radius:8px;height:38px;">
                         <span class="small text-muted me-2 text-nowrap"><?= t('Show:') ?></span>
                         <select class="form-select form-select-sm border-0 fw-bold p-0" id="pageLenSelect" style="width:55px;background:transparent;">
@@ -370,6 +378,7 @@ $company_logo = getSetting('company_logo', '');
                             <option value="50">50</option>
                             <option value="100">100</option>
                         </select>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -385,6 +394,7 @@ $company_logo = getSetting('company_logo', '');
                         <th class="text-primary"><?= t('Date') ?></th>
                         <th class="text-primary"><?= t('Customer') ?></th>
                         <th class="text-primary text-end"><?= t('Total') ?></th>
+                        <th class="text-primary text-end"><?= t('Refunded') ?></th>
                         <th class="text-primary"><?= t('Payment') ?></th>
                         <th class="text-primary"><?= t('Status') ?></th>
                         <th class="text-primary text-end"><?= t('Actions') ?></th>
@@ -591,6 +601,7 @@ $company_logo = getSetting('company_logo', '');
                     <input type="hidden" name="original_sale_id" id="ret_sale_id">
                     <div id="ret-message" class="mb-2"></div>
                     <div class="mb-2 small text-muted"><?= t('Receipt') ?> <span class="fw-bold" id="ret_receipt">—</span> · <span id="ret_customer">—</span></div>
+                    <div class="alert alert-info py-2 small d-none" id="ret_owed_note"></div>
                     <div class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead>
@@ -734,6 +745,7 @@ const VOID_URL    = '<?= buildUrl('api/pos/void_sale.php') ?>';
 const RETURN_URL  = '<?= buildUrl('api/pos/create_return.php') ?>';
 const RECEIVE_URL = '<?= buildUrl('api/pos/receive_payment.php') ?>';
 const RECEIPT_URL = '<?= buildUrl('api/pos/print_receipt.php') ?>';
+const REFUND_STATEMENT_URL = '<?= buildUrl('api/pos/refund_statement.php') ?>';
 const TARGET_URL  = '<?= buildUrl('api/pos/save_sales_target.php') ?>';
 const CURRENCY    = '<?= htmlspecialchars($currency, ENT_QUOTES) ?>';
 const CAN_CREATE  = <?= json_encode($can_create) ?>;
@@ -765,6 +777,11 @@ const T = {
     salesHistoryPrintTitle: <?= json_encode(wLabel('POS Sales History', 'Sales History')) ?>,
     actions: <?= json_encode(t('Actions')) ?>,
     viewReceipt: <?= json_encode(t('View Receipt')) ?>,
+    viewRefundReceipt: <?= json_encode(t('View Refund Receipt')) ?>,
+    viewRefunds: <?= json_encode(t('View Refunds (%d)')) ?>,
+    refundedLabel: <?= json_encode(t('Refunded')) ?>,
+    refundFor: <?= json_encode(t('For receipt %s')) ?>,
+    retOwedNote: <?= json_encode(t('This customer still owes %s on this sale. The return comes off that first; only the rest is paid back.')) ?>,
     receivePayment: <?= json_encode(t('Receive Payment')) ?>,
     returnRefund: <?= json_encode(t('Return / Refund')) ?>,
     voidSaleLabel: <?= json_encode(t('Void Sale')) ?>,
@@ -948,6 +965,22 @@ function initDashboardTables() {
     });
 }
 
+// A refund row (Returns view) names the receipt it belongs to.
+function refundForNote(r) {
+    return (r && r.is_return_sale && r.original_receipt) ? `<div class="small text-muted">${T.refundFor.replace('%s', safeOutput(r.original_receipt))}</div>` : '';
+}
+
+// Refunded column: on a receipt, its refunds; on a refund row (Returns view), which receipt it was for.
+function refundedCell(row, type) {
+    if (row.is_return_sale) {
+        if (type !== 'display') return row.grand_total;
+        return `<span class="text-danger">-${money(row.grand_total)}</span>`;
+    }
+    const v = +row.refunded_total || 0;
+    if (type !== 'display') return v;
+    return v > 0.009 ? `<span class="text-danger">-${money(v)}</span>` : '<span class="text-muted">—</span>';
+}
+
 function payBadge(row) {
     if (row.is_return_sale) return '';
     let html = T.payMethodLabels[row.payment_method] || safeOutput(row.payment_method || '—');
@@ -963,6 +996,14 @@ function payBadge(row) {
 // so both show the same real names (View Receipt / Receive Payment / Return-Refund / Void Sale).
 function actionItems(row) {
     let items = `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt text-primary me-2"></i> ${T.viewReceipt}</a></li>`;
+    // One entry however many refunds the receipt had: a single refund opens its own refund receipt,
+    // several open the refund statement (every refund of this receipt + totals).
+    const refunds = row.refunds || [];
+    if (refunds.length === 1) {
+        items += `<li><a class="dropdown-item py-2 rounded" href="${RECEIPT_URL}?id=${refunds[0].sale_id}" target="_blank"><i class="bi bi-receipt-cutoff text-primary me-2"></i> ${T.viewRefundReceipt} (${safeOutput(refunds[0].receipt_number)})</a></li>`;
+    } else if (refunds.length > 1) {
+        items += `<li><a class="dropdown-item py-2 rounded" href="${REFUND_STATEMENT_URL}?id=${row.sale_id}" target="_blank"><i class="bi bi-receipt-cutoff text-primary me-2"></i> ${T.viewRefunds.replace('%d', refunds.length)}</a></li>`;
+    }
     if (CAN_EDIT   && row.can_receive) items += `<li><button class="dropdown-item py-2 rounded" onclick="openReceive(${row.sale_id})"><i class="bi bi-cash-coin text-primary me-2"></i> ${T.receivePayment}</button></li>`;
     if (CAN_CREATE && row.can_return)  items += `<li><button class="dropdown-item py-2 rounded" onclick="openReturn(${row.sale_id})"><i class="bi bi-arrow-return-left text-primary me-2"></i> ${T.returnRefund}</button></li>`;
     if (CAN_DELETE && row.can_void)    items += `<li><hr class="dropdown-divider"></li><li><button class="dropdown-item py-2 rounded text-danger" onclick="voidSale(${row.sale_id},'${safeOutput(row.receipt_number)}')"><i class="bi bi-x-octagon text-danger me-2"></i> ${T.voidSaleLabel}</button></li>`;
@@ -1027,10 +1068,11 @@ function initHistoryTable() {
         ],
         columns: [
             BMSSerial.column({ className: 'text-muted' }),
-            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) },
+            { data: 'receipt_number', render: (d,t,r) => (r.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(d) + oldSaleBadge(r) + refundForNote(r) },
             { data: 'sale_date',      render: d => fmt(d) },
             { data: 'party',          render: d => caseFormatJs(d) },
             { data: 'grand_total',    className: 'text-end fw-bold', render: d => money(d) },
+            { data: 'refunded_total', className: 'text-end', render: (d,t,r) => refundedCell(r, t) },
             { data: 'payment_method', render: (d,t,r) => payBadge(r) },
             { data: 'sale_status',    render: d => statusBadge(d) },
             { data: null,             className: 'text-end', orderable: false, render: (d,t,r) => actionMenu(r) }
@@ -1041,6 +1083,27 @@ function initHistoryTable() {
 
     // Wire the page-length selector
     $('#pageLenSelect').on('change', function () { table.page.len($(this).val()).draw(); });
+
+    // Sales (default) shows receipts only — their refunds sit inside them; Returns lists the refunds.
+    $.fn.dataTable.ext.search.push(function (settings, data, idx) {
+        if (settings.nTable.id !== 'posSalesTable') return true;
+        const r = (settings.aoData[idx] && settings.aoData[idx]._aData) || {};
+        return ($('#kindFilter').val() === 'returns') ? !!r.is_return_sale : !r.is_return_sale;
+    });
+    $('#kindFilter').on('change', function () { renumberView(); table.draw(); });
+}
+
+// S/No counts only the rows in the chosen view (Sales or Returns), so hidden refund rows never use up numbers.
+function renumberView() {
+    const s = table.settings()[0];
+    const wantReturns = $('#kindFilter').val() === 'returns';
+    let n = 0;
+    s.aiDisplayMaster.forEach(function (idx) {
+        const row = s.aoData[idx];
+        row._bmsSn = (!!row._aData.is_return_sale === wantReturns) ? ++n : 0;
+        row._aSortData = null;
+        if (row.anCells && row.anCells[0]) row.anCells[0].innerHTML = row._bmsSn || '';
+    });
 }
 
 // ══════════════════════ TOOLBAR ACTIONS ══════════════════════
@@ -1058,7 +1121,9 @@ function loadSales() {
     $.getJSON(GET_SALES, { start_date: from, end_date: to }, function (res) {
         if (!res.success) { Swal.fire({ icon:'error', title: T.error, text: res.message || T.loadFailed }); return; }
         const rows = res.data || [];
-        table.clear().rows.add(rows).draw();
+        table.clear().rows.add(rows);
+        renumberView();
+        table.draw();
         applyView();
 
         let net = 0, count = 0, returns = 0, voided = 0;
@@ -1249,6 +1314,8 @@ function openReturn(saleId) {
         $('#ret_sale_id').val(res.sale.sale_id);
         $('#ret_receipt').text(res.sale.receipt_number);
         $('#ret_customer').text(applyCaseModeJs(res.sale.customer_name));
+        const owed = +res.sale.balance_due || 0;
+        $('#ret_owed_note').toggleClass('d-none', owed <= 0.009).text(owed > 0.009 ? T.retOwedNote.replace('%s', CURRENCY + ' ' + money(owed)) : '');
         let html = '';
         res.lines.forEach(l => {
             const dis = l.returnable <= 0 ? 'disabled' : '';
@@ -1275,11 +1342,11 @@ function renderCards(rows) {
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between">
-                        <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number) + oldSaleBadge(row)}</div>
+                        <div class="fw-bold"><span class="text-muted me-1">${i+1}.</span>${(row.is_return_sale ? '<i class="bi bi-arrow-return-left text-muted me-1"></i>' : '') + safeOutput(row.receipt_number) + oldSaleBadge(row) + refundForNote(row)}</div>
                         <div>${statusBadge(row.sale_status)}</div>
                     </div>
                     <small class="text-muted">${caseFormatJs(row.party)} &middot; ${fmt(row.sale_date)}</small>
-                    <div class="fw-bold text-primary mt-1">${CURRENCY} ${money(row.grand_total)}</div>
+                    <div class="fw-bold text-primary mt-1">${CURRENCY} ${money(row.grand_total)}${(!row.is_return_sale && +row.refunded_total > 0.009) ? ` <span class="small fw-normal text-danger ms-1">${T.refundedLabel} -${money(row.refunded_total)}</span>` : ''}</div>
                 </div>
                 <div class="card-footer bg-white border-top p-0">
                     <div style="padding:8px;">${actions}</div>

@@ -380,7 +380,7 @@
                     return '<tr>' +
                         '<td>' + fmtDate(p.created_at) + '</td>' +
                         '<td>' + money(p.amount) + '</td>' +
-                        '<td>' + esc(p.payment_method || '-') + '</td>' +
+                        '<td>' + esc(p.method_label || p.payment_method || '-') + '</td>' +
                         '<td>' + esc(p.received_by_name || '-') + '</td>' +
                         '</tr>';
                 }).join('')

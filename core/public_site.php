@@ -114,12 +114,14 @@ if (!function_exists('publicSitePages')) {
     function publicSitePages(): array
     {
         return [
-            ''          => ['Home', 'Mwanzo'],
-            'smart-pos' => ['Smart POS', 'Smart POS'],
-            'smart-bms' => ['Smart BMS', 'Smart BMS'],
-            'pricing'   => ['Pricing', 'Bei'],
-            'faq'       => ['FAQ', 'Maswali'],
-            'contact'   => ['Contact', 'Wasiliana'],
+            ''                     => ['Home', 'Mwanzo'],
+            'smart-pos'            => ['Smart POS', 'Smart POS'],
+            'smart-pos/retail'     => ['Smart POS · Retail shop', 'Smart POS · Duka la rejareja'],
+            'smart-pos/restaurant' => ['Smart POS · Restaurant', 'Smart POS · Mgahawa'],
+            'smart-bms'            => ['Smart BMS', 'Smart BMS'],
+            'pricing'              => ['Pricing', 'Bei'],
+            'faq'                  => ['FAQ', 'Maswali'],
+            'contact'              => ['Contact', 'Wasiliana'],
         ];
     }
 }

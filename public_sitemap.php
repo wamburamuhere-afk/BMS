@@ -33,7 +33,7 @@ foreach ($pages as $p) {
         if (count($langs) > 1) {
             foreach ($langs as $alt) echo '    <xhtml:link rel="alternate" hreflang="' . $alt . '" href="' . $x($abs($p, $alt)) . "\"/>\n";
         }
-        echo "    <priority>" . ($p === '' ? '1.0' : (in_array($p, ['smart-pos', 'smart-bms', 'pricing'], true) ? '0.8' : '0.5')) . "</priority>\n  </url>\n";
+        echo "    <priority>" . ($p === '' ? '1.0' : (in_array($p, ['smart-pos', 'smart-pos/retail', 'smart-pos/restaurant', 'smart-bms', 'pricing'], true) ? '0.8' : '0.5')) . "</priority>\n  </url>\n";
     }
 }
 echo "</urlset>\n";

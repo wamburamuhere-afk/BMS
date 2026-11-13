@@ -34,6 +34,8 @@ require_once __DIR__ . '/../../core/pos_batch_consumption.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_combo_products.php';
 require_once __DIR__ . '/../../core/pos_quantity.php';
+require_once __DIR__ . '/../../core/code_generator.php';
+require_once __DIR__ . '/../../core/sales_posting.php';
 
 header('Content-Type: application/json');
 
@@ -158,7 +160,19 @@ try {
     $shiftStmt->execute([$_SESSION['user_id']]);
     $shift_id = $shiftStmt->fetchColumn() ?: (int)$orig['shift_id'];
 
-    $return_receipt = 'RET-' . date('Ymd') . '-' . mt_rand(1000, 9999);
+    // 2026-11-11 — sequential, company-prefixed (BJP-RET-0001), allocated inside this transaction.
+    $return_receipt = nextCode($pdo, 'RET');
+
+    // A credit sale that is not fully paid: the return first comes off what the customer still owes;
+    // only the rest (if any) is paid back. Recorded as a 'return_credit' line in pos_sale_payments, so
+    // every "balance due" (Who Owes Me, Receive Payment, the sales list) drops by itself.
+    $to_balance = 0.0;
+    if (posReturnCreditReady($pdo)) {
+        $paidSoFar = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM pos_sale_payments WHERE sale_id = " . (int)$original_sale_id)->fetchColumn();
+        $owed      = round((float)$orig['grand_total'] - $paidSoFar, 2);
+        if ($owed > 0.009) $to_balance = round(min($owed, $r_grand), 2);
+    }
+    $cash_back = round($r_grand - $to_balance, 2);
 
     // Create the return header.
     $pdo->prepare("INSERT INTO pos_sales
@@ -171,7 +185,8 @@ try {
             $return_client_uuid ?: null,
             $return_receipt, $shift_id, $_SESSION['user_id'], $orig['customer_id'], $orig['customer_name'],
             $warehouse_id, $project_id, $r_subtotal, $r_discount, $r_tax, $r_grand,
-            $refund_method, $original_sale_id, $reason,
+            // Nothing paid back (all of it came off the balance): the return's method says so.
+            $cash_back > 0.009 ? $refund_method : 'credit', $original_sale_id, $reason,
         ]);
     $return_id = (int)$pdo->lastInsertId();
 
@@ -212,13 +227,15 @@ try {
             // (0), and summing component costs is a separate, larger change
             // to the same COGS logic Phase 18 already scoped narrowly;
             // documented here rather than guessed at.
+            // 2026-11-11 — the cost that goes back is what the SALE charged for this line
+            // (its batch cost, else the product cost — the same rule as posSaleCogs()), so the
+            // returned part's profit cancels exactly; a combo line included.
+            $restock_cost += round(posSaleLineUnitCost($pdo, (int)$iid) * $rq, 2);
             if (!empty($l['is_combo'])) {
                 if ($warehouse_id !== null) {
                     reverseComboComponents($pdo, $pid, $rq, $warehouse_id, $project_id, $return_id, $return_receipt, $_SESSION['user_id']);
                 }
             } else {
-                $unitCost = (float)($pdo->query("SELECT COALESCE(cost_price,0) FROM products WHERE product_id = $pid")->fetchColumn() ?: 0);
-                $restock_cost += round($unitCost * $rq, 2);
                 $restoreGlobal->execute([$rq, $rq, $pid]);
                 if ($warehouse_id !== null) $restoreWh->execute([$rq, $pid, $warehouse_id]);
                 recordStockMovement($pdo, [
@@ -247,12 +264,22 @@ try {
         }
     }
 
-    // Refund cash drawer (cash refunds only, against the active shift).
-    if ($refund_method === 'cash' && $shift_id) {
+    // Refund cash drawer (cash refunds only, against the active shift) — only what is really paid back.
+    if ($refund_method === 'cash' && $shift_id && $cash_back > 0.009) {
         $pdo->prepare("INSERT INTO cash_register_transactions
                           (shift_id, transaction_type, amount, payment_method, reference_number, sale_id, reason, created_by, created_at)
                        VALUES (?, 'refund', ?, 'cash', ?, ?, ?, ?, NOW())")
-            ->execute([$shift_id, $r_grand, $return_receipt, $return_id, 'Return: ' . $reason, $_SESSION['user_id']]);
+            ->execute([$shift_id, $cash_back, $return_receipt, $return_id, 'Return: ' . $reason, $_SESSION['user_id']]);
+    }
+
+    // The part that came off what the customer owed.
+    if ($to_balance > 0.009) {
+        $pdo->prepare("INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
+                       VALUES (?, ?, 'return_credit', ?, ?, ?, NOW())")
+            ->execute([$original_sale_id, $to_balance, $return_receipt, 'Goods returned: ' . $reason, $_SESSION['user_id']]);
+        $paidNow = (float)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM pos_sale_payments WHERE sale_id = " . (int)$original_sale_id)->fetchColumn();
+        $pdo->prepare("UPDATE pos_sales SET payment_status = ? WHERE sale_id = ?")
+            ->execute([round((float)$orig['grand_total'] - $paidNow, 2) <= 0.01 ? 'paid' : 'partial', $original_sale_id]);
     }
 
     // Flip the original: fully returned across all lines → 'refunded', else 'partially_refunded'.
@@ -265,11 +292,11 @@ try {
     //   Dr Sales Returns (net) [+ Dr Output VAT] / Cr Cash/Bank   (the refund)
     //   Dr Inventory / Cr COGS                                    (restocked cost)
     // Best-effort: never fails the return; idempotent.
-    require_once __DIR__ . '/../../core/sales_posting.php';
     $glPost = postPosReturn(
         $pdo, (int)$return_id, $refund_method, (float)$r_grand, (float)$r_tax,
         (float)$restock_cost, date('Y-m-d'), $return_receipt,
-        $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id']
+        $project_id !== null ? (int)$project_id : null, (int)$_SESSION['user_id'],
+        (float)$to_balance   // this part credits Accounts Receivable instead of cash
     );
     if (empty($glPost['revenue'])) {
         logActivity($pdo, $_SESSION['user_id'], 'POS Return GL warning',
@@ -283,15 +310,20 @@ try {
         'entity_type' => 'pos_sale',
         'entity_id'   => $original_sale_id,
         'old_values'  => ['sale_status' => $orig['sale_status']],
-        'new_values'  => ['sale_status' => $new_status, 'return_id' => $return_id, 'refund' => $r_grand],
+        'new_values'  => ['sale_status' => $new_status, 'return_id' => $return_id, 'refund' => $r_grand,
+                          'off_balance' => $to_balance, 'paid_back' => $cash_back],
     ]);
 
     echo json_encode([
         'success'        => true,
-        'message'        => sprintf(t('Return processed. Refund: %s'), number_format($r_grand, 2)),
+        'message'        => $to_balance > 0.009
+            ? sprintf(t('Return processed. %1$s taken off what the customer owes; %2$s paid back.'), number_format($to_balance, 2), number_format($cash_back, 2))
+            : sprintf(t('Return processed. Refund: %s'), number_format($r_grand, 2)),
         'return_id'      => $return_id,
         'receipt_number' => $return_receipt,
         'refund_total'   => $r_grand,
+        'off_balance'    => $to_balance,
+        'paid_back'      => $cash_back,
         'original_status'=> $new_status,
     ]);
 

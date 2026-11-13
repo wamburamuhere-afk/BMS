@@ -67,12 +67,13 @@ try {
     $sql = "SELECT ps.sale_id, ps.receipt_number, ps.sale_date, ps.grand_total, ps.tax_amount,
                    ps.payment_method, ps.payment_status, ps.sale_status, ps.is_return_sale,
                    {$pastExpr} AS is_past_entry, {$onlineExpr} AS online_orders, ps.created_at,
-                   ps.original_sale_id, ps.void_reason,
+                   ps.original_sale_id, ps.void_reason, os.receipt_number AS original_receipt,
                    COALESCE(NULLIF(ps.customer_name,''), c.customer_name, c.company_name, 'Walk-in') AS party,
                    pr.project_name, {$paidExpr} AS amount_paid
               FROM pos_sales ps
          LEFT JOIN customers c ON c.customer_id = ps.customer_id
          LEFT JOIN projects  pr ON pr.project_id = ps.project_id
+         LEFT JOIN pos_sales os ON os.sale_id = ps.original_sale_id
              WHERE DATE(ps.sale_date) BETWEEN ? AND ?" . $customerFilter . $searchFilter . $scope . "
           ORDER BY ps.sale_date DESC, ps.sale_id DESC"
         . ($limit > 0 ? " LIMIT " . $limit . " OFFSET " . $offset : "");
@@ -83,8 +84,35 @@ try {
     $st->execute($params);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
+    // 2026-11-11 — each receipt carries its own refunds (number + amount), so the list can show a
+    // Refunded column and "View Refund Receipt" on the receipt itself instead of a separate row.
+    // Return rows stay in the data (the mobile app and the totals read them); the page decides what to show.
+    $refundsBySale = [];
+    $origIds = [];
+    foreach ($rows as $row) { if ((int)$row['is_return_sale'] === 0) $origIds[] = (int)$row['sale_id']; }
+    if ($origIds) {
+        foreach (array_chunk($origIds, 500) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            $rq = $pdo->prepare("SELECT sale_id, original_sale_id, receipt_number, grand_total, sale_date
+                                   FROM pos_sales
+                                  WHERE is_return_sale = 1 AND sale_status NOT IN ('voided','cancelled')
+                                    AND original_sale_id IN ($ph)
+                               ORDER BY sale_id");
+            $rq->execute($chunk);
+            foreach ($rq->fetchAll(PDO::FETCH_ASSOC) as $rf) {
+                $refundsBySale[(int)$rf['original_sale_id']][] = [
+                    'sale_id' => (int)$rf['sale_id'], 'receipt_number' => $rf['receipt_number'],
+                    'amount' => round((float)$rf['grand_total'], 2), 'sale_date' => $rf['sale_date'],
+                ];
+            }
+        }
+    }
+
     foreach ($rows as &$r) {
         $r['sale_id']        = (int)$r['sale_id'];
+        $r['refunds']        = $refundsBySale[$r['sale_id']] ?? [];
+        $r['refunded_total'] = round(array_sum(array_column($r['refunds'], 'amount')), 2);
+        $r['original_sale_id'] = $r['original_sale_id'] !== null ? (int)$r['original_sale_id'] : null;
         $r['grand_total']    = (float)$r['grand_total'];
         $r['tax_amount']     = (float)$r['tax_amount'];
         $r['is_return_sale'] = (int)$r['is_return_sale'];

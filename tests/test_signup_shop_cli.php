@@ -53,8 +53,9 @@ ok(signupPosBusiness('restaurant') === 'restaurant' && signupPosBusiness(' Resta
 ok(signupPosBusiness('retail') === 'retail' && signupPosBusiness('') === 'retail' && signupPosBusiness('hybrid') === 'retail' && signupPosBusiness(null) === 'retail', 'anything else is retail (whitelist)');
 ok(signupShopCapacity() === 999999, 'capacity default 999999');
 $reg = $src('register.php');
-ok(strpos($reg, 'name="pos_business" value="retail" checked') !== false && strpos($reg, 'name="pos_business" value="restaurant"') !== false, 'sign-up page: Retail (default) / Restaurant choice');
-ok(strpos($reg, "const isPos = !prod() || prod().key !== 'bms_full';") !== false && strpos($reg, "\$('#posBizBox').toggleClass('d-none-i', !isPos).prop('disabled', !isPos);") !== false, 'sign-up page: choice hidden and not sent for Smart BMS');
+ok(strpos($reg, "\$pickBiz = (\$_GET['business'] ?? '') === 'restaurant' ? 'restaurant' : 'retail';") !== false
+   && strpos($reg, 'name="pos_business" value="retail"<?= $pickBiz === \'retail\' ? \' checked\'') !== false && strpos($reg, 'name="pos_business" value="restaurant"') !== false, 'sign-up page: Retail (default) / Restaurant choice');
+ok(strpos($reg, "const isPos = () => !prod() || prod().key !== 'bms_full';") !== false && strpos($reg, "\$('#posBizBox').toggleClass('d-none-i', !isPos()).prop('disabled', !isPos());") !== false, 'sign-up page: choice hidden and not sent for Smart BMS');
 ok(strpos($src('actions/register_tenant.php'), "'pos_business'             => \$_POST['pos_business'] ?? 'retail'") !== false, 'web action passes the choice');
 ok(strpos($src('api/mobile/register.php'), "signupPosBusiness(\$body['pos_business'] ?? 'retail')") !== false, 'mobile API stores the choice');
 ok(strpos($src('cron/process_registration_jobs.php'), "'signup_shop'      => \$signupShop,") !== false, 'mobile worker asks for the first shop');
