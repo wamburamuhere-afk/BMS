@@ -13,7 +13,9 @@
  *   - the wholesale price is below the buying price,
  *   - the wholesale price is above the retail price.
  * It never blocks: "Yes" keeps the figures and the user carries on, "No" puts
- * them back in the field they just changed. Empty or zero fields are left
+ * them back in the field they just changed. Exception (2026-11-14): with
+ * window.BMS_PRICE_BLOCK_BUY_ABOVE_RETAIL (Smart POS, Selling settings), a
+ * buying price above the retail price is a block with only "Change it". Empty or zero fields are left
  * alone (an empty wholesale still means retail on the server). The same set of
  * figures is only asked about once.
  *
@@ -75,6 +77,21 @@
         var w = $w.length ? num($w.val()) : null;
         var r = $r.length ? num($r.val()) : null;
         var pos = function (v) { return v !== null && v > 0; };
+
+        // Selling settings (2026-11-14): when the company does not allow a buying price above the
+        // retail price (Smart POS default), that case is a block, not a question — the server
+        // refuses it too. Only "Change it"; the field just changed gets the focus.
+        if (window.BMS_PRICE_BLOCK_BUY_ABOVE_RETAIL && pos(b) && pos(r) && r < b) {
+            if (typeof Swal === 'undefined') return;
+            Swal.fire({
+                icon: 'error',
+                title: T.blockTitle || T.buyTitle,
+                text: String(T.blockText || T.buyRetail).replace('{b}', fmt(b)).replace('{r}', fmt(r)),
+                confirmButtonText: T.change || T.no,
+                returnFocus: false
+            }).then(function () { $changed.trigger('focus').trigger('select'); });
+            return;
+        }
 
         var issues = [];
         if (pos(b) && pos(r) && r < b) issues.push({ title: T.buyTitle, text: T.buyRetail });

@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-14 — feat(pos): Selling settings — refuse buying price above selling price; default price list at the till
+
+**Changed:** `core/price_check.php`, `app/constant/settings/pos_config_settings.php`, `api/create_product.php`, `api/update_product.php`, `api/pos/quick_restock.php`, `api/stock/update_warehouse_batch.php`, `core/product_import.php`, `api/mobile/products/create.php`, `api/mobile/products/update.php`, `header.php`, `assets/js/bms-price-check.js`, `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `tests/test_pos_selling_settings_cli.php` (new)
+
+- **Settings › Selling settings › Prices** (Smart POS with a retail shop; not shown to a Restaurant-only company):
+  - **Allow a buying price above the selling price** — off by default. Off: a buying price higher than the retail selling price is refused on Add/Edit product, Receive Stock (web + app), batch price edit, Excel import (row error) and the app's Add/Edit product. Equal is fine; services and items without a selling price are not checked; an app edit that does not touch prices still saves. On: saves as before (warning only). Smart BMS (Simple Mode off) is not affected. Message: "Buying price (X) is higher than the selling price (Y). Correct it, or allow this in Settings › Selling settings."
+  - **Price list the Sell screen opens on** — Retail (default) or Wholesale (disabled when the Wholesale list is not active). The till opens on it; the cashier can still switch; a walk-in / cleared customer returns to it; a customer with their own list still gets theirs; online orders keep their list; a Restaurant-only shop always sells at Retail (the hidden list no longer stays on Wholesale there). Only a change of shop kind resets the list, so a cashier's own switch is kept.
+- **Browser:** with the setting off, the price check on forms turns "retail below buying" into a block with only "Change it" (other warnings unchanged).
+- **Not changed:** restaurant purchases/recipes, Smart BMS GRN, existing data, the Flutter app's till.
+- **Checked:** `test_pos_selling_settings_cli` 49/49 (every save path refused/allowed through the real endpoints, run in uncommitted child transactions; till default Retail/Wholesale; settings page; browser block). Unchanged: `test_pos_price_groups` 66/66, `test_pos_quick_restock` 36/36, `test_pos_restock_batch_dates` 20/20, `test_product_create_simple_pos` 58/58, `test_product_edit_simple_pos` 96/96, `test_product_import` 30/30, `test_wholesale_price_group` 25/25, `test_warehouse_batches_tab` 54/54 (served from this worktree).
+
 ## 2026-11-14 — fix(pos): a sale line keeps its buying cost; returns now come off Cost as well as Sales
 
 **Changed:** `core/pos_line_cost.php` (new), `api/pos/process_sale.php`, `api/pos/create_return.php`, `core/sales_posting.php`, `core/pos_dashboard_metrics.php`, `api/account/get_product_analysis_report.php`, `migrations/tenant/2026_11_14_pos_line_unit_cost.php` (new), `migrations/2026_11_14_pos_line_unit_cost_legacy_db.php` (new), `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`, `tests/test_pos_return_line_cost_cli.php` (new), `tests/test_pos_return_line_cost_http_cli.php` (new)

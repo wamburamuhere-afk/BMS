@@ -11,6 +11,78 @@
  * Empty or zero figures are left alone, as on the web.
  */
 
+/*
+ * 2026-11-14 — Selling settings (Smart POS, retail):
+ *   pos_allow_buying_above_selling  '0' (default) | '1'
+ *     Off: a buying price above the retail selling price is REFUSED on every Smart POS
+ *     save path (product create/edit, Receive Stock, batch edit, Excel import, mobile
+ *     app). Equal is fine. Services and items without a selling price are not checked.
+ *     On: today's behaviour — a warning only.
+ *   pos_default_price_list  'retail' (default) | 'wholesale' — the price list the till opens on.
+ * Read straight from system_settings (get_setting() caches for the whole request).
+ */
+if (!function_exists('priceSettingRaw')) {
+    function priceSettingRaw(PDO $pdo, string $key, string $default): string
+    {
+        try {
+            $s = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1");
+            $s->execute([$key]);
+            $v = $s->fetchColumn();
+            return ($v === false || $v === null) ? $default : (string)$v;
+        } catch (Throwable $e) {
+            return $default;
+        }
+    }
+}
+
+if (!function_exists('priceBuyingAboveSellingAllowed')) {
+    /** True when the company allows a buying price above the selling price. */
+    function priceBuyingAboveSellingAllowed(PDO $pdo): bool
+    {
+        return priceSettingRaw($pdo, 'pos_allow_buying_above_selling', '0') === '1';
+    }
+}
+
+if (!function_exists('priceBuyingGuardActive')) {
+    /** The refusal applies: Smart POS (Simple Mode) and the setting is off. */
+    function priceBuyingGuardActive(PDO $pdo): bool
+    {
+        return priceSettingRaw($pdo, 'pos_simple_mode', '0') === '1' && !priceBuyingAboveSellingAllowed($pdo);
+    }
+}
+
+if (!function_exists('priceBuyingAboveSellingError')) {
+    /**
+     * The refusal message when $buying is above $selling and the guard is active, else null.
+     * Empty / zero figures and services are left alone.
+     */
+    function priceBuyingAboveSellingError(PDO $pdo, $buying, $selling, bool $isService = false): ?string
+    {
+        if ($isService) return null;
+        $n = function ($v): ?float {
+            if ($v === null || $v === '') return null;
+            $f = (float)str_replace(',', '', (string)$v);
+            return $f > 0 ? $f : null;
+        };
+        $b = $n($buying); $s = $n($selling);
+        if ($b === null || $s === null || $b <= $s) return null;
+        if (!priceBuyingGuardActive($pdo)) return null;
+        $fmt = fn(float $x) => rtrim(rtrim(number_format($x, 2, '.', ','), '0'), '.');
+        $msg = function_exists('t')
+            ? t('Buying price ({b}) is higher than the selling price ({s}). Correct it, or allow this in Settings › Selling settings.')
+            : 'Buying price ({b}) is higher than the selling price ({s}). Correct it, or allow this in Settings › Selling settings.';
+        return str_replace(['{b}', '{s}'], [$fmt($b), $fmt($s)], $msg);
+    }
+}
+
+if (!function_exists('posDefaultPriceList')) {
+    /** 'retail' | 'wholesale' — the price list the till opens on. */
+    function posDefaultPriceList(PDO $pdo): string
+    {
+        return priceSettingRaw($pdo, 'pos_default_price_list', 'retail') === 'wholesale' ? 'wholesale' : 'retail';
+    }
+}
+
 if (!function_exists('priceCheckWarnings')) {
     /**
      * @return array<int, array{code:string, message:string}>

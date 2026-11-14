@@ -73,6 +73,8 @@ $fail = function (int $code, string $msg): void {
     echo json_encode(['success' => false, 'message' => $msg]);
     exit;
 };
+// Selling settings (2026-11-14): buying above selling refused in Smart POS unless allowed.
+if ($priceErr = priceBuyingAboveSellingError($pdo, $cost_price, $selling_price, $is_service === 1)) $fail(422, $priceErr);
 
 $dateOrNull = function (string $k) use ($body, $fail): ?string {
     $v = trim((string)($body[$k] ?? ''));

@@ -119,6 +119,11 @@ if (!function_exists('piColumns')) {
                 if ($v === false || ($v !== null && $v < 0)) $errors[] = sprintf(t('%s must be a number (0 or more).'), $k);
             }
             if (mb_strlen($category) > 100) $errors[] = t('Category name is too long.');
+            // Selling settings (2026-11-14): buying above selling refused in Smart POS unless allowed.
+            if (!$errors) {
+                require_once __DIR__ . '/price_check.php';
+                if ($priceErr = priceBuyingAboveSellingError($pdo, $cost, $sell)) $errors[] = $priceErr;
+            }
 
             if ($errors) {
                 $p['status'] = 'error';

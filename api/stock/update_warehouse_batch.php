@@ -96,6 +96,19 @@ try {
         echo json_encode(['success' => false, 'message' => t('Selling price must be a valid, non-negative number.')]);
         exit;
     }
+    // Selling settings (2026-11-14): buying above selling refused unless allowed — compared with this
+    // batch's selling price, or the product's own when the batch has none.
+    require_once __DIR__ . '/../../core/price_check.php';
+    $cmpSelling = $selling;
+    if ($cmpSelling === '' || (float)$cmpSelling <= 0) {
+        $ps = $pdo->prepare("SELECT p.selling_price FROM product_batches pb JOIN products p ON p.product_id = pb.product_id WHERE pb.batch_id = ?");
+        $ps->execute([$batchId]);
+        $cmpSelling = $ps->fetchColumn();
+    }
+    if ($priceErr = priceBuyingAboveSellingError($pdo, $unitCost, $cmpSelling)) {
+        echo json_encode(['success' => false, 'message' => $priceErr]);
+        exit;
+    }
 
     $pdo->prepare("
         UPDATE product_batches
