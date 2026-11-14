@@ -4157,7 +4157,7 @@ CREATE TABLE `kitchen_ticket_items` (
   `product_id` int NOT NULL,
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `modifiers_summary` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('queued','preparing','ready','served') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `status` enum('pending','queued','preparing','ready','served','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_kti_ticket` (`ticket_id`)
@@ -4177,15 +4177,26 @@ CREATE TABLE `kitchen_tickets` (
   `warehouse_id` int NOT NULL,
   `station_id` int NOT NULL,
   `table_id` int DEFAULT NULL,
-  `status` enum('queued','preparing','ready','served') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `status` enum('pending','queued','preparing','ready','served','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `order_label` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `sale_id` int DEFAULT NULL,
+  `sent_by` int DEFAULT NULL,
+  `confirmed_by` int DEFAULT NULL,
+  `confirmed_at` datetime DEFAULT NULL,
+  `ready_at` datetime DEFAULT NULL,
+  `served_by` int DEFAULT NULL,
+  `served_at` datetime DEFAULT NULL,
+  `cancelled_by` int DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL,
+  `cancel_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `closed_at` datetime DEFAULT NULL,
   PRIMARY KEY (`ticket_id`),
   KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
   KEY `idx_kt_hold` (`hold_id`),
-  KEY `idx_kt_sale` (`sale_id`)
+  KEY `idx_kt_sale` (`sale_id`),
+  KEY `idx_kt_table_open` (`table_id`,`closed_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -5304,7 +5315,7 @@ CREATE TABLE `notification_rules` (
   PRIMARY KEY (`id`),
   KEY `idx_nr_event` (`event_key`),
   KEY `idx_nr_target` (`target_type`,`target_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -5321,6 +5332,8 @@ CREATE TABLE `notifications` (
   `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `type` enum('loan','payment','system','report','alert') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `event_key` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `entity_type` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `entity_id` int DEFAULT NULL,
   `category` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `priority` enum('low','medium','high') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'medium',
   `is_read` tinyint(1) DEFAULT '0',
@@ -5332,7 +5345,8 @@ CREATE TABLE `notifications` (
   `read_at` timestamp NULL DEFAULT NULL,
   `project_id` int DEFAULT NULL,
   PRIMARY KEY (`notification_id`),
-  KEY `idx_notif_event` (`event_key`)
+  KEY `idx_notif_event` (`event_key`),
+  KEY `idx_notif_event_entity` (`event_key`,`entity_type`,`entity_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1120 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -5807,7 +5821,7 @@ CREATE TABLE `permissions` (
   `is_hidden` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`permission_id`),
   UNIQUE KEY `page_key` (`page_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=245 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=248 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -6053,6 +6067,7 @@ CREATE TABLE `pos_sale_items` (
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `unit` varchar(50) DEFAULT 'pcs',
   `unit_price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `unit_cost` decimal(15,4) DEFAULT NULL,
   `promo_original_price` decimal(15,2) DEFAULT NULL,
   `tax_rate` decimal(5,2) DEFAULT '0.00',
   `tax_amount` decimal(15,2) DEFAULT '0.00',
@@ -6081,7 +6096,7 @@ CREATE TABLE `pos_sale_payments` (
   `payment_id` int NOT NULL AUTO_INCREMENT,
   `sale_id` int NOT NULL,
   `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `payment_method` enum('cash','card','mobile_money','bank_transfer','voucher','loyalty_points') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cash',
+  `payment_method` enum('cash','card','mobile_money','bank_transfer','voucher','loyalty_points','return_credit') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cash',
   `reference` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `client_uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -6564,6 +6579,7 @@ CREATE TABLE `products` (
   `is_available` tinyint(1) NOT NULL DEFAULT '1',
   `recipe_yield` int unsigned NOT NULL DEFAULT '1',
   `online_hidden` tinyint(1) NOT NULL DEFAULT '0',
+  `recipe_extra_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
   PRIMARY KEY (`product_id`),
   UNIQUE KEY `product_code` (`product_code`),
   UNIQUE KEY `ux_products_client_uuid` (`client_uuid`),
@@ -7519,6 +7535,91 @@ CREATE TABLE `repayments` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `restaurant_cook_plan_items`
+--
+
+DROP TABLE IF EXISTS `restaurant_cook_plan_items`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_cook_plan_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `plan_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `quantity` decimal(15,3) NOT NULL,
+  `unit` varchar(20) DEFAULT NULL,
+  `unit_cost` decimal(15,4) NOT NULL DEFAULT '0.0000',
+  `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `movement_id` int DEFAULT NULL,
+  `status` enum('issued','requested','rejected') NOT NULL DEFAULT 'issued',
+  `requested_by` int DEFAULT NULL,
+  `decided_by` int DEFAULT NULL,
+  `decided_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_rcpi_plan` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_cook_plans`
+--
+
+DROP TABLE IF EXISTS `restaurant_cook_plans`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_cook_plans` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `plan_date` date NOT NULL,
+  `pots` decimal(10,2) NOT NULL DEFAULT '1.00',
+  `plates_planned` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `selling_price` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `recipe_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `stock_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `plates_left` decimal(10,2) DEFAULT NULL,
+  `plates_sold` decimal(10,2) DEFAULT NULL,
+  `status` enum('open','closed','cancelled') NOT NULL DEFAULT 'open',
+  `journal_entry_id` int DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `closed_by` int DEFAULT NULL,
+  `closed_at` datetime DEFAULT NULL,
+  `cancelled_by` int DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL,
+  `keep_left` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `idx_rcp_day` (`warehouse_id`,`plan_date`),
+  KEY `idx_rcp_dish` (`product_id`,`plan_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_cook_unsold`
+--
+
+DROP TABLE IF EXISTS `restaurant_cook_unsold`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_cook_unsold` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `plan_date` date NOT NULL,
+  `plates` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `kept_left` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `journal_entry_id` int DEFAULT NULL,
+  `status` enum('posted','reversed') NOT NULL DEFAULT 'posted',
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `reversed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_rcu_day` (`warehouse_id`,`product_id`,`plan_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `restaurant_floors`
 --
 
@@ -7549,7 +7650,7 @@ CREATE TABLE `restaurant_online_orders` (
   `order_id` int NOT NULL AUTO_INCREMENT,
   `warehouse_id` int NOT NULL,
   `table_id` int DEFAULT NULL,
-  `order_type` enum('table','pickup','shop_pickup','shop_delivery') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'table',
+  `order_type` enum('table','pickup','shop_pickup','shop_delivery') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'table',
   `order_code` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `public_ref` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `customer_name` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7565,11 +7666,11 @@ CREATE TABLE `restaurant_online_orders` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `accepted_at` datetime DEFAULT NULL,
-  `price_type` enum('retail','wholesale') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'retail',
-  `delivery_address` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `price_type` enum('retail','wholesale') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'retail',
+  `delivery_address` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `customer_id` int DEFAULT NULL,
   `sale_id` int DEFAULT NULL,
-  `cancelled_by` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cancelled_by` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `completed_at` datetime DEFAULT NULL,
   PRIMARY KEY (`order_id`),
   UNIQUE KEY `uq_roo_public_ref` (`public_ref`),
@@ -7578,6 +7679,36 @@ CREATE TABLE `restaurant_online_orders` (
   KEY `idx_roo_table_status` (`table_id`,`status`),
   KEY `idx_roo_sale` (`sale_id`),
   KEY `idx_roo_type_status` (`order_type`,`status`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_order_cancellations`
+--
+
+DROP TABLE IF EXISTS `restaurant_order_cancellations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_order_cancellations` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `table_id` int DEFAULT NULL,
+  `ticket_id` int DEFAULT NULL,
+  `sale_id` int DEFAULT NULL,
+  `product_id` int NOT NULL,
+  `quantity` decimal(10,3) NOT NULL DEFAULT '0.000',
+  `stage` enum('before_kitchen','after_kitchen') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `source` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cancel',
+  `reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `est_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `posted_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `journal_entry_id` int DEFAULT NULL,
+  `cancelled_by` int DEFAULT NULL,
+  `approved_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_roc_wh_date` (`warehouse_id`,`created_at`),
+  KEY `idx_roc_ticket` (`ticket_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -7625,6 +7756,31 @@ CREATE TABLE `restaurant_reservations` (
   KEY `idx_rr_table` (`table_id`),
   KEY `idx_rr_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `restaurant_spoilage`
+--
+
+DROP TABLE IF EXISTS `restaurant_spoilage`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `restaurant_spoilage` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `warehouse_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `quantity` decimal(15,3) NOT NULL,
+  `unit` varchar(20) DEFAULT NULL,
+  `unit_cost` decimal(15,4) NOT NULL DEFAULT '0.0000',
+  `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `reason` varchar(255) DEFAULT NULL,
+  `movement_id` int DEFAULT NULL,
+  `journal_entry_id` int DEFAULT NULL,
+  `created_by` int DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_rsp_day` (`warehouse_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -7823,7 +7979,7 @@ CREATE TABLE `role_permissions` (
   CONSTRAINT `fk_role_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`) ON DELETE CASCADE,
   CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE CASCADE,
   CONSTRAINT `role_permissions_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=3575 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3578 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -8130,7 +8286,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=105 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=116 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -9697,7 +9853,7 @@ CREATE TABLE `warehouses` (
   `online_menu_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `online_order_table` tinyint(1) NOT NULL DEFAULT '0',
   `online_order_pickup` tinyint(1) NOT NULL DEFAULT '0',
-  `online_shop_token` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `online_shop_token` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `online_shop_enabled` tinyint(1) NOT NULL DEFAULT '0',
   `online_shop_ordering` tinyint(1) NOT NULL DEFAULT '0',
   `online_shop_pickup` tinyint(1) NOT NULL DEFAULT '1',
