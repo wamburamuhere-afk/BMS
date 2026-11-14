@@ -88,8 +88,12 @@ try {
           LEFT JOIN (SELECT psib.sale_item_id, SUM(psib.quantity) AS batch_qty, SUM(psib.quantity * pb.unit_cost) AS batch_cost
                        FROM pos_sale_item_batches psib JOIN product_batches pb ON pb.batch_id = psib.batch_id
                       GROUP BY psib.sale_item_id) bc ON bc.sale_item_id = psi.sale_item_id" : "";
+    // 2026-11-14 — a line's buying cost fixed the day it was sold comes first (core/pos_line_cost.php).
+    require_once __DIR__ . '/../../core/pos_line_cost.php';
+    $posFixed = posLineCostReady($pdo) ? "WHEN psi.unit_cost IS NOT NULL THEN psi.quantity * psi.unit_cost" : "";
     $posGoods = $hasBatches
         ? "CASE WHEN COALESCE(pp.is_service, 1) = 1 THEN 0
+                $posFixed
                 WHEN bc.batch_qty > 0 THEN bc.batch_cost
                 WHEN pp.cost_price > pp.selling_price AND pp.selling_price > 0 THEN 0
                 ELSE psi.quantity * COALESCE(pp.cost_price, 0) END"

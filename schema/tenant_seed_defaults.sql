@@ -1910,9 +1910,13 @@ INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.online_order_new','New online order','A customer sent an order from the online menu or a table QR code.','Restaurant','restaurant_pos','view','high',1,1,'2026-11-05 03:38:28');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.online_order_uncollected','Online order not collected','An accepted pickup order has not been paid or collected yet.','Restaurant','restaurant_pos','view','medium',1,1,'2026-11-05 03:38:28');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.online_order_waiting','Online order waiting','An online order has not been accepted yet.','Restaurant','restaurant_pos','view','high',1,1,'2026-11-05 03:38:28');
+INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.order_returned','Order returned by the cashier','The cashier did not confirm an order and sent it back to the waiter.','Restaurant','restaurant_orders','view','medium',1,1,'2026-11-14 03:14:25');
+INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.order_to_confirm','Order waiting for the cashier','A waiter sent an order; the cashier must confirm it before the kitchen starts.','Restaurant','restaurant_orders','approve','high',1,1,'2026-11-14 03:14:25');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.reservation_new','New reservation','A table reservation was booked.','Restaurant','restaurant_pos','view','medium',1,1,'2026-11-05 03:38:28');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.reservation_upcoming','Reservation upcoming','A restaurant table reservation is coming up soon','POS','restaurant_pos','view','medium',1,1,'2026-10-27 04:33:32');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.stock_low','Running low on stock','A drink or ingredient is low or out of stock.','Restaurant','restaurant_pos','view','medium',1,1,'2026-11-05 03:38:28');
+INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.stock_request','Stock request from the kitchen','A cook asked for stock on the Cooking plan; someone with the stock right must give it out or reject it.','Restaurant','pos_restock','view','medium',1,1,'2026-11-14 03:14:27');
+INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.stock_request_answered','Stock request answered','The storekeeper gave out or rejected the stock a cook asked for.','Restaurant','restaurant_pos','view','low',1,1,'2026-11-14 03:14:27');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.supplier_payment_due','Supplier payment due','A supplier bill from Purchases is due or overdue.','Restaurant','restaurant_pos','view','high',1,1,'2026-11-05 03:38:28');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('restaurant.table_open_long','Table bill open long','A table bill has been open for a long time.','Restaurant','restaurant_pos','view','medium',1,1,'2026-11-05 03:38:28');
 INSERT INTO `notification_events` (`event_key`, `title`, `description`, `module`, `page_key`, `required_verb`, `default_severity`, `scope_aware`, `is_active`, `created_at`) VALUES ('retail.online_order_new','New online shop order','A buyer sent an order from the online shop link.','Online shop','pos','view','high',1,1,'2026-11-05 03:38:28');
@@ -1963,6 +1967,11 @@ INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`,
 INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (18,'restaurant.table_open_long','admins',NULL,1,1,'immediate',1,NULL,'2026-11-05 03:38:28','2026-11-05 03:38:28');
 INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (19,'restaurant.daily_summary','admins',NULL,1,1,'immediate',1,NULL,'2026-11-05 03:38:28','2026-11-05 03:38:28');
 INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (20,'restaurant.dishes_no_cost','admins',NULL,1,1,'immediate',1,NULL,'2026-11-05 03:38:28','2026-11-05 03:38:28');
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (21,'restaurant.order_to_confirm','permission',NULL,0,1,'immediate',1,NULL,'2026-11-14 03:14:25','2026-11-14 03:14:25');
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (22,'restaurant.order_returned','record_owner',NULL,0,1,'immediate',1,NULL,'2026-11-14 03:14:25','2026-11-14 03:14:25');
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (23,'restaurant.kitchen_ready','record_owner',NULL,0,1,'immediate',1,NULL,'2026-11-14 03:14:26','2026-11-14 03:14:26');
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (24,'restaurant.stock_request','permission',NULL,0,1,'immediate',1,NULL,'2026-11-14 03:14:27','2026-11-14 03:14:27');
+INSERT INTO `notification_rules` (`id`, `event_key`, `target_type`, `target_id`, `channel_email`, `channel_inapp`, `digest`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES (25,'restaurant.stock_request_answered','record_owner',NULL,0,1,'immediate',1,NULL,'2026-11-14 03:14:27','2026-11-14 03:14:27');
 /*!40000 ALTER TABLE `notification_rules` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -2303,6 +2312,9 @@ INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page
 INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (238,'','field_visits','Customer Visits','Record own customer visits (marketing) and print/download own daily report (admins see all staff)',NULL,'Customer Visits','2026-10-27 04:33:45',0);
 INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (241,'','service_sales_report','Service Sales Report','Sales of each service from posted invoices and POS: revenue, trend, categories and quotation conversion',NULL,'Reports','2026-10-27 04:33:49',0);
 INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (243,'','pos_past_sales','POS Record Old Sale','Record a sale made on an earlier day (up to the POS Settings limit) from the POS terminal',NULL,'Sales','2026-10-27 04:33:54',0);
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (245,'','restaurant_orders','Restaurant Orders','Take table orders and send them to the kitchen (create/edit), cancel items the kitchen has not started (delete), confirm orders to the kitchen and approve cancelling food already cooking (approve).',NULL,'Settings','2026-11-14 03:14:25',0);
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (246,'','kitchen_display','Kitchen Screen','See kitchen orders (view) and move them Preparing → Ready (edit).',NULL,'Settings','2026-11-14 03:14:25',0);
+INSERT INTO `permissions` (`permission_id`, `permission_name`, `page_key`, `page_name`, `description`, `module_id`, `module_name`, `created_at`, `is_hidden`) VALUES (247,'','restaurant_costing','Restaurant Costs & Profit','See buying prices, recipe costs and gross profit on the restaurant Menu, recipes and reports (view). Without it, staff see selling prices only.',NULL,'Settings','2026-11-14 03:14:26',0);
 /*!40000 ALTER TABLE `permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -2823,6 +2835,33 @@ LOCK TABLES `repayments` WRITE;
 UNLOCK TABLES;
 
 --
+-- Dumping data for table `restaurant_cook_plan_items`
+--
+
+LOCK TABLES `restaurant_cook_plan_items` WRITE;
+/*!40000 ALTER TABLE `restaurant_cook_plan_items` DISABLE KEYS */;
+/*!40000 ALTER TABLE `restaurant_cook_plan_items` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `restaurant_cook_plans`
+--
+
+LOCK TABLES `restaurant_cook_plans` WRITE;
+/*!40000 ALTER TABLE `restaurant_cook_plans` DISABLE KEYS */;
+/*!40000 ALTER TABLE `restaurant_cook_plans` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `restaurant_cook_unsold`
+--
+
+LOCK TABLES `restaurant_cook_unsold` WRITE;
+/*!40000 ALTER TABLE `restaurant_cook_unsold` DISABLE KEYS */;
+/*!40000 ALTER TABLE `restaurant_cook_unsold` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Dumping data for table `restaurant_floors`
 --
 
@@ -2841,6 +2880,15 @@ LOCK TABLES `restaurant_online_orders` WRITE;
 UNLOCK TABLES;
 
 --
+-- Dumping data for table `restaurant_order_cancellations`
+--
+
+LOCK TABLES `restaurant_order_cancellations` WRITE;
+/*!40000 ALTER TABLE `restaurant_order_cancellations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `restaurant_order_cancellations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Dumping data for table `restaurant_reservation_reminders`
 --
 
@@ -2856,6 +2904,15 @@ UNLOCK TABLES;
 LOCK TABLES `restaurant_reservations` WRITE;
 /*!40000 ALTER TABLE `restaurant_reservations` DISABLE KEYS */;
 /*!40000 ALTER TABLE `restaurant_reservations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `restaurant_spoilage`
+--
+
+LOCK TABLES `restaurant_spoilage` WRITE;
+/*!40000 ALTER TABLE `restaurant_spoilage` DISABLE KEYS */;
+/*!40000 ALTER TABLE `restaurant_spoilage` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -3528,6 +3585,9 @@ INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `c
 INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_review`, `can_approve`, `assigned_at`, `updated_at`) VALUES (3572,2,241,1,0,0,0,0,0,'2026-10-27 04:33:49','2026-10-27 04:33:49');
 INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_review`, `can_approve`, `assigned_at`, `updated_at`) VALUES (3573,11,241,1,0,0,0,0,0,'2026-10-27 04:33:49','2026-10-27 04:33:49');
 INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_review`, `can_approve`, `assigned_at`, `updated_at`) VALUES (3574,1,241,1,0,0,0,0,0,'2026-10-27 04:33:49','2026-10-27 04:33:49');
+INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_review`, `can_approve`, `assigned_at`, `updated_at`) VALUES (3575,1,245,1,1,1,1,0,1,'2026-11-14 03:14:25','2026-11-14 03:14:25');
+INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_review`, `can_approve`, `assigned_at`, `updated_at`) VALUES (3576,2,245,1,1,1,1,0,1,'2026-11-14 03:14:25','2026-11-14 03:14:25');
+INSERT INTO `role_permissions` (`id`, `role_id`, `permission_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_review`, `can_approve`, `assigned_at`, `updated_at`) VALUES (3577,11,245,1,1,1,1,0,1,'2026-11-14 03:14:25','2026-11-14 03:14:25');
 /*!40000 ALTER TABLE `role_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -3730,6 +3790,17 @@ INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (1
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (102,'2026_11_03_products_recipe_yield.php','2026-11-03 06:32:32');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (103,'2026_11_03_restaurant_notifications.php','2026-11-03 08:15:49');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (104,'2026_11_05_online_shop_and_order_record.php','2026-11-05 03:38:28');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (105,'2026_11_06_restaurant_order_flow.php','2026-11-14 03:14:25');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (106,'2026_11_07_smart_pos_min_price.php','2026-11-14 03:14:25');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (107,'2026_11_09_products_recipe_extra_cost.php','2026-11-14 03:14:25');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (108,'2026_11_09_restaurant_cook_plans.php','2026-11-14 03:14:26');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (109,'2026_11_09_restaurant_costing_permission.php','2026-11-14 03:14:26');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (110,'2026_11_10_restaurant_alerts.php','2026-11-14 03:14:26');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (111,'2026_11_10_restaurant_cook_requests.php','2026-11-14 03:14:26');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (112,'2026_11_10_restaurant_cook_unsold.php','2026-11-14 03:14:27');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (113,'2026_11_10_restaurant_ready_roles.php','2026-11-14 03:14:27');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (114,'2026_11_11_pos_return_credit.php','2026-11-14 03:14:27');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (115,'2026_11_14_pos_line_unit_cost.php','2026-11-14 03:14:27');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 

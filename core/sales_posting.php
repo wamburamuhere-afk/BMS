@@ -100,9 +100,15 @@ if (!function_exists('posSaleCogs')) {
      */
     function posSaleCogs(PDO $pdo, int $saleId): float
     {
+        // 2026-11-14 — a line's cost fixed the day it was sold (pos_sale_items.unit_cost) comes first.
+        require_once __DIR__ . '/pos_line_cost.php';
+        $fixed     = posLineCostReady($pdo);
+        $fixedCase = $fixed ? "WHEN si.unit_cost IS NOT NULL THEN si.quantity * si.unit_cost" : "";
+        $fixedOk   = $fixed ? "si.unit_cost IS NOT NULL OR" : "";
         $v = $pdo->query("
             SELECT COALESCE(SUM(
                 CASE
+                    $fixedCase
                     WHEN bc.batch_qty > 0 THEN bc.batch_cost_total
                     ELSE si.quantity * COALESCE(p.cost_price, 0)
                 END
@@ -120,6 +126,7 @@ if (!function_exists('posSaleCogs')) {
             WHERE si.sale_id = " . (int)$saleId . "
               AND p.is_service = 0
               AND (
+                  $fixedOk
                   bc.batch_qty > 0
                   OR NOT (p.cost_price > p.selling_price AND p.selling_price > 0)
               )
@@ -318,23 +325,9 @@ if (!function_exists('posSaleLineUnitCost')) {
      */
     function posSaleLineUnitCost(PDO $pdo, int $saleItemId): float
     {
-        try {
-            $b = $pdo->prepare("SELECT COALESCE(SUM(psib.quantity),0) AS q, COALESCE(SUM(psib.quantity * pb.unit_cost),0) AS c
-                                  FROM pos_sale_item_batches psib
-                                  JOIN product_batches pb ON pb.batch_id = psib.batch_id
-                                 WHERE psib.sale_item_id = ?");
-            $b->execute([$saleItemId]);
-            $row = $b->fetch(PDO::FETCH_ASSOC);
-            if ($row && (float)$row['q'] > 0) return round((float)$row['c'] / (float)$row['q'], 4);
-        } catch (Throwable $e) { /* no batch tables on this database — product cost below */ }
-        $p = $pdo->prepare("SELECT COALESCE(p.cost_price,0) AS cost, COALESCE(p.selling_price,0) AS sell, COALESCE(p.is_service,0) AS svc
-                              FROM pos_sale_items si JOIN products p ON p.product_id = si.product_id
-                             WHERE si.sale_item_id = ?");
-        $p->execute([$saleItemId]);
-        $r = $p->fetch(PDO::FETCH_ASSOC);
-        if (!$r || (int)$r['svc'] === 1) return 0.0;
-        if ((float)$r['cost'] > (float)$r['sell'] && (float)$r['sell'] > 0) return 0.0;
-        return (float)$r['cost'];
+        // 2026-11-14 — the cost fixed on the line the day it was sold comes first (core/pos_line_cost.php).
+        require_once __DIR__ . '/pos_line_cost.php';
+        return posLineUnitCostOrNull($pdo, $saleItemId) ?? 0.0;
     }
 }
 
