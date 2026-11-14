@@ -153,7 +153,11 @@ try {
         WHERE p.product_id = ?
     ");
     $stmt->execute([$_POST['product_id']]);
-    
+
+    // 2026-11-14 — Smart POS: the shop's batches follow the new count (core/stock_adjust_sync.php).
+    require_once __DIR__ . '/../core/stock_adjust_sync.php';
+    stockAdjustReconcileBatches($pdo, (int)$_POST['product_id'], (int)$_POST['warehouse_id'], (float)$unit_cost, $reference_number);
+
     // GL posting (6-part: two-sided, on create, inventory + equity, Balance Sheet)
     $project_id_gl = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
     postStockAdjustmentGl($pdo, $movement_id, $quantity, $movement_type, $unit_cost,

@@ -87,6 +87,13 @@ try {
         // If reversing subtracts and no entry exists, we can't really subtract below zero but let's assume valid state.
     }
 
+    // 2026-11-14 — the product's own stock copy and (Smart POS) the shop's batches follow the
+    // reversed count (core/stock_adjust_sync.php). The copy was never updated here before.
+    if (!empty($warehouse_id)) {
+        require_once __DIR__ . '/../core/stock_adjust_sync.php';
+        stockAdjustAfterChange($pdo, (int)$product_id, (int)$warehouse_id, (float)($adjustment['unit_cost'] ?? 0), (string)($adjustment['reference_number'] ?? 'Stock correction'));
+    }
+
     // GL reversal (6-part rule 6: delete reverses the journal entry)
     $ref = $adjustment['reference_number'] ?? "ADJ-$adjustment_id";
     reverseStockAdjustmentGl($pdo, $adjustment_id, (int)$_SESSION['user_id'], $ref);
