@@ -116,6 +116,10 @@ try {
     $stmt = $pdo->prepare("UPDATE products SET stock_quantity = (SELECT SUM(stock_quantity) FROM product_stocks WHERE product_id = ?), current_stock = (SELECT SUM(stock_quantity) FROM product_stocks WHERE product_id = ?) WHERE product_id = ?");
     $stmt->execute([$product_id, $product_id, $product_id]);
 
+    // 2026-11-14 — Smart POS: the shop's batches follow the corrected count (core/stock_adjust_sync.php).
+    require_once __DIR__ . '/../core/stock_adjust_sync.php';
+    stockAdjustReconcileBatches($pdo, (int)$product_id, (int)$warehouse_id, ($unit_cost > 0 ? (float)$unit_cost : (float)($old_adj['unit_cost'] ?? 0)), (string)($old_adj['reference_number'] ?? 'Stock correction'));
+
     // Update movement record
     $stmt = $pdo->prepare("
         UPDATE stock_movements SET 
