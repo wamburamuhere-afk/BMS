@@ -25,9 +25,20 @@ $restaurant_on = restaurantModuleOn($pdo);
 // no retail-only ones (Record Old Sale, Loyalty). Any other company sees the page exactly as before.
 $rf_set = $restaurant_on && restaurantOnlyCompany($pdo);
 
+// Prices (2026-11-14) — Smart POS with a retail shop only (core/price_check.php):
+// "allow buying price above selling price" and "default price list at the till".
+require_once __DIR__ . '/../../../core/pos_nav.php';
+require_once __DIR__ . '/../../../core/price_check.php';
+require_once __DIR__ . '/../../../core/pos_price_groups.php';
+$prices_section = posSimpleModeEnabled() && !$rf_set;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     try {
+        if ($prices_section) {
+            save_setting('pos_allow_buying_above_selling', isset($_POST['pos_allow_buying_above_selling']) ? '1' : '0');
+            save_setting('pos_default_price_list', ($_POST['pos_default_price_list'] ?? '') === 'wholesale' ? 'wholesale' : 'retail');
+        }
         save_setting('pos_discount_type', $_POST['pos_discount_type'] ?? 'percentage');
         $allowed_display_limits = [10, 20, 30, 50, 100];
         $display_limit = (int)($_POST['pos_products_display_limit'] ?? 20);
@@ -90,6 +101,15 @@ $pos_loyalty_enabled         = get_setting('pos_loyalty_enabled', '0');
 $pos_loyalty_spend_per_point  = get_setting('pos_loyalty_spend_per_point', '1000');
 $pos_loyalty_redeem_value     = get_setting('pos_loyalty_redeem_value', '50');
 $pos_currency = getSetting('currency', 'TZS');
+$pos_allow_buying_above = priceBuyingAboveSellingAllowed($pdo);
+$pos_default_list       = posDefaultPriceList($pdo);
+$wholesale_list_ready   = false;
+if ($prices_section) {
+    try {
+        $wgid = wholesalePriceGroupId($pdo);
+        $wholesale_list_ready = $wgid && $pdo->query("SELECT status FROM price_groups WHERE price_group_id = " . (int)$wgid)->fetchColumn() === 'active';
+    } catch (Throwable $e) { $wholesale_list_ready = false; }
+}
 
 // Registers / Tills — Shop assignment (2026-09-16). Same scoped list every
 // other Project+Warehouse dropdown in the app uses (core/warehouse_scope.php)
@@ -195,6 +215,30 @@ $reg_warehouses = $pos_advanced_entitled ? warehousesForSelect($pdo) : [];
                             </select>
                             <div class="form-text"><?= t('Same as above but for phones and small tablets (screen width below 768 px). Default is 10 for faster loading on mobile.') ?></div>
                         </div>
+
+                        <?php if ($prices_section): ?>
+                        <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><i class="bi bi-tags text-primary me-1"></i><?= t('Prices') ?></h6>
+                        <div class="mb-3 border rounded p-2 ps-5 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" name="pos_allow_buying_above_selling" id="pos_allow_buying_above_selling" value="1" <?= $pos_allow_buying_above ? 'checked' : '' ?>>
+                            <label class="form-check-label fw-semibold" for="pos_allow_buying_above_selling"><?= t('Allow a buying price above the selling price') ?></label>
+                            <div class="form-text mt-0"><?= t('Off (recommended): a product, a stock receipt or a batch whose buying price is higher than its selling price cannot be saved — it is almost always a typing mistake (for example the price of a whole carton). Turn on only if you really sell some items below what you paid.') ?></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold"><?= t('Price list the Sell screen opens on') ?></label>
+                            <?php foreach ([
+                                'retail'    => [t('Retail'), t('Normal shop prices. The cashier can switch to Wholesale on the Sell screen.')],
+                                'wholesale' => [t('Wholesale'), t('Wholesale prices first. The cashier can switch to Retail on the Sell screen.')],
+                            ] as $val => [$lbl, $hint]):
+                                $disabled = $val === 'wholesale' && !$wholesale_list_ready; ?>
+                            <div class="form-check border rounded p-2 ps-5 mb-2" <?= $disabled ? 'style="opacity:.55"' : '' ?>>
+                                <input class="form-check-input" type="radio" name="pos_default_price_list" id="pdl_<?= $val ?>" value="<?= $val ?>" <?= $pos_default_list === $val ? 'checked' : '' ?> <?= $disabled ? 'disabled' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="pdl_<?= $val ?>"><?= $lbl ?></label>
+                                <div class="form-text mt-0"><?= $hint ?><?php if ($disabled): ?> <span class="text-danger"><?= t('The Wholesale price list is not active.') ?></span><?php endif; ?></div>
+                            </div>
+                            <?php endforeach; ?>
+                            <div class="form-text"><?= t('A customer who has their own price list still gets it, and an online order keeps the price list it was ordered at.') ?></div>
+                        </div>
+                        <?php endif; ?>
 
                         <h6 class="fw-bold mb-3 mt-4 text-dark text-uppercase small"><?= t('Discount Configuration') ?></h6>
                         <div class="mb-3">

@@ -21,6 +21,14 @@ let posDiscountType = '<?= get_setting('pos_discount_type', 'percentage') ?>'; /
 let posShowAllProducts = false; // Simple Mode "Show all" — lifts the default grid cap for this page view
 let posSelectedPriceGroupId = 0; // Phase 14 (pos_upgrade_plan.md §8) — 0 = no group chosen, plain selling_price
 const POS_WHOLESALE_GROUP_ID = <?php require_once __DIR__ . '/../../../core/pos_price_groups.php'; echo (int)(wholesalePriceGroupId($GLOBALS['pdo']) ?? 0); ?>; // wholesale online orders load on this list
+// Selling settings (2026-11-14): the price list the till opens on and returns to for a walk-in
+// (Retail unless the company chose Wholesale); a Restaurant-only shop always sells at Retail.
+const POS_DEFAULT_PRICE_GROUP_ID = <?= (int)($pos_default_group_id ?? 0) ?>;
+const POS_RETAIL_PRICE_GROUP_ID  = <?= (int)($pos_retail_group_id ?? 0) ?>;
+let posLastRestOnly = null; // last shop kind applyPosModeUi() saw (null = not yet)
+function posDefaultGroupForShop() {
+    return (typeof posRestaurantOnlyShop === 'function' && posRestaurantOnlyShop()) ? POS_RETAIL_PRICE_GROUP_ID : POS_DEFAULT_PRICE_GROUP_ID;
+}
 const POS_DENOMINATIONS = <?= json_encode($pos_denomination_list) ?>; // Phase 20 (pos_upgrade_plan.md §8)
 const POS_AUTO_PRINT_RECEIPT = <?= get_setting('pos_auto_print_receipt', '0') === '1' ? 'true' : 'false' ?>; // Phase 10 (pos_upgrade_plan.md §7)
 const POS_CURRENCY = <?= json_encode($currency) ?>; // Phase 11 (pos_upgrade_plan.md §7) — was hardcoded 'TZS' everywhere
@@ -368,10 +376,10 @@ $(document).ready(function() {
         $('#loyaltyPointsSection').addClass('d-none');
         $('#redeemPointsInput').val(0);
         $('#customerCreditInfo').addClass('d-none').html('');
-        // Back to the default group (first option, seeded as "Retail") for a
-        // walk-in / cleared customer.
+        // Back to the till's default price list for a walk-in / cleared customer —
+        // Selling settings (Retail, or Wholesale when chosen); Retail on a Restaurant-only shop.
         if ($('#posPriceGroupId').length) {
-            $('#posPriceGroupId').val($('#posPriceGroupId option:first').val()).trigger('change');
+            $('#posPriceGroupId').val(String(posDefaultGroupForShop() || $('#posPriceGroupId option:first').val())).trigger('change');
         }
         calculateCartTotal();
     });
@@ -2157,6 +2165,17 @@ function applyPosModeUi() {
     $('#posMenuSwitchGroup').toggleClass('pos-rest-hide', restOnly);
     $('.pos-restock-btn, #addProductDropdown, #scannerReadyBadge, button[onclick="holdSale()"], button[onclick="showHeldSales()"], #loyaltyPointsSection').toggleClass('pos-rest-hide', restOnly);
     $('#posPriceGroupId').closest('.mb-2').toggleClass('pos-rest-hide', restOnly);
+    // The list is hidden on a Restaurant-only shop, so it must not stay on Wholesale there; back on a
+    // retail shop it returns to the default. Only when the shop kind changes — a cashier's own switch
+    // between Retail and Wholesale on the same shop is never undone.
+    if ($('#posPriceGroupId').length && posLastRestOnly !== restOnly) {
+        const first = posLastRestOnly === null;
+        posLastRestOnly = restOnly;
+        if (restOnly || (!first && !$('#customerSelect').val())) {
+            const want = String(posDefaultGroupForShop() || $('#posPriceGroupId option:first').val());
+            if ($('#posPriceGroupId').val() !== want) $('#posPriceGroupId').val(want).trigger('change');
+        }
+    }
     const $srch = $('#productSearch');
     if ($srch.length) {
         if ($srch.data('origPlaceholder') === undefined) $srch.data('origPlaceholder', $srch.attr('placeholder'));

@@ -90,6 +90,8 @@ if ($product_id <= 0) { echo json_encode(['success' => false, 'message' => t('Se
 if ($quantity <= 0)   { echo json_encode(['success' => false, 'message' => t('Quantity must be greater than zero.')]); exit; }
 if ($buying_price < 0 || $selling_price < 0) { echo json_encode(['success' => false, 'message' => t('Prices cannot be negative.')]); exit; }
 if ($selling_price <= 0) { echo json_encode(['success' => false, 'message' => t('Retail price is required.')]); exit; }
+// Selling settings (2026-11-14): buying above selling refused in Smart POS unless allowed.
+if ($priceErr = priceBuyingAboveSellingError($pdo, $buying_price, $selling_price)) { echo json_encode(['success' => false, 'message' => $priceErr]); exit; }
 if ($paid_from_account_id <= 0) { echo json_encode(['success' => false, 'message' => t('Select where this was paid from.')]); exit; }
 
 // Resolve the warehouse server-side — never trust a single-shop assumption
