@@ -4157,7 +4157,7 @@ CREATE TABLE `kitchen_ticket_items` (
   `product_id` int NOT NULL,
   `quantity` decimal(10,3) NOT NULL DEFAULT '1.000',
   `modifiers_summary` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('pending','queued','preparing','ready','served','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `status` enum('pending','queued','preparing','ready','served','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_kti_ticket` (`ticket_id`)
@@ -4177,7 +4177,7 @@ CREATE TABLE `kitchen_tickets` (
   `warehouse_id` int NOT NULL,
   `station_id` int NOT NULL,
   `table_id` int DEFAULT NULL,
-  `status` enum('pending','queued','preparing','ready','served','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
+  `status` enum('pending','queued','preparing','ready','served','cancelled') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'queued',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `order_label` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -4190,7 +4190,7 @@ CREATE TABLE `kitchen_tickets` (
   `served_at` datetime DEFAULT NULL,
   `cancelled_by` int DEFAULT NULL,
   `cancelled_at` datetime DEFAULT NULL,
-  `cancel_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cancel_reason` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `closed_at` datetime DEFAULT NULL,
   PRIMARY KEY (`ticket_id`),
   KEY `idx_kt_warehouse_station_status` (`warehouse_id`,`station_id`,`status`),
@@ -5332,7 +5332,7 @@ CREATE TABLE `notifications` (
   `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `type` enum('loan','payment','system','report','alert') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `event_key` varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `entity_type` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `entity_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `entity_id` int DEFAULT NULL,
   `category` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `priority` enum('low','medium','high') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'medium',
@@ -6096,7 +6096,7 @@ CREATE TABLE `pos_sale_payments` (
   `payment_id` int NOT NULL AUTO_INCREMENT,
   `sale_id` int NOT NULL,
   `amount` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `payment_method` enum('cash','card','mobile_money','bank_transfer','voucher','loyalty_points','return_credit') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cash',
+  `payment_method` enum('cash','card','mobile_money','bank_transfer','voucher','loyalty_points','return_credit') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cash',
   `reference` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `client_uuid` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -7697,9 +7697,9 @@ CREATE TABLE `restaurant_order_cancellations` (
   `sale_id` int DEFAULT NULL,
   `product_id` int NOT NULL,
   `quantity` decimal(10,3) NOT NULL DEFAULT '0.000',
-  `stage` enum('before_kitchen','after_kitchen') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `source` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cancel',
-  `reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `stage` enum('before_kitchen','after_kitchen') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `source` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cancel',
+  `reason` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `est_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
   `posted_cost` decimal(15,2) NOT NULL DEFAULT '0.00',
   `journal_entry_id` int DEFAULT NULL,
@@ -8286,7 +8286,7 @@ CREATE TABLE `schema_migrations` (
   `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_schema_migrations_name` (`migration_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=116 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

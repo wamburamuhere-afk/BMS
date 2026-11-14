@@ -167,6 +167,10 @@ try {
             ");
             $stmt->execute([$product_id]);
 
+            // 2026-11-14 — Smart POS: the shop's batches follow the new count (core/stock_adjust_sync.php).
+            require_once __DIR__ . '/../core/stock_adjust_sync.php';
+            stockAdjustReconcileBatches($pdo, (int)$product_id, (int)$warehouse_id, (float)$unit_cost, $reference_number);
+
             $pdo->commit();
             $success_count++;
 

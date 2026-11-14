@@ -3801,6 +3801,7 @@ INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (1
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (113,'2026_11_10_restaurant_ready_roles.php','2026-11-14 03:14:27');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (114,'2026_11_11_pos_return_credit.php','2026-11-14 03:14:27');
 INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (115,'2026_11_14_pos_line_unit_cost.php','2026-11-14 03:14:27');
+INSERT INTO `schema_migrations` (`id`, `migration_name`, `applied_at`) VALUES (116,'2026_11_14_product_edit_stock_sync.php','2026-11-14 08:01:42');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
