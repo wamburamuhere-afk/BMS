@@ -87,6 +87,19 @@ $loyalty_enabled = getSetting('pos_loyalty_enabled', '0') === '1';
 // POS users so every cashier can switch between Retail/Wholesale price groups.
 $price_groups_enabled = true;
 $price_groups = $pdo->query("SELECT price_group_id, name, is_default FROM price_groups WHERE status = 'active' ORDER BY is_default DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Selling settings (2026-11-14) — the price list the till opens on (Smart POS retail). Retail = the
+// default group, as before; Wholesale = the active Wholesale group when there is one.
+require_once ROOT_DIR . '/core/price_check.php';
+require_once ROOT_DIR . '/core/pos_price_groups.php';
+require_once ROOT_DIR . '/core/pos_nav.php';
+$pos_retail_group_id  = (int)($price_groups[0]['price_group_id'] ?? 0);   // is_default first
+$pos_default_group_id = $pos_retail_group_id;
+if (posSimpleModeEnabled() && posDefaultPriceList($pdo) === 'wholesale') {
+    $wgid = (int)(wholesalePriceGroupId($pdo) ?? 0);
+    foreach ($price_groups as $pg) {
+        if ((int)$pg['price_group_id'] === $wgid) { $pos_default_group_id = $wgid; break; }
+    }
+}
 
 // Phase 20 (pos_upgrade_plan.md §8) — cash denomination counting.
 require_once ROOT_DIR . '/core/pos_denominations.php';
@@ -771,7 +784,7 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                     <label class="form-label small fw-bold"><?= t('Price Group') ?></label>
                     <select class="form-select form-select-sm" id="posPriceGroupId">
                         <?php foreach ($price_groups as $pg): ?>
-                        <option value="<?= (int)$pg['price_group_id'] ?>" <?= $pg['is_default'] ? 'selected' : '' ?>>
+                        <option value="<?= (int)$pg['price_group_id'] ?>" <?= (int)$pg['price_group_id'] === $pos_default_group_id ? 'selected' : '' ?>>
                             <?= caseFormat($pg['name']) ?>
                         </option>
                         <?php endforeach; ?>

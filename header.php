@@ -937,7 +937,12 @@ window.BMS_PRICE_CHECK_T = <?= json_encode([
     'multiTitle'   => t('Please check these prices'),
     'yes'   => t('Yes, keep it'),
     'no'    => t('No, change it'),
+    // Selling settings (2026-11-14): Smart POS refuses a buying price above the retail price unless allowed.
+    'blockTitle' => t('Buying price is higher than the selling price'),
+    'blockText'  => t('Buying price ({b}) is higher than the selling price ({r}). Correct it, or allow this in Settings › Selling settings.'),
+    'change'     => t('Change it'),
 ]) ?>;
+window.BMS_PRICE_BLOCK_BUY_ABOVE_RETAIL = <?php require_once __DIR__ . '/core/price_check.php'; echo json_encode(($GLOBALS['pdo'] ?? null) instanceof PDO && priceBuyingGuardActive($GLOBALS['pdo'])); ?>;
 </script>
 <script src="<?= getUrl('assets/js/bms-price-check.js') ?>?v=<?= @filemtime(__DIR__ . '/assets/js/bms-price-check.js') ?>"></script>
 </head>

@@ -34,10 +34,18 @@ if (isset($_FILES['product_image']) && in_array($_FILES['product_image']['error'
     exit();
 }
 
+// Selling settings (2026-11-14): in Smart POS a buying price above the selling price is refused
+// unless the company allows it (core/price_check.php).
+require_once __DIR__ . '/../core/price_check.php';
+if ($priceErr = priceBuyingAboveSellingError($pdo, $_POST['cost_price'] ?? null, $_POST['selling_price'] ?? null, (int)($_POST['is_service'] ?? 0) === 1)) {
+    echo json_encode(['success' => false, 'message' => $priceErr]);
+    exit();
+}
+
 try {
     // Start transaction
     $pdo->beginTransaction();
-    
+
     // Handle file upload
     $image_url = '';
     if (isset($_FILES['product_image']) && $_FILES['product_image']['error'] === UPLOAD_ERR_OK) {

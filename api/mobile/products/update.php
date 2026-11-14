@@ -83,6 +83,12 @@ try {
         $set['min_selling_price'] = round($selling - ($selling * $disc / 100), 2);
     }
     if (isset($set['min_selling_price']) && $set['min_selling_price'] > $selling) $fail(422, 'min_selling_price cannot exceed selling_price');
+    // Selling settings (2026-11-14): buying above selling refused in Smart POS unless allowed —
+    // checked only when this request changes a price, so other edits still save.
+    if (isset($set['selling_price']) || isset($set['cost_price'])) {
+        $priceErr = priceBuyingAboveSellingError($pdo, $set['cost_price'] ?? $existing['cost_price'], $selling, (int)$existing['is_service'] === 1);
+        if ($priceErr) $fail(422, $priceErr);
+    }
 
     if (array_key_exists('reorder_level', $body)) $set['reorder_level'] = max(0, (float)$body['reorder_level']);
     if (isset($body['unit']) && trim((string)$body['unit']) !== '') $set['unit'] = trim((string)$body['unit']);
