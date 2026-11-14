@@ -7242,4 +7242,16 @@ return [
     'Sold on:' => 'Iliuzwa:',
     'No refunds have been made on this receipt.' => 'Hakuna marejesho yaliyofanywa kwenye risiti hii.',
     'View refund receipt' => 'Tazama risiti ya marejesho',
+    // Selling settings › Prices (2026-11-14)
+    'Allow a buying price above the selling price' => 'Ruhusu bei ya kununulia iwe juu ya bei ya kuuzia',
+    'Off (recommended): a product, a stock receipt or a batch whose buying price is higher than its selling price cannot be saved — it is almost always a typing mistake (for example the price of a whole carton). Turn on only if you really sell some items below what you paid.' => 'Imezimwa (inapendekezwa): bidhaa, mzigo uliopokelewa au batch yenye bei ya kununulia iliyo juu ya bei ya kuuzia haiwezi kuhifadhiwa — mara nyingi ni kosa la kuandika (kwa mfano bei ya katoni nzima). Washa tu kama kweli unauza baadhi ya bidhaa chini ya ulichonunulia.',
+    'Price list the Sell screen opens on' => 'Orodha ya bei inayofunguka kwenye skrini ya Uza',
+    'Normal shop prices. The cashier can switch to Wholesale on the Sell screen.' => 'Bei za kawaida za dukani. Keshia anaweza kubadili kwenda Jumla kwenye skrini ya Uza.',
+    'Wholesale prices first. The cashier can switch to Retail on the Sell screen.' => 'Bei za jumla kwanza. Keshia anaweza kubadili kwenda Rejareja kwenye skrini ya Uza.',
+    'The Wholesale price list is not active.' => 'Orodha ya bei ya Jumla haijawashwa.',
+    'A customer who has their own price list still gets it, and an online order keeps the price list it was ordered at.' => 'Mteja mwenye orodha yake ya bei bado anaipata, na oda ya mtandaoni inabaki na orodha ya bei iliyoagizwa nayo.',
+    'Buying price ({b}) is higher than the selling price ({s}). Correct it, or allow this in Settings › Selling settings.' => 'Bei ya kununulia ({b}) iko juu ya bei ya kuuzia ({s}). Irekebishe, au ruhusu hili kwenye Mipangilio › Mipangilio ya Kuuza.',
+    'Buying price ({b}) is higher than the selling price ({r}). Correct it, or allow this in Settings › Selling settings.' => 'Bei ya kununulia ({b}) iko juu ya bei ya kuuzia ({r}). Irekebishe, au ruhusu hili kwenye Mipangilio › Mipangilio ya Kuuza.',
+    'Buying price is higher than the selling price' => 'Bei ya kununulia iko juu ya bei ya kuuzia',
+    'Change it' => 'Ibadilishe',
 ];
