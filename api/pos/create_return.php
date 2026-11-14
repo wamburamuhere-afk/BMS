@@ -36,6 +36,7 @@ require_once __DIR__ . '/../../core/pos_combo_products.php';
 require_once __DIR__ . '/../../core/pos_quantity.php';
 require_once __DIR__ . '/../../core/code_generator.php';
 require_once __DIR__ . '/../../core/sales_posting.php';
+require_once __DIR__ . '/../../core/pos_line_cost.php';
 
 header('Content-Type: application/json');
 
@@ -194,6 +195,10 @@ try {
     $insLine = $pdo->prepare("INSERT INTO pos_sale_items
                                  (sale_id, product_id, product_name, quantity, unit_price, tax_rate, tax_amount, discount_rate, discount_amount, line_total)
                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    // 2026-11-14 — the return line carries the buying cost of the line it returns (core/pos_line_cost.php),
+    // so the return comes off Cost as well as off Sales.
+    $lineCostReady = posLineCostReady($pdo);
+    $setLineCost   = $pdo->prepare($lineCostReady ? "UPDATE pos_sale_items SET unit_cost = ? WHERE sale_item_id = ?" : "SELECT 1");
     $bumpOrig = $pdo->prepare("UPDATE pos_sale_items
                                   SET returned_quantity = returned_quantity + ?, is_returned = IF(returned_quantity + ? >= quantity, 1, 0)
                                 WHERE sale_item_id = ?");
@@ -213,10 +218,15 @@ try {
         $ln_disc  = round(((float)$l['discount_amount'] / $q) * $rq, 2);
         $ln_total = round(((float)$l['line_total']      / $q) * $rq, 2);
 
+        // Read BEFORE the batch links are reversed below.
+        $origUnitCost = posLineUnitCostOrNull($pdo, (int)$iid);
         $insLine->execute([
             $return_id, $pid, $l['product_name'], $rq, (float)$l['unit_price'],
             (float)$l['tax_rate'], $ln_tax, (float)$l['discount_rate'], $ln_disc, $ln_total,
         ]);
+        if ($lineCostReady && $origUnitCost !== null) {
+            $setLineCost->execute([$origUnitCost, (int)$pdo->lastInsertId()]);
+        }
         $bumpOrig->execute([$rq, $rq, $iid]);
 
         if ((int)($l['is_service'] ?? 0) !== 1 && $pid > 0) {

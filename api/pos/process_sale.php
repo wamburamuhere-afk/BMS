@@ -21,6 +21,7 @@ require_once __DIR__ . '/../../core/warehouse_scope.php';
 require_once __DIR__ . '/../../core/pos_override_guard.php';
 require_once __DIR__ . '/../../core/pos_price_groups.php';
 require_once __DIR__ . '/../../core/pos_batch_consumption.php';
+require_once __DIR__ . '/../../core/pos_line_cost.php';
 require_once __DIR__ . '/../../core/pos_serial_tracking.php';
 require_once __DIR__ . '/../../core/pos_unit_conversion.php';
 require_once __DIR__ . '/../../core/pos_quantity.php';
@@ -1002,6 +1003,10 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
             ), 409);
         }
     }
+
+    // 2026-11-14 — fix each line's buying cost now (its batch cost, after FEFO above), so a later
+    // return or batch edit can never change what this sale cost.
+    posStampSaleLineCosts($pdo, (int)$sale_id);
 
     $glPost = postPosSale(
         $pdo, (int)$sale_id, $payment_method, (float)$amount_paid_now, (float)$balance_due,

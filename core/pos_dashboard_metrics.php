@@ -136,6 +136,15 @@ if (!function_exists('posSimpleBuySellSeries')) {
         $recOrig = "ps.sale_status IN ('completed','partially_refunded','refunded') AND ps.is_return_sale = 0 AND ps.invoice_id IS NULL";
         $recRet  = "ps.is_return_sale = 1 AND ps.sale_status NOT IN ('voided','cancelled') AND ps.invoice_id IS NULL";
 
+        // 2026-11-14 — a line's buying cost fixed the day it was sold comes first, and a return line
+        // carries the cost of the line it returns (core/pos_line_cost.php). Before this a return was
+        // taken off "sold" but its cost (0 — no batch link, crate-priced cost_price) was not taken off
+        // "bought", so a week with returns showed a loss that did not exist.
+        require_once __DIR__ . '/pos_line_cost.php';
+        $fixed     = posLineCostReady($pdo);
+        $fixedCase = $fixed ? "WHEN si.unit_cost IS NOT NULL THEN si.quantity * si.unit_cost" : "";
+        $fixedOk   = $fixed ? "si.unit_cost IS NOT NULL OR" : "";
+
         $sql = "
             SELECT
                 $periodSql AS period_key,
@@ -148,7 +157,8 @@ if (!function_exists('posSimpleBuySellSeries')) {
               FROM pos_sales ps
               LEFT JOIN (
                     SELECT si.sale_id,
-                           SUM(CASE WHEN bc.batch_qty > 0 THEN bc.batch_cost_total
+                           SUM(CASE $fixedCase
+                                    WHEN bc.batch_qty > 0 THEN bc.batch_cost_total
                                     ELSE si.quantity * COALESCE(p.cost_price, 0) END) AS amount
                       FROM pos_sale_items si
                       JOIN products p ON si.product_id = p.product_id
@@ -161,7 +171,7 @@ if (!function_exists('posSimpleBuySellSeries')) {
                           GROUP BY psib.sale_item_id
                       ) bc ON bc.sale_item_id = si.sale_item_id
                      WHERE p.is_service = 0
-                       AND (bc.batch_qty > 0 OR NOT (p.cost_price > p.selling_price AND p.selling_price > 0))
+                       AND ($fixedOk bc.batch_qty > 0 OR NOT (p.cost_price > p.selling_price AND p.selling_price > 0))
                   GROUP BY si.sale_id
               ) cogs ON cogs.sale_id = ps.sale_id
              WHERE DATE(ps.sale_date) BETWEEN ? AND ? $scopeSql

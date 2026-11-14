@@ -1,5 +1,17 @@
 # BMS Changelog
 
+## 2026-11-14 — fix(pos): a sale line keeps its buying cost; returns now come off Cost as well as Sales
+
+**Changed:** `core/pos_line_cost.php` (new), `api/pos/process_sale.php`, `api/pos/create_return.php`, `core/sales_posting.php`, `core/pos_dashboard_metrics.php`, `api/account/get_product_analysis_report.php`, `migrations/tenant/2026_11_14_pos_line_unit_cost.php` (new), `migrations/2026_11_14_pos_line_unit_cost_legacy_db.php` (new), `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`, `tests/test_pos_return_line_cost_cli.php` (new), `tests/test_pos_return_line_cost_http_cli.php` (new)
+
+- **Problem (Piga Kazi Shop, 8–14 Nov):** dashboard showed a loss of 11,117.86 with no expenses. Returns made on 11 Nov were taken off Sales (68,100) but not off Cost (44,508): a return line had no batch link, so its cost fell back to `products.cost_price` — a crate price above the selling price — which the data-error guard counts as 0. A fully returned original line lost its batch links too, so the earlier week showed too much profit. Real result for the week: profit ≈ 33,391.
+- **New `pos_sale_items.unit_cost`:** the buying cost of the line, fixed when it is sold (its batch cost after FEFO; else `cost_price`; NULL for services and for the cost > selling-price guard, which keep the old rule). A return line copies the cost of the line it returns, read before the batch links are reversed.
+- **Readers use it first:** dashboard Bought vs Sold (`posSimpleBuySellSeries`), `posSaleCogs`, `posSaleLineUnitCost` (feeds the return's COGS reversal), product analysis report. NULL falls back to the old formula, unchanged.
+- **Behaviour:** selling price still follows the current product price; editing a batch's buying price no longer rewrites past sales, the next sale from that batch uses the new cost (void → edit batch → sell again works). Ledger already behaved this way; dashboard now agrees with it.
+- **Migration:** adds the column and fills past sales (criteria-based, NULL rows only, idempotent): lines with batch links → batch cost; returned lines whose links were removed → that product's batch cost in the same shop received on/before the sale; return lines → the line they returned.
+- **Tenant template rebuilt** (`scripts/build_tenant_template.php`).
+- **Checked:** `test_pos_return_line_cost_cli` 33/33 (Piga Kazi case: week with returns −6,500 instead of −20,750, batch edit/void workflow, NULL rules, backfill + re-run); `test_pos_return_line_cost_http_cli` 17/17 (real `process_sale.php` + `create_return.php`: line 475 not 11,400, both return lines 475, dashboard back to zero, ledger COGS 14,250 and reversals 14,250); `test_pos_batch_cogs_cli` 5/5, `test_pos_returns_cli` 25/25; tenant migration run twice on a scratch DB from the template.
+
 ## 2026-11-13 — fix(brand): company name is "BJP TECHNOLOGIES (T) LTD" (was "(L)")
 
 **Changed:** `core/public_site.php`, `tests/test_landing_cli.php`, `CLAUDE.md`
