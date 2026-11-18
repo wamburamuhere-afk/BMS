@@ -62,12 +62,17 @@ if (!function_exists('stockAdjustReconcileBatches')) {
      * @param float  $unitCost  buying price for an added correction batch (the adjustment's
      *                          price); <= 0 or above the selling price falls back to the shop's
      *                          latest batch price, else the product's buying price.
-     * @param string $label     batch_number of an added correction batch (e.g. the ADJ reference)
-     * @return array{action:string, quantity:float}  action = none | added | reduced | skipped
+     * @param string $label     batch_number of an added correction batch (e.g. the ADJ reference).
+     *                          When reducing, batches carrying this name are taken from FIRST
+     *                          (deleting/editing an adjustment takes back its own batch at its
+     *                          own price), then the rest in sale (FEFO) order.
+     * @return array{action:string, quantity:float, value:float}  action = none | added | reduced | skipped;
+     *                          value = Σ quantity × batch price added or taken (2026-11-17), so the
+     *                          caller can post the adjustment to the books at exactly that value.
      */
     function stockAdjustReconcileBatches(PDO $pdo, int $productId, int $warehouseId, float $unitCost = 0.0, string $label = 'Stock correction'): array
     {
-        $out = ['action' => 'skipped', 'quantity' => 0.0];
+        $out = ['action' => 'skipped', 'quantity' => 0.0, 'value' => 0.0];
         if ($productId <= 0 || $warehouseId <= 0 || !stockAdjustSmartPos($pdo)) return $out;
 
         $p = $pdo->prepare("SELECT COALESCE(is_service,0) AS svc, COALESCE(is_combo,0) AS combo, COALESCE(cost_price,0) AS cost, COALESCE(selling_price,0) AS sell
@@ -80,7 +85,7 @@ if (!function_exists('stockAdjustReconcileBatches')) {
         $s->execute([$productId, $warehouseId]);
         $stock = max(0.0, (float)$s->fetchColumn());
 
-        $b = $pdo->prepare("SELECT batch_id, quantity_remaining, unit_cost FROM product_batches
+        $b = $pdo->prepare("SELECT batch_id, batch_number, quantity_remaining, unit_cost FROM product_batches
                              WHERE product_id = ? AND warehouse_id = ?
                              ORDER BY (expiry_date IS NULL) ASC, expiry_date ASC, batch_id ASC
                              FOR UPDATE");
@@ -90,7 +95,7 @@ if (!function_exists('stockAdjustReconcileBatches')) {
         foreach ($batches as $row) $left += max(0.0, (float)$row['quantity_remaining']);
 
         $diff = round($stock - $left, 3);
-        if (abs($diff) < 0.0005) return ['action' => 'none', 'quantity' => 0.0];
+        if (abs($diff) < 0.0005) return ['action' => 'none', 'quantity' => 0.0, 'value' => 0.0];
 
         if ($diff > 0) {
             $sell = (float)$prod['sell'];
@@ -107,21 +112,43 @@ if (!function_exists('stockAdjustReconcileBatches')) {
                 INSERT INTO product_batches (product_id, warehouse_id, batch_number, quantity_received, quantity_remaining, unit_cost, selling_price, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
             ")->execute([$productId, $warehouseId, mb_substr($label, 0, 100), $diff, $diff, round($cost, 4), $sell > 0 ? $sell : null]);
-            return ['action' => 'added', 'quantity' => $diff];
+            return ['action' => 'added', 'quantity' => $diff, 'value' => round($diff * round($cost, 4), 2)];
         }
 
-        // Fewer in the shop than in the batches: take the difference off in sale (FEFO) order.
+        // Fewer in the shop than in the batches: take the difference off — the batch named
+        // $label first, then in sale (FEFO) order.
+        $own = array_values(array_filter($batches, fn($r) => (string)$r['batch_number'] === $label));
+        $rest = array_values(array_filter($batches, fn($r) => (string)$r['batch_number'] !== $label));
         $toTake = -$diff;
+        $value = 0.0;
         $upd = $pdo->prepare("UPDATE product_batches SET quantity_remaining = quantity_remaining - ?, updated_at = NOW() WHERE batch_id = ?");
-        foreach ($batches as $row) {
+        foreach (array_merge($own, $rest) as $row) {
             if ($toTake <= 0.0005) break;
             $rem = (float)$row['quantity_remaining'];
             if ($rem <= 0) continue;
-            $take = min($rem, $toTake);
-            $upd->execute([round($take, 3), (int)$row['batch_id']]);
+            $take = round(min($rem, $toTake), 3);
+            $upd->execute([$take, (int)$row['batch_id']]);
+            $value += $take * (float)$row['unit_cost'];
             $toTake = round($toTake - $take, 3);
         }
-        return ['action' => 'reduced', 'quantity' => -$diff];
+        return ['action' => 'reduced', 'quantity' => -$diff, 'value' => round($value, 2)];
+    }
+}
+
+if (!function_exists('stockAdjustUnitCostForBooks')) {
+    /**
+     * The unit price an adjustment should post to the books (2026-11-17): the batches' own value
+     * when the sync moved exactly the adjustment's quantity, else the caller's fallback price.
+     * Keeps Inventory in the books equal to the value left in the batches.
+     */
+    function stockAdjustUnitCostForBooks(array $sync, float $adjustQty, float $fallback): float
+    {
+        $q = abs($adjustQty);
+        if ($q > 0.0005 && in_array($sync['action'] ?? '', ['added', 'reduced'], true)
+            && abs((float)($sync['quantity'] ?? 0) - $q) < 0.0005 && (float)($sync['value'] ?? 0) > 0) {
+            return round((float)$sync['value'] / $q, 4);
+        }
+        return $fallback;
     }
 }
 
