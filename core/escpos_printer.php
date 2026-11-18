@@ -68,6 +68,15 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
         return $left . str_repeat(' ', $space) . $right . "\n";
     };
 
+    // 2026-11-17 — a credit sale: Paid (method) / Balance due / Pay by (core/pos_credit_receipt.php).
+    $escCredit = function (array $c) use ($twoCol, $currency) {
+        $label = !empty($c['methods_label']) ? sprintf(t('Paid (%s):'), $c['methods_label']) : t('Paid:');
+        $s = $twoCol($label, number_format((float)$c['paid'], 2));
+        $s .= ESCPOS_BOLD_ON . $twoCol(t('Balance due:'), $currency . ' ' . number_format((float)$c['balance'], 2)) . ESCPOS_BOLD_OFF;
+        if (!empty($c['due_date']) && (float)$c['balance'] > 0.009) $s .= $twoCol(t('Pay by:'), date('d/m/Y', strtotime($c['due_date'])));
+        return $s;
+    };
+
     $out = ESCPOS_INIT . ESCPOS_ALIGN_CENTER . ESCPOS_BOLD_ON;
     $out .= $center($data['company_name'] ?? '');
     $out .= ESCPOS_BOLD_OFF;
@@ -117,8 +126,12 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
         foreach ($r['refunds'] as $rf) $out .= $twoCol($rf['label'] . ':', '-' . number_format((float)$rf['amount'], 2));
         $out .= ESCPOS_BOLD_ON . $twoCol(t('NET PAID:'), $currency . ' ' . number_format((float)$r['net_paid'], 2)) . ESCPOS_BOLD_OFF;
         $out .= $line;
-        if (isset($data['amount_tendered'])) $out .= $twoCol('Payment (' . (string)($data['payment_method'] ?? '') . '):', number_format((float)$data['amount_tendered'], 2));
-        if ((float)($data['change_given'] ?? 0) > 0.009) $out .= $twoCol('Change:', number_format((float)$data['change_given'], 2));
+        if (!empty($data['credit'])) {
+            $out .= $escCredit($data['credit']);
+        } else {
+            if (isset($data['amount_tendered'])) $out .= $twoCol('Payment (' . (string)($data['payment_method'] ?? '') . '):', number_format((float)$data['amount_tendered'], 2));
+            if ((float)($data['change_given'] ?? 0) > 0.009) $out .= $twoCol('Change:', number_format((float)$data['change_given'], 2));
+        }
         $out .= ESCPOS_ALIGN_CENTER . ESCPOS_BOLD_ON . $center('** ' . $r['stamp'] . ' **') . ESCPOS_BOLD_OFF;
         $out .= $line . $center('*** THANK YOU ***') . "\n\n\n" . ESCPOS_CUT;
         return $out;   // a reprint opens no cash drawer
@@ -129,9 +142,13 @@ function buildEscPosReceipt(array $data, bool $kickDrawer = true): string
     if (!empty($data['tax_amount']))      $out .= $twoCol('Tax:', number_format((float)$data['tax_amount'], 2));
     $out .= ESCPOS_BOLD_ON . $twoCol('TOTAL (' . $currency . '):', number_format((float)($data['grand_total'] ?? 0), 2)) . ESCPOS_BOLD_OFF;
 
-    if (isset($data['amount_tendered'])) $out .= $twoCol('Tendered:', number_format((float)$data['amount_tendered'], 2));
-    if (isset($data['change_given']))    $out .= $twoCol('Change:', number_format((float)$data['change_given'], 2));
-    $out .= $twoCol('Payment:', (string)($data['payment_method'] ?? ''));
+    if (!empty($data['credit'])) {
+        $out .= $escCredit($data['credit']);
+    } else {
+        if (isset($data['amount_tendered'])) $out .= $twoCol('Tendered:', number_format((float)$data['amount_tendered'], 2));
+        if (isset($data['change_given']))    $out .= $twoCol('Change:', number_format((float)$data['change_given'], 2));
+        $out .= $twoCol('Payment:', (string)($data['payment_method'] ?? ''));
+    }
     $out .= $line;
 
     $out .= ESCPOS_ALIGN_CENTER . $center('*** THANK YOU ***') . "\n\n\n";

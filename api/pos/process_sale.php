@@ -242,6 +242,17 @@ try {
     if ($is_credit && empty($customer_id)) {
         throw new Exception('Credit sales require a customer — you cannot sell on credit to a walk-in.', 422);
     }
+    // 2026-11-17 — how the part paid now on a credit sale came in (cash / mobile money / bank /
+    // card). Drives the payment record, the account it is booked to, the bank register and the
+    // cash drawer. Absent (older app builds) = cash, exactly as before.
+    $deposit_method = 'cash';
+    if ($is_credit) {
+        $dm = (string)($input['deposit_method'] ?? 'cash');
+        $deposit_method = in_array($dm, ['cash', 'mobile_money', 'bank_transfer', 'card'], true) ? $dm : 'cash';
+    }
+    // The method the money actually received is booked under: the sale's own method, or for a
+    // credit sale the deposit's method.
+    $receipt_method = $is_credit ? $deposit_method : $payment_method;
 
     if (empty($items)) {
         throw new Exception("No items in cart", 422);
@@ -943,7 +954,7 @@ try {
         $hasPayTable = false;
         try { $hasPayTable = (bool)$pdo->query("SHOW TABLES LIKE 'pos_sale_payments'")->fetch(); } catch (Throwable $e) {}
         if ($hasPayTable) {
-            $pmRow = in_array($payment_method, ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'], true) ? $payment_method : 'cash';
+            $pmRow = in_array($receipt_method, ['cash','card','mobile_money','bank_transfer','voucher','loyalty_points'], true) ? $receipt_method : 'cash';
             $pdo->prepare("
                 INSERT INTO pos_sale_payments (sale_id, amount, payment_method, reference, notes, received_by, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -956,7 +967,10 @@ try {
     // a full-amount payment on a credit sale means cash was not actually tendered.
     if ($payment_method === 'cash') {
         $cash_received = $amount_paid_now;
-    } elseif ($is_credit && $amount_paid_now > 0 && $amount_paid_now < $calculated_total - 0.01) {
+    } elseif ($is_credit && $deposit_method === 'cash' && $amount_paid_now > 0
+              && ($amount_paid_now < $calculated_total - 0.01 || isset($input['deposit_method']))) {
+        // (an older client sending the full total on a credit sale did not tender cash; a client
+        //  that names deposit_method did)
         $cash_received = $amount_paid_now;
     } else {
         $cash_received = 0.0;
@@ -995,7 +1009,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     // An old sale may not land inside a bank reconciliation that is already
     // finalized for the account its payment goes into.
     if ($is_old_sale && $amount_paid_now > 0) {
-        $old_lock = posOldSaleReconLock($pdo, (int)posReceiptAccountId($pdo, $payment_method), $effective_date);
+        $old_lock = posOldSaleReconLock($pdo, (int)posReceiptAccountId($pdo, $receipt_method), $effective_date);
         if ($old_lock) {
             throw new Exception(sprintf(
                 t('The account this payment goes into is reconciled for %s to %s (%s). An old sale cannot be added inside that period.'),
@@ -1009,7 +1023,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     posStampSaleLineCosts($pdo, (int)$sale_id);
 
     $glPost = postPosSale(
-        $pdo, (int)$sale_id, $payment_method, (float)$amount_paid_now, (float)$balance_due,
+        $pdo, (int)$sale_id, $receipt_method, (float)$amount_paid_now, (float)$balance_due,
         (float)$calculated_total, (float)$calculated_tax, $effective_date, $receipt_number,
         $project_id !== null ? (int)$project_id : null, (int)$user_id
     );
@@ -1024,7 +1038,7 @@ require_once __DIR__ . '/../../core/bank_register.php';  // recordBankTransactio
     // Bank register — deposit for the cash/payment received at the POS terminal
     if ($amount_paid_now > 0) {
         try {
-            $posAccount = posReceiptAccountId($pdo, $payment_method);
+            $posAccount = posReceiptAccountId($pdo, $receipt_method);
             if ($posAccount) {
                 recordBankTransaction($pdo, (int)$posAccount, $amount_paid_now, 'deposit',
                     $effective_date, $receipt_number,

@@ -834,6 +834,31 @@ const POS_USER_ID = <?= (int)$user_id ?>;
                     </div>
                 </div>
 
+                <!-- Credit sale: part paid now, the rest owed (2026-11-17) -->
+                <div id="creditPaymentSection" class="mb-2 p-2 rounded" style="display:none;border:1px solid #b6ccfe;background:#f3f7ff;">
+                    <label for="creditPaidNow" class="form-label small fw-bold mb-1"><?= t('Amount paid now') ?></label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><?= htmlspecialchars($currency) ?></span>
+                        <input type="number" class="form-control" id="creditPaidNow" min="0" step="0.01" value="0" inputmode="decimal">
+                    </div>
+                    <div class="form-text mt-0 mb-2"><?= t('0 = all on credit') ?></div>
+                    <span class="form-label small fw-bold d-block mb-1"><?= t('Paid by') ?></span>
+                    <div class="btn-group w-100 mb-2" role="group" aria-label="<?= t('Paid by') ?>">
+                        <input type="radio" class="btn-check" name="creditPaidMethod" id="creditPaidCash" value="cash" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="creditPaidCash"><?= t('Cash') ?></label>
+                        <input type="radio" class="btn-check" name="creditPaidMethod" id="creditPaidMobile" value="mobile_money">
+                        <label class="btn btn-outline-primary btn-sm" for="creditPaidMobile"><?= t('Mobile') ?></label>
+                        <input type="radio" class="btn-check" name="creditPaidMethod" id="creditPaidBank" value="bank_transfer">
+                        <label class="btn btn-outline-primary btn-sm" for="creditPaidBank"><?= t('Bank') ?></label>
+                    </div>
+                    <div class="small border-top pt-2" style="border-color:#b6ccfe !important;">
+                        <div class="d-flex justify-content-between"><span><?= t('Total') ?></span><span id="creditSumTotal"><?= htmlspecialchars($currency) ?> 0</span></div>
+                        <div class="d-flex justify-content-between"><span><?= t('Paid now') ?></span><span id="creditSumPaid"><?= htmlspecialchars($currency) ?> 0</span></div>
+                        <div class="d-flex justify-content-between fw-bold" style="color:#084298;"><span><?= t('Balance due') ?></span><span id="creditSumBalance"><?= htmlspecialchars($currency) ?> 0</span></div>
+                    </div>
+                    <div class="small text-danger mt-1 d-none" id="creditPaidTooMuch"><?= t('The amount is the whole total or more. If the customer paid everything, choose Cash, Mobile or Bank instead.') ?></div>
+                </div>
+
                 <!-- Cash Payment Specific -->
                 <div id="cashPaymentSection">
                     <div class="mb-2">

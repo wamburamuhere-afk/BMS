@@ -87,6 +87,10 @@ $ret = posReceiptReturns($pdo, $sale, $items);
 $is_refund = $ret['mode'] === 'refund';
 $has_returns = $ret['mode'] === 'returns';
 $methodLabel = fn(string $m) => t(ucfirst(str_replace('_', ' ', $m)));
+// 2026-11-17 — a credit sale shows what was paid (and how), what is owed and by when.
+require_once __DIR__ . '/../../core/pos_credit_receipt.php';
+$credit = posCreditReceiptInfo($pdo, $sale);
+$creditMethods = $credit ? implode(', ', array_map($methodLabel, $credit['methods'])) : '';
 
 // Company info — read from the tenant's own Company Profile settings (was
 // hardcoded to placeholder BJP values, so every tenant's receipts printed the
@@ -151,6 +155,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
         'discount_amount' => $sale['discount_amount'], 'grand_total' => $sale['grand_total'],
         'payment_method' => $sale['payment_method'], 'amount_tendered' => $sale['amount_tendered'],
         'change_given' => $sale['change_given'], 'currency' => $currency,
+        'credit' => $credit ? $credit + ['methods_label' => $creditMethods] : null,
         'char_width' => $receipt_width === '58' ? 32 : 42,
     ];
     $bytes = buildEscPosReceipt($receiptData);
@@ -434,11 +439,28 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <span><?= t('NET PAID:') ?></span>
             <span><?= htmlspecialchars($currency) ?> <?= number_format($ret['net_paid'], 0) ?></span>
         </div>
+        <?php if ($credit): ?>
+        <div class="total-row" style="border-top:1px dashed #000;padding-top:5px;margin-top:5px;">
+            <span><?= $creditMethods !== '' ? sprintf(t('Paid (%s):'), htmlspecialchars($creditMethods)) : t('Paid:') ?></span>
+            <span><?= number_format($credit['paid'], 0) ?></span>
+        </div>
+        <div class="total-row" style="font-weight:bold;">
+            <span><?= t('Balance due:') ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($credit['balance'], 0) ?></span>
+        </div>
+        <?php if ($credit['due_date'] && $credit['balance'] > 0.009): ?>
+        <div class="total-row">
+            <span><?= t('Pay by:') ?></span>
+            <span><?= date('d/m/Y', strtotime($credit['due_date'])) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php else: ?>
         <div class="total-row" style="border-top:1px dashed #000;padding-top:5px;margin-top:5px;">
             <span><?= sprintf(t('Payment (%s):'), $methodLabel((string)$sale['payment_method'])) ?></span>
             <span><?= number_format($sale['amount_tendered'], 0) ?></span>
         </div>
-        <?php if ((float)$sale['change_given'] > 0.009): ?>
+        <?php endif; ?>
+        <?php if (!$credit && (float)$sale['change_given'] > 0.009): ?>
         <div class="total-row">
             <span><?= t('Change:') ?></span>
             <span><?= number_format($sale['change_given'], 0) ?></span>
@@ -468,6 +490,22 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <span><?= t('TOTAL:') ?></span>
             <span><?= htmlspecialchars($currency) ?> <?= number_format($sale['grand_total'], 0) ?></span>
         </div>
+        <?php if ($credit): ?>
+        <div class="total-row" style="margin-top: 10px;">
+            <span><?= $creditMethods !== '' ? sprintf(t('Paid (%s):'), htmlspecialchars($creditMethods)) : t('Paid:') ?></span>
+            <span><?= number_format($credit['paid'], 0) ?></span>
+        </div>
+        <div class="total-row" style="font-weight:bold;">
+            <span><?= t('Balance due:') ?></span>
+            <span><?= htmlspecialchars($currency) ?> <?= number_format($credit['balance'], 0) ?></span>
+        </div>
+        <?php if ($credit['due_date'] && $credit['balance'] > 0.009): ?>
+        <div class="total-row">
+            <span><?= t('Pay by:') ?></span>
+            <span><?= date('d/m/Y', strtotime($credit['due_date'])) ?></span>
+        </div>
+        <?php endif; ?>
+        <?php else: ?>
         <div class="total-row" style="margin-top: 10px;">
             <span><?= sprintf(t('Payment (%s):'), t(ucfirst(str_replace('_', ' ', $sale['payment_method'])))) ?></span>
             <span><?= number_format($sale['amount_tendered'], 0) ?></span>
@@ -476,6 +514,7 @@ if (($sale['printer_connection_type'] ?? 'browser') === 'network' && !empty($sal
             <span><?= t('Change:') ?></span>
             <span><?= number_format($sale['change_given'], 0) ?></span>
         </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
