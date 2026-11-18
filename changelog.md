@@ -1,5 +1,16 @@
 # BMS Changelog
 
+## 2026-11-17 — feat(pos): credit sale with part paid now — amount, how it was paid, balance owed on screen and receipt
+
+**Changed:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/process_sale.php`, `api/pos/print_receipt.php`, `core/escpos_printer.php`, `core/pos_credit_receipt.php` (new), `lang/sw.php`, `tests/test_pos_credit_partial_payment_cli.php` (new)
+
+- **Problem:** choosing "Mkopo wa Mteja" hid the amount box and sent 0, so a customer who paid 20,000 of 53,800 was recorded as owing 53,800. A deposit was always booked as cash, and the receipt printed "Payment (Credit): <whole total>, Change 0".
+- **Till:** with Mkopo chosen — **Amount paid now** (0 = all on credit), **Paid by** Cash / Mobile / Bank, and a live **Total / Paid now / Balance due**. Paying the whole total on Mkopo is stopped ("choose Cash, Mobile or Bank"). Customer and due date rules unchanged. Mockup approved: https://claude.ai/artifact/PPVnYUKKfP8RqYjubkr43T
+- **Server:** new optional `deposit_method` (cash | mobile_money | bank_transfer | card) — the payment record, the account it is booked to (Dr that account + Dr receivables for the rest), the bank register and the cash drawer (cash only) all follow it. Absent (older app builds) = cash, as before.
+- **Receipt** (browser and network printer): a credit sale shows **Paid (method): X**, **Balance due: Y**, **Pay by: date** from the payment records, so a reprint after Receive Payment shows the current position. Other receipts unchanged.
+- **Mobile API:** `api/pos/process_sale.php` accepts `deposit_method` — republish the mobile API doc after merge.
+- **Checked:** `test_pos_credit_partial_payment_cli` 29/29 (mobile-money and cash deposits through the real endpoints: status, balance, payment row, books, drawer, Who Owes Me; older client; nothing paid; receipts; Receive Payment clears it; thermal text; till wiring). Phone-width run of the real till (worktree served locally): section shows for Mkopo, 900 total / 500 paid → 400 owed, paid-in-full warning. Related suites (credit ×6, old sale ×4, receipts ×6, network printer, returns, i18n, simple UX, decimal qty) give the same results as on the base, failures included.
+
 ## 2026-11-17 — fix(stock): Inventory in the books always equals the value left in the batches
 
 **Changed:** `core/pos_batch_consumption.php`, `api/pos/create_return.php`, `core/stock_adjust_sync.php`, `api/update_product.php`, `api/create_stock_adjustment.php`, `api/process_bulk_adjustment.php`, `core/stock_posting.php`, `tests/test_stock_value_books_batches_cli.php` (new)
