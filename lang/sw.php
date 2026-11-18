@@ -7254,4 +7254,14 @@ return [
     'Buying price ({b}) is higher than the selling price ({r}). Correct it, or allow this in Settings › Selling settings.' => 'Bei ya kununulia ({b}) iko juu ya bei ya kuuzia ({r}). Irekebishe, au ruhusu hili kwenye Mipangilio › Mipangilio ya Kuuza.',
     'Buying price is higher than the selling price' => 'Bei ya kununulia iko juu ya bei ya kuuzia',
     'Change it' => 'Ibadilishe',
+    // Credit sale: part paid now (2026-11-17)
+    'Amount paid now' => 'Kiasi kilicholipwa sasa',
+    '0 = all on credit' => '0 = mkopo wote',
+    'Paid by' => 'Kimelipwa kwa',
+    'This is paid in full' => 'Hii imelipwa yote',
+    'The amount is the whole total or more. If the customer paid everything, choose Cash, Mobile or Bank instead.' => 'Kiasi ni sawa au zaidi ya jumla. Kama mteja amelipa yote, chagua Taslimu, Simu au Benki badala yake.',
+    'Paid (%s):' => 'Kilicholipwa (%s):',
+    'Paid:' => 'Kilicholipwa:',
+    'Balance due:' => 'Salio la deni:',
+    'Pay by:' => 'Lipa kabla ya:',
 ];

@@ -106,6 +106,8 @@ const PT = {
     customerRequiredText: <?= json_encode(t('Select a customer to record a credit (pay-later) sale.')) ?>,
     processing: <?= json_encode(t('Processing...')) ?>,
     creditDueDateTitle: <?= json_encode(t('When will this be paid back?')) ?>,
+    creditPaidAllTitle: <?= json_encode(t('This is paid in full')) ?>,
+    creditPaidAllText: <?= json_encode(t('The amount is the whole total or more. If the customer paid everything, choose Cash, Mobile or Bank instead.')) ?>,
     creditDueDateText: <?= json_encode(t('Set a due date for this credit sale so it can be tracked.')) ?>,
     creditDueDateConfirm: <?= json_encode(t('Confirm Credit Sale')) ?>,
     creditDueDateRequired: <?= json_encode(t('Please choose a due date.')) ?>,
@@ -543,6 +545,9 @@ $(document).ready(function() {
     $('input[name="paymentMethod"]').change(function() {
         const method = $(this).val();
         $('#cashPaymentSection').toggle(method === 'cash');
+        // 2026-11-17 — credit: the part paid now, how, and the balance owed.
+        $('#creditPaymentSection').toggle(method === 'credit');
+        if (method === 'credit') { $('#creditPaidNow').val('0'); updateCreditSummary(); }
         if (method === 'cash') {
             const currentTotal = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
             if (currentTotal > 0) $('#amountTendered').val(currentTotal.toFixed(2));
@@ -1683,9 +1688,28 @@ function calculateCartTotal() {
 
     // Hide discount row as we now handle per-item discount
     $('#discountRow').hide();
+
+    updateCreditSummary();
     
     return total;
 }
+
+// 2026-11-17 — credit sale: Total / Paid now / Balance due, live (pos.php #creditPaymentSection).
+function posCartTotalNow() {
+    return parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
+}
+function updateCreditSummary() {
+    if (!$('#creditPaymentSection').length) return;
+    const total = posCartTotalNow();
+    const paid  = Math.max(0, parseFloat($('#creditPaidNow').val()) || 0);
+    const shown = Math.min(paid, total);
+    const fmt = n => POS_CURRENCY + ' ' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    $('#creditSumTotal').text(fmt(total));
+    $('#creditSumPaid').text(fmt(shown));
+    $('#creditSumBalance').text(fmt(Math.max(0, total - shown)));
+    $('#creditPaidTooMuch').toggleClass('d-none', !(total > 0 && paid >= total - 0.01));
+}
+$(document).on('input change', '#creditPaidNow', updateCreditSummary);
 
 function calculateChange() {
     const total = parseFloat($('#cartTotal').text().replace(POS_CURRENCY + ' ', '').replace(/,/g, '')) || 0;
@@ -1766,6 +1790,15 @@ function processPayment() {
     if (paymentMethod === 'credit' && (!customerId || customerId === '')) {
         Swal.fire({ icon: 'warning', title: PT.customerRequiredTitle, text: PT.customerRequiredText });
         return;
+    }
+    // 2026-11-17 — the part paid now must be less than the total (paid in full = not a credit sale).
+    if (paymentMethod === 'credit' && !isSplitPayment) {
+        const paidNow = parseFloat($('#creditPaidNow').val()) || 0;
+        if (paidNow < 0) { $('#creditPaidNow').val('0'); }
+        if (paidNow >= total - 0.01 && total > 0) {
+            Swal.fire({ icon: 'warning', title: PT.creditPaidAllTitle, text: PT.creditPaidAllText });
+            return;
+        }
     }
 
     // pos_credit_receivables_plan.md Phase 1 — Simple POS only. Once a
@@ -1858,8 +1891,10 @@ function processPayment() {
         // How much is actually collected now. Credit: deposit typed in the tendered
         // box (0 = full credit). Everything else: paid in full.
         amount_paid: (paymentMethod === 'credit')
-            ? Math.min(parseFloat($('#amountTendered').val()) || 0, calculatedTotal)
+            ? Math.min(Math.max(0, parseFloat($('#creditPaidNow').val()) || 0), calculatedTotal)
             : calculatedTotal,
+        // 2026-11-17 — how the part paid now on a credit sale came in.
+        deposit_method: (paymentMethod === 'credit') ? ($('input[name="creditPaidMethod"]:checked').val() || 'cash') : undefined,
         redeem_points: redeemPointsRequested,
         // Phase 30 (pos_upgrade_plan.md §9) — additive/optional; undefined for
         // every plain retail sale, which process_sale.php treats identically
@@ -1974,6 +2009,8 @@ function submitPayment(paymentData) {
 
                     // 2. Clear Payment Inputs
                     $('#amountTendered').val('0');
+                    $('#creditPaidNow').val('0');
+                    $('#creditPaidCash').prop('checked', true);
                     $('#changeAlert').hide();
                     
                     // 3. Reset Customer to Walk-in (value "")
