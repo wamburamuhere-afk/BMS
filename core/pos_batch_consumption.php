@@ -81,11 +81,18 @@ function consumeFefoBatches(PDO $pdo, int $productId, int $warehouseId, float $q
  *                              (void); a number = reverse only up to this
  *                              much (a partial return of fewer units than
  *                              were originally sold on that line).
+ * @param float|null $restoredValue  out (2026-11-17): Σ restored qty × that batch's unit_cost —
+ *                              what the restored stock is worth, so a return can be valued
+ *                              at the batches it really went back into.
  * @return float total quantity actually restored
  */
-function reverseFefoBatchConsumption(PDO $pdo, int $saleItemId, ?float $limitQty = null): float
+function reverseFefoBatchConsumption(PDO $pdo, int $saleItemId, ?float $limitQty = null, ?float &$restoredValue = null): float
 {
-    $stmt = $pdo->prepare("SELECT id, batch_id, quantity FROM pos_sale_item_batches WHERE sale_item_id = ? ORDER BY id ASC");
+    $restoredValue = 0.0;
+    $stmt = $pdo->prepare("SELECT psib.id, psib.batch_id, psib.quantity, COALESCE(pb.unit_cost, 0) AS unit_cost
+                             FROM pos_sale_item_batches psib
+                             LEFT JOIN product_batches pb ON pb.batch_id = psib.batch_id
+                            WHERE psib.sale_item_id = ? ORDER BY psib.id ASC");
     $stmt->execute([$saleItemId]);
     $links = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if (empty($links)) return 0.0;
@@ -104,6 +111,7 @@ function reverseFefoBatchConsumption(PDO $pdo, int $saleItemId, ?float $limitQty
 
         $restoreStmt->execute([$restoreQty, $link['batch_id']]);
         $totalRestored += $restoreQty;
+        $restoredValue += $restoreQty * (float)$link['unit_cost'];
 
         if (abs($restoreQty - $qtyHere) < 0.0001) {
             $deleteStmt->execute([$link['id']]);
