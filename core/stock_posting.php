@@ -105,28 +105,34 @@ if (!function_exists('reverseStockAdjustmentGl')) {
         int    $userId,
         string $refNum
     ): void {
+        // 2026-11-17 — reverse only what is still standing for this movement: its posted entries
+        // MINUS the reversals already posted. Editing an adjustment reverses the old entry and
+        // posts a new one; a later delete used to reverse BOTH again (Inventory under by the
+        // old amount). Netting per account makes any number of reversals exact.
         $stmt = $pdo->prepare("
-            SELECT je.project_id, je.warehouse_id, jei.account_id, jei.type, jei.amount
+            SELECT je.project_id, je.warehouse_id, jei.account_id,
+                   SUM(CASE WHEN jei.type = 'debit' THEN jei.amount ELSE -jei.amount END) AS net
               FROM journal_entries je
               JOIN journal_entry_items jei ON jei.entry_id = je.entry_id
-             WHERE je.entity_type = 'stock_adjustment'
+             WHERE je.entity_type IN ('stock_adjustment', 'stock_adjustment_void')
                AND je.entity_id   = ?
                AND je.status      = 'posted'
-             ORDER BY je.entry_id DESC
+          GROUP BY jei.account_id, je.project_id, je.warehouse_id
         ");
         $stmt->execute([$movementId]);
-        $origLines = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $nets = array_values(array_filter($stmt->fetchAll(PDO::FETCH_ASSOC), fn($r) => abs((float)$r['net']) >= 0.005));
 
-        if (empty($origLines)) return; // nothing posted — skip (pre-feature row)
+        if (empty($nets)) return; // nothing posted, or already fully reversed — skip
 
-        $projectId     = $origLines[0]['project_id']   ? (int)$origLines[0]['project_id']   : null;
-        $warehouseId   = $origLines[0]['warehouse_id'] ? (int)$origLines[0]['warehouse_id'] : null;
+        $projectId     = $nets[0]['project_id']   ? (int)$nets[0]['project_id']   : null;
+        $warehouseId   = $nets[0]['warehouse_id'] ? (int)$nets[0]['warehouse_id'] : null;
         $reversalLines = [];
-        foreach ($origLines as $l) {
+        foreach ($nets as $l) {
+            $net = round((float)$l['net'], 2);
             $reversalLines[] = [
                 'account_id' => (int)$l['account_id'],
-                'type'       => $l['type'] === 'debit' ? 'credit' : 'debit',
-                'amount'     => (float)$l['amount'],
+                'type'       => $net > 0 ? 'credit' : 'debit',
+                'amount'     => abs($net),
             ];
         }
 

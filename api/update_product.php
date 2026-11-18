@@ -295,13 +295,18 @@ try {
             // GL posting — same call already proven correct in
             // api/create_stock_adjustment.php; this path was silently
             // skipping it (post_principle.md audit).
-            postStockAdjustmentGl($pdo, $movement_id, $diff, $movement_type,
-                (float)$product_data['cost_price'], null, $user_id, date('Y-m-d'), $reference_number);
-
             // 2026-11-14 — the product's own stock copy and (Smart POS) the shop's batches follow
             // the new count, like a sale or Receive Stock does (core/stock_adjust_sync.php).
+            // 2026-11-17 — then the books take exactly the value the batches moved (a reduction is
+            // worth the batches it came off, not the product's current buying price).
             require_once __DIR__ . '/../core/stock_adjust_sync.php';
-            stockAdjustAfterChange($pdo, (int)$product_id, $warehouse_id, (float)$product_data['cost_price'], $reference_number);
+            $sync = stockAdjustAfterChange($pdo, (int)$product_id, $warehouse_id, (float)$product_data['cost_price'], $reference_number);
+            $glUnitCost = stockAdjustUnitCostForBooks($sync, $diff, (float)$product_data['cost_price']);
+            $pdo->prepare("UPDATE stock_movements SET unit_cost = ?, total_cost = ? WHERE movement_id = ?")
+                ->execute([$glUnitCost, round(abs($diff) * $glUnitCost, 2), $movement_id]);
+
+            postStockAdjustmentGl($pdo, $movement_id, $diff, $movement_type,
+                $glUnitCost, null, $user_id, date('Y-m-d'), $reference_number);
         }
     }
 

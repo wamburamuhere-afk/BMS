@@ -156,7 +156,14 @@ try {
 
     // 2026-11-14 — Smart POS: the shop's batches follow the new count (core/stock_adjust_sync.php).
     require_once __DIR__ . '/../core/stock_adjust_sync.php';
-    stockAdjustReconcileBatches($pdo, (int)$_POST['product_id'], (int)$_POST['warehouse_id'], (float)$unit_cost, $reference_number);
+    $sync = stockAdjustReconcileBatches($pdo, (int)$_POST['product_id'], (int)$_POST['warehouse_id'], (float)$unit_cost, $reference_number);
+    // 2026-11-17 — the books take exactly the value the batches moved.
+    $glUnitCost = stockAdjustUnitCostForBooks($sync, (float)$quantity, (float)$unit_cost);
+    if (abs($glUnitCost - (float)$unit_cost) > 0.00005) {
+        $unit_cost = $glUnitCost;
+        $pdo->prepare("UPDATE stock_movements SET unit_cost = ?, total_cost = ? WHERE movement_id = ?")
+            ->execute([$unit_cost, round(abs((float)$quantity) * $unit_cost, 2), $movement_id]);
+    }
 
     // GL posting (6-part: two-sided, on create, inventory + equity, Balance Sheet)
     $project_id_gl = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;

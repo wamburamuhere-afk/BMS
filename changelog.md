@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-11-17 — fix(stock): Inventory in the books always equals the value left in the batches
+
+**Changed:** `core/pos_batch_consumption.php`, `api/pos/create_return.php`, `core/stock_adjust_sync.php`, `api/update_product.php`, `api/create_stock_adjustment.php`, `api/process_bulk_adjustment.php`, `core/stock_posting.php`, `tests/test_stock_value_books_batches_cli.php` (new)
+
+- **Returns:** valued at the batches the goods really went back into (`reverseFefoBatchConsumption()` now reports the restored value), not the sale line's average. Both the return line's cost and the COGS reversal use it. Was: 5 bottles back into a 475 batch booked at 480 → books 25 above batches.
+- **Stock reductions by adjustment** (Edit product, Stock Adjustment page, bulk): the batches are synced first and the books take exactly the value moved (`stockAdjustUnitCostForBooks()`); the movement's unit cost is set to it. Was: 4 bottles off a 475 batch booked at the 520 buying price → books 180 below batches. Editing/deleting an adjustment takes back its own batch (named after its ADJ reference) first.
+- **Deleting an edited adjustment** reversed both the original entry (already reversed by the edit) and the current one — Inventory went 8 × 530 down instead of 2 × 530. `reverseStockAdjustmentGl()` now reverses only what is still standing (entries minus earlier reversals, per account).
+- **Checked:** `test_stock_value_books_batches_cli` 34/34 — books = batches after register, Receive Stock, a sale crossing two batches, a return, sale + void, Receive Stock again, Edit product −4, Stock Adjustment out + delete, in + edit + delete. Unchanged: stock sync 30/30, stock adjustment GL 24/24 + scope 10/10, return line cost 33/33 + http 17/17, returns 25/25, batch COGS 5/5, batch expiry 47/47, product edit 96/96, selling settings 49/49, combos 28/28, restock dates 20/20, manufacturing date 22/22. `test_pos_decimal_qty` (Node step) and `test_pos_credit_receivables` (its fixture misses shift_id) fail the same on the base.
+
 ## 2026-11-14 — fix(stock): a stock adjustment keeps shop stock, the product's stock and the batches together
 
 **Changed:** `core/stock_adjust_sync.php` (new), `api/update_product.php`, `api/create_stock_adjustment.php`, `api/process_bulk_adjustment.php`, `api/update_adjustment.php`, `api/delete_adjustment.php`, `migrations/tenant/2026_11_14_product_edit_stock_sync.php` (new), `migrations/2026_11_14_product_edit_stock_sync_legacy_db.php` (new), `schema/tenant_schema_template.sql`, `schema/tenant_seed_defaults.sql`, `tests/test_product_edit_stock_sync_cli.php` (new)
