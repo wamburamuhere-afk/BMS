@@ -144,12 +144,6 @@ try {
             ]);
             $movement_id = (int)$pdo->lastInsertId();
 
-            // GL posting — same call already proven correct in
-            // api/create_stock_adjustment.php; this path was silently
-            // skipping it entirely (post_principle.md audit).
-            postStockAdjustmentGl($pdo, $movement_id, $adj_quantity, $movement_type,
-                (float)$unit_cost, null, $user_id, date('Y-m-d'), $reference_number);
-
             // Update product_stocks
             $stmt = $pdo->prepare("
                 INSERT INTO product_stocks (product_id, warehouse_id, stock_quantity, reserved_quantity)
@@ -169,7 +163,19 @@ try {
 
             // 2026-11-14 — Smart POS: the shop's batches follow the new count (core/stock_adjust_sync.php).
             require_once __DIR__ . '/../core/stock_adjust_sync.php';
-            stockAdjustReconcileBatches($pdo, (int)$product_id, (int)$warehouse_id, (float)$unit_cost, $reference_number);
+            $sync = stockAdjustReconcileBatches($pdo, (int)$product_id, (int)$warehouse_id, (float)$unit_cost, $reference_number);
+
+            // GL posting — same call already proven correct in
+            // api/create_stock_adjustment.php; this path was silently
+            // skipping it entirely (post_principle.md audit).
+            // 2026-11-17 — moved after the batch sync so the books take exactly the value the batches moved.
+            $glUnitCost = stockAdjustUnitCostForBooks($sync, (float)$adj_quantity, (float)$unit_cost);
+            if (abs($glUnitCost - (float)$unit_cost) > 0.00005) {
+                $pdo->prepare("UPDATE stock_movements SET unit_cost = ?, total_cost = ? WHERE movement_id = ?")
+                    ->execute([$glUnitCost, round(abs((float)$quantity) * $glUnitCost, 2), $movement_id]);
+            }
+            postStockAdjustmentGl($pdo, $movement_id, $adj_quantity, $movement_type,
+                $glUnitCost, null, $user_id, date('Y-m-d'), $reference_number);
 
             $pdo->commit();
             $success_count++;

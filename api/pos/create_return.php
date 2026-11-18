@@ -224,8 +224,9 @@ try {
             $return_id, $pid, $l['product_name'], $rq, (float)$l['unit_price'],
             (float)$l['tax_rate'], $ln_tax, (float)$l['discount_rate'], $ln_disc, $ln_total,
         ]);
+        $retLineId = (int)$pdo->lastInsertId();
         if ($lineCostReady && $origUnitCost !== null) {
-            $setLineCost->execute([$origUnitCost, (int)$pdo->lastInsertId()]);
+            $setLineCost->execute([$origUnitCost, $retLineId]);
         }
         $bumpOrig->execute([$rq, $rq, $iid]);
 
@@ -240,8 +241,8 @@ try {
             // 2026-11-11 — the cost that goes back is what the SALE charged for this line
             // (its batch cost, else the product cost — the same rule as posSaleCogs()), so the
             // returned part's profit cancels exactly; a combo line included.
-            $restock_cost += round(posSaleLineUnitCost($pdo, (int)$iid) * $rq, 2);
             if (!empty($l['is_combo'])) {
+                $restock_cost += round(posSaleLineUnitCost($pdo, (int)$iid) * $rq, 2);
                 if ($warehouse_id !== null) {
                     reverseComboComponents($pdo, $pid, $rq, $warehouse_id, $project_id, $return_id, $return_receipt, $_SESSION['user_id']);
                 }
@@ -264,7 +265,20 @@ try {
                 // Phase 17b (pos_upgrade_plan.md §8) — restore into the exact
                 // batch(es) this line drew from, capped at the returned quantity
                 // (a partial return only reverses that much, not the whole line).
-                reverseFefoBatchConsumption($pdo, $iid, $rq);
+                $restoredValue = 0.0;
+                $restoredQty   = reverseFefoBatchConsumption($pdo, $iid, $rq, $restoredValue);
+
+                // 2026-11-17 — the return is worth what the batches it went back into cost
+                // (not the line's average), so the books' Inventory and the batches stay equal.
+                // Any part with no batch link (sold before batches) keeps the line's own cost.
+                $lineUnit = $origUnitCost ?? posSaleLineUnitCost($pdo, (int)$iid);
+                $retUnit  = $restoredQty > 0.0001
+                    ? ($restoredValue + max(0.0, $rq - $restoredQty) * $lineUnit) / $rq
+                    : $lineUnit;
+                $restock_cost += round($retUnit * $rq, 2);
+                if ($lineCostReady && ($restoredQty > 0.0001 || $origUnitCost !== null)) {
+                    $setLineCost->execute([round($retUnit, 4), $retLineId]);
+                }
 
                 // Phase 26 (pos_upgrade_plan.md §9) — restore up to $rq of the
                 // serials this line sold back to in_stock. No-op for a
