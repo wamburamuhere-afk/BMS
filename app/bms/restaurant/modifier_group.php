@@ -190,6 +190,8 @@ const STRINGS = {
     multiple: <?= json_encode(t('Multiple choice')) ?>,
     yes: <?= json_encode(t('Yes')) ?>,
     no: <?= json_encode(t('No')) ?>,
+    required: <?= json_encode(t('Required')) ?>,
+    optional: <?= json_encode(t('Optional')) ?>,
     active: <?= json_encode(t('Active')) ?>,
     inactive: <?= json_encode(t('Inactive')) ?>,
     noRecords: <?= json_encode(t('No records found')) ?>,
@@ -278,9 +280,20 @@ function renderCards() {
     let html = '';
     GROUPS_DATA.forEach(g => {
         const statusColor = g.status === 'active' ? '#198754' : '#6c757d';
+        const typeLabel = g.selection_type === 'multiple' ? STRINGS.multiple : STRINGS.single;
+        // Phone cards carry the same actions as the desktop row (Options, Products, Edit) —
+        // without them a phone user could not add choices or link the group to dishes.
         html += `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body p-3">
-            <div class="fw-bold">${safeOutput(g.name)}</div>
-            <small class="text-muted">${(g.options || []).length} ${STRINGS.options} · ${g.linked_product_count} ${STRINGS.products}</small>
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="fw-bold">${safeOutput(g.name)}</div>
+                <span class="badge flex-shrink-0" style="background:${statusColor};color:#fff;">${g.status === 'active' ? STRINGS.active : STRINGS.inactive}</span>
+            </div>
+            <small class="text-muted">${typeLabel} · ${g.min_select}-${g.max_select} · ${g.is_required == 1 ? STRINGS.required : STRINGS.optional}</small>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openOptions(${g.group_id}, '${escAttr(g.name)}')"><i class="bi bi-list-ul me-1"></i>${(g.options || []).length} ${STRINGS.options}</button>
+                ${CAN_EDIT ? `<button type="button" class="btn btn-sm btn-outline-secondary" onclick="openProducts(${g.group_id}, '${escAttr(g.name)}')"><i class="bi bi-box-seam me-1"></i>${g.linked_product_count} ${STRINGS.products}</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editGroup(GROUPS_DATA.find(x => x.group_id == ${g.group_id}))" title="${STRINGS.edit}"><i class="bi bi-pencil"></i></button>` : `<span class="small text-muted align-self-center">${g.linked_product_count} ${STRINGS.products}</span>`}
+            </div>
         </div></div></div>`;
     });
     $('#cardView').html(html);
