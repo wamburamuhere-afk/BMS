@@ -341,7 +341,7 @@ $rfCur = htmlspecialchars(rfMoneyPrefix());   // money fields show the company c
         <div class="rp-table-wrap"><table class="table table-sm table-hover align-middle mb-0 w-100 rp-table" id="rpOweTable" style="width:100%">
             <thead><tr>
                 <th style="width:48px;"><?= t('S/No.') ?></th><th><?= t('Supplier') ?></th><th><?= t('What') ?></th><th><?= t('Date') ?></th><th><?= t('Pay by') ?></th>
-                <th class="text-end"><?= t('Total') ?></th><th class="text-end"><?= t('Paid') ?></th><th class="text-end"><?= t('Owed') ?></th><th></th>
+                <th class="text-end"><?= t('Total') ?></th><th class="text-end"><?= t('Paid') ?></th><th class="text-end"><?= t('Owed') ?></th><th class="text-end"><?= t('Actions') ?></th>
             </tr></thead>
             <tbody></tbody>
         </table></div>
@@ -752,7 +752,8 @@ $(function () {
     });
     $(window).on('resize', () => rpDT.columns.adjust());
     $('input[name="rpRange"]').on('change', function () { rpRange = this.value; rpDT.draw(); });
-    $('#rpTable').on('click', '.rp-again', function () { rpBuyAgain(+$(this).data('i')); });
+    // On the section, not the table: on a phone the rows are drawn as cards outside the table
+    $('#rpRecent').on('click', '.rp-again', function () { rpBuyAgain(+$(this).data('i')); });
 
     // Suppliers you owe — DataTable
     rpOweDT = $('#rpOweTable').DataTable({
@@ -856,7 +857,7 @@ $(function () {
 
     // Pay a supplier — part or all of what is owed
     let rpPayBill = null;
-    $('#rpOweTable').on('click', '.rp-pay-btn', function () {
+    $('#rpOwe').on('click', '.rp-pay-btn', function () {   // phone cards sit outside the table
         const r = rpDebts[$(this).data('id')]; if (!r) return;
         rpPayBill = r;
         $('#rpPayMsg, #rpPayHistory').empty();
