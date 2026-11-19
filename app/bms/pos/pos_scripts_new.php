@@ -1304,7 +1304,7 @@ function renderModifierPicker() {
             const id = `modopt_${g.group_id}_${o.option_id}`;
             html += `<div class="form-check">
                 <input class="form-check-input" type="${inputType}" name="${name}" id="${id}"
-                       onchange="toggleModifierOption(${g.group_id}, ${o.option_id}, ${JSON.stringify(o.name)}, ${adj}, '${g.selection_type}', '${inputType}')">
+                       onchange="toggleModifierOption(${g.group_id}, ${o.option_id}, ${JSON.stringify(o.name).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}, ${adj}, '${g.selection_type}', '${inputType}')">
                 <label class="form-check-label small" for="${id}">${safeOutput(o.name)}${adjLabel}</label>
             </div>`;
         });

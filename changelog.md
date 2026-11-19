@@ -1,5 +1,14 @@
 # BMS Changelog
 
+## 2026-11-19 — fix(pos): add-ons chosen at the till were never recorded; add-on forms no longer close after each add
+
+**Changed:** `app/bms/pos/pos_scripts_new.php`, `app/bms/restaurant/modifier_group.php`
+
+- **Problem 1 (till, found while recording the training video):** each add-on checkbox's `onchange="toggleModifierOption(…, "Kachumbari", …)"` was built with `JSON.stringify(o.name)`, whose raw double quotes ended the HTML attribute early — the handler was cut to `toggleModifierOption(2, 1, ` and never ran. Ticked add-ons were silently dropped: no add-on on the line, no price adjustment (Chipsi Mayai + extra egg stayed 3,000 instead of 4,000), on every device.
+- **Fix 1:** the name is HTML-escaped (`&` → `&amp;`, `"` → `&quot;`) before it goes into the attribute, so the browser decodes it back to a valid JS string.
+- **Problem 2 (Nyongeza page):** the global footer rule closes any open modal after a successful POST, so the Options and Products dialogs shut after every choice/dish added. **Fix 2:** both modals carry `data-no-autoclose="true"` (the existing opt-out).
+- **Checked:** patched picker run on the demo till at 390px with real data: ticking Kachumbari + Yai la ziada (+1,000) gives a cart line with both add-ons and price 4,000 (was 3,000, none); test cart cleared. Fix 2 uses footer.php's existing `data-no-autoclose` check (not exercised live, to avoid adding test choices). `php -l` clean.
+
 ## 2026-11-19 — fix(restaurant): Add-ons (Nyongeza) phone cards had no buttons — could not add choices or link dishes
 
 **Changed:** `app/bms/restaurant/modifier_group.php`

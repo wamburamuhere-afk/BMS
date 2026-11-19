@@ -122,7 +122,7 @@ $can_edit = canEdit('restaurant_pos');
 </div>
 
 <!-- Manage Options Modal -->
-<div class="modal fade" id="optionsModal" tabindex="-1">
+<div class="modal fade" id="optionsModal" tabindex="-1" data-no-autoclose="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
@@ -159,7 +159,7 @@ $can_edit = canEdit('restaurant_pos');
 </div>
 
 <!-- Manage Products Modal -->
-<div class="modal fade" id="productsModal" tabindex="-1">
+<div class="modal fade" id="productsModal" tabindex="-1" data-no-autoclose="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
