@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-19 — fix(restaurant): pay a supplier from a phone — Purchases "Suppliers you owe" card had no Pay button
+
+**Changed:** `app/bms/restaurant/purchases.php`
+
+- **Problem (found while recording the training video):** on a phone the "Suppliers you owe" rows are drawn as cards. The table's last column had an empty header, so the card dropped the **Pay** button and the card footer was empty — a phone user could not pay a supplier later. The Pay click and the recent purchases' **Buy again** click were also bound to the table, and the phone cards sit outside it.
+- **Fix:** the column is headed **Actions** (Vitendo), so the card keeps the Pay button; both clicks are bound to their section (`#rpOwe`, `#rpRecent`) instead of the table. Desktop unchanged apart from the new header text.
+- **Checked:** the patched page run on the demo at 390px with real data: the owed card shows Pay, tapping it opens "Pay supplier" with the bill (Mchele x25, owed 70,000); Buy again from a recent-purchase card fills item and quantity. Nothing saved. `php -l` clean.
+
 ## 2026-11-17 — feat(pos): credit sale with part paid now — amount, how it was paid, balance owed on screen and receipt
 
 **Changed:** `app/bms/pos/pos.php`, `app/bms/pos/pos_scripts_new.php`, `api/pos/process_sale.php`, `api/pos/print_receipt.php`, `core/escpos_printer.php`, `core/pos_credit_receipt.php` (new), `lang/sw.php`, `tests/test_pos_credit_partial_payment_cli.php` (new)
