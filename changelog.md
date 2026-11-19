@@ -1,5 +1,13 @@
 # BMS Changelog
 
+## 2026-11-19 — fix(restaurant): Add-ons (Nyongeza) phone cards had no buttons — could not add choices or link dishes
+
+**Changed:** `app/bms/restaurant/modifier_group.php`
+
+- **Problem (found while recording the training video):** on a phone the add-on groups are drawn as cards showing only the name and "0 Options · 0 Products". The Options, Products and Edit buttons existed only in the desktop table, so a phone user could create a group but never add its choices (e.g. Kachumbari, extra egg +1,000), link it to dishes, or edit it.
+- **Fix:** each card now shows the status badge, type · min-max · required/optional, and the same three actions as the desktop row (Options, Products, Edit — Products/Edit only for users who can edit). Desktop table unchanged.
+- **Checked:** the new card code run on the demo at 390px with real data: card shows "Nyongeza ya Chipsi · Hai · Chaguo Nyingi · 0-3 · Hiari" with the three buttons; each opens its modal for that group (Options, Products, Edit with the name filled). Nothing saved. `php -l` clean.
+
 ## 2026-11-19 — fix(restaurant): pay a supplier from a phone — Purchases "Suppliers you owe" card had no Pay button
 
 **Changed:** `app/bms/restaurant/purchases.php`
